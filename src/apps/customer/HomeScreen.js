@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
 
-  categoryGrid: {
+   /* categoryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-around",
@@ -434,8 +434,46 @@ const styles = StyleSheet.create({
   },
 
   categoryImg: { width: 120, height: 110, borderRadius: 12 },
-  categoryText: { marginTop: 6, fontWeight: "600" },
+  categoryText: { marginTop: 6, fontWeight: "600" }, */
+  categoryGrid: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  justifyContent: "center",
+  marginTop: 10,
+},
 
+categoryCard: {
+  width: 110,
+  height: 130,
+  padding: 8,
+  borderRadius: 12,
+  margin: 6,
+  backgroundColor: "#fff",
+
+  shadowColor: "#000",
+  shadowOpacity: 0.08,
+  shadowRadius: 4,
+
+  elevation: 2,
+
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+categoryImg: {
+  width: 75,
+  height: 75,
+  borderRadius: 10,
+},
+
+categoryText: {
+  fontSize: 12,
+  fontWeight: "600",
+  marginTop: 6,
+  textAlign: "center",
+  color: "#333",
+},
+   
   productGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
