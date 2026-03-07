@@ -1,26 +1,30 @@
 import React from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SignupScreen from '../apps/customer/signup';
 import useAuthStore from '../store/authStore';
 import { USER_ROLES } from '../constants';
+import { colors } from '../styles/colors';
 
-// Auth Screens
 import LoginScreen from '../apps/customer/LoginScreen';
-
-// Customer Screens
 import CustomerTabs from './CustomerTabs';
-
-// Vendor Screens
 import VendorTabs from './VendorTabs';
-
-// Delivery Screens
 import DeliveryTabs from './DeliveryTabs';
 
 const Stack = createNativeStackNavigator();
 
 export default function Navigation() {
-  const { isAuthenticated, role } = useAuthStore();
+  const { isAuthenticated, role, isLoading } = useAuthStore();
+
+  // Show spinner while checking stored token
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }}>
+        <ActivityIndicator size="large" color="white" />
+      </View>
+    );
+  }
 
   const getMainNavigator = () => {
     switch (role) {

@@ -7,7 +7,6 @@ const useCartStore = create((set, get) => ({
   addItem: (product, vendorId) => {
     const { items, vendorId: currentVendor } = get();
 
-    // Clear cart if switching vendors
     if (currentVendor && currentVendor !== vendorId) {
       set({ items: [{ ...product, qty: 1 }], vendorId });
       return;
