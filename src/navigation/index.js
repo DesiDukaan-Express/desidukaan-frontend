@@ -2,7 +2,7 @@ import React from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-
+import SignupScreen from '../apps/customer/signup';
 import useAuthStore from '../store/authStore';
 import { USER_ROLES } from '../constants';
 import { colors } from '../styles/colors';
@@ -41,10 +41,13 @@ export default function Navigation() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
-          <Stack.Screen name="Login" component={LoginScreen} />
-        ) : (
-          getMainNavigator()
-        )}
+  <>
+    <Stack.Screen name="Login" component={LoginScreen} />
+    <Stack.Screen name="Signup" component={SignupScreen} />
+  </>
+) : (
+  getMainNavigator()
+)}
       </Stack.Navigator>
     </NavigationContainer>
   );
