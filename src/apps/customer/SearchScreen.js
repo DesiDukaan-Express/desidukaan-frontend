@@ -6,131 +6,131 @@ import {
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
-  bg:          '#F4F8F4',
-  white:       '#FFFFFF',
-  green:       '#1A9E3F',
-  greenDark:   '#147832',
-  greenLight:  '#E8F5ED',
-  greenMid:    '#C8E6D0',
-  greenCard:   '#1DB954',
-  accent:      '#FF6B2C',
+  bg: '#F4F8F4',
+  white: '#FFFFFF',
+  green: '#1A9E3F',
+  greenDark: '#147832',
+  greenLight: '#E8F5ED',
+  greenMid: '#C8E6D0',
+  greenCard: '#1DB954',
+  accent: '#FF6B2C',
   accentLight: '#FFF0E9',
-  yellow:      '#FFB800',
+  yellow: '#FFB800',
   yellowLight: '#FFF8E7',
-  blue:        '#2563EB',
-  blueLight:   '#EFF6FF',
-  purple:      '#7C3AED',
+  blue: '#2563EB',
+  blueLight: '#EFF6FF',
+  purple: '#7C3AED',
   purpleLight: '#F5F3FF',
-  text:        '#0F1F0F',
-  textMed:     '#3D5A3E',
-  textLight:   '#7A9A7B',
-  border:      '#E0EDE1',
-  shadow:      '#0F1F0F',
-  tag1:        '#E8F5ED',
-  tag1Text:    '#1A9E3F',
-  tag2:        '#FFF0E9',
-  tag2Text:    '#FF6B2C',
-  tag3:        '#FFF8E7',
-  tag3Text:    '#B47D00',
+  text: '#0F1F0F',
+  textMed: '#3D5A3E',
+  textLight: '#7A9A7B',
+  border: '#E0EDE1',
+  shadow: '#0F1F0F',
+  tag1: '#E8F5ED',
+  tag1Text: '#1A9E3F',
+  tag2: '#FFF0E9',
+  tag2Text: '#FF6B2C',
+  tag3: '#FFF8E7',
+  tag3Text: '#B47D00',
 };
 
 // ─── Images ───────────────────────────────────────────────────────────────────
 const IMG = {
-  milk:         'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300&q=80',
-  bread:        'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&q=80',
-  eggs:         'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=300&q=80',
-  chips:        'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=300&q=80',
-  oil:          'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=300&q=80',
-  juice:        'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=300&q=80',
-  snacks:       'https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=300&q=80',
-  tea:          'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?w=300&q=80',
-  yogurt:       'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=300&q=80',
-  spinach:      'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=300&q=80',
-  banana:       'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300&q=80',
-  tomato:       'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=300&q=80',
-  apple:        'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?w=300&q=80',
-  honey:        'https://images.unsplash.com/photo-1587049352851-8d4e89133924?w=300&q=80',
-  oats:         'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&q=80',
-  almonds:      'https://images.unsplash.com/photo-1574226516831-e1dff420e562?w=300&q=80',
-  cucumber:     'https://images.unsplash.com/photo-1568584711075-3d021a7c3ca3?w=300&q=80',
-  strawberry:   'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=300&q=80',
-  coffee:       'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=300&q=80',
-  catDairy:     'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&q=80',
-  catVeg:       'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=200&q=80',
-  catFruit:     'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=200&q=80',
-  catSnacks:    'https://images.unsplash.com/photo-1599490659213-e2b9527bd087?w=200&q=80',
-  catDrinks:    'https://images.unsplash.com/photo-1527960471264-932f39eb5846?w=200&q=80',
-  catMeat:      'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=200&q=80',
-  catBakery:    'https://images.unsplash.com/photo-1486887396153-fa416526c108?w=200&q=80',
-  catCare:      'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=200&q=80',
-  promo:        'https://images.unsplash.com/photo-1543168256-418811576931?w=700&q=80',
-  promoOffer:   'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=700&q=80',
+  milk: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300&q=80',
+  bread: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&q=80',
+  eggs: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=300&q=80',
+  chips: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=300&q=80',
+  oil: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=300&q=80',
+  juice: 'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=300&q=80',
+  snacks: 'https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=300&q=80',
+  tea: 'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?w=300&q=80',
+  yogurt: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=300&q=80',
+  spinach: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=300&q=80',
+  banana: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300&q=80',
+  tomato: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=300&q=80',
+  apple: 'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?w=300&q=80',
+  honey: 'https://images.unsplash.com/photo-1587049352851-8d4e89133924?w=300&q=80',
+  oats: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&q=80',
+  almonds: 'https://images.unsplash.com/photo-1574226516831-e1dff420e562?w=300&q=80',
+  cucumber: 'https://images.unsplash.com/photo-1568584711075-3d021a7c3ca3?w=300&q=80',
+  strawberry: 'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=300&q=80',
+  coffee: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=300&q=80',
+  catDairy: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&q=80',
+  catVeg: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=200&q=80',
+  catFruit: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=200&q=80',
+  catSnacks: 'https://images.unsplash.com/photo-1599490659213-e2b9527bd087?w=200&q=80',
+  catDrinks: 'https://images.unsplash.com/photo-1527960471264-932f39eb5846?w=200&q=80',
+  catMeat: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=200&q=80',
+  catBakery: 'https://images.unsplash.com/photo-1486887396153-fa416526c108?w=200&q=80',
+  catCare: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=200&q=80',
+  promo: 'https://images.unsplash.com/photo-1543168256-418811576931?w=700&q=80',
+  promoOffer: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=700&q=80',
   promoOrganic: 'https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=700&q=80',
-  promoFresh:   'https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=700&q=80',
-  promoBudget:  'https://images.unsplash.com/photo-1604719312566-8912e9667d9f?w=700&q=80',
+  promoFresh: 'https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=700&q=80',
+  promoBudget: 'https://images.unsplash.com/photo-1604719312566-8912e9667d9f?w=700&q=80',
 };
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const RECENTS = [
-  { id: 'r1', label: 'Amul Butter 500g',  img: IMG.milk },
-  { id: 'r2', label: 'Organic Spinach',   img: IMG.catVeg },
-  { id: 'r3', label: 'Tata Tea Gold',     img: IMG.tea },
-  { id: 'r4', label: 'Brown Eggs Dozen',  img: IMG.eggs },
+  { id: 'r1', label: 'Amul Butter 500g', img: IMG.milk },
+  { id: 'r2', label: 'Organic Spinach', img: IMG.catVeg },
+  { id: 'r3', label: 'Tata Tea Gold', img: IMG.tea },
+  { id: 'r4', label: 'Brown Eggs Dozen', img: IMG.eggs },
   { id: 'r5', label: 'Whole Wheat Bread', img: IMG.bread },
 ];
 
 const CATEGORIES = [
-  { id: 'c1', name: 'Dairy & Eggs',  count: '80+',  img: IMG.catDairy },
-  { id: 'c2', name: 'Vegetables',    count: '120+', img: IMG.catVeg },
-  { id: 'c3', name: 'Fresh Fruits',  count: '90+',  img: IMG.catFruit },
-  { id: 'c4', name: 'Snacks',        count: '200+', img: IMG.catSnacks },
-  { id: 'c5', name: 'Cold Drinks',   count: '75+',  img: IMG.catDrinks },
-  { id: 'c6', name: 'Meat & Fish',   count: '60+',  img: IMG.catMeat },
-  { id: 'c7', name: 'Bakery',        count: '45+',  img: IMG.catBakery },
+  { id: 'c1', name: 'Dairy & Eggs', count: '80+', img: IMG.catDairy },
+  { id: 'c2', name: 'Vegetables', count: '120+', img: IMG.catVeg },
+  { id: 'c3', name: 'Fresh Fruits', count: '90+', img: IMG.catFruit },
+  { id: 'c4', name: 'Snacks', count: '200+', img: IMG.catSnacks },
+  { id: 'c5', name: 'Cold Drinks', count: '75+', img: IMG.catDrinks },
+  { id: 'c6', name: 'Meat & Fish', count: '60+', img: IMG.catMeat },
+  { id: 'c7', name: 'Bakery', count: '45+', img: IMG.catBakery },
   { id: 'c8', name: 'Personal Care', count: '150+', img: IMG.catCare },
 ];
 
 // flags: offer, organic, fresh, budget (≤100)
 const PRODUCTS = [
-  { id: 'p1',  name: 'Amul Gold Milk',          weight: '1 L',    price: 68,  mrp: null, tag: 'BESTSELLER', tagStyle: 'green',  img: IMG.milk,       fresh: true,    budget: true  },
-  { id: 'p2',  name: "Lay's Classic Salted",    weight: '104 g',  price: 30,  mrp: 33,   tag: '10% OFF',    tagStyle: 'orange', img: IMG.chips,      offer: true,    budget: true  },
-  { id: 'p3',  name: 'Fortune Sunflower Oil',   weight: '1 L',    price: 148, mrp: null, tag: 'POPULAR',    tagStyle: 'yellow', img: IMG.oil                                       },
-  { id: 'p4',  name: 'Britannia Brown Bread',   weight: '400 g',  price: 45,  mrp: 47,   tag: '5% OFF',     tagStyle: 'orange', img: IMG.bread,      offer: true,    budget: true  },
-  { id: 'p5',  name: 'Farm Fresh Eggs',         weight: '12 pcs', price: 89,  mrp: null, tag: 'FRESH',      tagStyle: 'green',  img: IMG.eggs,       fresh: true,    budget: true  },
-  { id: 'p6',  name: 'Tropicana Orange Juice',  weight: '1 L',    price: 99,  mrp: 115,  tag: '14% OFF',    tagStyle: 'orange', img: IMG.juice,      offer: true,    budget: true  },
-  { id: 'p7',  name: 'Tata Tea Premium',        weight: '500 g',  price: 220, mrp: null, tag: 'TOP RATED',  tagStyle: 'yellow', img: IMG.tea                                       },
-  { id: 'p8',  name: 'Haldiram Mixture',        weight: '200 g',  price: 79,  mrp: null, tag: 'NEW',        tagStyle: 'orange', img: IMG.snacks,                     budget: true  },
-  { id: 'p9',  name: 'Organic Greek Yogurt',    weight: '400 g',  price: 110, mrp: 130,  tag: 'ORGANIC',    tagStyle: 'green',  img: IMG.yogurt,     organic: true,  offer: true   },
-  { id: 'p10', name: 'Organic Baby Spinach',    weight: '250 g',  price: 65,  mrp: null, tag: 'ORGANIC',    tagStyle: 'green',  img: IMG.spinach,    organic: true,  fresh: true,  budget: true },
-  { id: 'p11', name: 'Fresh Bananas',           weight: '6 pcs',  price: 49,  mrp: null, tag: 'FRESH',      tagStyle: 'green',  img: IMG.banana,     fresh: true,    budget: true  },
-  { id: 'p12', name: 'Country Tomatoes',        weight: '500 g',  price: 35,  mrp: null, tag: 'FRESH',      tagStyle: 'green',  img: IMG.tomato,     fresh: true,    budget: true  },
-  { id: 'p13', name: 'Organic Honey',           weight: '250 g',  price: 199, mrp: 249,  tag: '20% OFF',    tagStyle: 'orange', img: IMG.honey,      organic: true,  offer: true   },
-  { id: 'p14', name: 'Organic Rolled Oats',     weight: '500 g',  price: 159, mrp: 189,  tag: 'ORGANIC',    tagStyle: 'green',  img: IMG.oats,       organic: true,  offer: true   },
-  { id: 'p15', name: 'Premium Almonds',         weight: '200 g',  price: 249, mrp: 299,  tag: '17% OFF',    tagStyle: 'orange', img: IMG.almonds,    offer: true                   },
-  { id: 'p16', name: 'Crisp Cucumber',          weight: '4 pcs',  price: 30,  mrp: null, tag: 'FRESH',      tagStyle: 'green',  img: IMG.cucumber,   fresh: true,    budget: true  },
-  { id: 'p17', name: 'Fresh Strawberries',      weight: '250 g',  price: 89,  mrp: 110,  tag: 'FRESH',      tagStyle: 'green',  img: IMG.strawberry, fresh: true,    offer: true,  budget: true },
-  { id: 'p18', name: 'Nescafé Instant Coffee',  weight: '100 g',  price: 95,  mrp: 109,  tag: '13% OFF',    tagStyle: 'orange', img: IMG.coffee,     offer: true,    budget: true  },
-  { id: 'p19', name: 'Red Delicious Apple',     weight: '4 pcs',  price: 79,  mrp: null, tag: 'FRESH',      tagStyle: 'green',  img: IMG.apple,      fresh: true,    budget: true  },
-  { id: 'p20', name: 'Organic Almonds Raw',     weight: '150 g',  price: 99,  mrp: 129,  tag: 'ORGANIC',    tagStyle: 'green',  img: IMG.almonds,    organic: true,  budget: true, offer: true },
+  { id: 'p1', name: 'Amul Gold Milk', weight: '1 L', price: 68, mrp: null, tag: 'BESTSELLER', tagStyle: 'green', img: IMG.milk, fresh: true, budget: true },
+  { id: 'p2', name: "Lay's Classic Salted", weight: '104 g', price: 30, mrp: 33, tag: '10% OFF', tagStyle: 'orange', img: IMG.chips, offer: true, budget: true },
+  { id: 'p3', name: 'Fortune Sunflower Oil', weight: '1 L', price: 148, mrp: null, tag: 'POPULAR', tagStyle: 'yellow', img: IMG.oil },
+  { id: 'p4', name: 'Britannia Brown Bread', weight: '400 g', price: 45, mrp: 47, tag: '5% OFF', tagStyle: 'orange', img: IMG.bread, offer: true, budget: true },
+  { id: 'p5', name: 'Farm Fresh Eggs', weight: '12 pcs', price: 89, mrp: null, tag: 'FRESH', tagStyle: 'green', img: IMG.eggs, fresh: true, budget: true },
+  { id: 'p6', name: 'Tropicana Orange Juice', weight: '1 L', price: 99, mrp: 115, tag: '14% OFF', tagStyle: 'orange', img: IMG.juice, offer: true, budget: true },
+  { id: 'p7', name: 'Tata Tea Premium', weight: '500 g', price: 220, mrp: null, tag: 'TOP RATED', tagStyle: 'yellow', img: IMG.tea },
+  { id: 'p8', name: 'Haldiram Mixture', weight: '200 g', price: 79, mrp: null, tag: 'NEW', tagStyle: 'orange', img: IMG.snacks, budget: true },
+  { id: 'p9', name: 'Organic Greek Yogurt', weight: '400 g', price: 110, mrp: 130, tag: 'ORGANIC', tagStyle: 'green', img: IMG.yogurt, organic: true, offer: true },
+  { id: 'p10', name: 'Organic Baby Spinach', weight: '250 g', price: 65, mrp: null, tag: 'ORGANIC', tagStyle: 'green', img: IMG.spinach, organic: true, fresh: true, budget: true },
+  { id: 'p11', name: 'Fresh Bananas', weight: '6 pcs', price: 49, mrp: null, tag: 'FRESH', tagStyle: 'green', img: IMG.banana, fresh: true, budget: true },
+  { id: 'p12', name: 'Country Tomatoes', weight: '500 g', price: 35, mrp: null, tag: 'FRESH', tagStyle: 'green', img: IMG.tomato, fresh: true, budget: true },
+  { id: 'p13', name: 'Organic Honey', weight: '250 g', price: 199, mrp: 249, tag: '20% OFF', tagStyle: 'orange', img: IMG.honey, organic: true, offer: true },
+  { id: 'p14', name: 'Organic Rolled Oats', weight: '500 g', price: 159, mrp: 189, tag: 'ORGANIC', tagStyle: 'green', img: IMG.oats, organic: true, offer: true },
+  { id: 'p15', name: 'Premium Almonds', weight: '200 g', price: 249, mrp: 299, tag: '17% OFF', tagStyle: 'orange', img: IMG.almonds, offer: true },
+  { id: 'p16', name: 'Crisp Cucumber', weight: '4 pcs', price: 30, mrp: null, tag: 'FRESH', tagStyle: 'green', img: IMG.cucumber, fresh: true, budget: true },
+  { id: 'p17', name: 'Fresh Strawberries', weight: '250 g', price: 89, mrp: 110, tag: 'FRESH', tagStyle: 'green', img: IMG.strawberry, fresh: true, offer: true, budget: true },
+  { id: 'p18', name: 'Nescafé Instant Coffee', weight: '100 g', price: 95, mrp: 109, tag: '13% OFF', tagStyle: 'orange', img: IMG.coffee, offer: true, budget: true },
+  { id: 'p19', name: 'Red Delicious Apple', weight: '4 pcs', price: 79, mrp: null, tag: 'FRESH', tagStyle: 'green', img: IMG.apple, fresh: true, budget: true },
+  { id: 'p20', name: 'Organic Almonds Raw', weight: '150 g', price: 99, mrp: 129, tag: 'ORGANIC', tagStyle: 'green', img: IMG.almonds, organic: true, budget: true, offer: true },
 ];
 
 const FILTERS = ['All', 'Offers', 'Organic', 'Fresh', 'Under ₹100'];
 
 const TAG_STYLES = {
-  green:  { bg: C.tag1,  text: C.tag1Text },
-  orange: { bg: C.tag2,  text: C.tag2Text },
-  yellow: { bg: C.tag3,  text: C.tag3Text },
+  green: { bg: C.tag1, text: C.tag1Text },
+  orange: { bg: C.tag2, text: C.tag2Text },
+  yellow: { bg: C.tag3, text: C.tag3Text },
 };
 
 // ─── Filter section configs ───────────────────────────────────────────────────
 const FILTER_META = {
   Offers: {
-    emoji:       '🏷️',
-    title:       "Today's Best Offers",
-    subtitle:    'Save big on your daily essentials',
-    bannerImg:   IMG.promoOffer,
+    emoji: '🏷️',
+    title: "Today's Best Offers",
+    subtitle: 'Save big on your daily essentials',
+    bannerImg: IMG.promoOffer,
     bannerColor: 'rgba(180,50,0,0.58)',
-    bannerTag:   'HOT DEALS',
+    bannerTag: 'HOT DEALS',
     bannerTagBg: C.accent,
     bannerTitle: 'Up to 20% Off\nOn Groceries',
     accentColor: C.accent,
@@ -144,12 +144,12 @@ const FILTER_META = {
     filterFn: p => !!p.offer,
   },
   Organic: {
-    emoji:       '🌿',
-    title:       'Certified Organic',
-    subtitle:    '100% natural, no pesticides',
-    bannerImg:   IMG.promoOrganic,
+    emoji: '🌿',
+    title: 'Certified Organic',
+    subtitle: '100% natural, no pesticides',
+    bannerImg: IMG.promoOrganic,
     bannerColor: 'rgba(10,60,20,0.56)',
-    bannerTag:   'CERTIFIED',
+    bannerTag: 'CERTIFIED',
     bannerTagBg: C.green,
     bannerTitle: 'Go Organic\nLive Healthy',
     accentColor: C.green,
@@ -163,12 +163,12 @@ const FILTER_META = {
     filterFn: p => !!p.organic,
   },
   Fresh: {
-    emoji:       '🌱',
-    title:       'Farm Fresh Today',
-    subtitle:    'Harvested & delivered same day',
-    bannerImg:   IMG.promoFresh,
+    emoji: '🌱',
+    title: 'Farm Fresh Today',
+    subtitle: 'Harvested & delivered same day',
+    bannerImg: IMG.promoFresh,
     bannerColor: 'rgba(5,80,30,0.54)',
-    bannerTag:   'JUST ARRIVED',
+    bannerTag: 'JUST ARRIVED',
     bannerTagBg: '#059669',
     bannerTitle: 'Farm to\nYour Door',
     accentColor: '#059669',
@@ -182,12 +182,12 @@ const FILTER_META = {
     filterFn: p => !!p.fresh,
   },
   'Under ₹100': {
-    emoji:       '💰',
-    title:       'Budget Picks',
-    subtitle:    'Quality groceries under ₹100',
-    bannerImg:   IMG.promoBudget,
+    emoji: '💰',
+    title: 'Budget Picks',
+    subtitle: 'Quality groceries under ₹100',
+    bannerImg: IMG.promoBudget,
     bannerColor: 'rgba(20,40,100,0.58)',
-    bannerTag:   'BEST VALUE',
+    bannerTag: 'BEST VALUE',
     bannerTagBg: C.blue,
     bannerTitle: 'Smart Savings\nUnder ₹100',
     accentColor: C.blue,
@@ -219,9 +219,9 @@ function FadeIn({ delay = 0, children, style }) {
 }
 
 // ─── Search Bar ───────────────────────────────────────────────────────────────
-function SearchBar({ value, onChange, onClear, recents, onRecentPress, onRemoveRecent, onClearAll }) {
+function SearchBar({ value, onChange, onClear, recents, onRecentPress, onRemoveRecent, onClearAll , searchRef }) {
   const [focused, setFocused] = useState(false);
-  const bdr      = useRef(new Animated.Value(0)).current;
+  const bdr = useRef(new Animated.Value(0)).current;
   const dropAnim = useRef(new Animated.Value(0)).current;
 
   const handleFocus = () => {
@@ -238,7 +238,7 @@ function SearchBar({ value, onChange, onClear, recents, onRecentPress, onRemoveR
     }, 150);
   };
 
-  const borderColor   = bdr.interpolate({ inputRange: [0, 1], outputRange: [C.border, C.green] });
+  const borderColor = bdr.interpolate({ inputRange: [0, 1], outputRange: [C.border, C.green] });
   const shadowOpacity = bdr.interpolate({ inputRange: [0, 1], outputRange: [0.04, 0.18] });
 
   const showDropdown = focused && !value && recents.length > 0;
@@ -258,6 +258,7 @@ function SearchBar({ value, onChange, onClear, recents, onRecentPress, onRemoveR
           onBlur={handleBlur}
           returnKeyType="search"
           selectionColor={C.green}
+          ref={searchRef}
         />
         {value.length > 0 && (
           <TouchableOpacity onPress={onClear} style={styles.clearBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -308,7 +309,7 @@ function ProductCard({ item, index }) {
 
   const pop = () => Animated.sequence([
     Animated.spring(scale, { toValue: 0.93, useNativeDriver: true, tension: 300 }),
-    Animated.spring(scale, { toValue: 1,    useNativeDriver: true, tension: 200 }),
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 200 }),
   ]).start();
 
   const ts = TAG_STYLES[item.tagStyle] || TAG_STYLES.green;
@@ -387,7 +388,7 @@ function RecentRow({ item, onPress, onRemove }) {
 
 // ─── Filter Section (Offers / Organic / Fresh / Under ₹100) ──────────────────
 function FilterSection({ filterId }) {
-  const meta     = FILTER_META[filterId];
+  const meta = FILTER_META[filterId];
   const products = PRODUCTS.filter(meta.filterFn);
 
   return (
@@ -487,7 +488,7 @@ function AllSection({ query, recents, setRecents }) {
       )}
 
       {/* Recents */}
-      {!query && recents.length > 0 && (
+      {/* {!query && recents.length > 0 && (
         <View style={styles.section}>
           <View style={styles.secHead}>
             <Text style={styles.secTitle}>Recent Searches</Text>
@@ -501,7 +502,7 @@ function AllSection({ query, recents, setRecents }) {
             ))}
           </View>
         </View>
-      )}
+      )} */}
 
       {/* Categories */}
       {!query && (
@@ -511,7 +512,7 @@ function AllSection({ query, recents, setRecents }) {
             <TouchableOpacity><Text style={styles.secLink}>See all</Text></TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catScroll}>
-            {CATEGORIES.map(c => <CatTile key={c.id} item={c} onPress={() => {}} />)}
+            {CATEGORIES.map(c => <CatTile key={c.id} item={c} onPress={() => { }} />)}
           </ScrollView>
         </View>
       )}
@@ -553,13 +554,20 @@ function AllSection({ query, recents, setRecents }) {
 
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 export default function SearchScreen() {
-  const [query,   setQuery]   = useState('');
-  const [filter,  setFilter]  = useState('All');
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('All');
   const [recents, setRecents] = useState(RECENTS);
   const headerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.spring(headerAnim, { toValue: 1, tension: 70, friction: 10, useNativeDriver: true }).start();
+  }, []);
+
+  const searchRef = useRef(null);
+
+  useEffect(() => {
+    searchRef.current?.focus();
+
   }, []);
 
   return (
@@ -592,6 +600,7 @@ export default function SearchScreen() {
           onRecentPress={r => setQuery(r.label)}
           onRemoveRecent={id => setRecents(prev => prev.filter(x => x.id !== id))}
           onClearAll={() => setRecents([])}
+          searchRef={searchRef}
         />
 
         {/* Filter tabs */}
@@ -656,10 +665,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11, paddingVertical: 6, gap: 5,
   },
   deliveryPulse: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.green },
-  deliveryLbl:   { fontSize: 12, color: C.textMed, fontWeight: '500' },
-  deliveryTime:  { fontSize: 13, color: C.green,   fontWeight: '900' },
-  locationRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  locationTxt:   { fontSize: 13, color: C.text, fontWeight: '700' },
+  deliveryLbl: { fontSize: 12, color: C.textMed, fontWeight: '500' },
+  deliveryTime: { fontSize: 13, color: C.green, fontWeight: '900' },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  locationTxt: { fontSize: 13, color: C.text, fontWeight: '700' },
   locationChevron: { fontSize: 18, color: C.green, fontWeight: '700', marginTop: -2 },
 
   // Search
@@ -678,7 +687,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   searchIcon: { fontSize: 17, marginRight: 10, color: C.textLight },
-  searchInput: { flex: 1, fontSize: 15, color: C.text, fontWeight: '500', padding: 0, borderWidth:0, outlineStyle:'none'},
+  searchInput: { flex: 1, fontSize: 15, color: C.text, fontWeight: '500', padding: 0, borderWidth: 0, outlineStyle: 'none' },
   clearBtn: {
     width: 26, height: 26, borderRadius: 13,
     backgroundColor: C.bg,
@@ -707,16 +716,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: C.border,
   },
   dropTitle: { fontSize: 12, color: C.textLight, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-  dropClear:  { fontSize: 12, color: C.green, fontWeight: '700' },
+  dropClear: { fontSize: 12, color: C.green, fontWeight: '700' },
   dropRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 14, paddingVertical: 10,
     borderBottomWidth: 1, borderBottomColor: C.border, gap: 12,
   },
-  dropThumb:     { width: 38, height: 38, borderRadius: 10, backgroundColor: C.greenLight },
-  dropRowMid:    { flex: 1 },
-  dropLabel:     { fontSize: 14, color: C.text, fontWeight: '600' },
-  dropSub:       { fontSize: 11, color: C.textLight, marginTop: 2 },
+  dropThumb: { width: 38, height: 38, borderRadius: 10, backgroundColor: C.greenLight },
+  dropRowMid: { flex: 1 },
+  dropLabel: { fontSize: 14, color: C.text, fontWeight: '600' },
+  dropSub: { fontSize: 11, color: C.textLight, marginTop: 2 },
   dropRemove: {
     width: 24, height: 24, borderRadius: 12,
     backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center',
@@ -724,7 +733,7 @@ const styles = StyleSheet.create({
   dropRemoveTxt: { fontSize: 10, color: C.textLight, fontWeight: '700' },
 
   // Filters
-  filterScroll:  { marginBottom: 0 },
+  filterScroll: { marginBottom: 0 },
   filterContent: { paddingBottom: 12, gap: 8 },
   chip: {
     flexDirection: 'row',
@@ -732,24 +741,24 @@ const styles = StyleSheet.create({
     borderRadius: 20, borderWidth: 1.5, borderColor: C.border,
     backgroundColor: C.white, alignItems: 'center',
   },
-  chipOn:    { backgroundColor: C.green, borderColor: C.green },
-  chipTxt:   { fontSize: 13, color: C.textMed, fontWeight: '600' },
+  chipOn: { backgroundColor: C.green, borderColor: C.green },
+  chipTxt: { fontSize: 13, color: C.textMed, fontWeight: '600' },
   chipTxtOn: { color: C.white },
-  chipDot:   { fontSize: 8, color: 'rgba(255,255,255,0.7)' },
+  chipDot: { fontSize: 8, color: 'rgba(255,255,255,0.7)' },
 
   // Scroll
-  scroll:        { flex: 1 },
+  scroll: { flex: 1 },
   scrollContent: { paddingTop: 6 },
-  section:       { paddingHorizontal: 16, marginTop: 22 },
+  section: { paddingHorizontal: 16, marginTop: 22 },
   secHead: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginBottom: 12,
   },
-  secTitle:    { fontSize: 17, fontWeight: '800', color: C.text, letterSpacing: -0.3 },
+  secTitle: { fontSize: 17, fontWeight: '800', color: C.text, letterSpacing: -0.3 },
   secSubtitle: { fontSize: 13, color: C.textLight, marginTop: 2, marginBottom: 12 },
-  secLink:     { fontSize: 13, color: C.green, fontWeight: '700' },
-  countBadge:  { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  countTxt:    { fontSize: 12, fontWeight: '700' },
+  secLink: { fontSize: 13, color: C.green, fontWeight: '700' },
+  countBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  countTxt: { fontSize: 12, fontWeight: '700' },
 
   // Stats strip
   statsStrip: {
@@ -757,9 +766,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14, borderWidth: 1,
     alignItems: 'center',
   },
-  statItem:    { flex: 1, alignItems: 'center' },
-  statNum:     { fontSize: 16, fontWeight: '900' },
-  statLbl:     { fontSize: 11, color: C.textLight, marginTop: 2, fontWeight: '500' },
+  statItem: { flex: 1, alignItems: 'center' },
+  statNum: { fontSize: 16, fontWeight: '900' },
+  statLbl: { fontSize: 11, color: C.textLight, marginTop: 2, fontWeight: '500' },
   statDivider: { width: 1, height: 30 },
 
   // Sub pills
@@ -770,7 +779,7 @@ const styles = StyleSheet.create({
     borderRadius: 20, borderWidth: 1.5,
   },
   subPillIcon: { fontSize: 14 },
-  subPillTxt:  { fontSize: 13, fontWeight: '700' },
+  subPillTxt: { fontSize: 13, fontWeight: '700' },
 
   // Recent
   recentList: { gap: 7 },
@@ -782,7 +791,7 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
   },
-  recentImg:   { width: 42, height: 42, borderRadius: 11, backgroundColor: C.greenLight },
+  recentImg: { width: 42, height: 42, borderRadius: 11, backgroundColor: C.greenLight },
   recentLabel: { flex: 1, fontSize: 14, color: C.text, fontWeight: '600' },
   recentX: {
     width: 26, height: 26, borderRadius: 13,
@@ -797,11 +806,11 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.13, shadowRadius: 6, elevation: 4,
   },
-  catImg:     { width: '100%', height: '100%' },
+  catImg: { width: '100%', height: '100%' },
   catOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,35,12,0.42)' },
-  catLabel:   { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end', padding: 10 },
-  catName:    { fontSize: 12, color: C.white, fontWeight: '800', lineHeight: 15 },
-  catCount:   { fontSize: 10, color: 'rgba(255,255,255,0.72)', marginTop: 2 },
+  catLabel: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end', padding: 10 },
+  catName: { fontSize: 12, color: C.white, fontWeight: '800', lineHeight: 15 },
+  catCount: { fontSize: 10, color: 'rgba(255,255,255,0.72)', marginTop: 2 },
 
   // Banner
   banner: {
@@ -809,15 +818,15 @@ const styles = StyleSheet.create({
     shadowColor: C.green, shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.22, shadowRadius: 12, elevation: 6,
   },
-  bannerImg:     { width: '100%', height: '100%' },
+  bannerImg: { width: '100%', height: '100%' },
   bannerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,40,14,0.55)' },
   bannerContent: { ...StyleSheet.absoluteFillObject, padding: 20, justifyContent: 'center' },
   bannerTag: {
     alignSelf: 'flex-start', backgroundColor: C.greenCard,
     borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 9,
   },
-  bannerTagTxt:  { fontSize: 9, color: C.white, fontWeight: '900', letterSpacing: 1 },
-  bannerTitle:   { fontSize: 22, color: C.white, fontWeight: '900', lineHeight: 28, marginBottom: 14 },
+  bannerTagTxt: { fontSize: 9, color: C.white, fontWeight: '900', letterSpacing: 1 },
+  bannerTitle: { fontSize: 22, color: C.white, fontWeight: '900', lineHeight: 28, marginBottom: 14 },
   bannerBtn: {
     alignSelf: 'flex-start', borderRadius: 20,
     paddingHorizontal: 16, paddingVertical: 7,
@@ -835,7 +844,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1, shadowRadius: 10, elevation: 3,
   },
   productImgWrap: { height: 130, backgroundColor: C.greenLight },
-  productImg:     { width: '100%', height: '100%' },
+  productImg: { width: '100%', height: '100%' },
   productTag: {
     position: 'absolute', top: 8, left: 8,
     borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3,
@@ -849,13 +858,13 @@ const styles = StyleSheet.create({
     shadowColor: C.accent, shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4, shadowRadius: 4, elevation: 3,
   },
-  discTxt:      { fontSize: 8, color: C.white, fontWeight: '900', textAlign: 'center', lineHeight: 11 },
-  productInfo:  { padding: 11 },
-  productName:  { fontSize: 13, color: C.text, fontWeight: '700', lineHeight: 18, marginBottom: 3 },
-  productWt:    { fontSize: 11, color: C.textLight, marginBottom: 10, fontWeight: '500' },
-  productRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  discTxt: { fontSize: 8, color: C.white, fontWeight: '900', textAlign: 'center', lineHeight: 11 },
+  productInfo: { padding: 11 },
+  productName: { fontSize: 13, color: C.text, fontWeight: '700', lineHeight: 18, marginBottom: 3 },
+  productWt: { fontSize: 11, color: C.textLight, marginBottom: 10, fontWeight: '500' },
+  productRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   productPrice: { fontSize: 16, color: C.text, fontWeight: '800' },
-  productMrp:   { fontSize: 11, color: C.textLight, textDecorationLine: 'line-through', marginTop: 2 },
+  productMrp: { fontSize: 11, color: C.textLight, textDecorationLine: 'line-through', marginTop: 2 },
 
   // Add / qty
   addBtn: {
@@ -869,13 +878,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: C.green, borderRadius: 10, overflow: 'hidden',
   },
-  qtyBtn:  { paddingHorizontal: 10, paddingVertical: 8 },
-  qtyTxt:  { fontSize: 16, color: C.white, fontWeight: '700', lineHeight: 18 },
-  qtyNum:  { fontSize: 14, color: C.white, fontWeight: '800', paddingHorizontal: 4 },
+  qtyBtn: { paddingHorizontal: 10, paddingVertical: 8 },
+  qtyTxt: { fontSize: 16, color: C.white, fontWeight: '700', lineHeight: 18 },
+  qtyNum: { fontSize: 14, color: C.white, fontWeight: '800', paddingHorizontal: 4 },
 
   // Empty
-  emptyWrap:  { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 32 },
-  emptyImg:   { width: 160, height: 130, marginBottom: 20, opacity: 0.65 },
+  emptyWrap: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 32 },
+  emptyImg: { width: 160, height: 130, marginBottom: 20, opacity: 0.65 },
   emptyTitle: { fontSize: 18, color: C.text, fontWeight: '800', marginBottom: 6 },
-  emptySub:   { fontSize: 14, color: C.textLight, textAlign: 'center' },
+  emptySub: { fontSize: 14, color: C.textLight, textAlign: 'center' },
 });
