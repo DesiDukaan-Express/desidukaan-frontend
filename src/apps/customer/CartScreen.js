@@ -1,13 +1,20 @@
+
 import React from "react";
-import { View, Text, FlatList, Image, StyleSheet } from "react-native";
+import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity } from "react-native";
 import useCartStore from "../../store/cartStore";
 
+
 export default function CartScreen() {
+  const addItem = useCartStore((state) => state.addItem);
+ const removeItem = useCartStore((state) => state.removeItem);
 
   const items = useCartStore((state) => state.items);
 
-  const itemTotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
-
+  // TOTAL OF ITEMS
+const itemTotal = items.reduce(
+  (sum, item) => sum + Number(item.price) * item.qty,
+  0
+);
   const deliveryCharge = 30;
   const handlingCharge = 5;
   const smallCartFee = itemTotal < 200 ? 20 : 0;
@@ -23,7 +30,7 @@ export default function CartScreen() {
   }
 
   return (
-    <View style={{flex:1}}>
+    <View style={{ flex: 1 }}>
 
       <FlatList
         data={items}
@@ -33,10 +40,29 @@ export default function CartScreen() {
 
             <Image source={{ uri: item.image }} style={styles.image} />
 
-            <View style={{flex:1}}>
+            <View style={{ flex: 1 }}>
               <Text style={styles.name}>{item.name}</Text>
               <Text style={styles.price}>₹{item.price}</Text>
-              <Text style={styles.qty}>Qty: {item.qty}</Text>
+              {/*<Text style={styles.qty}>Qty: {item.qty}</Text> */}
+              <View style={styles.qtyContainer}>
+
+  <TouchableOpacity
+    style={styles.qtyBtn}
+    onPress={() => removeItem(item.id)}
+  >
+    <Text style={styles.qtyText}>-</Text>
+  </TouchableOpacity>
+
+  <Text style={styles.qtyNumber}>{item.qty}</Text>
+
+  <TouchableOpacity
+    style={styles.qtyBtn}
+    onPress={() => addItem(item, item.vendorId)}
+  >
+    <Text style={styles.qtyText}>+</Text>
+  </TouchableOpacity>
+
+</View>
             </View>
 
           </View>
@@ -84,69 +110,96 @@ export default function CartScreen() {
 
 const styles = StyleSheet.create({
 
-  empty:{
-    flex:1,
-    justifyContent:"center",
-    alignItems:"center"
+  empty: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center"
   },
 
-  card:{
-    flexDirection:"row",
-    padding:15,
-    borderBottomWidth:1,
-    borderColor:"#eee"
+  card: {
+    flexDirection: "row",
+    padding: 15,
+    borderBottomWidth: 1,
+    borderColor: "#eee"
   },
 
-  image:{
-    width:70,
-    height:70,
-    borderRadius:10,
-    marginRight:15
+  image: {
+    width: 70,
+    height: 70,
+    borderRadius: 10,
+    marginRight: 15
   },
 
-  name:{
-    fontSize:16,
-    fontWeight:"600"
+  name: {
+    fontSize: 16,
+    fontWeight: "600"
   },
 
-  price:{
-    color:"green",
-    marginTop:5
+  price: {
+    color: "green",
+    marginTop: 5
   },
 
-  qty:{
-    marginTop:5,
-    color:"#555"
+  qty: {
+    marginTop: 5,
+    color: "#555"
   },
 
-  billBox:{
-    padding:20,
-    borderTopWidth:1,
-    borderColor:"#eee",
-    backgroundColor:"#fafafa"
+  billBox: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderColor: "#eee",
+    backgroundColor: "#fafafa"
   },
 
-  billTitle:{
-    fontSize:18,
-    fontWeight:"bold",
-    marginBottom:10
+  billTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10
   },
 
-  row:{
-    flexDirection:"row",
-    justifyContent:"space-between",
-    marginVertical:4
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginVertical: 4
   },
 
-  divider:{
-    height:1,
-    backgroundColor:"#ddd",
-    marginVertical:10
+  divider: {
+    height: 1,
+    backgroundColor: "#ddd",
+    marginVertical: 10
   },
 
-  totalText:{
-    fontSize:16,
-    fontWeight:"bold"
-  }
+  totalText: {
+    fontSize: 16,
+    fontWeight: "bold"
+  },
+  qtyContainer:{
+  flexDirection:"row",
+  alignItems:"center",
+  marginTop:8
+},
+
+qtyBtn:{
+  backgroundColor:"#1ca049",
+  width:30,
+  height:30,
+  justifyContent:"center",
+  alignItems:"center",
+  borderRadius:6
+},
+
+qtyText:{
+  color:"white",
+  fontSize:18,
+  fontWeight:"bold"
+},
+
+qtyNumber:{
+  marginHorizontal:10,
+  fontWeight:"bold",
+  fontSize:16
+}
+
 
 });
