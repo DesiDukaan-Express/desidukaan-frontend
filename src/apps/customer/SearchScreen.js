@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, StyleSheet, ScrollView,
   TouchableOpacity, Image, Animated, StatusBar, Platform,
 } from 'react-native';
+import useCartStore from '../../store/cartStore';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -219,7 +220,7 @@ function FadeIn({ delay = 0, children, style }) {
 }
 
 // ─── Search Bar ───────────────────────────────────────────────────────────────
-function SearchBar({ value, onChange, onClear, recents, onRecentPress, onRemoveRecent, onClearAll , searchRef }) {
+function SearchBar({ value, onChange, onClear, recents, onRecentPress, onRemoveRecent, onClearAll, searchRef }) {
   const [focused, setFocused] = useState(false);
   const bdr = useRef(new Animated.Value(0)).current;
   const dropAnim = useRef(new Animated.Value(0)).current;
@@ -302,6 +303,7 @@ function SearchBar({ value, onChange, onClear, recents, onRecentPress, onRemoveR
   );
 }
 
+
 // ─── Product Card ─────────────────────────────────────────────────────────────
 function ProductCard({ item, index }) {
   const [qty, setQty] = useState(0);
@@ -311,6 +313,17 @@ function ProductCard({ item, index }) {
     Animated.spring(scale, { toValue: 0.93, useNativeDriver: true, tension: 300 }),
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 200 }),
   ]).start();
+
+
+  const cart = useCartStore();
+
+  const addToCart = (item) => {
+    cart.addItem(item, "VENDOR_EXAMPLE")
+  }
+
+  const removeFromCart = (item) => {
+    cart.removeItem(item.id);
+  }
 
   const ts = TAG_STYLES[item.tagStyle] || TAG_STYLES.green;
   const discPct = item.mrp ? Math.round((1 - item.price / item.mrp) * 100) : null;
@@ -338,16 +351,16 @@ function ProductCard({ item, index }) {
           </View>
           <Animated.View style={{ transform: [{ scale }] }}>
             {qty === 0 ? (
-              <TouchableOpacity style={styles.addBtn} onPress={() => { pop(); setQty(1); }} activeOpacity={0.85}>
+              <TouchableOpacity style={styles.addBtn} onPress={() => { pop(); setQty(1); addToCart(item); }} activeOpacity={0.85}>
                 <Text style={styles.addTxt}>+ ADD</Text>
               </TouchableOpacity>
             ) : (
               <View style={styles.qtyRow}>
-                <TouchableOpacity style={styles.qtyBtn} onPress={() => { pop(); setQty(q => Math.max(0, q - 1)); }}>
+                <TouchableOpacity style={styles.qtyBtn} onPress={() => { pop(); setQty(q => Math.max(0, q - 1)); removeFromCart(item); }}>
                   <Text style={styles.qtyTxt}>−</Text>
                 </TouchableOpacity>
                 <Text style={styles.qtyNum}>{qty}</Text>
-                <TouchableOpacity style={styles.qtyBtn} onPress={() => { pop(); setQty(q => q + 1); }}>
+                <TouchableOpacity style={styles.qtyBtn} onPress={() => { pop(); setQty(q => q + 1); addToCart(item); }}>
                   <Text style={styles.qtyTxt}>+</Text>
                 </TouchableOpacity>
               </View>

@@ -11,6 +11,7 @@ import LoginScreen from '../apps/customer/LoginScreen';
 import CustomerTabs from './CustomerTabs';
 import VendorTabs from './VendorTabs';
 import DeliveryTabs from './DeliveryTabs';
+import CheckoutScreen from '../apps/customer/Checkout';
 
 const Stack = createNativeStackNavigator();
 
@@ -51,6 +52,10 @@ export default function Navigation() {
       {
         getMainNavigator()
       }
+      
+      {/* Customer Tabs */}
+      <Stack.Screen name="Checkout" component={CheckoutScreen} />
+
       </Stack.Navigator>
     </NavigationContainer>
   );

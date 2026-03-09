@@ -1,10 +1,13 @@
 import React from "react";
-import { View, Text, FlatList, Image, StyleSheet } from "react-native";
+import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity } from "react-native";
 import useCartStore from "../../store/cartStore";
+import { useNavigation } from "@react-navigation/native";
 
 export default function CartScreen() {
 
   const items = useCartStore((state) => state.items);
+
+  const navigation = useNavigation();
 
   const itemTotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
 
@@ -21,6 +24,7 @@ export default function CartScreen() {
       </View>
     );
   }
+
 
   return (
 
@@ -77,7 +81,14 @@ export default function CartScreen() {
           <Text style={styles.totalText}>₹{grandTotal}</Text>
         </View>
 
+        
+        <TouchableOpacity onPress={() => navigation.navigate('Checkout')} style={styles.checkOutButton}>
+          <Text style={styles.checkOutButtonText}>
+            Checkout
+          </Text>
+        </TouchableOpacity>
       </View>
+
 
     </View>
   );
@@ -150,6 +161,31 @@ const styles = StyleSheet.create({
   totalText: {
     fontSize: 16,
     fontWeight: "bold"
+  }
+  ,
+
+  checkOutButton: {
+    flex: 1,
+    backgroundColor: "#0ff022",
+    paddingVertical: 16,
+    maxHeight : 30,
+    marginTop : 10,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+    shadowColor: "#0ff022",
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
+
+  checkOutButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#000",
   }
 
 });

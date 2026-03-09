@@ -8,8 +8,8 @@ import { shadows } from '../../styles/shadows';
 export default function SearchScreen() {  // Change name for each file
   return (
     <View style={styles.container}>
-      <Text style={styles.emoji}>📦</Text>   {/* 🔍 / 🛒 / 📦 / 👤 */}
-      <Text style={styles.title}>Search</Text>  {/* Change title */}
+      <Text style={styles.emoji}>📦</Text>
+      <Text style={styles.title}>Search</Text>  
       <Text style={styles.sub}>Coming soon</Text>
     </View>
   );
