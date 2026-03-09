@@ -41,18 +41,14 @@ export default function Navigation() {
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {/* {!isAuthenticated ? (
+        {!isAuthenticated ? (
   <>
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Signup" component={SignupScreen} />
   </>
 ) : (
   getMainNavigator()
-)} */}
-      {
-        getMainNavigator()
-      }
-      
+)}
       {/* Customer Tabs */}
       <Stack.Screen name="Checkout" component={CheckoutScreen} />
 

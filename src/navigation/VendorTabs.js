@@ -4,13 +4,12 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Text } from 'react-native';
 import { colors } from '../styles/colors';
 
-import HomeScreen from '../apps/customer/HomeScreen';
-import SearchScreen from '../apps/customer/SearchScreen';
-import CartScreen from '../apps/customer/CartScreen';
-import OrdersScreen from '../apps/customer/OrdersScreen';
-import ProfileScreen from '../apps/customer/ProfileScreen';
 // import VendorScreen from '../apps/customer/VendorScreen';
 // import CheckoutScreen from '../apps/customer/CheckoutScreen';
+import DashboardScreen from '../apps/vendor/DashboardScreen';
+import InventoryScreen from '../apps/vendor/InventoryScreen';
+import VendorOrdersScreen from '../apps/vendor/VendorOrdersScreen';
+import EarningsScreen from '../apps/vendor/EarningsScreen';
 
 const Tab = createBottomTabNavigator();
 
