@@ -4,7 +4,6 @@ import Navigation from './src/navigation';
 import useAuthStore from './src/store/authStore';
 
 export default function App() {
-  return <Navigation/>;
   const hydrate = useAuthStore((state) => state.hydrate);
 
   useEffect(() => {

@@ -11,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
+import { useNavigation } from "@react-navigation/native";
 
 // ================= CATEGORIES =================
 const categories = [
@@ -284,9 +285,80 @@ const nearbyStores = [
   },
 ];
 
+const recentOrders = [
+  {
+    id: "1",
+    name: "Gupta General Store",
+    time: "2 days ago",
+    image:
+      "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400",
+  },
+  {
+    id: "2",
+    name: "Bikaner Sweets & Snacks",
+    time: "5 days ago",
+    image:
+      "https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400",
+  },
+  {
+    id: "3",
+    name: "Fresh Veggie Mart",
+    time: "1 week ago",
+    image:
+      "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400",
+  },
+  {
+    id: "4",
+    name: "Sharma Dairy Store",
+    time: "3 days ago",
+    image:
+      "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400",
+  },
+  {
+    id: "5",
+    name: "Daily Needs Kirana",
+    time: "4 days ago",
+    image:
+      "https://images.unsplash.com/photo-1506617420156-8e4536971650?w=400",
+  },
+];
+
+
+const IMG = {
+  promo: 'https://images.unsplash.com/photo-1543168256-418811576931?w=700&q=80'
+};
+
+const C = {
+  bg: '#F4F8F4',
+  white: '#FFFFFF',
+  green: '#1A9E3F',
+  greenDark: '#147832',
+  greenLight: '#E8F5ED',
+  greenMid: '#C8E6D0',
+  greenCard: '#1DB954',
+  accent: '#FF6B2C',
+  accentLight: '#FFF0E9',
+  yellow: '#FFB800',
+  yellowLight: '#FFF8E7',
+  blue: '#2563EB',
+  blueLight: '#EFF6FF',
+  purple: '#7C3AED',
+  purpleLight: '#F5F3FF',
+  text: '#0F1F0F',
+  textMed: '#3D5A3E',
+  textLight: '#7A9A7B',
+  border: '#E0EDE1',
+  shadow: '#0F1F0F',
+  tag1: '#E8F5ED',
+  tag1Text: '#1A9E3F',
+  tag2: '#FFF0E9',
+  tag2Text: '#FF6B2C',
+  tag3: '#FFF8E7',
+  tag3Text: '#B47D00',
+};
+
 export default function HomeScreen() {
   const [selectedCategory, setSelectedCategory] = useState("Vegetables");
-  // const [cartCount, setCartCount] = useState(0);
 
   const logout = useAuthStore((state) => state.logout);
 
@@ -350,6 +422,8 @@ export default function HomeScreen() {
     return "Good Night 🌙";
   };
 
+  const navigate = useNavigation();
+
   const filteredProducts = products[selectedCategory]?.filter((item) =>
     item.name.toLowerCase().includes(search.toLowerCase()),
   );
@@ -357,158 +431,124 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* HEADER */}
+
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>{getGreeting()}</Text>
-            <Text style={address ? styles.location : {}}>
-              {address ? (
-                <Text style={styles.address}>{address}</Text>
-              ) : (
-                <TouchableOpacity onPress={getLocation}>
-                  <Text>Fetch My Location</Text>
-                </TouchableOpacity>
-              )}
-            </Text>
+          <View style={styles.locationBox}>
+            <Ionicons name="location" size={20} color="#1ca049" />
+
+            <View>
+              <Text style={styles.locationTitle}>Home</Text>
+
+              <Text numberOfLines={1} style={styles.locationSub}>
+                {address || "Fetching location..."}
+              </Text>
+            </View>
+
+            <Ionicons name="chevron-down" size={16} color="#777" />
           </View>
 
-          <View style={styles.cartIcon}>
-
-            <TouchableOpacity
-              onPress={logout}
-              style={{
-                padding : 16,
-                paddingVertical : 8,
-                backgroundColor: "red",
-                margin: 16,
-                borderRadius: 8
-              }}
-            >
-              <Text style={{ color: "white", textAlign: "center" }}>
-                Logout
-              </Text>
-            </TouchableOpacity>
+          <View style={styles.headerIcons}>
+            <Ionicons name="notifications-outline" size={22} color="#333" />
+            <Ionicons name="person-circle-outline" size={28} color="#1ca049" />
           </View>
         </View>
 
         {/* SEARCH */}
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={20} color="#777" />
+        <TouchableOpacity
+          style={{...styles.searchContainer , cursor : "auto  " }}
+          onPress={() => navigate.navigate("Search")}
+        >
+          <Ionicons name="search" size={18} color="#888" />
 
           <TextInput
-            placeholder="Search groceries..."
-            placeholderTextColor="#999"
-            style={styles.searchBar}
+            placeholder="Search for stores or items"
+            style={styles.searchInput}
             value={search}
             onChangeText={setSearch}
           />
-        </View>
+        </TouchableOpacity>
 
-        {/* CATEGORIES */}
-        <Text style={styles.sectionTitle}>Shop by Categories</Text>
+        {/* Banner */}
+        {/* <View style={styles.offerBanner}>
+          <View>
+            <Text style={styles.offerSmall}>FLASH SALE</Text>
+            <Text style={styles.offerTitle}>50% OFF</Text>
+            <Text style={styles.offerDesc}>On your first 3 orders</Text>
 
-        <View style={styles.categoryGrid}>
-          {categories.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.categoryCard,
-                selectedCategory === item.name && styles.activeCategory,
-              ]}
-              onPress={() => setSelectedCategory(item.name)}
-            >
-              <Image source={{ uri: item.image }} style={styles.categoryImg} />
-              <Text style={styles.categoryText}>{item.name}</Text>
+            <TouchableOpacity style={styles.offerButton}>
+              <Text style={styles.offerBtnText}>USE: FIRST50</Text>
             </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* PRODUCTS */}
-        <Text style={styles.sectionTitle}>{selectedCategory}</Text>
-
-        <View style={styles.productGrid}>
-          {filteredProducts?.map((item) => (
-            <View key={item.id} style={styles.productCard}>
-              <Image source={{ uri: item.image }} style={styles.productImg} />
-
-              <Text style={styles.delivery}>⏱ 8 MINS</Text>
-
-              <Text style={styles.productName}>{item.name}</Text>
-
-              <Text style={styles.productQty}>1Kg</Text>
-
-              <View style={styles.bottomRow}>
-                <Text style={styles.price}>₹{item.price}</Text>
-
-                <TouchableOpacity
-                  style={styles.addBtn}
-                  onPress={() => cart.addItem(item , "MOCK_VENDOR_ID")}
-                >
-                  <Text style={styles.addText}>ADD</Text>
-                </TouchableOpacity>
+          </View>
+        </View> */}
+        <View style={styles.bannerSection}>
+          <TouchableOpacity style={styles.banner} activeOpacity={0.9}>
+            <Image source={{ uri: IMG.promo }} style={styles.bannerImg} resizeMode="cover" />
+            <View style={styles.bannerOverlay} />
+            <View style={styles.bannerContent}>
+              <View style={styles.bannerTag}>
+                <Text style={styles.bannerTagTxt}>LIMITED OFFER</Text>
+              </View>
+              <Text style={styles.bannerTitle}>Fresh Veggies{'\n'}Up to 30% Off</Text>
+              <View style={[styles.bannerBtn, { backgroundColor: C.white }]}>
+                <Text style={[styles.bannerBtnTxt, { color: C.green }]}>Shop Now  →</Text>
               </View>
             </View>
-          ))}
+          </TouchableOpacity>
         </View>
 
-        {/* STORES */}
+        {/* Stores */}
         <Text style={styles.sectionTitle}>Nearby Stores</Text>
 
-        <View style={styles.storeGrid}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ paddingLeft: 20 }}
+        >
           {nearbyStores.map((store, index) => (
             <View key={index} style={styles.storeCard}>
-              <View style={styles.storeHeader}>
-                <Image
-                  source={{ uri: store.image }}
-                  style={styles.storeImage}
-                />
 
-                <View style={styles.storeInfo}>
-                  <Text style={styles.storeName}>{store.name}</Text>
+              <Image
+                source={{ uri: store.image }}
+                style={styles.storeImage}
+              />
 
-                  <View style={styles.storeMeta}>
-                    <View style={styles.ratingBox}>
-                      <Text style={styles.ratingText}>⭐ {store.rating}</Text>
-                    </View>
+              <View style={styles.storeInfo}>
+                <Text style={styles.storeName}>{store.name}</Text>
 
-                    <View style={styles.metaBox}>
-                      <Text style={styles.metaText}>{store.distance}</Text>
-                    </View>
-
-                    <View style={styles.timeBox}>
-                      <Text style={styles.timeText}>{store.time}</Text>
-                    </View>
-                  </View>
-
-                  <Text style={styles.categoryText}>
-                    🛒 Grocery • 🥬 Fruits • 🥛 Dairy
-                  </Text>
-
-                  <Text style={styles.offerText}>
-                    10% OFF on orders above ₹299
-                  </Text>
+                <View style={styles.storeMeta}>
+                  <Text style={styles.rating}>⭐ {store.rating}</Text>
+                  <Text style={styles.distance}>{store.distance}</Text>
                 </View>
               </View>
 
-              <TouchableOpacity style={styles.viewBtn}>
-                <Text style={styles.viewText}>View Store</Text>
-              </TouchableOpacity>
             </View>
           ))}
-        </View>
+        </ScrollView>
 
-        <View style={{ height: 120 }} />
+        <Text style={styles.sectionTitle}>Recently Ordered</Text>
+
+        {recentOrders.map((item, index) => (
+          <TouchableOpacity key={index} style={styles.recentCard}>
+            <Image
+              source={{ uri: item.image }}
+              style={styles.recentImage}
+            />
+
+            <View style={{ flex: 1 }}>
+              <Text style={styles.recentName}>{item.name}</Text>
+              <Text style={styles.recentTime}>
+                Ordered {item.time}
+              </Text>
+
+              <Text style={styles.reorderText}>
+                Reorder now
+              </Text>
+            </View>
+
+            <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          </TouchableOpacity>
+        ))}
       </ScrollView>
-
-      {/* FLOATING CART */}
-      <TouchableOpacity TouchableOpacity style={styles.floatingBtn}>
-        <Ionicons name="cart" size={24} color="white" />
-        {cart.getItemCount() > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{cart.getItemCount() }</Text>
-              </View>
-            )}
-      </TouchableOpacity>
     </View>
   );
 }
@@ -516,330 +556,331 @@ export default function HomeScreen() {
 // ================= STYLES =================
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f6f6f6" },
-
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 20,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderColor: "#eee"
   },
 
-  greeting: { fontSize: 22, fontWeight: "bold" },
-
-  location: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#222",
-  },
-
-  address: {
-    fontSize: 13,
-    color: "#6b6b6b",
-    marginTop: 2,
-    maxWidth: 260,
-  },
-
-  cartIcon: {
-    position: "relative",
-    display: "flex",
+  locationBox: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 6
   },
 
-  badge: {
-    position: "absolute",
-    top: -5,
-    right: -8,
-    backgroundColor: "#1ca049",
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+  locationTitle: {
+    fontWeight: "700",
+    fontSize: 14
   },
 
-  badgeText: { color: "white", fontSize: 12 },
+  locationSub: {
+    fontSize: 11,
+    color: "#777"
+  },
 
-  searchBox: {
+  headerIcons: {
     flexDirection: "row",
+    gap: 14
+  },
+
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#fff",
     marginHorizontal: 20,
+    marginTop: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 14,
-    alignItems: "center",
-
-    borderWidth: 1,
-    borderColor: "#dcdcdc",
+    borderRadius: 14
   },
 
-  searchBar: {
-    flex: 1,
+  searchInput: {
     marginLeft: 8,
+    flex: 1,
     fontSize: 14,
-    borderWidth: 0,
     outlineWidth: 0,
-    outlineStyle: "none",
+    outlineColor: 'transparent'
+  }
+  ,
+  offerBanner: {
+    backgroundColor: "#1ca049",
+    margin: 20,
+    padding: 18,
+    borderRadius: 18
   },
 
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginHorizontal: 20,
-    marginTop: 20,
+  offerSmall: {
+    fontSize: 10,
+    color: "#d7ffd9",
+    fontWeight: "700"
   },
 
-  /* categoryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-around",
+  offerTitle: {
+    fontSize: 26,
+    color: "white",
+    fontWeight: "bold"
+  },
+
+  offerDesc: {
+    color: "white",
+    fontSize: 12
+  },
+
+  offerButton: {
     marginTop: 10,
-  },
-
-  categoryCard: {
-    width: "29%",
-    backgroundColor: "white",
-    marginVertical: 7,
-    borderRadius: 16,
-    padding: 10,
-    alignItems: "center",
-  },
-
-  activeCategory: {
-    borderWidth: 2,
-    borderColor: "#1ca049",
-  },
-
-  categoryImg: { width: 120, height: 110, borderRadius: 12 },
-  categoryText: { marginTop: 6, fontWeight: "600" }, */
-  categoryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "start",
-    marginLeft: 20,
-    marginTop: 10,
-  },
-
-  categoryCard: {
-    width: 110,
-    height: 130,
-    padding: 8,
-    borderRadius: 12,
-    margin: 6,
-    backgroundColor: "#fff",
-
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-
-    elevation: 2,
-
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  categoryImg: {
-    width: 75,
-    height: 75,
-    borderRadius: 10,
-  },
-
-  categoryText: {
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 6,
-    textAlign: "center",
-    color: "#333",
-  },
-
-  productGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 16,
-    marginLeft: 20,
-    marginTop: 10,
-  },
-
-  productCard: {
-    width: 200,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#e6e6e6",
-  },
-
-  productImg: {
-    width: "100%",
-    height: 150,
-    resizeMode: "contain",
-    marginBottom: 8,
-  },
-
-  delivery: {
-    alignSelf: "flex-start",
-    fontSize: 11,
-    backgroundColor: "#e8f5e9",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    color: "#1ca049",
-    fontWeight: "700",
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: "#c8e6c9",
-  },
-
-  productName: {
-    fontWeight: "600",
-    fontSize: 15,
-    marginBottom: 4,
-  },
-
-  productQty: {
-    fontSize: 13,
-    color: "#777",
-    marginBottom: 8,
-  },
-
-  bottomRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  price: {
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-
-  addBtn: {
-    borderWidth: 1,
-    borderColor: "#1ca049",
+    backgroundColor: "black",
     paddingVertical: 6,
-    paddingHorizontal: 18,
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10
   },
 
-  addText: {
+  offerBtnText: {
     color: "#1ca049",
-    fontWeight: "700",
+    fontWeight: "700"
   },
-
-  storeGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-
-  storeHeader: {
-    flexDirection: "row",
-    gap: 12,
+  storeCard: {
+    width: 220,
+    marginRight: 16
   },
 
   storeImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 10,
+    width: "100%",
+    height: 140,
+    borderRadius: 16
   },
+
+  bannerSection: {
+    margin: 20,
+  },
+
+  banner: {
+    height: 148, borderRadius: 22, overflow: 'hidden',
+    shadowColor: C.green, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22, shadowRadius: 12, elevation: 6,
+  },
+
+  bannerImg: { width: '100%', height: '100%' },
+
+  bannerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,40,14,0.55)' },
+
+  bannerContent: { ...StyleSheet.absoluteFillObject, padding: 20, justifyContent: 'center' },
+
+  bannerTag: {
+    alignSelf: 'flex-start', backgroundColor: C.greenCard,
+    borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 9,
+  },
+
+  bannerTagTxt: { fontSize: 9, color: C.white, fontWeight: '900', letterSpacing: 1 },
+
+  bannerTitle: { fontSize: 22, color: C.white, fontWeight: '900', lineHeight: 28, marginBottom: 14 },
+
+  bannerBtn: {
+    alignSelf: 'flex-start', borderRadius: 20,
+    paddingHorizontal: 16, paddingVertical: 7,
+  },
+
+  bannerBtnTxt: { fontSize: 13, fontWeight: '800' },
 
   storeInfo: {
-    flex: 1,
-  },
-
-  categoryText: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 4,
-  },
-
-  offerText: {
-    fontSize: 12,
-    color: "#1ca049",
-    marginTop: 4,
-    fontWeight: "600",
-  },
-
-  viewBtn: {
-    marginTop: 12,
-    backgroundColor: "#1ca049",
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-
-  viewText: {
-    color: "white",
-    fontWeight: "600",
-  },
-
-  storeCard: {
-    backgroundColor: "#fff",
-    marginHorizontal: 20,
-    padding: 16,
-    borderRadius: 14,
-    marginTop: 14,
-
-    borderWidth: 1,
-    borderColor: "#eaeaea",
-
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+    marginTop: 8
   },
 
   storeName: {
     fontWeight: "700",
-    fontSize: 17,
-    marginBottom: 10,
+    fontSize: 15
   },
 
   storeMeta: {
     flexDirection: "row",
-    gap: 10,
+    gap: 8,
+    marginTop: 4
   },
 
-  ratingBox: {
-    backgroundColor: "#f7f7f7",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+  rating: {
+    fontSize: 12
   },
 
-  metaBox: {
-    backgroundColor: "#f7f7f7",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+  distance: {
+    fontSize: 12,
+    color: "#666"
+  },
+  recentCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginBottom: 12,
+    padding: 10,
+    backgroundColor: "white",
+    borderRadius: 14
   },
 
-  timeBox: {
-    backgroundColor: "#e8f5e9",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+  recentImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 10,
+    marginRight: 12
   },
 
-  ratingText: {
-    fontWeight: "600",
+  recentName: {
+    fontWeight: "700"
   },
 
-  metaText: {
-    color: "#555",
+  recentTime: {
+    fontSize: 12,
+    color: "#777"
   },
 
-  timeText: {
+  reorderText: {
+    fontSize: 11,
     color: "#1ca049",
+    marginTop: 4
+  },
+  container: {
+    flex: 1,
+    backgroundColor: "#f6f6f6"
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderColor: "#eee"
+  },
+  locationTitle: {
     fontWeight: "700",
+    fontSize: 16
   },
 
-  floatingBtn: {
-    position: "absolute",
-    bottom: 80,
-    right: 20,
-    backgroundColor: "#1ca049",
-    padding: 15,
-    borderRadius: 30,
-    elevation: 5,
+  locationSub: {
+    fontSize: 12,
+    color: "#777",
+    maxWidth: 200
   },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    marginHorizontal: 20,
+    marginTop: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+
+    elevation: 3,
+
+  },
+  offerBanner: {
+    backgroundColor: "#1ca049",
+    marginHorizontal: 20,
+    marginTop: 18,
+    padding: 20,
+    borderRadius: 18,
+
+    shadowColor: "#1ca049",
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+
+    elevation: 6
+  },
+  offerButton: {
+    marginTop: 12,
+    backgroundColor: "white",
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    alignSelf: "flex-start"
+  },
+
+  offerBtnText: {
+    color: "#1ca049",
+    fontWeight: "700"
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginHorizontal: 20,
+    marginTop: 24,
+    marginBottom: 10
+  },
+  storeCard: {
+    width: 240,
+    marginRight: 16,
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    padding: 10,
+
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+
+    elevation: 4
+  },
+  storeImage: {
+    width: "100%",
+    height: 140,
+    borderRadius: 14
+  },
+  storeInfo: {
+    marginTop: 10
+  },
+
+  storeName: {
+    fontWeight: "700",
+    fontSize: 16
+  },
+
+  storeMeta: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4
+  },
+  recentCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+
+    elevation: 2
+  },
+  recentImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    marginRight: 12
+  },
+  recentName: {
+    fontWeight: "700",
+    fontSize: 15
+  },
+
+  recentTime: {
+    fontSize: 12,
+    color: "#777",
+    marginTop: 2
+  },
+
+  reorderText: {
+    fontSize: 12,
+    color: "#1ca049",
+    marginTop: 6,
+    fontWeight: "600"
+  }
 });
