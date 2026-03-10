@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import useAuthStore from '../../store/authStore';
+import useCartStore from '../../store/cartStore';
+import useAddressStore from '../../store/addressStore';
 
 // In colors ko image ke according set kiya hai
 const UI_COLORS = {
@@ -52,6 +54,15 @@ export default function ProfileScreen() {
       <Text style={[styles.arrow, isGreen && { color: UI_COLORS.primary }]}>›</Text>
     </TouchableOpacity>
   );
+
+  const {clearCart} = useCartStore();
+  const {clearAddresses} = useAddressStore();
+
+  const handleLogout = () => {
+    clearCart();
+    clearAddresses();
+    logout();
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -106,7 +117,7 @@ export default function ProfileScreen() {
           <MenuItem icon="📄" title="Terms and Conditions" screen="Terms" />
 
           {/* Logout */}
-          <TouchableOpacity style={styles.logoutSection} onPress={logout}>
+          <TouchableOpacity style={styles.logoutSection} onPress={handleLogout}>
             <Text style={styles.logoutText}>Log Out</Text>
             <Text style={styles.versionText}>v. 1.0.4</Text>
           </TouchableOpacity>

@@ -11,6 +11,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from '../../store/addressStore';
+import useOrderStore from "../../store/orderStore";
 
 const paymentModes = [
   {
@@ -36,6 +37,8 @@ export default function CheckoutScreen() {
 
   const navigation = useNavigation();
 
+  const {addOrder} = useOrderStore();
+
   const subtotal = items.reduce((sum, i) => sum + i.price * i.qty, 0);
   const delivery = 25;
   const tax = 18;
@@ -54,6 +57,17 @@ export default function CheckoutScreen() {
   const [currPaymentMode, setCurrPaymentMode] = useState(0);
 
   const addresses = useAddressStore((state) => state.addresses);
+
+  const handlePlaceOrder = () => {
+    addOrder({
+      id : Math.random().toString(),
+      name : "dummyStore",
+      time : "1 Min Ago",
+      image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400",
+    });
+    cart.clearCart();
+    navigation.navigate('OrderPlaced');
+  }
   
 
   return (
@@ -175,7 +189,7 @@ export default function CheckoutScreen() {
           <Text style={styles.totalBottom}>₹{total}</Text>
         </View>
 
-        <TouchableOpacity style={styles.placeOrderBtn}>
+        <TouchableOpacity style={styles.placeOrderBtn} onPress={handlePlaceOrder}>
           <Text style={styles.placeOrderText}>Place Order</Text>
           <MaterialIcons name="arrow-forward" size={20} />
         </TouchableOpacity>

@@ -19,6 +19,10 @@ const useAddressStore = create((set, get) => ({
         set({addresses : addresses.filter((elem) => {
             return elem.id === address.id;
         })})
+    },
+
+    clearAddresses : () => {
+        set({addresses : []})
     }
 }));
 
