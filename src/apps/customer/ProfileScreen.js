@@ -9,6 +9,7 @@ import {
   SafeAreaView
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import useAuthStore from '../../store/authStore';
 
 // In colors ko image ke according set kiya hai
 const UI_COLORS = {
@@ -23,6 +24,7 @@ const UI_COLORS = {
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
+  const { logout } = useAuthStore();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -104,7 +106,7 @@ export default function ProfileScreen() {
           <MenuItem icon="📄" title="Terms and Conditions" screen="Terms" />
 
           {/* Logout */}
-          <TouchableOpacity style={styles.logoutSection}>
+          <TouchableOpacity style={styles.logoutSection} onPress={logout}>
             <Text style={styles.logoutText}>Log Out</Text>
             <Text style={styles.versionText}>v. 1.0.4</Text>
           </TouchableOpacity>
