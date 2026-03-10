@@ -290,25 +290,226 @@ export default function HomeScreen() {
 
   const logout = useAuthStore((state) => state.logout);
 
-  const [location, setLocation] = useState(null);
+  // ================= PRODUCTS =================
+  const products = {
+    Vegetables: [
+      {
+        id: 1,
+        name: "Tomatoes",
+        price: 50,
+        image:
+          "https://images.unsplash.com/photo-1561136594-7f68413baa99",
+      },
+      {
+        id: 2,
+        name: "Cucumber",
+        price: 30,
+        image:
+          "https://images.unsplash.com/photo-1568584711271-6c929fb49b60?q=80&w=1172&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+      },
+      {
+        id: 3,
+        name: "Carrot",
+        price: 40,
+        image:
+          "https://images.unsplash.com/photo-1447175008436-054170c2e979",
+      },
+      {
+        id: 4,
+        name: "Broccoli",
+        price: 80,
+        image:
+          "https://images.unsplash.com/photo-1589927986089-35812388d1f4",
+      },
+      {
+        id: 5,
+        name: "Spinach",
+        price: 30,
+        image:
+          "https://images.unsplash.com/photo-1576045057995-568f588f82fb",
+      },
+      {
+        id: 6,
+        name: "Potatoes",
+        price: 20,
+        image:
+          "https://images.unsplash.com/photo-1518977676601-b53f82aba655?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+      },
+    ],
 
-  const [address, setAddress] = useState(null);
+    Fruits: [
+      {
+        id: 7,
+        name: "Apple",
+        price: 180,
+        image:
+          "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6",
+      },
+      {
+        id: 8,
+        name: "Banana",
+        price: 60,
+        image:
+          "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e",
+      },
+      {
+        id: 9,
+        name: "Orange",
+        price: 40,
+        image:
+          "https://images.unsplash.com/photo-1580052614034-c55d20bfee3b",
+      },
+      {
+        id: 10,
+        name: "Strawberry",
+        price: 100,
+        image:
+          "https://images.unsplash.com/photo-1464965911861-746a04b4bca6",
+      },
+      {
+        id: 11,
+        name: "Grapes",
+        price: 60,
+        image:
+          "https://images.unsplash.com/photo-1423483641154-5411ec9c0ddf?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+      },
+      {
+        id: 12,
+        name: "Pineapple",
+        price: 150,
+        image:
+          "https://images.unsplash.com/photo-1623689071937-c3eeaf91650c?q=80&w=1174&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+      }
+    ],
 
-  const [search, setSearch] = useState("");
+    Dairy: [
+      {
+        id: 13,
+        name: "Milk",
+        price: 80,
+        image:
+          "https://images.unsplash.com/photo-1757802868665-60b771aa399b?q=80&w=1105&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+      },
+      {
+        id: 14,
+        name: "Cheese",
+        price: 85,
+        image:
+          "https://images.unsplash.com/photo-1654513547430-973fe7570159?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+      },
+      {
+        id: 15,
+        name: "Butter",
+        price: 45,
+        image:
+          "https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+      },
+      {
+        id: 16,
+        name: "Yogurt",
+        price: 69,
+        image:
+          "https://images.unsplash.com/photo-1604095853918-1a1823a63dd5?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+      },
+    ],
 
-  const getLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setLocation({ latitude, longitude });
-        },
-        (error) => console.log(error.message),
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 },
-      );
-    } else {
-      console.log("Geolocation is not supported by this browser.");
-    }
+    Meat: [
+      {
+      id: 17,
+      name: "Chicken",
+      price: 322,
+      image: 
+      "https://images.unsplash.com/photo-1587593810167-a84920ea0781?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+      },
+       {
+      id: 18,
+      name: "Fish",
+      price: 229,
+      image: 
+      "https://images.unsplash.com/photo-1635843125771-e8eaca55d7da?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+       },
+       {
+        id:19,
+        name: "Goat Meat",
+        price: 659,
+        image:
+        "https://images.unsplash.com/photo-1606677661991-446cea8ee182?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+
+
+       },
+       {
+        id:20,
+        name: "frozen Meat",
+        price: 889,
+        image:
+        "https://images.unsplash.com/photo-1547637205-fde0c9011f9d?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+
+       },
+
+    ],
+    Beverages: [
+      {
+        id:21,
+        name: "Soft Drinks",
+        price: 45,
+        image:
+        "https://images.unsplash.com/photo-1665359045452-bfa257a2a6bf?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+      },
+      {
+        id:22,
+        name: "Juices",
+        price: 65,
+        image:
+        "https://images.unsplash.com/photo-1583577612013-4fecf7bf8f13?q=80&w=966&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+      },
+      {
+        id:23,
+        name: "Dairy Drinks",
+        price: 74,
+        image:
+        "https://plus.unsplash.com/premium_photo-1695669385408-62d2b7d77861?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+      },
+      {
+        id:24,
+        name: "Tea & Coffee",
+        price: 25,
+        image:
+        "https://images.unsplash.com/photo-1566897245752-b287a7c599a5?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+      },
+    ],
+    Snacks: [
+      {
+        id:25,
+        name:"Chips & Crisps",
+        price:20,
+        image:
+        "https://images.unsplash.com/photo-1613462847848-f65a8b231bb5?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+      },
+            {
+        id:26,
+        name:"Namkeens & Mixtures",
+        price:20,
+        image:
+        "https://media.istockphoto.com/id/1217942210/photo/namkeen-fried-food-gujarati-food-gujarat-india.jpg?s=1024x1024&w=is&k=20&c=rZJokW-fq4Uh_3cR9zI1PChifQzm5ybt9U0ZcCCxRPY="
+            },
+            {
+              id:27,
+              name:"Biscuits & Cookies",
+              price: 30,
+              image:
+              "https://images.unsplash.com/photo-1598839950984-034f6dc7b495?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+
+            },
+            {
+              id:28,
+              name:"Chocolates",
+              price:40,
+              image:
+              "https://images.unsplash.com/photo-1606312619070-d48b4c652a52?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+            },
+
+
+    ],
   };
 
   useEffect(() => {
@@ -373,21 +574,12 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.cartIcon}>
-
-            <TouchableOpacity
-              onPress={logout}
-              style={{
-                padding : 16,
-                paddingVertical : 8,
-                backgroundColor: "red",
-                margin: 16,
-                borderRadius: 8
-              }}
-            >
-              <Text style={{ color: "white", textAlign: "center" }}>
-                Logout
-              </Text>
-            </TouchableOpacity>
+            <Ionicons name="cart-outline" size={26} color="black" />
+           {cartItems.length > 0 && (
+  <View style={styles.badge}>
+    <Text style={styles.badgeText}>{cartItems.length}</Text>
+  </View>
+)}
           </View>
         </View>
 
@@ -430,23 +622,19 @@ export default function HomeScreen() {
           {filteredProducts?.map((item) => (
             <View key={item.id} style={styles.productCard}>
               <Image source={{ uri: item.image }} style={styles.productImg} />
-
-              <Text style={styles.delivery}>⏱ 8 MINS</Text>
-
+              <Text style={styles.price}>₹{item.price}</Text>
               <Text style={styles.productName}>{item.name}</Text>
+               
+            <TouchableOpacity
 
-              <Text style={styles.productQty}>1Kg</Text>
-
-              <View style={styles.bottomRow}>
-                <Text style={styles.price}>₹{item.price}</Text>
-
-                <TouchableOpacity
-                  style={styles.addBtn}
-                  onPress={() => cart.addItem(item , "MOCK_VENDOR_ID")}
-                >
-                  <Text style={styles.addText}>ADD</Text>
-                </TouchableOpacity>
-              </View>
+  style={styles.addBtn}
+  onPress={() => {
+  addItem(item, item.vendorId);
+}}
+>
+  <Text style={styles.addText}>Add to Cart</Text>
+</TouchableOpacity>
+           
             </View>
           ))}
         </View>
@@ -501,14 +689,19 @@ export default function HomeScreen() {
       </ScrollView>
 
       {/* FLOATING CART */}
-      <TouchableOpacity TouchableOpacity style={styles.floatingBtn}>
-        <Ionicons name="cart" size={24} color="white" />
-        {cart.getItemCount() > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{cart.getItemCount() }</Text>
-              </View>
-            )}
-      </TouchableOpacity>
+     
+      {cartItems.length > 0 && (
+  <TouchableOpacity
+    style={styles.viewCartBar}
+    onPress={() => navigation.navigate("Cart")}
+  >
+    <Text style={styles.viewCartText}>
+      {cartItems.length} Items | View Cart
+    </Text>
+  </TouchableOpacity>
+)}
+
+    
     </View>
   );
 }
@@ -842,4 +1035,22 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     elevation: 5,
   },
+  viewCartBar: {
+  position: "absolute",
+  bottom: 20,
+  left: 20,
+  right: 20,
+  backgroundColor: "#1ca049",
+  padding: 15,
+  borderRadius: 12,
+  alignItems: "center",
+},
+
+viewCartText: {
+  color: "white",
+  fontSize: 16,
+  fontWeight: "bold",
+},
+
+  
 });
