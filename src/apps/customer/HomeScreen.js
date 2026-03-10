@@ -12,8 +12,12 @@ import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import { useNavigation } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
+
 import useAddressStore from "../../store/addressStore";
 import useOrderStore from "../../store/orderStore";
+
+
+
 
 
 // 
@@ -111,6 +115,11 @@ export default function HomeScreen() {
   }, [location]);
 
   const cart = useCartStore();
+  const itemCount = cart.items?.length || 0;
+
+const totalPrice = cart.items?.reduce((sum, item) => {
+  return sum + item.price * item.quantity;
+}, 0) || 0;
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -208,7 +217,14 @@ export default function HomeScreen() {
             <MaterialIcons name="chevron-right" size={22} color="#ccc" />
           </View>
         ))}
+        
       </ScrollView> 
+      
+      
+
+
+     
+
     </View>
   );
 }

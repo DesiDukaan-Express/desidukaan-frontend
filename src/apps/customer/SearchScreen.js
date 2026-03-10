@@ -4,6 +4,8 @@ import {
   TouchableOpacity, Image, Animated, StatusBar, Platform,
 } from 'react-native';
 import useCartStore from '../../store/cartStore';
+import FloatCart from './FloatCart';
+
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -202,6 +204,7 @@ const FILTER_META = {
     filterFn: p => !!p.budget,
   },
 };
+
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function FadeIn({ delay = 0, children, style }) {
@@ -566,7 +569,11 @@ function AllSection({ query, recents, setRecents }) {
 }
 
 // ─── Main Screen ───────────────────────────────────────────────────────────────
-export default function SearchScreen() {
+export default function SearchScreen( { navigation }) {
+  const cartItems = useCartStore((state) => state.cartItems);
+ const items = useCartStore((state) => state.items) ?? [];
+const itemCount = items.reduce((sum, item) => sum + item.qty, 0);
+const totalPrice = items.reduce((sum, item) => sum + item.price * item.qty, 0);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All');
   const [recents, setRecents] = useState(RECENTS);
@@ -647,6 +654,13 @@ export default function SearchScreen() {
         }
         <View style={{ height: 120 }} />
       </ScrollView>
+       <FloatCart
+        itemCount={itemCount}
+        totalPrice={totalPrice}
+        onPress={() => navigation.navigate('Cart')}  // ✅ add this line
+      /> 
+      
+
     </View>
   );
 }
