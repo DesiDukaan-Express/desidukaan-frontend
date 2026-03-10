@@ -52,7 +52,6 @@ export default function Navigation() {
           getMainNavigator()
         )}
         
-        {getMainNavigator()}
         
         {/* Customer Tabs */}
         <Stack.Screen name="Checkout" component={CheckoutScreen} />
