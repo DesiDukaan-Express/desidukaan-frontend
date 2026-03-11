@@ -64,6 +64,7 @@ export default function CheckoutScreen() {
       name : "dummyStore",
       time : "1 Min Ago",
       image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400",
+      items
     });
     cart.clearCart();
     navigation.navigate('OrderPlaced');
