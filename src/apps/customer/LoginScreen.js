@@ -132,8 +132,8 @@ export default function LoginScreen({ navigation }) {
             <View style={styles.logoMark}>
               <Feather name="shopping-cart" size={22} color="#16A34A" />
             </View>
-            <Text style={styles.brandName}>desi dukaan</Text>
-            <Text style={styles.brandTagline}>your neighbourhood, delivered</Text>
+            <Text style={styles.brandName}>DesiDukaan</Text>
+            <Text style={styles.brandTagline}>Your Neighbourhood, Delivered</Text>
           </Animated.View>
 
           {/* Form card */}
@@ -180,7 +180,7 @@ export default function LoginScreen({ navigation }) {
                 <>
                   <Text style={styles.formHeading}>Sign in</Text>
                   <Text style={styles.formSubheading}>
-                    Enter your mobile number to continue
+                    Already a member? Enter your mobile number to continue
                   </Text>
 
                   <View style={styles.fieldGroup}>

@@ -12,16 +12,8 @@ import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import { useNavigation } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
-
 import useAddressStore from "../../store/addressStore";
 import useOrderStore from "../../store/orderStore";
-
-
-
-
-
-// 
-
 
 const stores = [
   {
@@ -49,102 +41,67 @@ const stores = [
 
 export default function HomeScreen() {
   const [selectedCategory, setSelectedCategory] = useState("Vegetables");
-
-  const logout = useAuthStore((state) => state.logout);
-
-  const orders = useOrderStore((state) => state.orders);
-
-  const [location, setLocation] = useState(null);
-
   const [address, setAddress] = useState(null);
-
   const [search, setSearch] = useState("");
 
+  const logout = useAuthStore((state) => state.logout);
+  const orders = useOrderStore((state) => state.orders);
   const navigation = useNavigation();
-
-  const getLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setLocation({ latitude, longitude });
-        },
-        (error) => console.log(error.message),
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 },
-      );
-    } else {
-      console.log("Geolocation is not supported by this browser.");
-    }
-  };
-
   const addressStore = useAddressStore();
-
-  useEffect(() => {
-    if(!address) return;
-    
-    addressStore.addAddress(address);
-    
-  } , [address]);
-
-  useEffect(() => {
-    getLocation();
-  }, []);
-
-  useEffect(() => {
-    if (!location) return;
-
-    (async () => {
-      try {
-        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.latitude}&lon=${location.longitude}`;
-
-        const response = await fetch(url, {
-          headers: {
-            "User-Agent": "MyReactNativeApp/1.0 (contact@example.com)",
-          },
-        });
-
-        const data = await response.json();
-
-        if (data && data.address) {
-          setAddress(data.display_name);
-        }
-      } catch (error) {
-        console.error("Error fetching address:", error);
-      }
-    })();
-  }, [location]);
-
   const cart = useCartStore();
-  const itemCount = cart.items?.length || 0;
 
-const totalPrice = cart.items?.reduce((sum, item) => {
-  return sum + item.price * item.quantity;
-}, 0) || 0;
+  const itemCount = cart.items?.length || 0;
+  const totalPrice = cart.items?.reduce((sum, item) => sum + item.price * item.quantity, 0) || 0;
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        console.log('GPS coords:', latitude, longitude);
+        try {
+          const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
+          const response = await fetch(url, {
+            headers: { 'User-Agent': 'MyReactNativeApp/1.0 (contact@example.com)' },
+          });
+          const data = await response.json();
+          if (data && data.display_name) {
+            setAddress(data.display_name);
+            addressStore.clearAddresses();
+            addressStore.addAddress(data.display_name);
+          }
+        } catch (error) {
+          console.error('Reverse geocode failed:', error.message);
+        }
+      },
+      (error) => console.log('Geolocation error:', error.message),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }, []);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-
     if (hour < 12) return "Good Morning 👋";
     if (hour < 17) return "Good Afternoon ☀️";
     if (hour < 21) return "Good Evening 🌇";
     return "Good Night 🌙";
   };
 
-    
-
   return (
-     <View style={styles.container}>
+    <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* HEADER */}
         <View style={styles.header}>
           <View style={styles.locationRow}>
             <MaterialIcons name="location-on" size={20} color="#0ff022" />
-
             <View>
-              <Text style={styles.locationTitle}>Home - {address && address.split(',')[0]}</Text>
-              <Text style={styles.locationSubtitle}>{address ? address : "Fetching Location"} </Text>
+              <Text style={styles.locationTitle}>
+                Home - {address && address.split(",")[0]}
+              </Text>
+              <Text style={styles.locationSubtitle}>
+                {address ? address : "Fetching Location..."}
+              </Text>
             </View>
-
             <MaterialIcons name="expand-more" size={18} color="#888" />
           </View>
 
@@ -155,8 +112,9 @@ const totalPrice = cart.items?.reduce((sum, item) => {
         </View>
 
         {/* SEARCH */}
-        <TouchableOpacity style={styles.searchBox} 
-            onPress={() => navigation.navigate('Search')}
+        <TouchableOpacity
+          style={styles.searchBox}
+          onPress={() => navigation.navigate("Search")}
         >
           <MaterialIcons name="search" size={20} color="#888" />
           <TextInput
@@ -170,7 +128,6 @@ const totalPrice = cart.items?.reduce((sum, item) => {
           <Text style={styles.bannerSmall}>Flash Sale</Text>
           <Text style={styles.bannerTitle}>50% OFF</Text>
           <Text style={styles.bannerSub}>On your first 3 orders</Text>
-
           <View style={styles.bannerBtn}>
             <Text style={styles.bannerBtnText}>USE: FIRST50</Text>
           </View>
@@ -186,14 +143,11 @@ const totalPrice = cart.items?.reduce((sum, item) => {
           {stores.map((store, i) => (
             <View key={i} style={styles.storeCard}>
               <Image source={{ uri: store.image }} style={styles.storeImage} />
-
               <View style={styles.ratingBox}>
                 <MaterialIcons name="star" size={14} color="#0ff022" />
                 <Text style={styles.ratingText}>{store.rating}</Text>
               </View>
-
               <Text style={styles.storeName}>{store.name}</Text>
-
               <Text style={styles.storeMeta}>
                 {store.type} • {store.distance}
               </Text>
@@ -203,32 +157,21 @@ const totalPrice = cart.items?.reduce((sum, item) => {
 
         {/* RECENTLY ORDERED */}
         <Text style={styles.sectionTitle}>Recently Ordered From</Text>
-
         {orders.map((order, i) => (
           <View key={i} style={styles.orderCard}>
             <Image source={{ uri: order.image }} style={styles.orderImage} />
-
             <View style={{ flex: 1 }}>
               <Text style={styles.orderTitle}>{order.name}</Text>
               <Text style={styles.orderTime}>{order.time}</Text>
               <Text style={styles.reorder}>Reorder now</Text>
             </View>
-
             <MaterialIcons name="chevron-right" size={22} color="#ccc" />
           </View>
         ))}
-        
-      </ScrollView> 
-      
-      
-
-
-     
-
+      </ScrollView>
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -236,35 +179,29 @@ const styles = StyleSheet.create({
     backgroundColor: "#f5f8f6",
     paddingTop: 40,
   },
-
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 16,
     alignItems: "center",
   },
-
   locationRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
-
   locationTitle: {
     fontSize: 14,
     fontWeight: "700",
   },
-
   locationSubtitle: {
     fontSize: 10,
     color: "#888",
   },
-
   headerIcons: {
     flexDirection: "row",
     gap: 12,
   },
-
   searchBox: {
     margin: 16,
     flexDirection: "row",
@@ -273,33 +210,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 10,
   },
-
   searchInput: {
     flex: 1,
     padding: 10,
   },
-
   banner: {
     marginHorizontal: 16,
     backgroundColor: "#0ff022",
     padding: 20,
     borderRadius: 16,
   },
-
   bannerSmall: {
     fontSize: 12,
     fontWeight: "700",
   },
-
   bannerTitle: {
     fontSize: 28,
     fontWeight: "800",
   },
-
   bannerSub: {
     fontSize: 14,
   },
-
   bannerBtn: {
     marginTop: 10,
     backgroundColor: "#000",
@@ -308,43 +239,36 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignSelf: "flex-start",
   },
-
   bannerBtnText: {
     color: "#0ff022",
     fontWeight: "700",
     fontSize: 12,
   },
-
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 20,
   },
-
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
     paddingHorizontal: 16,
     marginTop: 20,
-    marginBottom : 20
+    marginBottom: 20,
   },
-
   viewAll: {
     color: "#0ff022",
     fontWeight: "700",
   },
-
   storeCard: {
     width: 220,
     marginLeft: 16,
   },
-
   storeImage: {
     width: "100%",
     height: 140,
     borderRadius: 14,
   },
-
   ratingBox: {
     position: "absolute",
     top: 10,
@@ -356,24 +280,20 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     alignItems: "center",
   },
-
   ratingText: {
     fontSize: 12,
     fontWeight: "700",
     marginLeft: 2,
   },
-
   storeName: {
     marginTop: 8,
     fontWeight: "700",
     fontSize: 15,
   },
-
   storeMeta: {
     color: "#666",
     fontSize: 13,
   },
-
   orderCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -383,29 +303,24 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 16,
   },
-
   orderImage: {
     width: 60,
     height: 60,
     borderRadius: 10,
     marginRight: 12,
   },
-
   orderTitle: {
     fontWeight: "700",
   },
-
   orderTime: {
     fontSize: 12,
     color: "#777",
   },
-
   reorder: {
     color: "#0ff022",
     fontSize: 12,
     fontWeight: "700",
   },
-
   bottomNav: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -414,17 +329,14 @@ const styles = StyleSheet.create({
     borderColor: "#eee",
     backgroundColor: "#fff",
   },
-
   navItem: {
     alignItems: "center",
   },
-
   navTextActive: {
     fontSize: 11,
     color: "#0ff022",
     fontWeight: "700",
   },
-
   navText: {
     fontSize: 11,
     color: "#777",

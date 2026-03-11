@@ -1938,18 +1938,21 @@ function FadeSlide({ delay = 0, children, style }) {
   );
 }
 
-function AddButton({ inStock }) {
-  const [qty, setQty] = useState(0);
+function AddButton({ inStock, item }) {
+  const cartItems = useCartStore((state) => state.items);
+  const addItem = useCartStore((state) => state.addItem);
+  const removeItem = useCartStore((state) => state.removeItem);
+
+  const cartItem = cartItems.find((i) => i.id === item.id);
+  const qty = cartItem ? cartItem.qty : 0;
+
   const sc = useRef(new Animated.Value(1)).current;
   const pop = () =>
     Animated.sequence([
-      Animated.spring(sc, {
-        toValue: 0.85,
-        useNativeDriver: true,
-        tension: 400,
-      }),
+      Animated.spring(sc, { toValue: 0.85, useNativeDriver: true, tension: 400 }),
       Animated.spring(sc, { toValue: 1, useNativeDriver: true, tension: 200 }),
     ]).start();
+
   if (!inStock)
     return (
       <TouchableOpacity style={s.notifyBtn}>
@@ -1963,7 +1966,7 @@ function AddButton({ inStock }) {
           style={s.addBtn}
           onPress={() => {
             pop();
-            setQty(1);
+            addItem({ ...item, image: item.img }, "SEARCH");
           }}
           activeOpacity={0.85}
         >
@@ -1975,7 +1978,7 @@ function AddButton({ inStock }) {
             style={s.qtyBtnW}
             onPress={() => {
               pop();
-              setQty((q) => Math.max(0, q - 1));
+              removeItem(item.id);
             }}
           >
             <Text style={s.qtyTxt}>−</Text>
@@ -1985,7 +1988,7 @@ function AddButton({ inStock }) {
             style={s.qtyBtnW}
             onPress={() => {
               pop();
-              setQty((q) => q + 1);
+              addItem({ ...item, image: item.img }, "SEARCH");
             }}
           >
             <Text style={s.qtyTxt}>+</Text>
@@ -2048,7 +2051,7 @@ function ProductRow({ item, index, onSeeStores }) {
           )}
         </View>
         <View style={s.itemCta}>
-          <AddButton inStock={item.inStock} />
+          <AddButton inStock={item.inStock} item={item} />
         </View>
       </View>
       <View style={s.itemDivider} />
