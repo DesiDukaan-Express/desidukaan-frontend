@@ -1,23 +1,72 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { colors } from '../../styles/colors';
-import { typography } from '../../styles/typography';
-import { spacing, radius } from '../../styles/spacing';
-import { shadows } from '../../styles/shadows';
+import { View, Text, StyleSheet, Image, ScrollView } from 'react-native';
+import { MaterialIcons } from "@expo/vector-icons";
+import useOrderStore from '../../store/orderStore';
 
-export default function SearchScreen() {  // Change name for each file
+
+export default function OrderScreen() {
+
+  const orders = useOrderStore((state) => state.orders);
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.emoji}>📦</Text>   {/* 🔍 / 🛒 / 📦 / 👤 */}
-      <Text style={styles.title}>Search</Text>  {/* Change title */}
-      <Text style={styles.sub}>Coming soon</Text>
-    </View>
+    <ScrollView style={styles.container}>
+      <Text style={styles.sectionTitle}>Recently Ordered From</Text>
+
+      {orders.map((order, i) => (
+        <View key={i} style={styles.orderCard}>
+          <Image source={{ uri: order.image }} style={styles.orderImage} />
+
+          <View style={{ flex: 1 }}>
+            <Text style={styles.orderTitle}>{order.name}</Text>
+            <Text style={styles.orderTime}>{order.time}</Text>
+            <Text style={styles.reorder}>Reorder now</Text>
+          </View>
+
+          <MaterialIcons name="chevron-right" size={22} color="#ccc" />
+        </View>
+      ))}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
-  emoji: { fontSize: 48, marginBottom: 12 },
-  title: { fontSize: 22, fontWeight: '700', color: colors.primary },
-  sub: { fontSize: 14, color: colors.textLight, marginTop: 6 },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    paddingHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 20
+  },
+
+  orderCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+  },
+
+  orderImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 10,
+    marginRight: 12,
+  },
+
+  orderTitle: {
+    fontWeight: "700",
+  },
+
+  orderTime: {
+    fontSize: 12,
+    color: "#777",
+  },
+
+  reorder: {
+    color: "#0ff022",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
 });

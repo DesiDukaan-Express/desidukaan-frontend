@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,537 +8,409 @@ import {
   Image,
   TouchableOpacity,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import useAuthStore from "../../store/authStore";
+import useCartStore from "../../store/cartStore";
+import { useNavigation } from "@react-navigation/native";
+import { MaterialIcons } from "@expo/vector-icons";
+import useAddressStore from "../../store/addressStore";
+import useOrderStore from "../../store/orderStore";
+
+
+// 
+
+
+const stores = [
+  {
+    name: "Sharma Kirana",
+    type: "Kirana",
+    distance: "1.2 km",
+    rating: "4.5",
+    image: "https://lh3.googleusercontent.com/Y4HVaAmhszdCQFJs-THvcyZWGha5NLhjo790LmL0zCRMErR8ai58wOPzAKZ-tqsel7OjR6rMsPkq0Xrx_m9MWRdCzEfcJhVn7_EOQsI=w360-rw",
+  },
+  {
+    name: "Fresh Mart",
+    type: "Vegetables and Kirana",
+    distance: "0.8 km",
+    rating: "4.2",
+    image: "https://lh3.googleusercontent.com/TW79DOPeTuw01SC4TNqtKXHNMjG1HGU7LT_-Ph2bY9COIgXwP0PBAQ_NxEyNu7cO4ofS5xu75SIF3t5WyXKjBF7Rng=w300-rw",
+  },
+  {
+    name: "Suresh Store",
+    type: "Daily Items",
+    distance: "2.5 km",
+    rating: "4.8",
+    image: "https://content3.jdmagicbox.com/comp/jaipur/i1/0141px141.x141.090825212123.x8i1/catalogue/sharma-kirana-and-general-store-shyamnagar-jaipur-provision-stores-3ea9myb.jpg",
+  },
+];
 
 export default function HomeScreen() {
   const [selectedCategory, setSelectedCategory] = useState("Vegetables");
-  const [cartCount, setCartCount] = useState(0);
 
-  // ================= CATEGORIES =================
-  const categories = [
-    {
-      name: "Vegetables",
-      image:
-        "https://images.unsplash.com/photo-1542838132-92c53300491e",
-    },
-    {
-      name: "Fruits",
-      image:
-        "https://images.unsplash.com/photo-1655483911598-41377da0019d?q=80&w=693&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    },
-    {
-      name: "Dairy",
-      image:
-        "https://images.unsplash.com/photo-1500595046743-cd271d694d30?q=80&w=1174&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    },
-    {
-      name: "Meat",
-      image:
-        "https://images.unsplash.com/photo-1607623814075-e51df1bdc82f",
-    },
-    {
-      name: "Snacks",
-      image:
-        "https://images.unsplash.com/photo-1599490659213-e2b9527bd087",
-    },
-    {
-      name: "Beverages",
-      image:
-        "https://images.unsplash.com/photo-1544145945-f90425340c7e",
-    },
-  ];
+  const logout = useAuthStore((state) => state.logout);
 
-  // ================= PRODUCTS =================
-  const products = {
-    Vegetables: [
-      {
-        id: 1,
-        name: "Tomatoes",
-        price: "1.54 €",
-        image:
-          "https://images.unsplash.com/photo-1561136594-7f68413baa99",
-      },
-      {
-        id: 2,
-        name: "Cucumber",
-        price: "0.95 €",
-        image:
-          "https://images.unsplash.com/photo-1568584711271-6c929fb49b60?q=80&w=1172&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-      },
-      {
-        id: 3,
-        name: "Carrot",
-        price: "1.10 €",
-        image:
-          "https://images.unsplash.com/photo-1447175008436-054170c2e979",
-      },
-      {
-        id: 4,
-        name: "Broccoli",
-        price: "1.80 €",
-        image:
-          "https://images.unsplash.com/photo-1589927986089-35812388d1f4",
-      },
-      {
-        id: 5,
-        name: "Spinach",
-        price: "0.75 €",
-        image:
-          "https://images.unsplash.com/photo-1576045057995-568f588f82fb",
-      },
-      {
-        id: 6,
-        name: "Potatoes",
-        price: "1.20 €",
-        image:
-          "https://images.unsplash.com/photo-1518977676601-b53f82aba655?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-      },
-    ],
+  const orders = useOrderStore((state) => state.orders);
 
-    Fruits: [
-      {
-        id: 7,
-        name: "Apple",
-        price: "2.20 €",
-        image:
-          "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6",
-      },
-      {
-        id: 8,
-        name: "Banana",
-        price: "1.10 €",
-        image:
-          "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e",
-      },
-      {
-        id: 9,
-        name: "Orange",
-        price: "1.30 €",
-        image:
-          "https://images.unsplash.com/photo-1580052614034-c55d20bfee3b",
-      },
-      {
-        id: 10,
-        name: "Strawberry",
-        price: "3.00 €",
-        image:
-          "https://images.unsplash.com/photo-1464965911861-746a04b4bca6",
-      },
-      {
-        id: 11,
-        name: "Grapes",
-        price: "2.50 €",
-        image:
-          "https://images.unsplash.com/photo-1423483641154-5411ec9c0ddf?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-      },
-      {
-        id: 12,
-        name: "Pineapple",
-        price: "2.80 €",
-        image:
-          "https://images.unsplash.com/photo-1623689071937-c3eeaf91650c?q=80&w=1174&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-      }
-    ],
+  const [location, setLocation] = useState(null);
 
-    Dairy: [
-      {
-        id: 13,
-        name: "Milk",
-        price: "1.80 €",
-        image:
-          "https://images.unsplash.com/photo-1757802868665-60b771aa399b?q=80&w=1105&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-      },
-      {
-        id: 14,
-        name: "Cheese",
-        price: "3.50 €",
-        image:
-          "https://images.unsplash.com/photo-1654513547430-973fe7570159?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-      },
-      {
-        id: 15,
-        name: "Butter",
-        price: "2.40 €",
-        image:
-          "https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-      },
-      {
-        id: 16,
-        name: "Yogurt",
-        price: "1.60 €",
-        image:
-          "https://images.unsplash.com/photo-1604095853918-1a1823a63dd5?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-      },
-    ],
+  const [address, setAddress] = useState(null);
 
-    Meat: [
-      {
-      id: 17,
-      name: "Chicken",
-      price: "1.69 $",
-      image: 
-      "https://images.unsplash.com/photo-1587593810167-a84920ea0781?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-      },
-       {
-      id: 18,
-      name: "Fish",
-      price: "1.69 $",
-      image: 
-      "https://images.unsplash.com/photo-1635843125771-e8eaca55d7da?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-       },
-       {
-        id:19,
-        name: "Goat Meat",
-        price: "2.34 $",
-        image:
-        "https://images.unsplash.com/photo-1606677661991-446cea8ee182?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+  const [search, setSearch] = useState("");
 
+  const navigation = useNavigation();
 
-       },
-       {
-        id:20,
-        name: "frozen Meat",
-        price: "3.4 $",
-        image:
-        "https://images.unsplash.com/photo-1547637205-fde0c9011f9d?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-
-       },
-
-    ],
-    Beverages: [
-      {
-        id:21,
-        name: "Soft Drinks",
-        price: "0.3 $",
-        image:
-        "https://images.unsplash.com/photo-1665359045452-bfa257a2a6bf?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-      },
-      {
-        id:22,
-        name: "Juices",
-        price: "0.5 $",
-        image:
-        "https://images.unsplash.com/photo-1583577612013-4fecf7bf8f13?q=80&w=966&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-      },
-      {
-        id:23,
-        name: "Dairy Drinks",
-        price: "0.6 $",
-        image:
-        "https://plus.unsplash.com/premium_photo-1695669385408-62d2b7d77861?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-      },
-      {
-        id:24,
-        name: "Tea & Coffee",
-        price: "0.7 $",
-        image:
-        "https://images.unsplash.com/photo-1566897245752-b287a7c599a5?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-      },
-    ],
-    Snacks: [
-      {
-        id:25,
-        name:"Chips & Crisps",
-        price:"0.2 $",
-        image:
-        "https://images.unsplash.com/photo-1613462847848-f65a8b231bb5?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-      },
-            {
-        id:26,
-        name:"Namkeens & Mixtures",
-        price:"0.3 $",
-        image:
-        "https://media.istockphoto.com/id/1217942210/photo/namkeen-fried-food-gujarati-food-gujarat-india.jpg?s=1024x1024&w=is&k=20&c=rZJokW-fq4Uh_3cR9zI1PChifQzm5ybt9U0ZcCCxRPY="
-            },
-            {
-              id:27,
-              name:"Biscuits & Cookies",
-              price: "0.2 $",
-              image:
-              "https://images.unsplash.com/photo-1598839950984-034f6dc7b495?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-
-            },
-            {
-              id:28,
-              name:"Chocolates",
-              price:"0.3 $",
-              image:
-              "https://images.unsplash.com/photo-1606312619070-d48b4c652a52?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-            },
-
-
-    ],
+  const getLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setLocation({ latitude, longitude });
+        },
+        (error) => console.log(error.message),
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 },
+      );
+    } else {
+      console.log("Geolocation is not supported by this browser.");
+    }
   };
 
-  // ================= STORES =================
-  const nearbyStores = [
-    { name: "Sharma Kirana", rating: 4.5, distance: "1.2 km", time: "12 min" },
-    { name: "Gupta Store", rating: 4.2, distance: "2 km", time: "15 min" },
-    { name: "Fresh Mart", rating: 4.7, distance: "900 m", time: "8 min" },
-    { name: "Daily Needs", rating: 4.3, distance: "1.5 km", time: "10 min" },
-  ];
+  const addressStore = useAddressStore();
+
+  useEffect(() => {
+    if(!address) return;
+    
+    addressStore.addAddress(address);
+    
+  } , [address]);
+
+  useEffect(() => {
+    getLocation();
+  }, []);
+
+  useEffect(() => {
+    if (!location) return;
+
+    (async () => {
+      try {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.latitude}&lon=${location.longitude}`;
+
+        const response = await fetch(url, {
+          headers: {
+            "User-Agent": "MyReactNativeApp/1.0 (contact@example.com)",
+          },
+        });
+
+        const data = await response.json();
+
+        if (data && data.address) {
+          setAddress(data.display_name);
+        }
+      } catch (error) {
+        console.error("Error fetching address:", error);
+      }
+    })();
+  }, [location]);
+
+  const cart = useCartStore();
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+
+    if (hour < 12) return "Good Morning 👋";
+    if (hour < 17) return "Good Afternoon ☀️";
+    if (hour < 21) return "Good Evening 🌇";
+    return "Good Night 🌙";
+  };
+
+    
 
   return (
-    <View style={styles.container}>
+     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* HEADER */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Good Morning 👋</Text>
-            <Text style={styles.location}>
-              Oderstrasse 12a, Berlin • 12 min
-            </Text>
+          <View style={styles.locationRow}>
+            <MaterialIcons name="location-on" size={20} color="#0ff022" />
+
+            <View>
+              <Text style={styles.locationTitle}>Home - {address && address.split(',')[0]}</Text>
+              <Text style={styles.locationSubtitle}>{address ? address : "Fetching Location"} </Text>
+            </View>
+
+            <MaterialIcons name="expand-more" size={18} color="#888" />
           </View>
 
-          <View style={styles.cartIcon}>
-            <Ionicons name="cart-outline" size={26} color="black" />
-            {cartCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{cartCount}</Text>
-              </View>
-            )}
+          <View style={styles.headerIcons}>
+            <MaterialIcons name="notifications" size={22} color="#333" />
+            <MaterialIcons name="account-circle" size={26} color="#0ff022" />
           </View>
         </View>
 
         {/* SEARCH */}
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={20} color="gray" />
-          <TextInput placeholder="Search something" />
+        <TouchableOpacity style={styles.searchBox} 
+            onPress={() => navigation.navigate('Search')}
+        >
+          <MaterialIcons name="search" size={20} color="#888" />
+          <TextInput
+            placeholder="Search for stores or items"
+            style={styles.searchInput}
+          />
+        </TouchableOpacity>
+
+        {/* OFFER BANNER */}
+        <View style={styles.banner}>
+          <Text style={styles.bannerSmall}>Flash Sale</Text>
+          <Text style={styles.bannerTitle}>50% OFF</Text>
+          <Text style={styles.bannerSub}>On your first 3 orders</Text>
+
+          <View style={styles.bannerBtn}>
+            <Text style={styles.bannerBtnText}>USE: FIRST50</Text>
+          </View>
         </View>
 
-        {/* CATEGORIES */}
-        <Text style={styles.sectionTitle}>Shop by Categories</Text>
-        <View style={styles.categoryGrid}>
-          {categories.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.categoryCard,
-                selectedCategory === item.name && styles.activeCategory,
-              ]}
-              onPress={() => setSelectedCategory(item.name)}
-            >
-              <Image source={{ uri: item.image }} style={styles.categoryImg} />
-              <Text style={styles.categoryText}>{item.name}</Text>
-            </TouchableOpacity>
-          ))}
+        {/* NEARBY STORES */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Nearby Stores</Text>
+          <Text style={styles.viewAll}>View all</Text>
         </View>
 
-        {/* PRODUCTS */}
-        <Text style={styles.sectionTitle}>{selectedCategory}</Text>
-        <View style={styles.productGrid}>
-          {products[selectedCategory]?.map((item) => (
-            <View key={item.id} style={styles.productCard}>
-              <Image source={{ uri: item.image }} style={styles.productImg} />
-              <Text style={styles.price}>{item.price}</Text>
-              <Text style={styles.productName}>{item.name}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {stores.map((store, i) => (
+            <View key={i} style={styles.storeCard}>
+              <Image source={{ uri: store.image }} style={styles.storeImage} />
 
-              <TouchableOpacity
-                style={styles.addBtn}
-                onPress={() => setCartCount(cartCount + 1)}
-              >
-                <Text style={styles.addText}>Add to Cart</Text>
-              </TouchableOpacity>
+              <View style={styles.ratingBox}>
+                <MaterialIcons name="star" size={14} color="#0ff022" />
+                <Text style={styles.ratingText}>{store.rating}</Text>
+              </View>
+
+              <Text style={styles.storeName}>{store.name}</Text>
+
+              <Text style={styles.storeMeta}>
+                {store.type} • {store.distance}
+              </Text>
             </View>
           ))}
-        </View>
+        </ScrollView>
 
-        {/* STORES */}
-        <Text style={styles.sectionTitle}>Nearby Stores</Text>
-        {nearbyStores.map((store, index) => (
-          <View key={index} style={styles.storeCard}>
-            <Text style={styles.storeName}>{store.name}</Text>
-            <Text>
-              ⭐ {store.rating} • {store.distance} • {store.time}
-            </Text>
+        {/* RECENTLY ORDERED */}
+        <Text style={styles.sectionTitle}>Recently Ordered From</Text>
+
+        {orders.map((order, i) => (
+          <View key={i} style={styles.orderCard}>
+            <Image source={{ uri: order.image }} style={styles.orderImage} />
+
+            <View style={{ flex: 1 }}>
+              <Text style={styles.orderTitle}>{order.name}</Text>
+              <Text style={styles.orderTime}>{order.time}</Text>
+              <Text style={styles.reorder}>Reorder now</Text>
+            </View>
+
+            <MaterialIcons name="chevron-right" size={22} color="#ccc" />
           </View>
         ))}
-
-        <View style={{ height: 120 }} />
-      </ScrollView>
-
-      {/* FLOATING CART */}
-      <TouchableOpacity style={styles.floatingBtn}>
-        <Ionicons name="cart" size={24} color="white" />
-      </TouchableOpacity>
-
-    
+      </ScrollView> 
     </View>
   );
 }
 
-// ================= STYLES =================
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f6f6f6" },
+  container: {
+    flex: 1,
+    backgroundColor: "#f5f8f6",
+    paddingTop: 40,
+  },
 
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    padding: 20,
+    paddingHorizontal: 16,
+    alignItems: "center",
   },
 
-  greeting: { fontSize: 22, fontWeight: "bold" },
-  location: { color: "gray" },
-
-  cartIcon: { position: "relative" },
-
-  badge: {
-    position: "absolute",
-    top: -5,
-    right: -8,
-    backgroundColor: "#1ca049",
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
 
-  badgeText: { color: "white", fontSize: 12 },
+  locationTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
+  locationSubtitle: {
+    fontSize: 10,
+    color: "#888",
+  },
+
+  headerIcons: {
+    flexDirection: "row",
+    gap: 12,
+  },
 
   searchBox: {
+    margin: 16,
     flexDirection: "row",
-    backgroundColor: "#eaeaea",
-    marginHorizontal: 20,
-    padding: 12,
-    borderRadius: 12,
     alignItems: "center",
-    gap: 10,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+  },
+
+  searchInput: {
+    flex: 1,
+    padding: 10,
+  },
+
+  banner: {
+    marginHorizontal: 16,
+    backgroundColor: "#0ff022",
+    padding: 20,
+    borderRadius: 16,
+  },
+
+  bannerSmall: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  bannerTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+  },
+
+  bannerSub: {
+    fontSize: 14,
+  },
+
+  bannerBtn: {
+    marginTop: 10,
+    backgroundColor: "#000",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: "flex-start",
+  },
+
+  bannerBtnText: {
+    color: "#0ff022",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 20,
   },
 
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "bold",
-    marginHorizontal: 20,
+    fontWeight: "700",
+    paddingHorizontal: 16,
     marginTop: 20,
+    marginBottom : 20
   },
 
-   /* categoryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-around",
-    marginTop: 10,
-  },
-
-  categoryCard: {
-    width: "29%",
-    backgroundColor: "white",
-    marginVertical: 7,
-    borderRadius: 16,
-    padding: 10,
-    alignItems: "center",
-  },
-
-  activeCategory: {
-    borderWidth: 2,
-    borderColor: "#1ca049",
-  },
-
-  categoryImg: { width: 120, height: 110, borderRadius: 12 },
-  categoryText: { marginTop: 6, fontWeight: "600" }, */
-  categoryGrid: {
-  flexDirection: "row",
-  flexWrap: "wrap",
-  justifyContent: "center",
-  marginTop: 10,
-},
-
-categoryCard: {
-  width: 110,
-  height: 130,
-  padding: 8,
-  borderRadius: 12,
-  margin: 6,
-  backgroundColor: "#fff",
-
-  shadowColor: "#000",
-  shadowOpacity: 0.08,
-  shadowRadius: 4,
-
-  elevation: 2,
-
-  alignItems: "center",
-  justifyContent: "center",
-},
-
-categoryImg: {
-  width: 75,
-  height: 75,
-  borderRadius: 10,
-},
-
-categoryText: {
-  fontSize: 12,
-  fontWeight: "600",
-  marginTop: 6,
-  textAlign: "center",
-  color: "#333",
-},
-   
-  productGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-around",
-  },
-
-  productCard: {
-    width: "45%",
-    backgroundColor: "white",
-    marginVertical: 10,
-    borderRadius: 16,
-    padding: 10,
-    elevation: 3,
-  },
-
-  productImg: {
-    width: "60%",
-    height: 130,
-    borderRadius: 12,
-  },
-
-  productName: {
-    fontWeight: "600",
-    marginTop: 6,
-  },
-
-  price: {
-    color: "#1ca049",
-    fontWeight: "bold",
-    marginTop: 6,
-  },
-
-  addBtn: {
-    marginTop: 8,
-    width:120,
-    backgroundColor: "#1ca049",
-    paddingVertical: 8,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-
-  addText: {
-    color: "white",
-    fontWeight: "600",
+  viewAll: {
+    color: "#0ff022",
+    fontWeight: "700",
   },
 
   storeCard: {
-    backgroundColor: "white",
-    marginHorizontal: 20,
-    padding: 15,
-    borderRadius: 12,
-    marginTop: 10,
+    width: 220,
+    marginLeft: 16,
   },
 
-  storeName: { fontWeight: "bold", fontSize: 16 },
+  storeImage: {
+    width: "100%",
+    height: 140,
+    borderRadius: 14,
+  },
 
-  floatingBtn: {
+  ratingBox: {
     position: "absolute",
-    bottom: 80,
-    right: 20,
-    backgroundColor: "#1ca049",
-    padding: 15,
-    borderRadius: 30,
-    elevation: 5,
+    top: 10,
+    right: 10,
+    backgroundColor: "#fff",
+    flexDirection: "row",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignItems: "center",
   },
 
-  
+  ratingText: {
+    fontSize: 12,
+    fontWeight: "700",
+    marginLeft: 2,
+  },
+
+  storeName: {
+    marginTop: 8,
+    fontWeight: "700",
+    fontSize: 15,
+  },
+
+  storeMeta: {
+    color: "#666",
+    fontSize: 13,
+  },
+
+  orderCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+  },
+
+  orderImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 10,
+    marginRight: 12,
+  },
+
+  orderTitle: {
+    fontWeight: "700",
+  },
+
+  orderTime: {
+    fontSize: 12,
+    color: "#777",
+  },
+
+  reorder: {
+    color: "#0ff022",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  bottomNav: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderColor: "#eee",
+    backgroundColor: "#fff",
+  },
+
+  navItem: {
+    alignItems: "center",
+  },
+
+  navTextActive: {
+    fontSize: 11,
+    color: "#0ff022",
+    fontWeight: "700",
+  },
+
+  navText: {
+    fontSize: 11,
+    color: "#777",
+  },
 });
