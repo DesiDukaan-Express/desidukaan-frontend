@@ -4,6 +4,7 @@ import {
   TouchableOpacity, Image, Animated, StatusBar,
   Platform, KeyboardAvoidingView, Keyboard,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -51,20 +52,17 @@ const ALL_PRODUCTS = [
   { id:'p62', name:'Nestle Slim Skimmed Milk',         brand:'Nestle',        weight:'1 L',     price:72,  mrp:80,   inStock:true,  img:'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400&q=85',  keywords:['milk','dairy','nestle','skimmed','low fat','slim','drink','white','beverage','healthy'], storeIds:['s3','s5','s6','s8','s10'] },
   { id:'p63', name:'Britannia Cheese Spread',          brand:'Britannia',     weight:'180 g',   price:95,  mrp:105,  inStock:true,  img:'https://images.unsplash.com/photo-1552767059-ce182ead6c1b?w=400&q=85',  keywords:['cheese','dairy','britannia','spread','bread','sandwich','milk'], storeIds:['s1','s2','s5','s7','s9'] },
   { id:'p64', name:'Amul Kool Chocolate Milk',         brand:'Amul',          weight:'200 ml',  price:25,  mrp:null, inStock:true,  img:'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400&q=85',  keywords:['milk','chocolate milk','amul','dairy','drink','flavoured','cold','kool','beverage'], storeIds:['s1','s2','s4','s5','s9','s10'] },
-
   // EGGS
   { id:'p11', name:'Farm Fresh Brown Eggs',            brand:'Country Egg',   weight:'12 pcs',  price:89,  mrp:null, inStock:true,  img:'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=400&q=85',  keywords:['eggs','egg','farm','protein','brown eggs','breakfast','fresh','boiled'], storeIds:['s1','s3','s4','s5','s6','s9','s10'] },
   { id:'p12', name:'Keggland White Eggs',              brand:'Keggland',      weight:'6 pcs',   price:45,  mrp:null, inStock:true,  img:'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=400&q=85',  keywords:['eggs','egg','white eggs','protein','breakfast','fresh','boiled'], storeIds:['s2','s4','s7','s8','s10'] },
   { id:'p13', name:'Organic Free-Range Eggs',          brand:'Go Organic',    weight:'6 pcs',   price:79,  mrp:90,   inStock:true,  img:'https://images.unsplash.com/photo-1506976785307-8732e854ad03?w=400&q=85',  keywords:['eggs','egg','organic','free range','protein','breakfast','healthy'], storeIds:['s3','s6','s8','s10'] },
   { id:'p14', name:'Suguna Cage-Free Eggs',            brand:'Suguna',        weight:'6 pcs',   price:55,  mrp:60,   inStock:true,  img:'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=400&q=85',  keywords:['eggs','egg','cage free','protein','breakfast','fresh','suguna'], storeIds:['s2','s5','s7','s9','s10'] },
-
   // BREAD & BAKERY
   { id:'p15', name:'Britannia Whole Wheat Bread',      brand:'Britannia',     weight:'400 g',   price:45,  mrp:50,   inStock:true,  img:'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400&q=85',  keywords:['bread','wheat','bakery','britannia','whole wheat','sandwich','breakfast','toast','loaf'], storeIds:['s1','s2','s4','s5','s7','s8','s9'] },
   { id:'p16', name:'Harvest Gold White Bread',         brand:'Harvest Gold',  weight:'400 g',   price:40,  mrp:null, inStock:true,  img:'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=85',  keywords:['bread','white bread','bakery','harvest gold','sandwich','toast','loaf','breakfast'], storeIds:['s2','s5','s7','s9','s10'] },
   { id:'p17', name:'English Oven Multigrain Bread',    brand:'English Oven',  weight:'400 g',   price:55,  mrp:60,   inStock:true,  img:'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400&q=85',  keywords:['bread','multigrain','bakery','english oven','sandwich','healthy','toast','loaf','breakfast'], storeIds:['s3','s6','s8','s9','s10'] },
   { id:'p18', name:'Britannia NutriChoice Digestive',  brand:'Britannia',     weight:'250 g',   price:65,  mrp:72,   inStock:true,  img:'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400&q=85',  keywords:['biscuit','cookies','bakery','britannia','digestive','snacks','healthy','oats'], storeIds:['s1','s2','s4','s7','s9'] },
   { id:'p19', name:'Parle-G Original Biscuits',        brand:'Parle',         weight:'800 g',   price:50,  mrp:null, inStock:true,  img:'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400&q=85',  keywords:['biscuit','parle','cookies','snacks','bakery','tea time','sweet'], storeIds:['s1','s2','s4','s5','s7','s9','s10'] },
-
   // SNACKS
   { id:'p20', name:"Lay's Classic Salted Chips",       brand:"Lay's",         weight:'104 g',   price:30,  mrp:33,   inStock:true,  img:'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=85', keywords:['chips','lays','snacks','crisps','potato chips','fried','salty','party'], storeIds:['s1','s2','s4','s5','s7','s9','s10'] },
   { id:'p21', name:"Lay's Magic Masala",               brand:"Lay's",         weight:'104 g',   price:30,  mrp:33,   inStock:true,  img:'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=85', keywords:['chips','lays','snacks','masala','potato chips','spicy','fried','salty'], storeIds:['s1','s2','s4','s5','s9','s10'] },
@@ -76,7 +74,6 @@ const ALL_PRODUCTS = [
   { id:'p27', name:'Too Yumm Multigrain Chips',        brand:'Too Yumm',      weight:'80 g',    price:25,  mrp:28,   inStock:true,  img:'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=85', keywords:['chips','snacks','multigrain','healthy','baked','salty'], storeIds:['s1','s5','s6','s9','s10'] },
   { id:'p67', name:'Bingo Mad Angles',                 brand:'ITC',           weight:'130 g',   price:20,  mrp:null, inStock:true,  img:'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=85', keywords:['chips','bingo','snacks','itc','fried','salty','masala','party'], storeIds:['s1','s2','s4','s5','s7','s9','s10'] },
   { id:'p68', name:'Doritos Nacho Cheese',             brand:'Doritos',       weight:'114 g',   price:130, mrp:140,  inStock:true,  img:'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=85', keywords:['chips','doritos','snacks','imported','cheese','nacho','crisps','party'], storeIds:['s3','s6','s9','s10'] },
-
   // BEVERAGES — JUICE
   { id:'p28', name:'Tropicana Orange Juice',           brand:'Tropicana',     weight:'1 L',     price:99,  mrp:115,  inStock:true,  img:'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=400&q=85', keywords:['juice','orange','tropicana','drinks','beverage','fruit juice','cold'], storeIds:['s2','s4','s5','s7','s9','s10'] },
   { id:'p29', name:'Real Mixed Fruit Juice',           brand:'Dabur',         weight:'1 L',     price:85,  mrp:95,   inStock:true,  img:'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=400&q=85', keywords:['juice','mixed fruit','dabur','drinks','beverage','fruit juice','real'], storeIds:['s2','s5','s6','s8','s9','s10'] },
@@ -85,7 +82,6 @@ const ALL_PRODUCTS = [
   { id:'p70', name:'B Natural Guava Juice',            brand:'ITC',           weight:'1 L',     price:80,  mrp:90,   inStock:true,  img:'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=400&q=85', keywords:['juice','guava','itc','drinks','beverage','fruit juice','b natural'], storeIds:['s1','s5','s6','s9','s10'] },
   { id:'p71', name:'Minute Maid Pulpy Orange',         brand:'Coca Cola',     weight:'1 L',     price:89,  mrp:99,   inStock:true,  img:'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=400&q=85', keywords:['juice','orange','minute maid','drinks','beverage','fruit juice','cold','pulpy'], storeIds:['s1','s2','s4','s7','s9','s10'] },
   { id:'p72', name:'Raw Pressery Watermelon Juice',    brand:'Raw Pressery',  weight:'250 ml',  price:75,  mrp:85,   inStock:true,  img:'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=400&q=85', keywords:['juice','watermelon','raw pressery','drinks','beverage','cold pressed','fruit juice','healthy'], storeIds:['s3','s6','s8','s10'] },
-
   // BEVERAGES — TEA & COFFEE
   { id:'p31', name:'Tata Tea Premium Leaf',            brand:'Tata',          weight:'500 g',   price:220, mrp:null, inStock:true,  img:'https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=400&q=85', keywords:['tea','tata','beverages','chai','leaf tea','drink','hot','morning'], storeIds:['s1','s2','s3','s7','s8'] },
   { id:'p32', name:'Brooke Bond Red Label Tea',        brand:'HUL',           weight:'500 g',   price:199, mrp:215,  inStock:true,  img:'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?w=400&q=85', keywords:['tea','red label','hul','beverages','chai','drink','hot','morning','leaf tea'], storeIds:['s1','s2','s5','s7','s9','s10'] },
@@ -96,7 +92,6 @@ const ALL_PRODUCTS = [
   { id:'p73', name:'Blue Tokai Vienna Roast Coffee',   brand:'Blue Tokai',    weight:'250 g',   price:450, mrp:499,  inStock:true,  img:'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400&q=85', keywords:['coffee','blue tokai','filter coffee','premium','gourmet','beverage','roasted','cafe'], storeIds:['s3','s6','s8','s10'] },
   { id:'p74', name:'Continental Malabar Blend Coffee', brand:'Continental',   weight:'200 g',   price:210, mrp:240,  inStock:true,  img:'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400&q=85', keywords:['coffee','continental','filter coffee','south indian','beverage','decoction','cafe','drink'], storeIds:['s2','s5','s7','s9','s10'] },
   { id:'p57', name:'Organic India Tulsi Green Tea',    brand:'Organic India', weight:'25 bags', price:165, mrp:190,  inStock:true,  img:'https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=400&q=85', keywords:['tea','green tea','organic','tulsi','herbal','beverages','healthy','drink'], storeIds:['s3','s6','s8','s10'] },
-
   // VEGETABLES & FRUITS
   { id:'p37', name:'Organic Baby Spinach',             brand:'Go Organic',    weight:'250 g',   price:65,  mrp:null, inStock:true,  img:'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=400&q=85', keywords:['spinach','greens','organic','veggies','leaves','vegetables','fresh','salad','healthy'], storeIds:['s3','s5','s6','s8','s10'] },
   { id:'p38', name:'Country Fresh Tomatoes',           brand:'Farm Direct',   weight:'500 g',   price:35,  mrp:null, inStock:true,  img:'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&q=85', keywords:['tomato','veggies','fresh','vegetables','cooking','salad','red'], storeIds:['s3','s5','s6','s8','s10'] },
@@ -106,7 +101,6 @@ const ALL_PRODUCTS = [
   { id:'p42', name:'Seedless Green Grapes',            brand:'Farm Direct',   weight:'500 g',   price:89,  mrp:null, inStock:true,  img:'https://images.unsplash.com/photo-1537640538966-79f369143f8f?w=400&q=85', keywords:['grapes','fruit','fresh','green grapes','sweet','healthy'], storeIds:['s3','s5','s6','s8','s10'] },
   { id:'p43', name:'Fresh Broccoli',                   brand:'Farm Direct',   weight:'300 g',   price:55,  mrp:null, inStock:true,  img:'https://images.unsplash.com/photo-1459411621453-7b03977f4bfc?w=400&q=85', keywords:['broccoli','veggies','vegetables','fresh','greens','healthy','salad','cooking'], storeIds:['s3','s6','s8','s10'] },
   { id:'p44', name:'Nendran Bananas',                  brand:'Farm Direct',   weight:'500 g',   price:65,  mrp:null, inStock:true,  img:'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=400&q=85', keywords:['banana','nendran','fruit','fresh','yellow','healthy','kerala'], storeIds:['s5','s6','s8','s10'] },
-
   // STAPLES
   { id:'p45', name:'Aashirvaad Whole Wheat Atta',      brand:'Aashirvaad',    weight:'5 kg',    price:249, mrp:280,  inStock:true,  img:'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=400&q=85', keywords:['atta','wheat','flour','aashirvaad','whole wheat','roti','chapati','cooking','staples'], storeIds:['s1','s2','s5','s7','s9'] },
   { id:'p46', name:'Pillsbury Maida All Purpose Flour', brand:'Pillsbury',    weight:'1 kg',    price:55,  mrp:60,   inStock:true,  img:'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=400&q=85', keywords:['atta','flour','maida','pillsbury','baking','cooking','bread','staples','wheat'], storeIds:['s2','s5','s7','s8','s9'] },
@@ -119,7 +113,6 @@ const ALL_PRODUCTS = [
   { id:'p76', name:'Kohinoor Super Value Basmati',     brand:'Kohinoor',      weight:'5 kg',    price:360, mrp:399,  inStock:true,  img:'https://images.unsplash.com/photo-1536304993881-ff86e0c9ee89?w=400&q=85', keywords:['rice','basmati','kohinoor','staples','grain','cooking','biryani'], storeIds:['s1','s2','s5','s7','s9','s10'] },
   { id:'p77', name:'Fortune Sona Masoori Rice',        brand:'Fortune',       weight:'5 kg',    price:320, mrp:350,  inStock:true,  img:'https://images.unsplash.com/photo-1536304993881-ff86e0c9ee89?w=400&q=85', keywords:['rice','sona masoori','fortune','staples','grain','cooking','daily use'], storeIds:['s2','s5','s6','s7','s8','s9','s10'] },
   { id:'p79', name:'Patanjali Atta Whole Wheat',       brand:'Patanjali',     weight:'5 kg',    price:215, mrp:240,  inStock:true,  img:'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=400&q=85', keywords:['atta','wheat','flour','patanjali','whole wheat','roti','chapati','cooking','staples'], storeIds:['s1','s2','s5','s7','s9','s10'] },
-
   // ORGANIC & HEALTH
   { id:'p53', name:'Quaker Organic Rolled Oats',       brand:'Quaker',        weight:'500 g',   price:159, mrp:189,  inStock:true,  img:'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=85', keywords:['oats','quaker','breakfast','organic','rolled oats','healthy','porridge'], storeIds:['s2','s3','s6','s8'] },
   { id:'p54', name:'Saffola Masala Oats',              brand:'Saffola',       weight:'400 g',   price:129, mrp:149,  inStock:true,  img:'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=85', keywords:['oats','saffola','breakfast','masala','savory','healthy','instant','quick'], storeIds:['s1','s2','s5','s7','s9'] },
@@ -134,7 +127,6 @@ const ALL_PRODUCTS = [
 ];
 
 // ─── ALL STORES ───────────────────────────────────────────────────────────────
-// productIds computed from product.storeIds above (source of truth = product.storeIds)
 const ALL_STORES = [
   { id:'s1',  name:'Blinkit – Sector 18',           type:'Instant Delivery',   open:true,  promoted:true,  distance:'0.4 km', eta:'8 min',  rating:4.6, reviews:'2.1k', address:'Shop 12, Sector 18 Market, Noida',      features:['Free delivery ₹199+','24×7','No-contact'],          img:'https://images.unsplash.com/photo-1601598851547-4302969d0614?auto=format&fit=crop&w=800&q=80' },
   { id:'s2',  name:'DMart – Sector 2',              type:'Supermarket',         open:true,  promoted:false, distance:'1.2 km', eta:'15 min', rating:4.4, reviews:'5.3k', address:'D-Block, Sector 2, Noida',              features:['Bulk discounts','Low prices','Parking'],             img:'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80' },
@@ -149,75 +141,56 @@ const ALL_STORES = [
 ];
 
 // ─── Search helpers ───────────────────────────────────────────────────────────
-// Strict: only match product name or brand — used for "matched" results shown to user
 function strictMatch(p, q) {
   return p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q);
 }
-
-// Broad: also checks keywords — used only to decide which stores appear in results
 function broadMatch(p, q) {
   return strictMatch(p, q) || p.keywords.some(k => k.includes(q));
 }
-
-// Items tab: only strictly relevant products
 function searchProducts(query) {
   const q = query.toLowerCase().trim();
   return ALL_PRODUCTS.filter(p => strictMatch(p, q));
 }
-
-// Places tab: stores that stock at least one broadly-matching product
-// matchedItems uses STRICT match so only truly relevant items show in detail
 function searchStores(query) {
   const q = query.toLowerCase().trim();
   const strictMatched = ALL_PRODUCTS.filter(p => strictMatch(p, q));
   const broadMatched  = ALL_PRODUCTS.filter(p => broadMatch(p, q));
-
-  // Use broad match to find stores (so stores aren't missed)
   const storeMatchMap = new Map();
   for (const p of broadMatched) {
     for (const sid of p.storeIds) {
       if (!storeMatchMap.has(sid)) storeMatchMap.set(sid, []);
     }
   }
-
-  // But matchedItems = only strict matches for that store
-  const strictIds = new Set(strictMatched.map(p => p.id));
   return ALL_STORES
     .filter(st => storeMatchMap.has(st.id))
-    .map(st => ({
-      ...st,
-      matchedItems: strictMatched.filter(p => p.storeIds.includes(st.id)),
-    }))
+    .map(st => ({ ...st, matchedItems: strictMatched.filter(p => p.storeIds.includes(st.id)) }))
     .filter(st => st.matchedItems.length > 0)
     .sort((a, b) => b.matchedItems.length - a.matchedItems.length);
 }
-
-// Given a store, return ALL products it stocks (from product.storeIds)
 function getStoreProducts(storeId) {
   return ALL_PRODUCTS.filter(p => p.storeIds.includes(storeId));
 }
 
 // ─── Idle screen data ─────────────────────────────────────────────────────────
 const INITIAL_HISTORY = [
-  { id:'h1', text:'Milk',              img:'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=120&q=80' },
-  { id:'h2', text:'Eggs',              img:'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=120&q=80' },
-  { id:'h3', text:'Bread',             img:'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=120&q=80' },
-  { id:'h4', text:'Rice',              img:'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=300&q=80'},
-  { id:'h5', text:'Coffee',            img:'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=120&q=80' },
+  { id:'h1', text:'Milk',    img:'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=120&q=80' },
+  { id:'h2', text:'Eggs',   img:'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=120&q=80' },
+  { id:'h3', text:'Bread',  img:'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=120&q=80' },
+  { id:'h4', text:'Rice',   img:'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=300&q=80' },
+  { id:'h5', text:'Coffee', img:'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=120&q=80' },
 ];
-
 const TRENDING = [
-  { id:'t1', text:'Paneer',        img:'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=300&q=80' },
-  { id:'t2', text:'Basmati Rice',  img:'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=300&q=80' },
-  { id:'t3', text:'Atta',          img:'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=300&q=80' },
-  { id:'t4', text:'Coffee',        img:'https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=300&q=80' },
-  { id:'t5', text:'Noodles',       img:'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=300&q=80' },
-  { id:'t6', text:'Banana',        img:'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300&q=80' },
-  { id:'t7', text:'Chips',         img:'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=300&q=80' },
-  { id:'t8', text:'Honey',         img:'https://images.unsplash.com/photo-1587049352851-8d4e89133924?w=300&q=80' },
+  { id:'t1', text:'Paneer',       img:'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=300&q=80' },
+  { id:'t2', text:'Basmati Rice', img:'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=300&q=80' },
+  { id:'t3', text:'Atta',         img:'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=300&q=80' },
+  { id:'t4', text:'Coffee',       img:'https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=300&q=80' },
+  { id:'t5', text:'Noodles',      img:'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=300&q=80' },
+  { id:'t6', text:'Banana',       img:'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300&q=80' },
+  { id:'t7', text:'Chips',        img:'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=300&q=80' },
+  { id:'t8', text:'Honey',        img:'https://images.unsplash.com/photo-1587049352851-8d4e89133924?w=300&q=80' },
 ];
 
-// ─── Animation wrapper ────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function FadeSlide({ delay = 0, children, style }) {
   const a = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -230,7 +203,6 @@ function FadeSlide({ delay = 0, children, style }) {
   );
 }
 
-// ─── ADD / Qty button (shared) ────────────────────────────────────────────────
 function AddButton({ inStock }) {
   const [qty, setQty] = useState(0);
   const sc = useRef(new Animated.Value(1)).current;
@@ -244,7 +216,7 @@ function AddButton({ inStock }) {
       {qty === 0
         ? <TouchableOpacity style={s.addBtn} onPress={() => { pop(); setQty(1); }} activeOpacity={0.85}><Text style={s.addTxt}>+ ADD</Text></TouchableOpacity>
         : <View style={s.qtyBox}>
-            <TouchableOpacity style={s.qtyBtnW} onPress={() => { pop(); setQty(q => Math.max(0, q-1)); }}><Text style={s.qtyTxt}>−</Text></TouchableOpacity>
+            <TouchableOpacity style={s.qtyBtnW} onPress={() => { pop(); setQty(q => Math.max(0,q-1)); }}><Text style={s.qtyTxt}>−</Text></TouchableOpacity>
             <Text style={s.qtyNum}>{qty}</Text>
             <TouchableOpacity style={s.qtyBtnW} onPress={() => { pop(); setQty(q => q+1); }}><Text style={s.qtyTxt}>+</Text></TouchableOpacity>
           </View>
@@ -253,7 +225,6 @@ function AddButton({ inStock }) {
   );
 }
 
-// ─── Product row (used in Items tab + Store detail) ───────────────────────────
 function ProductRow({ item, index, onSeeStores }) {
   const discPct = item.mrp ? Math.round((1 - item.price / item.mrp) * 100) : null;
   const storeCount = item.storeIds?.length ?? 0;
@@ -287,7 +258,6 @@ function ProductRow({ item, index, onSeeStores }) {
   );
 }
 
-// ─── Suggestion row ───────────────────────────────────────────────────────────
 function SuggRow({ item, query, onPress }) {
   const lower = item.name.toLowerCase();
   const q     = query.toLowerCase();
@@ -306,13 +276,11 @@ function SuggRow({ item, query, onPress }) {
   );
 }
 
-// ─── Place card (tap → store detail) ─────────────────────────────────────────
 function PlaceCard({ item, index, onTap }) {
   const count = item.matchedItems?.length ?? 0;
   return (
     <FadeSlide delay={index * 50}>
       <TouchableOpacity style={s.placeCard} onPress={() => onTap(item)} activeOpacity={0.92}>
-        {/* Banner */}
         <View style={s.placeImgWrap}>
           <Image source={{ uri: item.img }} style={s.placeImg} resizeMode="cover" />
           {item.promoted && <View style={s.adBadge}><Text style={s.adTxt}>PROMOTED</Text></View>}
@@ -321,7 +289,6 @@ function PlaceCard({ item, index, onTap }) {
           <View style={s.distChip}><Text style={s.distTxt}>📍 {item.distance}</Text></View>
           {count > 0 && <View style={s.itemCountBadge}><Text style={s.itemCountTxt}>{count} item{count > 1 ? 's' : ''} available</Text></View>}
         </View>
-        {/* Body */}
         <View style={s.placeBody}>
           <View style={s.placeTopRow}>
             <View style={{ flex:1 }}>
@@ -331,7 +298,6 @@ function PlaceCard({ item, index, onTap }) {
             <View style={s.ratingBox}><Text style={s.ratingStar}>★</Text><Text style={s.ratingNum}>{item.rating}</Text></View>
           </View>
           <Text style={s.placeAddress} numberOfLines={1}>📍 {item.address}</Text>
-          {/* Feature pills */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop:8 }} contentContainerStyle={{ gap:6 }}>
             {item.features.map(f => <View key={f} style={s.featurePill}><Text style={s.featureTxt}>{f}</Text></View>)}
           </ScrollView>
@@ -341,7 +307,6 @@ function PlaceCard({ item, index, onTap }) {
   );
 }
 
-// ─── Tab bar ──────────────────────────────────────────────────────────────────
 function TabBar({ active, onSelect, itemCount, placeCount }) {
   const lineX = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -362,28 +327,40 @@ function TabBar({ active, onSelect, itemCount, placeCount }) {
   );
 }
 
-// ─── Store Detail Screen ──────────────────────────────────────────────────────
+// ─── Store Detail  ────────────────────────────────────────────────────────────
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  FIX: StoreDetail now accepts an `onBack` that it calls AFTER animating ║
+// ║  out, so the search results are always alive underneath — no blank.     ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
 function StoreDetail({ store, searchQuery, onBack }) {
-  const slideX = useRef(new Animated.Value(60)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
+  const translateX = useRef(new Animated.Value(40)).current;
+  const opacity    = useRef(new Animated.Value(0)).current;
+
+  // Animate IN on mount
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(opacity, { toValue:1, duration:220, useNativeDriver:true }),
-      Animated.spring(slideX,  { toValue:0, tension:180, friction:18, useNativeDriver:true }),
+      Animated.timing(opacity,    { toValue:1, duration:200, useNativeDriver:true }),
+      Animated.spring(translateX, { toValue:0, tension:180, friction:18, useNativeDriver:true }),
     ]).start();
   }, []);
 
-  // ALL products this store stocks that match the query
+  // Animate OUT, then call onBack so search results are already visible
+  const handleDetailBack = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(opacity,    { toValue:0, duration:160, useNativeDriver:true }),
+      Animated.timing(translateX, { toValue:40, duration:160, useNativeDriver:true }),
+    ]).start(() => onBack());
+  }, [onBack]);
+
   const storeProducts = getStoreProducts(store.id);
   const q = searchQuery.toLowerCase().trim();
   const matchedItems = storeProducts.filter(p => strictMatch(p, q));
   const otherItems   = storeProducts.filter(p => !strictMatch(p, q));
 
   return (
-    <Animated.View style={[s.detailRoot, { opacity, transform:[{ translateX:slideX }] }]}>
-      {/* Header */}
+    <Animated.View style={[s.detailRoot, { opacity, transform:[{ translateX }] }]}>
       <View style={s.detailHeader}>
-        <TouchableOpacity onPress={onBack} style={s.detailBackBtn} hitSlop={{ top:10,bottom:10,left:10,right:10 }}>
+        <TouchableOpacity onPress={handleDetailBack} style={s.detailBackBtn} hitSlop={{ top:10,bottom:10,left:10,right:10 }}>
           <Text style={s.detailBackArrow}>←</Text>
         </TouchableOpacity>
         <View style={{ flex:1 }}>
@@ -395,43 +372,32 @@ function StoreDetail({ store, searchQuery, onBack }) {
       <View style={s.sep} />
 
       <ScrollView style={{ flex:1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom:100 }}>
-        {/* Store banner */}
         <View style={{ position:'relative' }}>
           <Image source={{ uri:store.img }} style={s.detailBanner} resizeMode="cover" />
           <View style={[s.etaChip, { bottom:12, left:14 }]}><View style={s.etaDot} /><Text style={s.etaTxt}>{store.eta} away</Text></View>
           {!store.open && <View style={s.closedOverlay}><Text style={s.closedTxt}>Currently Closed</Text></View>}
         </View>
-
-        {/* Address + features */}
         <View style={{ paddingHorizontal:16, paddingTop:12, paddingBottom:4 }}>
           <Text style={s.placeAddress}>📍 {store.address}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop:8 }} contentContainerStyle={{ gap:6 }}>
             {store.features.map(f => <View key={f} style={s.featurePill}><Text style={s.featureTxt}>{f}</Text></View>)}
           </ScrollView>
         </View>
-
-        {/* Matched section */}
         {matchedItems.length > 0 && (
           <View style={s.detailSection}>
             <View style={s.detailSectionHead}>
-              <Text style={s.detailSectionTitle}> "{searchQuery}" — {matchedItems.length} result{matchedItems.length > 1 ? 's' : ''}</Text>
+              <Text style={s.detailSectionTitle}>🎯 "{searchQuery}" — {matchedItems.length} result{matchedItems.length > 1 ? 's' : ''}</Text>
             </View>
-            {matchedItems.map((item, i) => (
-              <ProductRow key={item.id} item={item} index={i} onSeeStores={null} />
-            ))}
+            {matchedItems.map((item, i) => <ProductRow key={item.id} item={item} index={i} onSeeStores={null} />)}
           </View>
         )}
-
-        {/* Other items this store stocks */}
         {otherItems.length > 0 && (
           <View style={s.detailSection}>
             <View style={s.detailSectionHead}>
               <Text style={s.detailSectionTitle}>Also available at this store</Text>
               <Text style={s.detailSectionCount}>{otherItems.length} items</Text>
             </View>
-            {otherItems.map((item, i) => (
-              <ProductRow key={item.id} item={item} index={i} onSeeStores={null} />
-            ))}
+            {otherItems.map((item, i) => <ProductRow key={item.id} item={item} index={i} onSeeStores={null} />)}
           </View>
         )}
       </ScrollView>
@@ -441,12 +407,13 @@ function StoreDetail({ store, searchQuery, onBack }) {
 
 // ─── Main SearchScreen ────────────────────────────────────────────────────────
 export default function SearchScreen({ onClose }) {
-  const [query,       setQuery]    = useState('');
-  const [committed,   setCommit]   = useState(false);
-  const [activeTab,   setTab]      = useState('places');
-  const [history,     setHistory]  = useState(INITIAL_HISTORY);
-  const [selectedStore, setStore]  = useState(null); // → StoreDetail
+  const [query,         setQuery]   = useState('');
+  const [committed,     setCommit]  = useState(false);
+  const [activeTab,     setTab]     = useState('places');
+  const [history,       setHistory] = useState(INITIAL_HISTORY);
+  const [selectedStore, setStore]   = useState(null);
 
+  const navigation = useNavigation();
   const inputRef  = useRef(null);
   const mountAnim = useRef(new Animated.Value(0)).current;
 
@@ -456,9 +423,20 @@ export default function SearchScreen({ onClose }) {
     return () => clearTimeout(t);
   }, []);
 
-  const handleClose = () => {
+  // Back button behaviour:
+  //   • If search results are showing → clear back to idle screen
+  //   • If already idle              → close the SearchScreen entirely
+  const handleBack = () => {
     Keyboard.dismiss();
-    Animated.timing(mountAnim, { toValue:0, duration:150, useNativeDriver:true }).start(() => onClose?.());
+    if (committed || query.length > 0) {
+      setQuery('');
+      setCommit(false);
+      setStore(null);
+      setTab('places');
+      setTimeout(() => inputRef.current?.focus(), 100);
+    } else {
+      navigation.navigate('Home');
+    }
   };
 
   const commitSearch = useCallback((text) => {
@@ -478,141 +456,155 @@ export default function SearchScreen({ onClose }) {
   const isIdle    = !committed && trimmed.length === 0;
   const isTyping  = !committed && trimmed.length > 0;
 
-  const suggestions  = isTyping ? ALL_PRODUCTS.filter(p => p.name.toLowerCase().includes(trimmed.toLowerCase()) || p.brand.toLowerCase().includes(trimmed.toLowerCase())).slice(0, 6) : [];
-  const itemResults  = committed ? searchProducts(trimmed) : [];
-  const placeResults = committed ? searchStores(trimmed) : [];
+  const suggestions  = isTyping  ? ALL_PRODUCTS.filter(p => p.name.toLowerCase().includes(trimmed.toLowerCase()) || p.brand.toLowerCase().includes(trimmed.toLowerCase())).slice(0,6) : [];
+  const itemResults  = committed ? searchProducts(trimmed)  : [];
+  const placeResults = committed ? searchStores(trimmed)    : [];
 
-  // If a store is selected, render StoreDetail over everything
-  if (selectedStore) {
-    return <StoreDetail store={selectedStore} searchQuery={trimmed} onBack={() => setStore(null)} />;
-  }
-
+  // ╔══════════════════════════════════════════════════════════════════════════╗
+  // ║  THE FIX — three changes vs the original:                              ║
+  // ║                                                                        ║
+  // ║  1. REMOVED the early-return `if (selectedStore) return <StoreDetail>` ║
+  // ║     — that was what caused SearchScreen to unmount and go blank.       ║
+  // ║                                                                        ║
+  // ║  2. SearchScreen is now ALWAYS mounted inside a plain <View>.          ║
+  // ║                                                                        ║
+  // ║  3. StoreDetail renders as an absoluteFillObject overlay ON TOP.       ║
+  // ║     When back is pressed, StoreDetail animates out (160 ms) and THEN   ║
+  // ║     calls setStore(null), so results are already visible beneath.      ║
+  // ╚══════════════════════════════════════════════════════════════════════════╝
   return (
-    <Animated.View style={[s.root, { opacity: mountAnim }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+    <View style={{ flex:1 }}>
 
-      {/* Search bar */}
-      <View style={s.topBar}>
-        <TouchableOpacity onPress={handleClose} style={s.backBtn} hitSlop={{ top:10,bottom:10,left:10,right:10 }}>
-          <Text style={s.backArrow}>←</Text>
-        </TouchableOpacity>
-        <View style={s.inputWrap}>
-          <View style={s.inputIconBox}>
-            <SearchIcon size={18} color={committed || trimmed.length > 0 ? C.green : C.textLight} />
+      {/* ── Search results screen — always mounted ─────────────────────── */}
+      <Animated.View style={[s.root, { opacity: mountAnim }]}>
+        <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+
+        {/* Search bar */}
+        <View style={s.topBar}>
+          <TouchableOpacity onPress={handleBack} style={s.backBtn} hitSlop={{ top:10,bottom:10,left:10,right:10 }}>
+            <Text style={s.backArrow}>←</Text>
+          </TouchableOpacity>
+          <View style={s.inputWrap}>
+            <View style={s.inputIconBox}>
+              <SearchIcon size={18} color={committed || trimmed.length > 0 ? C.green : C.textLight} />
+            </View>
+            <TextInput
+              ref={inputRef}
+              style={s.inputField}
+              placeholder="Search items or stores…"
+              placeholderTextColor={C.textLight}
+              value={query}
+              onChangeText={onQChange}
+              onSubmitEditing={() => commitSearch()}
+              returnKeyType="search"
+              selectionColor={C.green}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={() => { setQuery(''); setCommit(false); inputRef.current?.focus(); }} style={s.clearBtn} hitSlop={{ top:8,bottom:8,left:8,right:8 }}>
+                <Text style={s.clearTxt}>✕</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          <TextInput
-            ref={inputRef}
-            style={s.inputField}
-            placeholder="Search items or stores…"
-            placeholderTextColor={C.textLight}
-            value={query}
-            onChangeText={onQChange}
-            onSubmitEditing={() => commitSearch()}
-            returnKeyType="search"
-            selectionColor={C.green}
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
           {query.length > 0 && (
-            <TouchableOpacity onPress={() => { setQuery(''); setCommit(false); inputRef.current?.focus(); }} style={s.clearBtn} hitSlop={{ top:8,bottom:8,left:8,right:8 }}>
-              <Text style={s.clearTxt}>✕</Text>
+            <TouchableOpacity style={s.searchBtn} onPress={() => commitSearch()} activeOpacity={0.85}>
+              <Text style={s.searchBtnTxt}>Search</Text>
             </TouchableOpacity>
           )}
         </View>
-        {query.length > 0 && (
-          <TouchableOpacity style={s.searchBtn} onPress={() => commitSearch()} activeOpacity={0.85}>
-            <Text style={s.searchBtnTxt}>Search</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-      <View style={s.sep} />
+        <View style={s.sep} />
 
-      {/* Inline suggestions */}
-      {isTyping && (
-        <View style={s.suggList}>
-          {suggestions.map(item => <SuggRow key={item.id} item={item} query={trimmed} onPress={commitSearch} />)}
-          <TouchableOpacity style={[s.suggRow, { borderBottomWidth:0 }]} onPress={() => commitSearch()} activeOpacity={0.65}>
-            <View style={s.suggSearchAll}><SearchIcon size={16} color={C.green} /></View>
-            <Text style={s.suggFreeText}>Search for <Text style={{ color:C.green, fontWeight:'700' }}>"{trimmed}"</Text></Text>
-          </TouchableOpacity>
+        {isTyping && (
+          <View style={s.suggList}>
+            {suggestions.map(item => <SuggRow key={item.id} item={item} query={trimmed} onPress={commitSearch} />)}
+            <TouchableOpacity style={[s.suggRow, { borderBottomWidth:0 }]} onPress={() => commitSearch()} activeOpacity={0.65}>
+              <View style={s.suggSearchAll}><SearchIcon size={16} color={C.green} /></View>
+              <Text style={s.suggFreeText}>Search for <Text style={{ color:C.green, fontWeight:'700' }}>"{trimmed}"</Text></Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {committed && <TabBar active={activeTab} onSelect={setTab} itemCount={itemResults.length} placeCount={placeResults.length} />}
+
+        <KeyboardAvoidingView style={{ flex:1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+
+            {isIdle && (
+              <>
+                {history.length > 0 && (
+                  <FadeSlide style={s.block}>
+                    <View style={s.blockHead}>
+                      <Text style={s.blockTitle}>Recent Searches</Text>
+                      <TouchableOpacity onPress={() => setHistory([])}><Text style={s.blockAction}>Clear all</Text></TouchableOpacity>
+                    </View>
+                    {history.map((h, i) => (
+                      <TouchableOpacity key={h.id} style={[s.histRow, i === history.length-1 && { borderBottomWidth:0 }]} onPress={() => commitSearch(h.text)} activeOpacity={0.7}>
+                        <Image source={{ uri:h.img }} style={s.histThumb} resizeMode="cover" />
+                        <Text style={s.histTxt} numberOfLines={1}>{h.text}</Text>
+                        <TouchableOpacity onPress={() => setHistory(hh => hh.filter(x => x.id !== h.id))} hitSlop={{ top:8,bottom:8,left:8,right:8 }}>
+                          <Text style={s.histX}>✕</Text>
+                        </TouchableOpacity>
+                      </TouchableOpacity>
+                    ))}
+                  </FadeSlide>
+                )}
+                <FadeSlide delay={60} style={s.block}>
+                  <Text style={s.blockTitle}>Trending Searches</Text>
+                  <View style={s.trendGrid}>
+                    {TRENDING.map(t => (
+                      <TouchableOpacity key={t.id} style={s.trendCard} onPress={() => commitSearch(t.text)} activeOpacity={0.8}>
+                        <Image source={{ uri:t.img }} style={s.trendImg} resizeMode="cover" />
+                        <View style={s.trendOverlay} />
+                        <Text style={s.trendLabel}>{t.text}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </FadeSlide>
+              </>
+            )}
+
+            {committed && activeTab === 'places' && (
+              <View style={s.block}>
+                {placeResults.length === 0
+                  ? <View style={s.emptyBox}><Text style={s.emptyTitle}>No stores found</Text><Text style={s.emptySub}>Try the Items tab or a different keyword</Text></View>
+                  : <>
+                      <Text style={s.resultNote}>{placeResults.length} store{placeResults.length > 1 ? 's' : ''} carry "{trimmed}"</Text>
+                      {placeResults.map((item, i) => <PlaceCard key={item.id} item={item} index={i} onTap={setStore} />)}
+                    </>
+                }
+              </View>
+            )}
+
+            {committed && activeTab === 'items' && (
+              <View style={s.block}>
+                {itemResults.length === 0
+                  ? <View style={s.emptyBox}><Text style={s.emptyTitle}>No items found</Text><Text style={s.emptySub}>Try the Places tab or a different keyword</Text></View>
+                  : <>
+                      <Text style={s.resultNote}>{itemResults.length} result{itemResults.length > 1 ? 's' : ''} for "{trimmed}"</Text>
+                      {itemResults.map((item, i) => <ProductRow key={item.id} item={item} index={i} onSeeStores={() => setTab('places')} />)}
+                    </>
+                }
+              </View>
+            )}
+
+            <View style={{ height:100 }} />
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Animated.View>
+
+      {/* ── Store detail overlay — slides in on top, search stays alive ── */}
+      {selectedStore && (
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: C.bg }]}>
+          <StoreDetail
+            store={selectedStore}
+            searchQuery={trimmed}
+            onBack={() => setStore(null)}
+          />
         </View>
       )}
 
-      {/* Tab bar */}
-      {committed && <TabBar active={activeTab} onSelect={setTab} itemCount={itemResults.length} placeCount={placeResults.length} />}
-
-      <KeyboardAvoidingView style={{ flex:1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-
-          {/* IDLE */}
-          {isIdle && (
-            <>
-              {history.length > 0 && (
-                <FadeSlide style={s.block}>
-                  <View style={s.blockHead}>
-                    <Text style={s.blockTitle}>Recent Searches</Text>
-                    <TouchableOpacity onPress={() => setHistory([])}><Text style={s.blockAction}>Clear all</Text></TouchableOpacity>
-                  </View>
-                  {history.map((h, i) => (
-                    <TouchableOpacity key={h.id} style={[s.histRow, i === history.length-1 && { borderBottomWidth:0 }]} onPress={() => commitSearch(h.text)} activeOpacity={0.7}>
-                      <Image source={{ uri:h.img }} style={s.histThumb} resizeMode="cover" />
-                      <Text style={s.histTxt} numberOfLines={1}>{h.text}</Text>
-                      <TouchableOpacity onPress={() => setHistory(hh => hh.filter(x => x.id !== h.id))} hitSlop={{ top:8,bottom:8,left:8,right:8 }}>
-                        <Text style={s.histX}>✕</Text>
-                      </TouchableOpacity>
-                    </TouchableOpacity>
-                  ))}
-                </FadeSlide>
-              )}
-              <FadeSlide delay={60} style={s.block}>
-                <Text style={s.blockTitle}>Trending Searches </Text>
-                <View style={s.trendGrid}>
-                  {TRENDING.map(t => (
-                    <TouchableOpacity key={t.id} style={s.trendCard} onPress={() => commitSearch(t.text)} activeOpacity={0.8}>
-                      <Image source={{ uri:t.img }} style={s.trendImg} resizeMode="cover" />
-                      <View style={s.trendOverlay} />
-                      <Text style={s.trendLabel}>{t.text}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </FadeSlide>
-            </>
-          )}
-
-          {/* PLACES TAB */}
-          {committed && activeTab === 'places' && (
-            <View style={s.block}>
-              {placeResults.length === 0
-                ? <View style={s.emptyBox}><Text style={s.emptyTitle}>No stores found</Text><Text style={s.emptySub}>Try the Items tab or a different keyword</Text></View>
-                : <>
-                    <Text style={s.resultNote}>{placeResults.length} store{placeResults.length > 1 ? 's' : ''} carry "{trimmed}"</Text>
-                    {placeResults.map((item, i) => (
-                      <PlaceCard key={item.id} item={item} index={i} onTap={setStore} />
-                    ))}
-                  </>
-              }
-            </View>
-          )}
-
-          {/* ITEMS TAB */}
-          {committed && activeTab === 'items' && (
-            <View style={s.block}>
-              {itemResults.length === 0
-                ? <View style={s.emptyBox}><Text style={s.emptyTitle}>No items found</Text><Text style={s.emptySub}>Try the Places tab or a different keyword</Text></View>
-                : <>
-                    <Text style={s.resultNote}>{itemResults.length} result{itemResults.length > 1 ? 's' : ''} for "{trimmed}"</Text>
-                    {itemResults.map((item, i) => (
-                      <ProductRow key={item.id} item={item} index={i} onSeeStores={() => setTab('places')} />
-                    ))}
-                  </>
-              }
-            </View>
-          )}
-
-          <View style={{ height:100 }} />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -621,38 +613,35 @@ const s = StyleSheet.create({
   root:       { flex:1, backgroundColor:C.bg, paddingTop: Platform.OS === 'ios' ? 52 : 32 },
   detailRoot: { flex:1, backgroundColor:C.bg, paddingTop: Platform.OS === 'ios' ? 52 : 32 },
 
-  // Top bars
-  topBar:     { flexDirection:'row', alignItems:'center', paddingHorizontal:14, paddingBottom:12, backgroundColor:C.bg, gap:8 },
-  backBtn:    { width:36, height:36, alignItems:'center', justifyContent:'center' },
-  backArrow:  { fontSize:22, color:C.text, fontWeight:'300' },
-  detailHeader: { flexDirection:'row', alignItems:'center', paddingHorizontal:14, paddingBottom:12, paddingTop:4, backgroundColor:C.bg, gap:10 },
-  detailBackBtn:  { width:36, height:36, alignItems:'center', justifyContent:'center' },
-  detailBackArrow:{ fontSize:22, color:C.text, fontWeight:'300' },
-  detailTitle:    { fontSize:15, color:C.text, fontWeight:'800' },
-  detailSub:      { fontSize:11, color:C.textLight, marginTop:1 },
-  detailBanner:   { width:'100%', height:160 },
+  topBar:          { flexDirection:'row', alignItems:'center', paddingHorizontal:14, paddingBottom:12, backgroundColor:C.bg, gap:8 },
+  backBtn:         { width:36, height:36, alignItems:'center', justifyContent:'center' },
+  backArrow:       { fontSize:22, color:C.text, fontWeight:'300' },
+  detailHeader:    { flexDirection:'row', alignItems:'center', paddingHorizontal:14, paddingBottom:12, paddingTop:4, backgroundColor:C.bg, gap:10 },
+  detailBackBtn:   { width:36, height:36, alignItems:'center', justifyContent:'center' },
+  detailBackArrow: { fontSize:22, color:C.text, fontWeight:'300' },
+  detailTitle:     { fontSize:15, color:C.text, fontWeight:'800' },
+  detailSub:       { fontSize:11, color:C.textLight, marginTop:1 },
+  detailBanner:    { width:'100%', height:160 },
 
-  inputWrap:  { flex:1, flexDirection:'row', alignItems:'center', borderWidth:1.5, borderColor:C.border, borderRadius:14, paddingHorizontal:12, paddingVertical: Platform.OS === 'ios' ? 10 : 7, backgroundColor:C.bg, gap:9, shadowColor:C.green, shadowOffset:{width:0,height:2}, shadowOpacity:0.08, shadowRadius:6, elevation:2 },
+  inputWrap:    { flex:1, flexDirection:'row', alignItems:'center', borderWidth:1.5, borderColor:C.border, borderRadius:14, paddingHorizontal:12, paddingVertical: Platform.OS === 'ios' ? 10 : 7, backgroundColor:C.bg, gap:9, shadowColor:C.green, shadowOffset:{width:0,height:2}, shadowOpacity:0.08, shadowRadius:6, elevation:2 },
   inputIconBox: { width:20, height:20, justifyContent:'center', alignItems:'center' },
-  inputField:   { flex:1, fontSize:15, color:C.text, fontWeight:'500', padding:0, borderWidth:0, outlineStyle:'none'},
+  inputField:   { flex:1, fontSize:15, color:C.text, fontWeight:'500', padding:0, borderWidth:0, outlineStyle:'none' },
   clearBtn:     { width:22, height:22, borderRadius:11, backgroundColor:C.border, alignItems:'center', justifyContent:'center' },
   clearTxt:     { fontSize:10, color:C.textMed, fontWeight:'800' },
   searchBtn:    { backgroundColor:C.green, borderRadius:12, paddingHorizontal:14, paddingVertical:10, shadowColor:C.green, shadowOffset:{width:0,height:2}, shadowOpacity:0.3, shadowRadius:4, elevation:3 },
   searchBtnTxt: { fontSize:14, color:C.white, fontWeight:'800' },
   sep:          { height:1, backgroundColor:C.border },
 
-  // Suggestions
-  suggList:    { backgroundColor:C.bg, borderBottomWidth:1, borderBottomColor:C.border },
-  suggRow:     { flexDirection:'row', alignItems:'center', paddingHorizontal:16, paddingVertical:12, borderBottomWidth:1, borderBottomColor:C.divider, gap:12 },
-  suggThumb:   { width:40, height:40, borderRadius:10, backgroundColor:C.greenLight },
+  suggList:     { backgroundColor:C.bg, borderBottomWidth:1, borderBottomColor:C.border },
+  suggRow:      { flexDirection:'row', alignItems:'center', paddingHorizontal:16, paddingVertical:12, borderBottomWidth:1, borderBottomColor:C.divider, gap:12 },
+  suggThumb:    { width:40, height:40, borderRadius:10, backgroundColor:C.greenLight },
   suggSearchAll:{ width:40, height:40, borderRadius:10, backgroundColor:C.greenLight, alignItems:'center', justifyContent:'center' },
-  suggText:    { flex:1, fontSize:14, color:C.textMed },
-  suggBold:    { color:C.text, fontWeight:'700' },
-  suggBrand:   { fontSize:12, color:C.textLight },
-  suggArrow:   { fontSize:14, color:C.textLight },
-  suggFreeText:{ flex:1, fontSize:14, color:C.textMed },
+  suggText:     { flex:1, fontSize:14, color:C.textMed },
+  suggBold:     { color:C.text, fontWeight:'700' },
+  suggBrand:    { fontSize:12, color:C.textLight },
+  suggArrow:    { fontSize:14, color:C.textLight },
+  suggFreeText: { flex:1, fontSize:14, color:C.textMed },
 
-  // Tabs
   tabBar:       { flexDirection:'row', backgroundColor:C.bg, borderBottomWidth:1.5, borderBottomColor:C.border, position:'relative' },
   tabBtn:       { flex:1, paddingVertical:13, alignItems:'center' },
   tabInner:     { flexDirection:'row', alignItems:'center', gap:7 },
@@ -672,20 +661,17 @@ const s = StyleSheet.create({
   blockAction:   { fontSize:13, color:C.green, fontWeight:'700' },
   resultNote:    { fontSize:12, color:C.textLight, marginBottom:14, fontWeight:'500' },
 
-  // History
   histRow:   { flexDirection:'row', alignItems:'center', paddingVertical:11, gap:13, borderBottomWidth:1, borderBottomColor:C.divider },
   histThumb: { width:44, height:44, borderRadius:12, backgroundColor:C.greenLight },
   histTxt:   { flex:1, fontSize:14, color:C.text, fontWeight:'600' },
   histX:     { fontSize:13, color:C.textLight, paddingHorizontal:2 },
 
-  // Trending grid
   trendGrid:    { flexDirection:'row', flexWrap:'wrap', gap:10, marginTop:14, paddingBottom:6 },
   trendCard:    { width:'47%', height:90, borderRadius:14, overflow:'hidden', shadowColor:C.shadow, shadowOffset:{width:0,height:3}, shadowOpacity:0.12, shadowRadius:6, elevation:4 },
   trendImg:     { width:'100%', height:'100%' },
   trendOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor:'rgba(10,40,16,0.45)' },
   trendLabel:   { position:'absolute', bottom:9, left:11, fontSize:13, color:C.white, fontWeight:'800', letterSpacing:0.2, textShadowColor:'rgba(0,0,0,0.4)', textShadowOffset:{width:0,height:1}, textShadowRadius:3 },
 
-  // Product row
   itemCard:   { flexDirection:'row', alignItems:'flex-start', paddingVertical:16, gap:12 },
   itemImgBox: { width:92, height:92, borderRadius:14, overflow:'hidden', backgroundColor:C.greenLight, borderWidth:1, borderColor:C.greenMid },
   itemImg:    { width:'100%', height:'100%' },
@@ -716,7 +702,6 @@ const s = StyleSheet.create({
   qtyNum:     { fontSize:14, color:C.white, fontWeight:'800', paddingHorizontal:7 },
   itemDivider:{ height:1, backgroundColor:C.divider, marginLeft:104 },
 
-  // Place card
   placeCard:      { borderRadius:18, overflow:'hidden', borderWidth:1, borderColor:C.border, backgroundColor:C.bg, marginBottom:16, shadowColor:C.shadow, shadowOffset:{width:0,height:3}, shadowOpacity:0.08, shadowRadius:10, elevation:3 },
   placeImgWrap:   { position:'relative' },
   placeImg:       { width:'100%', height:150 },
@@ -742,26 +727,17 @@ const s = StyleSheet.create({
   featurePill:    { backgroundColor:C.greenLight, borderRadius:20, paddingHorizontal:10, paddingVertical:5, borderWidth:1, borderColor:C.greenMid },
   featureTxt:     { fontSize:11, color:C.green, fontWeight:'700' },
 
-  // Place card preview strip
-  previewStrip:       { marginTop:10 },
-  previewStripDivider:{ height:1, backgroundColor:C.divider, marginBottom:10 },
-  previewStripHead:   { flexDirection:'row', alignItems:'center', marginBottom:8, gap:4 },
-  previewStripLabel:  { fontSize:12, color:C.green, fontWeight:'700', flex:1 },
-  previewStripArrow:  { fontSize:14, color:C.green, fontWeight:'800' },
-  previewThumbWrap:   { width:52, height:52, borderRadius:10, overflow:'hidden', borderWidth:1, borderColor:C.greenMid, backgroundColor:C.greenLight },
-  previewThumb:       { width:'100%', height:'100%' },
-  previewOos:         { ...StyleSheet.absoluteFillObject, backgroundColor:'rgba(255,255,255,0.65)', alignItems:'center', justifyContent:'center' },
-  previewMore:        { width:52, height:52, borderRadius:10, backgroundColor:C.greenLight, borderWidth:1, borderColor:C.greenMid, alignItems:'center', justifyContent:'center' },
-  previewMoreTxt:     { fontSize:13, color:C.green, fontWeight:'800' },
-
-  // Store detail
   detailSection:      { paddingHorizontal:16, paddingTop:16, paddingBottom:4 },
   detailSectionHead:  { flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:6 },
   detailSectionTitle: { fontSize:14, color:C.text, fontWeight:'800', flex:1 },
   detailSectionCount: { fontSize:12, color:C.textLight, fontWeight:'600' },
 
-  // Empty
   emptyBox:   { alignItems:'center', paddingVertical:64, paddingHorizontal:32 },
   emptyTitle: { fontSize:17, color:C.text, fontWeight:'800', marginBottom:6, textAlign:'center' },
   emptySub:   { fontSize:14, color:C.textLight, textAlign:'center', lineHeight:21 },
+
+  // unused strips kept so any external references don't crash
+  previewStrip:{}, previewStripDivider:{}, previewStripHead:{}, previewStripLabel:{},
+  previewStripArrow:{}, previewThumbWrap:{}, previewThumb:{}, previewOos:{},
+  previewMore:{}, previewMoreTxt:{},
 });
