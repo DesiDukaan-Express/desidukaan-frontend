@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -10,143 +10,198 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import useAuthStore from "../../store/authStore";
 
+import { LineChart } from "react-native-chart-kit";
+import { Dimensions } from "react-native";
+
+
 export default function StoreDashboard() {
   const { logout } = useAuthStore();
-  const orders = [
+
+  const data = [
     {
-      id: "#ORD-5542",
-      name: "Rajesh Kumar",
-      status: "New",
-      image: "https://randomuser.me/api/portraits/men/32.jpg",
-    },
+      totalOrders: 42,
+      revenue: "8,450",
+      sales: [200, 450, 700, 600, 820],
+      avgPrepTime: 8.5,
+      deliveryTime: 18
+    } ,
     {
-      id: "#ORD-5541",
-      name: "Priya Sharma",
-      status: "Preparing",
-      image: "https://randomuser.me/api/portraits/women/44.jpg",
-    },
+      totalOrders: 305,
+      revenue: "8,450",
+      sales: [300, 200, 100, 900, 520],
+      avgPrepTime: 6,
+      deliveryTime: 22
+    } ,
     {
-      id: "#ORD-5539",
-      name: "Amit Singh",
-      status: "On Way",
-      image: "https://randomuser.me/api/portraits/men/41.jpg",
-    },
+      totalOrders: 1400,
+      revenue: "8,450",
+      sales: [900, 100, 400, 300, 820],
+      avgPrepTime: 10,
+      deliveryTime: 17
+    }
   ];
+
+  const [currIndex, setCurrIndex] = useState(0);
+
+
+
+  const screenWidth = Dimensions.get("window").width;
 
   return (
     <View style={styles.container}>
+
       <ScrollView>
-        {/* HEADER */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <View style={styles.storeIcon}>
-              <MaterialIcons name="storefront" size={22} color="#0ff022" />
-            </View>
-
-            <Text style={styles.headerTitle}>Desi Store Dashboard</Text>
-          </View>
-
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.iconBtn}>
-              <MaterialIcons name="notifications" size={22} />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.iconBtn}>
-              <MaterialIcons name="account-circle" size={24} />
-            </TouchableOpacity>
-
-            {/* Temporary logout button */}
-            <TouchableOpacity style={styles.iconBtn} onPress={logout}>
-              <MaterialIcons name="logout" size={24} color="red" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* ORDER SUMMARY */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Order Summary</Text>
-          <Text style={styles.badge}>Today</Text>
-        </View>
-
-        <View style={styles.cardRow}>
-          <View style={styles.summaryCard}>
-            <View style={styles.cardIconGreen}>
-              <MaterialIcons name="shopping-cart" size={22} color="#0ff022" />
-            </View>
-
-            <View>
-              <Text style={styles.summaryNumber}>3</Text>
-              <Text style={styles.summaryLabel}>New Orders</Text>
-            </View>
-          </View>
-
-          <View style={styles.summaryCard}>
-            <View style={styles.cardIconOrange}>
-              <MaterialIcons name="schedule" size={22} color="orange" />
-            </View>
-
-            <View>
-              <Text style={styles.summaryNumber}>5</Text>
-              <Text style={styles.summaryLabel}>Preparing</Text>
-            </View>
-          </View>
-
-          <View style={styles.summaryCard}>
-            <View style={styles.cardIconBlue}>
-              <MaterialIcons name="local-shipping" size={22} color="#3b82f6" />
-            </View>
-
-            <View>
-              <Text style={styles.summaryNumber}>2</Text>
-              <Text style={styles.summaryLabel}>Out for Delivery</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* QUICK ACTIONS */}
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-
-        <View style={styles.actionsRow}>
-          <TouchableOpacity style={styles.primaryBtn}>
-            <MaterialIcons name="add-box" size={20} />
-            <Text style={styles.primaryBtnText}>Add Product</Text>
+        {/* FILTER TABS */}
+        <View style={styles.tabs}>
+          <TouchableOpacity onPress={() => setCurrIndex(0)}>
+            <Text style={currIndex === 0 ? styles.tabActive : styles.tab}>Today</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.secondaryBtn}>
-            <MaterialIcons name="group" size={20} />
-            <Text style={styles.secondaryBtnText}>Manage Delivery Staff</Text>
+          <TouchableOpacity onPress={() => setCurrIndex(1)}>
+            <Text style={currIndex === 1 ? styles.tabActive : styles.tab}>Weekly</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => setCurrIndex(2)}>
+            <Text style={currIndex === 2 ? styles.tabActive : styles.tab}>Monthly</Text>
           </TouchableOpacity>
         </View>
 
-        {/* RECENT ORDERS */}
-        <Text style={styles.sectionTitle}>Recent Orders</Text>
-
-        <View style={styles.ordersBox}>
-          {orders.map((order) => (
-            <View key={order.id} style={styles.orderRow}>
-              <Text style={styles.orderId}>{order.id}</Text>
-
-              <View style={styles.customer}>
-                <Image source={{ uri: order.image }} style={styles.avatar} />
-                <Text style={styles.customerName}>{order.name}</Text>
-              </View>
-
-              <Text style={styles.status}>{order.status}</Text>
-
-              <TouchableOpacity>
-                <Text style={styles.viewBtn}>View</Text>
-              </TouchableOpacity>
+        {/* METRICS */}
+        <View style={styles.metricsRow}>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>TOTAL ORDERS</Text>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricValue}>{data[currIndex].totalOrders}</Text>
+              <Text style={styles.metricUp}>+{Math.floor(Math.random().toPrecision(2) * 100 / 2)}%</Text>
             </View>
-          ))}
+          </View>
+
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>REVENUE</Text>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricValue}>₹{data[currIndex].revenue}</Text>
+              <Text style={styles.metricUp}>+{Math.floor(Math.random().toPrecision(2) * 100 / 2)}%</Text>
+            </View>
+          </View>
         </View>
 
-        <View style={{ height: 120 }} />
+        {/* SALES TREND */}
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Sales Trend</Text>
+            <Text style={styles.sectionHint}>Last 24 Hours</Text>
+          </View>
+
+          <LineChart
+            data={{
+              labels: ["06", "10", "14", "18", "22"],
+              datasets: [
+                {
+                  data: data[currIndex].sales,
+                },
+              ],
+            }}
+            width={screenWidth - 32}
+            height={200}
+            yAxisSuffix="₹"
+            chartConfig={{
+              backgroundGradientFrom: "#ffffff",
+              backgroundGradientTo: "#ffffff",
+              decimalPlaces: 0,
+
+              color: (opacity = 1) => `rgba(15, 240, 34, ${opacity})`,
+              labelColor: () => "#888",
+
+              propsForDots: {
+                r: "4",
+                strokeWidth: "2",
+                stroke: "#0ff022",
+              },
+
+              propsForBackgroundLines: {
+                stroke: "#eee",
+              },
+            }}
+            bezier
+            style={{
+              borderRadius: 16,
+              marginTop: 10,
+            }}
+          />
+        </View>
+
+        {/* TOP PRODUCTS */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Top Products</Text>
+            <Text style={styles.link}>View All</Text>
+          </View>
+
+          <Product
+            name="Organic Tomatoes"
+            sold="124 units sold"
+            price="₹3,720"
+            tag="Best Seller"
+            image="https://lh3.googleusercontent.com/aida-public/AB6AXuArJb_YjUzyHc1EykEd8C-YI9CAx2GFurQX4vUzqad5rJrlxAEC9B1DBH0kXVpxybUryn3EWlZ5J49YdOv7oQPi3kQs-qODzKZLc9lcx3rX7_vrMWwIVDVacAWC5E0-c4f03sq8wn-JDaFjsktGx_ZyfK8aEw9siyxb4roc-XhIT2s57LgGZ0BgPA8pd7FalJD3FtFMvoyZ3tXymbleXKQDPl3ZHIU3jPxomkT0FmUSaKJLk7bHZe3lxwy1CJKZDg7pQcg3nszmOyY"
+          />
+
+          <Product
+            name="Local Red Onions"
+            sold="98 units sold"
+            price="₹1,960"
+            tag="Trending"
+            image="https://lh3.googleusercontent.com/aida-public/AB6AXuBN8BS8RTeTByuvZrCfBBVUkYKpRvz9b6RZcQLf_6CoZoAGyp5vQZwAvwJNqQI9thzGWvt8GA44JAoDrTVe9JcKOGHg5bvckedi_pXt-5rw-yDECY_ASw7zRzRQf20I2dky9lBAyYX9kbrDJ3T6BeOLuuIBpvHPHJTZb1zRaVrFKEHlfTK6sTH4tYOx0hb8PZr7VDlNzaQwWh6fbFE5PYGRXNlf7mO36z_Pz0czYL0sYnTTyW8fFZQRZ4F1A51-uRCdwXrAEYdOSS8"
+          />
+        </View>
+
+        {/* DELIVERY EFFICIENCY */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Delivery Efficiency</Text>
+
+          <View style={styles.deliveryRow}>
+            <View style={styles.deliveryCard}>
+              <MaterialIcons name="schedule" size={20} color="#0ff022" />
+              <Text style={styles.deliveryLabel}>Avg. Prep Time</Text>
+              <Text style={styles.deliveryValue}>{data[currIndex].avgPrepTime} min</Text>
+            </View>
+
+            <View style={styles.deliveryCard}>
+              <MaterialIcons name="moped" size={20} color="#0ff022" />
+              <Text style={styles.deliveryLabel}>Delivery Time</Text>
+              <Text style={styles.deliveryValue}>{data[currIndex].deliveryTime} min</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
 }
 
+
+function Product({ name, sold, price, tag, image }) {
+  return (
+    <View style={styles.productCard}>
+      <Image source={{ uri: image }} style={styles.productImage} />
+
+      <View style={{ flex: 1 }}>
+        <Text style={styles.productName}>{name}</Text>
+        <Text style={styles.productSold}>{sold}</Text>
+      </View>
+
+      <View style={{ alignItems: "flex-end" }}>
+        <Text style={styles.productPrice}>{price}</Text>
+        <Text style={styles.productTag}>{tag}</Text>
+      </View>
+    </View>
+  );
+}
+
+
 const styles = StyleSheet.create({
+
   container: {
     flex: 1,
     backgroundColor: "#f5f8f6",
@@ -155,21 +210,9 @@ const styles = StyleSheet.create({
 
   header: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center",
     padding: 16,
-  },
-
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  storeIcon: {
-    backgroundColor: "#0ff02220",
-    padding: 8,
-    borderRadius: 8,
-    marginRight: 10,
   },
 
   headerTitle: {
@@ -177,157 +220,208 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  headerRight: {
-    flexDirection: "row",
+  calendarBtn: {
+    backgroundColor: "#eee",
+    padding: 8,
+    borderRadius: 8,
   },
 
-  iconBtn: {
-    marginLeft: 10,
+  tabs: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    borderBottomWidth: 1,
+    borderColor: "#eee",
+  },
+
+  tab: {
+    padding: 12,
+    color: "#888",
+    fontWeight: "600",
+  },
+
+  tabActive: {
+    padding: 12,
+    color: "#000",
+    borderBottomWidth: 3,
+    borderColor: "#0ff022",
+    fontWeight: "700",
+  },
+
+  metricsRow: {
+    flexDirection: "row",
+    padding: 16,
+    gap: 10,
+  },
+
+  metricCard: {
+    flex: 1,
+    backgroundColor: "#0ff02210",
+    borderRadius: 12,
+    padding: 14,
+  },
+
+  metricLabel: {
+    fontSize: 10,
+    color: "#666",
+  },
+
+  metricRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  metricValue: {
+    fontSize: 22,
+    fontWeight: "700",
+  },
+
+  metricUp: {
+    fontSize: 12,
+    color: "green",
+    fontWeight: "700",
+  },
+
+  section: {
+    paddingHorizontal: 16,
+    marginTop: 20,
   },
 
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    marginTop: 20,
+    marginBottom: 10,
   },
 
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700",
-    marginHorizontal: 16,
-    marginTop: 20,
   },
 
-  badge: {
-    backgroundColor: "#eee",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    fontSize: 11,
+  sectionHint: {
+    fontSize: 12,
+    color: "#777",
   },
 
-  cardRow: {
-    paddingHorizontal: 16,
+  chart: {
+    height: 160,
+    backgroundColor: "#f2f2f2",
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    padding: 10,
   },
 
-  summaryCard: {
+  bar: {
+    width: 12,
+    backgroundColor: "#0ff022",
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+  },
+
+  chartLabels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 6,
+    fontSize: 10,
+  },
+
+  productCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    padding: 14,
+    backgroundColor: "#f7f7f7",
+    padding: 10,
     borderRadius: 10,
+    marginBottom: 10,
+  },
+
+  productImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    marginRight: 10,
+  },
+
+  productName: {
+    fontWeight: "700",
+  },
+
+  productSold: {
+    fontSize: 12,
+    color: "#777",
+  },
+
+  productPrice: {
+    fontWeight: "700",
+  },
+
+  productTag: {
+    fontSize: 10,
+    color: "green",
+  },
+
+  deliveryRow: {
+    flexDirection: "row",
+    gap: 10,
     marginTop: 10,
   },
 
-  cardIconGreen: {
-    backgroundColor: "#0ff02220",
-    padding: 8,
-    borderRadius: 8,
-    marginRight: 10,
+  deliveryCard: {
+    flex: 1,
+    backgroundColor: "#fff",
+    padding: 14,
+    borderRadius: 12,
   },
 
-  cardIconOrange: {
-    backgroundColor: "#ffe7cc",
-    padding: 8,
-    borderRadius: 8,
-    marginRight: 10,
+  deliveryLabel: {
+    fontSize: 12,
+    color: "#777",
   },
 
-  cardIconBlue: {
-    backgroundColor: "#e0ecff",
-    padding: 8,
-    borderRadius: 8,
-    marginRight: 10,
-  },
-
-  summaryNumber: {
+  deliveryValue: {
     fontSize: 20,
     fontWeight: "700",
   },
 
-  summaryLabel: {
-    color: "#777",
-    fontSize: 13,
+  partnerBox: {
+    backgroundColor: "#111",
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 20,
   },
 
-  actionsRow: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    marginTop: 10,
-  },
-
-  primaryBtn: {
-    backgroundColor: "#0ff022",
-    padding: 10,
-    borderRadius: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    marginRight: 10,
-  },
-
-  primaryBtnText: {
+  partnerTitle: {
+    color: "#fff",
     fontWeight: "700",
-    marginLeft: 6,
+    marginBottom: 10,
   },
 
-  secondaryBtn: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    padding: 10,
-    borderRadius: 8,
+  partnerRow: {
     flexDirection: "row",
-    alignItems: "center",
-  },
-
-  secondaryBtnText: {
-    marginLeft: 6,
-  },
-
-  ordersBox: {
-    margin: 16,
-    backgroundColor: "#fff",
-    borderRadius: 10,
-  },
-
-  orderRow: {
-    flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    padding: 12,
-    borderBottomWidth: 1,
-    borderColor: "#eee",
   },
 
-  orderId: {
+  partnerName: {
+    color: "#ccc",
+  },
+
+  partnerRating: {
+    color: "#fff",
     fontWeight: "700",
   },
 
-  customer: {
-    flexDirection: "row",
-    alignItems: "center",
+  progressBg: {
+    height: 4,
+    backgroundColor: "#444",
+    borderRadius: 4,
+    marginTop: 4,
   },
 
-  avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    marginRight: 6,
-  },
-
-  customerName: {
-    fontSize: 13,
-  },
-
-  status: {
-    fontSize: 12,
-    color: "#0ff022",
-    fontWeight: "700",
-  },
-
-  viewBtn: {
-    color: "#0ff022",
-    fontWeight: "700",
+  progressFill: {
+    height: 4,
+    backgroundColor: "#0ff022",
+    borderRadius: 4,
   },
 
   bottomNav: {
@@ -347,14 +441,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  navActive: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#0ff022",
-  },
-
   navText: {
-    fontSize: 12,
+    fontSize: 10,
     color: "#888",
   },
+
 });
