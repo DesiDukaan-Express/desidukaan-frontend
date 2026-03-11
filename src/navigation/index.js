@@ -73,17 +73,17 @@ export default function Navigation() {
 
     // Vendor — check onboarding first
     if (normalizedRole === 'vendor') {
-      // if (!vendorOnboarded) {
-      //   return (
-      //     <Stack.Screen name="VendorOnboarding">
-      //       {() => (
-      //         <VendorOnboardingScreen
-      //           onComplete={() => setVendorOnboarded(true)}
-      //         />
-      //       )}
-      //     </Stack.Screen>
-      //   );
-      // }
+      if (!vendorOnboarded) {
+        return (
+          <Stack.Screen name="VendorOnboarding">
+            {() => (
+              <VendorOnboardingScreen
+                onComplete={() => setVendorOnboarded(true)}
+              />
+            )}
+          </Stack.Screen>
+        );
+      }
       return <Stack.Screen name="VendorApp" component={VendorTabs} />;
     }
 
