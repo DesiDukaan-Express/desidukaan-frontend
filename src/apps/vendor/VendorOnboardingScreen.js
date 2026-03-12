@@ -124,6 +124,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
       setCurrentStep(prev => prev + 1);
       return;
     }
+    return onComplete();
     // Final step — submit everything
     setLoading(true);
     try {
