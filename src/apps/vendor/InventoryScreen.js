@@ -1,8 +1,16 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 1. MOCK DATA  (replace _mockProducts with API responses later)
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Responsive hook ──
+function useWindowSize() {
+  const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  useEffect(() => {
+    const handler = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return width;
+}
+
 
 let _mockDB = [
   { id:"P10234", name:"Tomatoes",    category:"Vegetables", store:"Ameerpet Store",  stock:"45 kg",      price:"₹40/kg",     updatedAt:"Today",      status:"In Stock"                },
@@ -20,20 +28,23 @@ let _mockDB = [
   { id:"P10246", name:"Dal",         category:"Grains",     store:"KPHB Store",      stock:"0",          price:"₹120/kg",    updatedAt:"3 days ago", status:"Out of Stock"             },
   { id:"P10247", name:"Coriander",   category:"Vegetables", store:"Ameerpet Store",  stock:"15 bundles", price:"₹10/bundle", updatedAt:"Today",      status:"In Stock"                },
   { id:"P10248", name:"Coconut Oil", category:"Oils",       store:"Begumpet Store",  stock:"0",          price:"₹180/L",     updatedAt:"1 day ago",  status:"Out of Stock"             },
+  { id:"P10249", name:"Cabbage",     category:"Vegetables", store:"SR Nagar Store",  stock:"12 heads",   price:"₹30/head",   updatedAt:"Today",      status:"In Stock"                },
+  { id:"P10250", name:"Turmeric",    category:"Grains",     store:"KPHB Store",      stock:"2 kg",       price:"₹180/kg",    updatedAt:"Yesterday",  status:"Low Stock",   storeCount:2 },
+  { id:"P10251", name:"Ghee",        category:"Dairy",      store:"Ameerpet Store",  stock:"0",          price:"₹550/kg",    updatedAt:"2 days ago", status:"Out of Stock"             },
+  { id:"P10252", name:"Mustard Oil", category:"Oils",       store:"Begumpet Store",  stock:"20 L",       price:"₹130/L",     updatedAt:"Today",      status:"In Stock"                },
+  { id:"P10253", name:"Green Chili", category:"Vegetables", store:"SR Nagar Store",  stock:"3 kg",       price:"₹60/kg",     updatedAt:"Today",      status:"Low Stock",   storeCount:1 },
+  { id:"P10254", name:"Lemon",       category:"Fruits",     store:"KPHB Store",      stock:"50 pcs",     price:"₹5/pc",      updatedAt:"Today",      status:"In Stock"                },
+  { id:"P10255", name:"Bread",       category:"Grains",     store:"Ameerpet Store",  stock:"0",          price:"₹45/loaf",   updatedAt:"1 day ago",  status:"Out of Stock"             },
 ];
-let _nextId = 10249;
+let _nextId = 10256;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. SERVICE LAYER  ← only file you need to touch when backend is ready
+// 2. SERVICE LAYER
 // ─────────────────────────────────────────────────────────────────────────────
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const inventoryService = {
-  /**
-   * GET /api/products?status=all&store=All+Stores&q=searchterm
-   * Returns: { data: Product[], total: number }
-   */
   async getProducts({ status = "all", store = "All Stores", q = "" } = {}) {
     await sleep(360);
     let data = [..._mockDB];
@@ -52,10 +63,6 @@ const inventoryService = {
     return { data, total: data.length };
   },
 
-  /**
-   * GET /api/products/stats
-   * Returns: { totalProducts, availableStock, lowStockItems, outOfStockItems }
-   */
   async getStats() {
     await sleep(180);
     const all = _mockDB;
@@ -67,20 +74,11 @@ const inventoryService = {
     };
   },
 
-  /**
-   * GET /api/stores
-   * Returns: string[]
-   */
   async getStores() {
     await sleep(140);
     return ["All Stores", ...[...new Set(_mockDB.map((p) => p.store))].sort()];
   },
 
-  /**
-   * POST /api/products
-   * Body: { name, category, store, stock, price, status }
-   * Returns: Product
-   */
   async createProduct(payload) {
     await sleep(480);
     const product = { id: `P${_nextId++}`, ...payload, storeCount: 0, updatedAt: "Just now" };
@@ -88,11 +86,6 @@ const inventoryService = {
     return product;
   },
 
-  /**
-   * PUT /api/products/:id
-   * Body: partial Product fields
-   * Returns: updated Product
-   */
   async updateProduct(id, payload) {
     await sleep(420);
     const i = _mockDB.findIndex((p) => p.id === id);
@@ -101,30 +94,41 @@ const inventoryService = {
     return _mockDB[i];
   },
 
-  /**
-   * DELETE /api/products/:id
-   * Returns: { success: true }
-   */
   async deleteProduct(id) {
     await sleep(280);
     _mockDB = _mockDB.filter((p) => p.id !== id);
     return { success: true };
   },
+
+  async deleteProducts(ids) {
+    await sleep(380);
+    _mockDB = _mockDB.filter((p) => !ids.includes(p.id));
+    return { success: true };
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. CUSTOM HOOK  (all state + data logic lives here)
+// 3. CUSTOM HOOK
 // ─────────────────────────────────────────────────────────────────────────────
 
+const PAGE_SIZE = 8;
+
 function useInventory() {
-  const [products,      setProducts]  = useState([]);
-  const [stats,         setStats]     = useState(null);
-  const [stores,        setStores]    = useState(["All Stores"]);
-  const [statusFilter,  setStatus]    = useState("all");
-  const [storeFilter,   setStoreF]    = useState("All Stores");
-  const [search,        setSearch]    = useState("");
-  const [loading,       setLoading]   = useState(true);
-  const [saving,        setSaving]    = useState(false);
+  const [products,     setProducts]  = useState([]);
+  const [stats,        setStats]     = useState(null);
+  const [stores,       setStores]    = useState(["All Stores"]);
+  const [statusFilter, setStatus]    = useState("all");
+  const [storeFilter,  setStoreF]    = useState("All Stores");
+  const [search,       setSearch]    = useState("");
+  const [loading,      setLoading]   = useState(true);
+  const [saving,       setSaving]    = useState(false);
+
+  // ── NEW: sort state ──
+  const [sortKey,      setSortKey]   = useState(null);   // column key or null
+  const [sortDir,      setSortDir]   = useState("asc");  // "asc" | "desc"
+
+  // ── NEW: pagination ──
+  const [page,         setPage]      = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -137,6 +141,7 @@ function useInventory() {
       setProducts(data);
       setStats(st);
       setStores(storeList);
+      setPage(1); // reset to first page on reload
     } finally {
       setLoading(false);
     }
@@ -144,16 +149,45 @@ function useInventory() {
 
   useEffect(() => { load(); }, [load]);
 
+  // ── Sorted products ──
+  const sortedProducts = useMemo(() => {
+    if (!sortKey) return products;
+    return [...products].sort((a, b) => {
+      let av = a[sortKey] ?? "";
+      let bv = b[sortKey] ?? "";
+      // numeric-ish comparison for stock/price (just lexicographic otherwise)
+      const cmp = String(av).localeCompare(String(bv), undefined, { numeric: true });
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [products, sortKey, sortDir]);
+
+  // ── Paginated slice ──
+  const totalPages    = Math.max(1, Math.ceil(sortedProducts.length / PAGE_SIZE));
+  const pagedProducts = sortedProducts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const toggleSort = (key) => {
+    setSortKey((prev) => {
+      if (prev === key) { setSortDir((d) => d === "asc" ? "desc" : "asc"); return key; }
+      setSortDir("asc"); return key;
+    });
+    setPage(1);
+  };
+
   const withSave = async (fn) => { setSaving(true); try { await fn(); await load(); } finally { setSaving(false); } };
 
   return {
-    products, stats, stores, loading, saving,
+    products: pagedProducts,
+    allProducts: sortedProducts,
+    stats, stores, loading, saving,
     statusFilter, setStatus,
     storeFilter,  setStoreF,
     search,       setSearch,
-    createProduct: (payload) => withSave(() => inventoryService.createProduct(payload)),
-    updateProduct: (id, payload) => withSave(() => inventoryService.updateProduct(id, payload)),
-    deleteProduct: (id) => withSave(() => inventoryService.deleteProduct(id)),
+    sortKey, sortDir, toggleSort,
+    page, setPage, totalPages,
+    createProduct:  (payload) => withSave(() => inventoryService.createProduct(payload)),
+    updateProduct:  (id, payload) => withSave(() => inventoryService.updateProduct(id, payload)),
+    deleteProduct:  (id) => withSave(() => inventoryService.deleteProduct(id)),
+    deleteProducts: (ids) => withSave(() => inventoryService.deleteProducts(ids)),
   };
 }
 
@@ -176,6 +210,7 @@ const T = {
   textLight:   "#6B7280",
   textXLight:  "#9CA3AF",
   orange:      "#EA580C",
+  orangeLight: "#FFF7ED",
   red:         "#DC2626",
   redLight:    "#FEF2F2",
   redBorder:   "#FECACA",
@@ -214,8 +249,8 @@ function CheckBox({ checked, onChange, indeterminate }) {
       display:"flex", alignItems:"center", justifyContent:"center",
       cursor:"pointer", transition:"all .15s",
     }}>
-      {checked     && <span style={{color:"#fff",fontSize:10,fontWeight:900,lineHeight:1}}>✓</span>}
-      {indeterminate && !checked && <span style={{color:"#fff",fontSize:10,fontWeight:900,lineHeight:1,color:T.green}}>—</span>}
+      {checked        && <span style={{color:"#fff",fontSize:10,fontWeight:900,lineHeight:1}}>✓</span>}
+      {indeterminate && !checked && <span style={{color:T.green,fontSize:10,fontWeight:900,lineHeight:1}}>—</span>}
     </div>
   );
 }
@@ -235,11 +270,7 @@ function StatusPill({ status, storeCount }) {
         {status}
       </span>
       {status === "Low Stock" && storeCount > 0 && (
-        <span style={{
-          background:T.orange, color:"#fff",
-          borderRadius:20, padding:"1px 7px",
-          fontSize:11, fontWeight:800,
-        }}>+{storeCount}</span>
+        <span style={{ background:T.orange, color:"#fff", borderRadius:20, padding:"1px 7px", fontSize:11, fontWeight:800 }}>+{storeCount}</span>
       )}
     </span>
   );
@@ -248,7 +279,7 @@ function StatusPill({ status, storeCount }) {
 function SelectChip({ label, active, onClick }) {
   return (
     <button onClick={onClick} style={{
-      border: `1.5px solid ${active ? T.green : T.border}`,
+      border:`1.5px solid ${active ? T.green : T.border}`,
       borderRadius:20, padding:"6px 14px",
       fontSize:12, fontWeight:600, cursor:"pointer",
       background: active ? T.green : "#fff",
@@ -258,30 +289,179 @@ function SelectChip({ label, active, onClick }) {
   );
 }
 
-function ToastBanner({ message, visible }) {
+function ToastBanner({ message, visible, type = "success" }) {
+  const bg = type === "danger" ? "#7F1D1D" : "#111827";
+  const icon = type === "danger" ? "⚠" : "✓";
+  const iconColor = type === "danger" ? "#FCA5A5" : "#4ADE80";
   return (
     <div style={{
       position:"fixed", bottom:28, left:"50%",
       transform:`translateX(-50%) translateY(${visible?0:14}px)`,
       opacity: visible ? 1 : 0,
       transition:"all .28s cubic-bezier(.4,0,.2,1)",
-      background:"#111827", color:"#fff",
+      background: bg, color:"#fff",
       borderRadius:12, padding:"11px 20px",
       fontSize:13, fontWeight:600,
       display:"flex", alignItems:"center", gap:8,
       boxShadow:"0 8px 24px rgba(0,0,0,.25)",
       pointerEvents:"none", zIndex:9999, whiteSpace:"nowrap",
     }}>
-      <span style={{color:"#4ADE80",fontSize:15}}>✓</span>{message}
+      <span style={{color:iconColor,fontSize:15}}>{icon}</span>{message}
+    </div>
+  );
+}
+
+
+
+function LowStockBanner({ stats, onFilterLowStock }) {
+  const [dismissed, setDismissed] = useState(false);
+  const lowCount = stats?.lowStockItems ?? 0;
+  const outCount = stats?.outOfStockItems ?? 0;
+
+  if (dismissed || (lowCount === 0 && outCount === 0)) return null;
+
+  return (
+    <div style={{
+      background: "linear-gradient(135deg, #7C2D12 0%, #9A3412 100%)",
+      borderRadius:14, padding:"14px 20px", marginBottom:20,
+      display:"flex", alignItems:"center", gap:14,
+      boxShadow:"0 4px 16px rgba(234,88,12,.25)",
+      animation:"iv-up .3s ease",
+      position:"relative", overflow:"hidden",
+    }}>
+      {/* Subtle background pattern */}
+      <div style={{ position:"absolute", inset:0, opacity:.05, backgroundImage:"repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 0, transparent 50%)", backgroundSize:"12px 12px", pointerEvents:"none" }}/>
+
+      {/* Warning icon */}
+      <div style={{ width:42, height:42, borderRadius:12, background:"rgba(255,255,255,.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>
+        ⚠️
+      </div>
+
+      {/* Text */}
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontSize:14, fontWeight:800, color:"#fff", marginBottom:3 }}>
+          Inventory Alert — Immediate attention required
+        </div>
+        <div style={{ fontSize:13, color:"rgba(255,255,255,.75)", display:"flex", gap:16, flexWrap:"wrap" }}>
+          {lowCount > 0 && (
+            <span>
+              <span style={{ color:"#FDE68A", fontWeight:700 }}>{lowCount} item{lowCount !== 1 ? "s" : ""}</span> running low on stock
+            </span>
+          )}
+          {outCount > 0 && (
+            <span>
+              <span style={{ color:"#FCA5A5", fontWeight:700 }}>{outCount} item{outCount !== 1 ? "s" : ""}</span> completely out of stock
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
+        <button
+          onClick={onFilterLowStock}
+          style={{ background:"rgba(255,255,255,.2)", color:"#fff", border:"1.5px solid rgba(255,255,255,.35)", borderRadius:9, padding:"8px 14px", fontSize:12, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap", transition:"all .15s" }}
+          className="banner-btn"
+        >
+          View Low Stock
+        </button>
+        <button
+          onClick={() => setDismissed(true)}
+          style={{ width:28, height:28, borderRadius:"50%", background:"rgba(255,255,255,.12)", border:"none", color:"rgba(255,255,255,.7)", cursor:"pointer", fontSize:14, display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s" }}
+          className="banner-dismiss"
+        >✕</button>
+      </div>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 6. STAT CARD  — SVG icons, colored icon backgrounds, accent bar
+// NEW: BULK DELETE CONFIRM DIALOG
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Inline SVG icons — crisp at any size, no emoji rendering inconsistency
+function BulkDeleteDialog({ count, onConfirm, onCancel, saving }) {
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:1100, background:"rgba(0,0,0,.5)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+      <div style={{
+        background:"#fff", borderRadius:20, width:"100%", maxWidth:420,
+        padding:"28px 28px 24px",
+        boxShadow:"0 24px 64px rgba(0,0,0,.22)", animation:"iv-up .2s ease",
+      }}>
+        <div style={{ width:52, height:52, borderRadius:16, background:T.redLight, display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, marginBottom:16 }}>🗑</div>
+        <div style={{ fontSize:18, fontWeight:800, color:T.text, marginBottom:8 }}>Delete {count} product{count !== 1 ? "s" : ""}?</div>
+        <div style={{ fontSize:14, color:T.textLight, lineHeight:1.6, marginBottom:24 }}>
+          This will permanently remove {count} selected product{count !== 1 ? "s" : ""} from your inventory. This action cannot be undone.
+        </div>
+        <div style={{ display:"flex", gap:10 }}>
+          <button onClick={onCancel} disabled={saving}
+            style={{ flex:1, border:`1.5px solid ${T.border}`, borderRadius:11, padding:"11px 0", fontSize:14, fontWeight:700, cursor:"pointer", background:"#fff", color:T.textMed, transition:"all .15s" }}
+            className="btn-secondary"
+          >Cancel</button>
+          <button onClick={onConfirm} disabled={saving}
+            style={{ flex:1, border:"none", borderRadius:11, padding:"11px 0", fontSize:14, fontWeight:700, cursor:saving?"not-allowed":"pointer", background:T.red, color:"#fff", opacity:saving?0.7:1, display:"flex", alignItems:"center", justifyContent:"center", gap:8, transition:"all .15s" }}
+          >
+            {saving && <Spinner size={15} color="#fff"/>}
+            {saving ? "Deleting…" : "Delete"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEW: PAGINATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Pagination({ page, totalPages, onPage }) {
+  if (totalPages <= 1) return null;
+
+  const pages = [];
+  for (let i = 1; i <= totalPages; i++) pages.push(i);
+
+  // Show at most 7 page buttons with ellipsis
+  const getVisible = () => {
+    if (totalPages <= 7) return pages;
+    if (page <= 4) return [...pages.slice(0,5), "…", totalPages];
+    if (page >= totalPages - 3) return [1, "…", ...pages.slice(totalPages-5)];
+    return [1, "…", page-1, page, page+1, "…", totalPages];
+  };
+
+  return (
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:5, padding:"16px 20px" }}>
+      <PgBtn label="←" disabled={page === 1} onClick={() => onPage(page - 1)} />
+      {getVisible().map((p, i) =>
+        p === "…"
+          ? <span key={`ellipsis-${i}`} style={{ width:32, textAlign:"center", color:T.textXLight, fontSize:13 }}>…</span>
+          : <PgBtn key={p} label={p} active={p === page} onClick={() => onPage(p)} />
+      )}
+      <PgBtn label="→" disabled={page === totalPages} onClick={() => onPage(page + 1)} />
+    </div>
+  );
+}
+
+function PgBtn({ label, active, disabled, onClick }) {
+  return (
+    <button onClick={onClick} disabled={disabled}
+      style={{
+        width:34, height:34, borderRadius:9,
+        border:`1.5px solid ${active ? T.green : T.border}`,
+        background: active ? T.green : disabled ? "#F9FAFB" : "#fff",
+        color: active ? "#fff" : disabled ? T.textXLight : T.textMed,
+        fontSize:13, fontWeight:active ? 800 : 600,
+        cursor: disabled ? "default" : "pointer",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        transition:"all .15s",
+      }}
+      className={disabled || active ? "" : "pg-btn"}
+    >{label}</button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. STAT CARD
+// ─────────────────────────────────────────────────────────────────────────────
+
 const ICONS = {
   box: (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -325,35 +505,15 @@ function StatCard({ icon, label, value, sub, badge, badgeColor, accentColor, ico
       transition:"all .2s",
       position:"relative", overflow:"hidden",
     }} className="stat-card">
-      {/* subtle background tint */}
-      <div style={{
-        position:"absolute", top:-20, right:-20,
-        width:90, height:90, borderRadius:"50%",
-        background: accentColor,
-        opacity:.04,
-        pointerEvents:"none",
-      }}/>
-
-      {/* Icon box */}
-      <div style={{
-        width:50, height:50, borderRadius:14, flexShrink:0,
-        background: iconBg,
-        display:"flex", alignItems:"center", justifyContent:"center",
-        color: accentColor,
-      }}>
+      <div style={{ position:"absolute", top:-20, right:-20, width:90, height:90, borderRadius:"50%", background:accentColor, opacity:.04, pointerEvents:"none" }}/>
+      <div style={{ width:50, height:50, borderRadius:14, flexShrink:0, background:iconBg, display:"flex", alignItems:"center", justifyContent:"center", color:accentColor }}>
         {icon}
       </div>
-
-      {/* Text */}
       <div style={{ minWidth:0 }}>
         <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:5 }}>
           <span style={{ fontSize:13, color:T.textLight, fontWeight:500, whiteSpace:"nowrap" }}>{label}</span>
           {badge != null && badge > 0 && (
-            <span style={{
-              background:badgeColor, color:"#fff",
-              borderRadius:20, padding:"2px 8px",
-              fontSize:11, fontWeight:800, flexShrink:0,
-            }}>{badge}</span>
+            <span style={{ background:badgeColor, color:"#fff", borderRadius:20, padding:"2px 8px", fontSize:11, fontWeight:800, flexShrink:0 }}>{badge}</span>
           )}
         </div>
         <div style={{ display:"flex", alignItems:"baseline", gap:5 }}>
@@ -385,43 +545,30 @@ function ProductModal({ editing, onClose, onSave, saving }) {
   };
 
   return (
-    <div
-      style={{ position:"fixed", inset:0, zIndex:1000, background:"rgba(0,0,0,.42)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div style={{
-        background:"#fff", borderRadius:20, width:"100%", maxWidth:520,
-        maxHeight:"92vh", overflow:"hidden", display:"flex", flexDirection:"column",
-        boxShadow:"0 24px 64px rgba(0,0,0,.22)", animation:"iv-up .22s ease",
-      }}>
-        {/* Header */}
+    <div style={{ position:"fixed", inset:0, zIndex:1000, background:"rgba(0,0,0,.42)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{ background:"#fff", borderRadius:20, width:"100%", maxWidth:520, maxHeight:"92vh", overflow:"hidden", display:"flex", flexDirection:"column", boxShadow:"0 24px 64px rgba(0,0,0,.22)", animation:"iv-up .22s ease" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"22px 26px 18px", borderBottom:`1px solid ${T.border}` }}>
           <span style={{ fontSize:18, fontWeight:800, color:T.text }}>{editing ? "Edit Product" : "Add New Product"}</span>
           <button onClick={onClose} style={{ width:30, height:30, borderRadius:"50%", border:"none", background:"#F3F4F6", cursor:"pointer", color:T.textLight, fontWeight:700, fontSize:13, display:"flex", alignItems:"center", justifyContent:"center" }}>✕</button>
         </div>
-
-        {/* Body */}
         <div style={{ overflowY:"auto", padding:"22px 26px 28px", display:"flex", flexDirection:"column", gap:20 }}>
-          
           <div>
             <label style={LBL}>Product Name *</label>
             <input style={INP} value={form.name} onChange={(e)=>set("name",e.target.value)} placeholder="e.g. Tomatoes" />
           </div>
-
           <div>
             <label style={LBL}>Category</label>
             <div style={{ display:"flex", flexWrap:"wrap", gap:7, marginTop:4 }}>
               {CATEGORIES.map((c) => <SelectChip key={c} label={c} active={form.category===c} onClick={()=>set("category",c)} />)}
             </div>
           </div>
-
           <div>
             <label style={LBL}>Store</label>
             <div style={{ display:"flex", flexWrap:"wrap", gap:7, marginTop:4 }}>
               {STORES_OPTS.map((s) => <SelectChip key={s} label={s} active={form.store===s} onClick={()=>set("store",s)} />)}
             </div>
           </div>
-
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
             <div>
               <label style={LBL}>Stock *</label>
@@ -432,25 +579,16 @@ function ProductModal({ editing, onClose, onSave, saving }) {
               <input style={INP} value={form.price} onChange={(e)=>set("price",e.target.value)} placeholder="e.g. ₹40/kg" />
             </div>
           </div>
-
           <div>
             <label style={LBL}>Status</label>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginTop:4 }}>
               {STATUS_OPTS.map((s) => <SelectChip key={s} label={s} active={form.status===s} onClick={()=>set("status",s)} />)}
             </div>
           </div>
-
           {err && <span style={{ fontSize:12, color:T.red, fontWeight:600 }}>{err}</span>}
-
-          <button
-            onClick={handleSubmit} disabled={saving}
-            style={{
-              background:T.green, color:"#fff", border:"none", borderRadius:12,
-              padding:"13px 0", fontSize:14, fontWeight:800,
-              cursor:saving?"not-allowed":"pointer", opacity:saving?0.7:1,
-              display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-              boxShadow:"0 4px 14px rgba(22,101,52,.3)", transition:"all .15s",
-            }} className="btn-primary"
+          <button onClick={handleSubmit} disabled={saving}
+            style={{ background:T.green, color:"#fff", border:"none", borderRadius:12, padding:"13px 0", fontSize:14, fontWeight:800, cursor:saving?"not-allowed":"pointer", opacity:saving?0.7:1, display:"flex", alignItems:"center", justifyContent:"center", gap:8, boxShadow:"0 4px 14px rgba(22,101,52,.3)", transition:"all .15s" }}
+            className="btn-primary"
           >
             {saving && <Spinner size={16} color="#fff"/>}
             {saving ? "Saving…" : editing ? "Save Changes" : "+ Add Product"}
@@ -465,7 +603,34 @@ const LBL = { display:"block", fontSize:11, fontWeight:700, color:T.textXLight, 
 const INP = { width:"100%", border:`1.5px solid ${T.border}`, borderRadius:10, padding:"10px 12px", fontSize:14, color:T.text, outline:"none", fontFamily:"inherit", boxSizing:"border-box", background:"#FAFAFA", transition:"border-color .15s" };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 8. TABLE ROW
+// 8. SORT HEADER
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SortTH({ label, sortKey, colKey, sortDir, onSort, style: extraStyle }) {
+  const active = sortKey === colKey;
+  return (
+    <th
+      onClick={() => onSort(colKey)}
+      style={{
+        ...TH, ...extraStyle,
+        cursor:"pointer", userSelect:"none",
+        color: active ? T.green : T.textXLight,
+        transition:"color .15s",
+      }}
+      className="sort-th"
+    >
+      <span style={{ display:"inline-flex", alignItems:"center", gap:4 }}>
+        {label}
+        <span style={{ fontSize:10, opacity: active ? 1 : 0.35, color: active ? T.green : T.textXLight }}>
+          {active ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+        </span>
+      </span>
+    </th>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. TABLE ROW
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ProductRow({ product, selected, onSelect, onEdit, onDelete, isEven }) {
@@ -479,10 +644,7 @@ function ProductRow({ product, selected, onSelect, onEdit, onDelete, isEven }) {
   }, []);
 
   return (
-    <tr style={{
-      background: selected ? "#F0FDF4" : isEven ? "#fff" : "#FAFAFA",
-      borderBottom:`1px solid #F3F4F6`, transition:"background .12s",
-    }} className="inv-row">
+    <tr style={{ background: selected ? "#F0FDF4" : isEven ? "#fff" : "#FAFAFA", borderBottom:`1px solid #F3F4F6`, transition:"background .12s" }} className="inv-row">
       <td style={TD}><CheckBox checked={selected} onChange={()=>onSelect(product.id)}/></td>
       <td style={TD}><span style={{ color:"#15803D", fontWeight:700, fontSize:13 }}>{product.id}</span></td>
       <td style={TD}><span style={{ fontWeight:700, color:T.text, fontSize:13 }}>{product.name}</span></td>
@@ -494,25 +656,17 @@ function ProductRow({ product, selected, onSelect, onEdit, onDelete, isEven }) {
       <td style={TD}><StatusPill status={product.status} storeCount={product.storeCount||0}/></td>
       <td style={TD}>
         <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-          <button
-            onClick={()=>onEdit(product)}
+          <button onClick={()=>onEdit(product)}
             style={{ display:"flex", alignItems:"center", gap:5, background:T.green, color:"#fff", border:"none", borderRadius:8, padding:"7px 14px", fontSize:12, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap", transition:"all .15s" }}
             className="btn-edit"
           >✎ Edit</button>
-
           <div ref={menuRef} style={{ position:"relative" }}>
-            <button
-              onClick={()=>setMenu((v)=>!v)}
+            <button onClick={()=>setMenu((v)=>!v)}
               style={{ width:32, height:32, borderRadius:8, border:`1.5px solid ${T.border}`, background:"#fff", cursor:"pointer", fontSize:16, color:T.textXLight, display:"flex", alignItems:"center", justifyContent:"center", transition:"all .15s", letterSpacing:2 }}
               className="btn-dots"
             >⋯</button>
-
             {menuOpen && (
-              <div style={{
-                position:"absolute", right:0, top:36, zIndex:50,
-                background:"#fff", borderRadius:12, border:`1px solid ${T.border}`,
-                boxShadow:"0 10px 28px rgba(0,0,0,.13)", minWidth:155, overflow:"hidden",
-              }}>
+              <div style={{ position:"absolute", right:0, top:36, zIndex:50, background:"#fff", borderRadius:12, border:`1px solid ${T.border}`, boxShadow:"0 10px 28px rgba(0,0,0,.13)", minWidth:155, overflow:"hidden" }}>
                 {[
                   { label:"✏️  Edit product", color:T.textMed,  fn:()=>{ setMenu(false); onEdit(product); } },
                   { label:"🗑  Delete",        color:T.red,      fn:()=>{ setMenu(false); onDelete(product.id); } },
@@ -535,63 +689,78 @@ const TD = { padding:"14px 14px", verticalAlign:"middle" };
 const TH = { padding:"12px 14px", fontSize:11, fontWeight:800, color:T.textXLight, textTransform:"uppercase", letterSpacing:".5px", textAlign:"left", whiteSpace:"nowrap" };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 9. MAIN PAGE
+// 10. MAIN PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function InventoryPage() {
-  const inv         = useInventory();
-  const [selected,  setSelected]  = useState(new Set());
-  const [modal,     setModal]     = useState(null); // null | "add" | product
-  const [storeOpen, setStoreOpen] = useState(false);
-  const [toast,     setToast]     = useState({ msg:"", show:false });
+  const screenW      = useWindowSize();
+  const isMobile     = screenW < 768;
+  const inv          = useInventory();
+  const [selected,   setSelected]   = useState(new Set());
+  const [modal,      setModal]      = useState(null);
+  const [storeOpen,  setStoreOpen]  = useState(false);
+  const [toast,      setToast]      = useState({ msg:"", show:false, type:"success" });
+  const [bulkDel,    setBulkDel]    = useState(false); // show bulk delete dialog
   const storeRef = useRef(null);
 
-  // Outside click for store dropdown
   useEffect(() => {
     const h = (e) => { if (storeRef.current && !storeRef.current.contains(e.target)) setStoreOpen(false); };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  // Reset selection when products change
-  useEffect(() => { setSelected(new Set()); }, [inv.products]);
+  const _productIds = inv.products.map(p => p.id).join(",");
+  useEffect(() => { setSelected(new Set()); }, [_productIds]);
 
-  const showToast = (msg) => {
-    setToast({ msg, show:true });
-    setTimeout(()=>setToast((t)=>({...t,show:false})), 2500);
+  const showToast = (msg, type = "success") => {
+    setToast({ msg, show:true, type });
+    setTimeout(() => setToast((t) => ({ ...t, show:false })), 2500);
   };
 
-  // Selection helpers
-  const allSel    = inv.products.length > 0 && selected.size === inv.products.length;
+  // Selection helpers — based on the CURRENT page
+  const allSel    = inv.products.length > 0 && selected.size === inv.products.length && inv.products.every(p => selected.has(p.id));
   const someSel   = selected.size > 0 && !allSel;
-  const toggleAll = () => setSelected(allSel ? new Set() : new Set(inv.products.map((p)=>p.id)));
+  const toggleAll = () => {
+    const pageIds = new Set(inv.products.map((p) => p.id));
+    if (allSel) {
+      setSelected((prev) => { const n = new Set(prev); pageIds.forEach(id => n.delete(id)); return n; });
+    } else {
+      setSelected((prev) => { const n = new Set(prev); pageIds.forEach(id => n.add(id)); return n; });
+    }
+  };
   const toggleOne = (id) => setSelected((prev) => { const n = new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; });
 
-  // Save handler
   const handleSave = async (form) => {
     if (modal === "add") { await inv.createProduct(form); showToast("Product added successfully"); }
     else                 { await inv.updateProduct(modal.id, form); showToast("Product updated"); }
     setModal(null);
   };
 
-  // Delete handler
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this product? This cannot be undone.")) return;
     await inv.deleteProduct(id);
     showToast("Product deleted");
   };
 
-  // Bulk CSV download
+  // Bulk delete
+  const handleBulkDelete = async () => {
+    const ids = [...selected];
+    await inv.deleteProducts(ids);
+    setSelected(new Set());
+    setBulkDel(false);
+    showToast(`${ids.length} product${ids.length !== 1 ? "s" : ""} deleted`, "success");
+  };
+
   const handleDownload = () => {
     const rows = selected.size > 0
-      ? inv.products.filter((p)=>selected.has(p.id))
-      : inv.products;
+      ? inv.allProducts.filter((p) => selected.has(p.id))
+      : inv.allProducts;
     const header = "Product ID,Product Name,Category,Store,Stock,Price,Status,Last Updated";
-    const csv = [header, ...rows.map((p)=>
+    const csv = [header, ...rows.map((p) =>
       `${p.id},"${p.name}","${p.category}","${p.store}","${p.stock}","${p.price}","${p.status}","${p.updatedAt}"`
     )].join("\n");
     const a = Object.assign(document.createElement("a"), {
-      href: URL.createObjectURL(new Blob([csv],{type:"text/csv"})),
+      href: URL.createObjectURL(new Blob([csv], { type:"text/csv" })),
       download:"inventory.csv",
     });
     a.click();
@@ -605,55 +774,66 @@ export default function InventoryPage() {
     { key:"outofstock", label:"Out of Stock", count: inv.stats?.outOfStockItems ?? 0,  dot:T.red },
   ];
 
+  const SORTABLE_COLS = [
+    { key:"id",        label:"Product ID",   w:100 },
+    { key:"name",      label:"Product Name", w:140 },
+    { key:"category",  label:"Category",     w:110 },
+    { key:"store",     label:"Store",        w:145 },
+    { key:"stock",     label:"Stock",        w:100 },
+    { key:"price",     label:"Price",        w:105 },
+    { key:"updatedAt", label:"Last Updated", w:115 },
+    { key:"status",    label:"Status",       w:165 },
+  ];
+
   return (
-    <div style={{ display:"flex", minHeight:"100vh", background:T.bg, fontFamily:"'DM Sans', system-ui, sans-serif", color:T.text }}>
+    <div style={{ display:"flex", minHeight:"100vh", width:"100%", background:T.bg, fontFamily:"'DM Sans', system-ui, sans-serif", color:T.text }}>
       <style>{GLOBAL_CSS}</style>
 
-      {/* ── Sidebar ────────────────────────────────────────────────────── */}
-      <aside style={{ width:58, background:T.sidebar, display:"flex", flexDirection:"column", alignItems:"center", paddingTop:14, paddingBottom:24, gap:4, flexShrink:0 }}>
+      {/* ── Sidebar ── */}
+      <aside className="inv-sidebar" style={{ width:58, background:T.sidebar, display: isMobile ? "none" : "flex", flexDirection:"column", alignItems:"center", paddingTop:14, paddingBottom:24, gap:4, flexShrink:0, position:"sticky", top:0, height:"100vh" }}>
         <div style={{ width:36, height:36, borderRadius:10, background:T.yellow, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, marginBottom:18 }}>🛒</div>
-        {[
-          {icon:"🔍"},{icon:"🏠"},{icon:"📦",active:true},{icon:"📋"},{icon:"📊"},{icon:"👤"},{icon:"⚙️"},
-        ].map(({icon,active},i)=>(
+        {[{icon:"🔍"},{icon:"🏠"},{icon:"📦",active:true},{icon:"📋"},{icon:"📊"},{icon:"👤"},{icon:"⚙️"}].map(({icon,active},i)=>(
           <div key={i} style={{ width:40, height:40, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", background:active?"rgba(255,255,255,.15)":"transparent", fontSize:18, transition:"background .15s" }} className="sidebar-icon">
             {icon}
           </div>
         ))}
       </aside>
 
-      {/* ── Main ───────────────────────────────────────────────────────── */}
-      <main style={{ flex:1, padding:"28px 28px 64px", minWidth:0, overflowX:"hidden" }}>
+      {/* ── Main ── */}
+      <main className="inv-main-pad" style={{ flex:1, padding: isMobile ? "16px 12px 48px" : "28px 28px 64px", minWidth:0, width:0, overflowY:"auto" }}>
 
         {/* Page header */}
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:26 }}>
-          <h1 style={{ margin:0, fontSize:26, fontWeight:900, letterSpacing:"-0.5px" }}>Inventory</h1>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:12 }} className="inv-topbar">
+          <h1 style={{ margin:0, fontSize: isMobile ? 20 : 26, fontWeight:900, letterSpacing:"-0.5px" }}>Inventory</h1>
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <button onClick={()=>setModal("add")}
+            <button onClick={() => setModal("add")}
               style={{ display:"flex", alignItems:"center", gap:7, background:T.green, color:"#fff", border:"none", borderRadius:12, padding:"11px 20px", fontSize:14, fontWeight:700, cursor:"pointer", boxShadow:"0 4px 14px rgba(22,101,52,.3)", transition:"all .15s" }}
               className="btn-primary"
             ><span style={{fontSize:17,lineHeight:1}}>+</span> Add Product</button>
-            <div style={{ width:38, height:38, borderRadius:"50%", background:T.green, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:800, boxShadow:"0 2px 8px rgba(0,0,0,.15)", position:"relative" }}>
-              3
-              <span style={{ position:"absolute", top:-3, right:-3, width:16, height:16, background:T.red, borderRadius:"50%", border:"2px solid #fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:900 }}>3</span>
-            </div>
           </div>
         </div>
 
+        {/* ── LOW STOCK ALERT BANNER ── */}
+        <LowStockBanner
+          stats={inv.stats}
+          onFilterLowStock={() => { inv.setStatus("lowstock"); }}
+        />
+
         {/* Stat cards */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:24 }} className="stat-grid">
-          <StatCard icon={ICONS.box}           label="Total Products"     value={inv.stats?.totalProducts}  accentColor="#1A5C1A" iconBg="#F0FDF4" />
-          <StatCard icon={ICONS.layers}        label="Available Stock"    value={inv.stats?.availableStock} sub="units" accentColor="#1565C0" iconBg="#EFF6FF" />
+        <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: isMobile ? 10 : 14, marginBottom:24 }} className="stat-grid">
+          <StatCard icon={ICONS.box}           label="Total Products"     value={inv.stats?.totalProducts}   accentColor="#1A5C1A" iconBg="#F0FDF4" />
+          <StatCard icon={ICONS.layers}        label="Available Stock"    value={inv.stats?.availableStock}  sub="units" accentColor="#1565C0" iconBg="#EFF6FF" />
           <StatCard icon={ICONS.alertTriangle} label="Low Stock Items"    value={inv.stats?.lowStockItems}   badge={inv.stats?.lowStockItems}   badgeColor={T.orange} accentColor={T.orange} iconBg="#FFF7ED" />
           <StatCard icon={ICONS.xCircle}       label="Out of Stock Items" value={inv.stats?.outOfStockItems} badge={inv.stats?.outOfStockItems} badgeColor={T.red}    accentColor={T.red}    iconBg="#FEF2F2" />
         </div>
 
-        {/* Filter tabs + Bulk download */}
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, gap:10, flexWrap:"wrap" }}>
+        {/* Filter tabs + Bulk actions */}
+        <div style={{ display:"flex", flexDirection: isMobile ? "column" : "row", justifyContent:"space-between", alignItems: isMobile ? "stretch" : "center", marginBottom:16, gap:10 }} className="inv-filterrow">
           <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-            {filterTabs.map((tab)=>{
+            {filterTabs.map((tab) => {
               const active = inv.statusFilter === tab.key;
               return (
-                <button key={tab.key} onClick={()=>inv.setStatus(tab.key)}
+                <button key={tab.key} onClick={() => inv.setStatus(tab.key)}
                   style={{ display:"flex", alignItems:"center", gap:7, border:`1.5px solid ${active?T.green:T.border}`, borderRadius:20, padding:"8px 16px", fontSize:13, fontWeight:active?700:600, cursor:"pointer", background:active?T.green:"#fff", color:active?"#fff":T.textLight, transition:"all .15s" }}
                   className="filter-tab"
                 >
@@ -665,32 +845,44 @@ export default function InventoryPage() {
             })}
           </div>
 
-          <button onClick={handleDownload}
-            style={{ display:"flex", alignItems:"center", gap:7, border:`1.5px solid ${T.border}`, borderRadius:10, padding:"9px 16px", fontSize:13, fontWeight:600, color:T.textLight, background:"#fff", cursor:"pointer", transition:"all .15s" }}
-            className="btn-secondary"
-          >
-            ⬇ Bulk Download
-            {selected.size > 0 && <span style={{ background:T.green, color:"#fff", borderRadius:20, padding:"1px 7px", fontSize:11, fontWeight:800 }}>{selected.size}</span>}
-          </button>
+          {/* Right-side actions */}
+          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+            {/* BULK DELETE button — only visible when items are selected */}
+            {selected.size > 0 && (
+              <button onClick={() => setBulkDel(true)}
+                style={{ display:"flex", alignItems:"center", gap:7, border:`1.5px solid ${T.redBorder}`, borderRadius:10, padding:"9px 16px", fontSize:13, fontWeight:700, color:T.red, background:T.redLight, cursor:"pointer", transition:"all .15s", animation:"iv-up .18s ease" }}
+                className="btn-danger"
+              >
+                🗑 Delete Selected
+                <span style={{ background:T.red, color:"#fff", borderRadius:20, padding:"1px 7px", fontSize:11, fontWeight:800 }}>{selected.size}</span>
+              </button>
+            )}
+
+            <button onClick={handleDownload}
+              style={{ display:"flex", alignItems:"center", gap:7, border:`1.5px solid ${T.border}`, borderRadius:10, padding:"9px 16px", fontSize:13, fontWeight:600, color:T.textLight, background:"#fff", cursor:"pointer", transition:"all .15s" }}
+              className="btn-secondary"
+            >
+              ⬇ Bulk Download
+              {selected.size > 0 && <span style={{ background:T.green, color:"#fff", borderRadius:20, padding:"1px 7px", fontSize:11, fontWeight:800 }}>{selected.size}</span>}
+            </button>
+          </div>
         </div>
 
         {/* Store selector + search */}
-        <div style={{ display:"flex", gap:12, marginBottom:18, alignItems:"center", flexWrap:"wrap" }}>
-          {/* Store dropdown */}
+        <div style={{ display:"flex", flexDirection: isMobile ? "column" : "row", gap:10, marginBottom:18, alignItems:"stretch" }} className="inv-toolrow">
           <div ref={storeRef} style={{ position:"relative" }}>
-            <button onClick={()=>setStoreOpen((v)=>!v)}
+            <button onClick={() => setStoreOpen((v) => !v)}
               style={{ display:"flex", alignItems:"center", gap:6, border:`1.5px solid ${T.border}`, borderRadius:10, padding:"9px 14px", background:"#fff", cursor:"pointer", fontSize:13, color:T.textMed, transition:"all .15s" }}
-              className="btn-secondary"
+              className="btn-secondary inv-store-btn"
             >
               <span>Select Store:</span>
               <span style={{ fontWeight:700, color:T.text }}>{inv.storeFilter}</span>
               <span style={{ color:T.textXLight, fontSize:10, marginLeft:2 }}>{storeOpen?"▲":"▼"}</span>
             </button>
-
             {storeOpen && (
               <div style={{ position:"absolute", top:44, left:0, zIndex:100, background:"#fff", borderRadius:12, border:`1px solid ${T.border}`, boxShadow:"0 10px 28px rgba(0,0,0,.12)", minWidth:210, overflow:"hidden" }}>
-                {inv.stores.map((s)=>(
-                  <div key={s} onClick={()=>{inv.setStoreF(s);setStoreOpen(false);}}
+                {inv.stores.map((s) => (
+                  <div key={s} onClick={() => { inv.setStoreF(s); setStoreOpen(false); }}
                     style={{ padding:"11px 16px", fontSize:13, cursor:"pointer", fontWeight:inv.storeFilter===s?700:500, color:inv.storeFilter===s?T.green:T.textMed, background:inv.storeFilter===s?T.greenLight:"#fff", display:"flex", alignItems:"center", gap:8, borderBottom:`1px solid #F9FAFB`, transition:"background .1s" }}
                     className="menu-item"
                   >
@@ -702,43 +894,33 @@ export default function InventoryPage() {
             )}
           </div>
 
-          {/* Search */}
           <div style={{ flex:1, minWidth:200, display:"flex", alignItems:"center", gap:8, border:`1.5px solid ${T.border}`, borderRadius:10, padding:"9px 14px", background:"#fff" }}>
             <span style={{ color:T.textXLight, fontSize:15, flexShrink:0 }}>🔍</span>
             <input
               style={{ flex:1, border:"none", outline:"none", fontSize:13, color:T.text, background:"transparent", fontFamily:"inherit" }}
               placeholder="Search by name, ID or category…"
               value={inv.search}
-              onChange={(e)=>inv.setSearch(e.target.value)}
+              onChange={(e) => inv.setSearch(e.target.value)}
             />
             {inv.search && (
-              <button onClick={()=>inv.setSearch("")} style={{ border:"none", background:"none", cursor:"pointer", color:T.textXLight, fontSize:14, padding:0, display:"flex" }}>✕</button>
+              <button onClick={() => inv.setSearch("")} style={{ border:"none", background:"none", cursor:"pointer", color:T.textXLight, fontSize:14, padding:0, display:"flex" }}>✕</button>
             )}
           </div>
         </div>
 
         {/* TABLE */}
-        <div style={{ background:"#fff", borderRadius:16, border:`1px solid ${T.border}`, boxShadow:"0 1px 6px rgba(0,0,0,.05)", overflow:"hidden" }}>
-          <div style={{ overflowX:"auto" }}>
+        <div style={{ background:"#fff", borderRadius:16, border:`1px solid ${T.border}`, boxShadow:"0 1px 6px rgba(0,0,0,.05)" }}>
+          <div style={{ overflowX:"auto", WebkitOverflowScrolling:"touch", borderRadius:16 }}>
             <table style={{ width:"100%", borderCollapse:"collapse", minWidth:1020 }}>
               <thead>
                 <tr style={{ background:"#F9FAFB", borderBottom:`1.5px solid ${T.border}` }}>
                   <th style={{ ...TH, width:46 }}>
                     <CheckBox checked={allSel} indeterminate={someSel} onChange={toggleAll}/>
                   </th>
-                  {[
-                    {label:"Product ID",   w:100},
-                    {label:"Product Name", w:140},
-                    {label:"Category",     w:110},
-                    {label:"Store",        w:145},
-                    {label:"Stock",        w:100},
-                    {label:"Price",        w:105},
-                    {label:"Last Updated", w:115},
-                    {label:"Status",       w:165},
-                    {label:"Actions",      w:165},
-                  ].map(({label,w})=>(
-                    <th key={label} style={{...TH,width:w}}>{label}</th>
+                  {SORTABLE_COLS.map(({ key, label, w }) => (
+                    <SortTH key={key} colKey={key} label={label} sortKey={inv.sortKey} sortDir={inv.sortDir} onSort={inv.toggleSort} style={{ width:w }}/>
                   ))}
+                  <th style={{ ...TH, width:165 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -757,23 +939,28 @@ export default function InventoryPage() {
                     </div>
                   </td></tr>
                 ) : (
-                  inv.products.map((p,i)=>(
-                    <ProductRow key={p.id} product={p} isEven={i%2===0} selected={selected.has(p.id)} onSelect={toggleOne} onEdit={(prod)=>setModal(prod)} onDelete={handleDelete}/>
+                  inv.products.map((p, i) => (
+                    <ProductRow key={p.id} product={p} isEven={i%2===0} selected={selected.has(p.id)} onSelect={toggleOne} onEdit={(prod) => setModal(prod)} onDelete={handleDelete}/>
                   ))
                 )}
               </tbody>
             </table>
           </div>
 
-          {/* Footer */}
-          {!inv.loading && inv.products.length > 0 && (
-            <div style={{ padding:"12px 20px", borderTop:`1px solid #F3F4F6`, background:"#FAFAFA", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-              <span style={{ fontSize:12, color:T.textXLight }}>
-                {selected.size>0 ? `${selected.size} of ${inv.products.length} selected` : `${inv.products.length} product${inv.products.length!==1?"s":""}`}
-              </span>
-              {selected.size>0 && (
-                <button onClick={()=>setSelected(new Set())} style={{ border:"none", background:"none", cursor:"pointer", fontSize:12, color:T.textLight, fontWeight:600 }}>Clear selection</button>
-              )}
+          {/* Footer: count + pagination */}
+          {!inv.loading && inv.allProducts.length > 0 && (
+            <div style={{ borderTop:`1px solid #F3F4F6`, background:"#FAFAFA" }}>
+              <div style={{ padding:"10px 20px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <span style={{ fontSize:12, color:T.textXLight }}>
+                  {selected.size > 0
+                    ? `${selected.size} of ${inv.allProducts.length} selected`
+                    : `${inv.allProducts.length} product${inv.allProducts.length!==1?"s":""} · Page ${inv.page} of ${inv.totalPages}`}
+                </span>
+                {selected.size > 0 && (
+                  <button onClick={() => setSelected(new Set())} style={{ border:"none", background:"none", cursor:"pointer", fontSize:12, color:T.textLight, fontWeight:600 }}>Clear selection</button>
+                )}
+              </div>
+              <Pagination page={inv.page} totalPages={inv.totalPages} onPage={inv.setPage}/>
             </div>
           )}
         </div>
@@ -781,17 +968,22 @@ export default function InventoryPage() {
 
       {/* Modal */}
       {modal !== null && (
-        <ProductModal editing={modal==="add"?null:modal} onClose={()=>setModal(null)} onSave={handleSave} saving={inv.saving}/>
+        <ProductModal editing={modal==="add"?null:modal} onClose={() => setModal(null)} onSave={handleSave} saving={inv.saving}/>
+      )}
+
+      {/* Bulk Delete Confirm Dialog */}
+      {bulkDel && (
+        <BulkDeleteDialog count={selected.size} onConfirm={handleBulkDelete} onCancel={() => setBulkDel(false)} saving={inv.saving}/>
       )}
 
       {/* Toast */}
-      <ToastBanner message={toast.msg} visible={toast.show}/>
+      <ToastBanner message={toast.msg} visible={toast.show} type={toast.type}/>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 10. GLOBAL CSS
+// GLOBAL CSS
 // ─────────────────────────────────────────────────────────────────────────────
 
 const GLOBAL_CSS = `
@@ -800,21 +992,37 @@ const GLOBAL_CSS = `
   body { margin: 0; }
 
   @keyframes iv-spin { to { transform: rotate(360deg); } }
-  @keyframes iv-up   { from { opacity:0; transform:translateY(22px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes iv-up   { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
 
-  .btn-primary:hover  { background: #123D12 !important; transform:translateY(-1px); box-shadow:0 6px 18px rgba(18,61,18,.4) !important; }
-  .btn-edit:hover     { background: #123D12 !important; }
-  .btn-secondary:hover{ background:#F3F4F6 !important; border-color:#D1D5DB !important; }
-  .btn-dots:hover     { background:#F3F4F6 !important; border-color:#D1D5DB !important; }
-  .filter-tab:hover   { border-color:#D1D5DB !important; }
-  .sel-chip:hover     { border-color:#9CA3AF !important; }
-  .stat-card:hover    { box-shadow:0 4px 16px rgba(0,0,0,.09) !important; transform:translateY(-1px); transition:all .2s !important; }
-  .inv-row:hover td   { background:#F0FDF4 !important; }
-  .menu-item:hover    { background:#F3F4F6 !important; }
-  .sidebar-icon:hover { background:rgba(255,255,255,.1) !important; }
+  .btn-primary:hover   { background: #123D12 !important; transform:translateY(-1px); box-shadow:0 6px 18px rgba(18,61,18,.4) !important; }
+  .btn-edit:hover      { background: #123D12 !important; }
+  .btn-secondary:hover { background:#F3F4F6 !important; border-color:#D1D5DB !important; }
+  .btn-dots:hover      { background:#F3F4F6 !important; border-color:#D1D5DB !important; }
+  .btn-danger:hover    { background:#FEE2E2 !important; border-color:#FCA5A5 !important; }
+  .filter-tab:hover    { border-color:#D1D5DB !important; }
+  .sel-chip:hover      { border-color:#9CA3AF !important; }
+  .stat-card:hover     { box-shadow:0 4px 16px rgba(0,0,0,.09) !important; transform:translateY(-1px); }
+  .inv-row:hover td    { background:#F0FDF4 !important; }
+  .menu-item:hover     { background:#F3F4F6 !important; }
+  .sidebar-icon:hover  { background:rgba(255,255,255,.1) !important; }
+  .sort-th:hover       { color: #374151 !important; }
+  .pg-btn:hover        { background:#F3F4F6 !important; border-color:#D1D5DB !important; }
+  .banner-btn:hover    { background:rgba(255,255,255,.3) !important; }
+  .banner-dismiss:hover{ background:rgba(255,255,255,.2) !important; }
 
   input:focus { border-color:#1A5C1A !important; box-shadow:0 0 0 3px rgba(26,92,26,.1) !important; }
 
   @media (max-width: 1100px) { .stat-grid { grid-template-columns: repeat(2,1fr) !important; } }
   @media (max-width: 640px)  { .stat-grid { grid-template-columns: 1fr 1fr !important; } }
+
+  /* ── Mobile / small device fixes ── */
+  @media (max-width: 768px) {
+    .inv-main-pad  { padding: 16px 14px 48px !important; }
+    .inv-sidebar   { display: none !important; }
+    .inv-topbar    { flex-wrap: wrap !important; gap: 10px !important; }
+    .inv-filterrow { flex-direction: column !important; align-items: flex-start !important; }
+    .inv-toolrow   { flex-direction: column !important; align-items: stretch !important; }
+    .inv-store-btn { width: 100% !important; justify-content: space-between !important; }
+    .inv-search    { width: 100% !important; }
+  }
 `;
