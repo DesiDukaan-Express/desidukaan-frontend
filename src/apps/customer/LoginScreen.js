@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  SafeAreaView, KeyboardAvoidingView, Platform, Animated, Dimensions, StatusBar,
+  SafeAreaView, KeyboardAvoidingView, Platform, Animated, Dimensions, StatusBar, Alert, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,6 +25,10 @@ export default function LoginScreen({ navigation }) {
   const [resendTimer, setResendTimer] = useState(0);
 
   const login = useAuthStore((state) => state.login);
+  const [loading, setLoading] = useState(false);
+
+  // Set the base URL dynamically or statically. Here we will use the local network IP for Android/iOS emulator accessibility.
+  const API_URL = 'http://192.168.29.215:3000/api';
 
   const logoAnim = useRef(new Animated.Value(0)).current;
   const formAnim = useRef(new Animated.Value(40)).current;
@@ -73,29 +77,88 @@ export default function LoginScreen({ navigation }) {
     ]).start(() => callback());
   };
 
-  const handleSendOtp = () => {
+  const handleSendOtp = async () => {
     if (mobile.length === 10) {
-      animateStep(() => {
-        setStep('otp');
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: mobile }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          Alert.alert('Error', data.msg || 'Failed to send OTP');
+          return;
+        }
+
+        animateStep(() => {
+          setStep('otp');
+          setOtp('');
+          setResendTimer(30);
+        });
+      } catch (err) {
+        Alert.alert('Error', 'Network error. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (otp.length === 6) {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/auth/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: mobile, code: otp }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          Alert.alert('Error', data.msg || 'Invalid OTP');
+          return;
+        }
+
+        // Ensure role requested matches user's role if needed, or simply let the backend dictate role. 
+        // We will default to storing the response user and token.
+        // User could click 'Vendor' but actually be a 'customer' in db. 
+        // We will respect what the DB returns, but update role logic.
+        login(data.user, data.token);
+
+      } catch (err) {
+        Alert.alert('Error', 'Network error. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleResend = async () => {
+    if (resendTimer === 0) {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: mobile }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          Alert.alert('Error', data.msg || 'Failed to resend OTP');
+          return;
+        }
         setOtp('');
         setResendTimer(30);
-      });
-    }
-  };
-
-  const handleVerifyOtp = () => {
-    if (otp.length === 6) {
-      login(
-        { id: '1', name: 'Test User', mobile, role: selectedRole },
-        'mock-jwt-token'
-      );
-    }
-  };
-
-  const handleResend = () => {
-    if (resendTimer === 0) {
-      setOtp('');
-      setResendTimer(30);
+      } catch (err) {
+        Alert.alert('Error', 'Network error. Please try again.');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -223,27 +286,34 @@ export default function LoginScreen({ navigation }) {
                   </View>
 
                   <TouchableOpacity
-                    style={[styles.cta, mobile.length !== 10 && styles.ctaDisabled]}
-                    disabled={mobile.length !== 10}
+                    style={[styles.cta, (mobile.length !== 10 || loading) && styles.ctaDisabled]}
+                    disabled={mobile.length !== 10 || loading}
                     onPress={handleSendOtp}
                     activeOpacity={0.88}
                   >
                     <LinearGradient
-                      colors={mobile.length === 10 ? ['#22C55E', '#15803D'] : ['#D1FAE5', '#D1FAE5']}
+                      colors={mobile.length === 10 && !loading ? ['#22C55E', '#15803D'] : ['#D1FAE5', '#D1FAE5']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.ctaInner}
                     >
-                      <Text style={[styles.ctaText, mobile.length !== 10 && styles.ctaTextOff]}>
-                        Send OTP
-                      </Text>
-                      <View style={[styles.ctaArrow, mobile.length !== 10 && styles.ctaArrowOff]}>
-                        <Feather
-                          name="arrow-right"
-                          size={15}
-                          color={mobile.length === 10 ? '#052E16' : '#6EE7B7'}
-                        />
-                      </View>
+                      {loading ? (
+                        <ActivityIndicator color="#052E16" />
+                      ) : (
+                        <Text style={[styles.ctaText, mobile.length !== 10 && styles.ctaTextOff]}>
+                          Send OTP
+                        </Text>
+                      )}
+
+                      {!loading && (
+                        <View style={[styles.ctaArrow, mobile.length !== 10 && styles.ctaArrowOff]}>
+                          <Feather
+                            name="arrow-right"
+                            size={15}
+                            color={mobile.length === 10 ? '#052E16' : '#6EE7B7'}
+                          />
+                        </View>
+                      )}
                     </LinearGradient>
                   </TouchableOpacity>
                 </>
@@ -316,27 +386,34 @@ export default function LoginScreen({ navigation }) {
                   </View>
 
                   <TouchableOpacity
-                    style={[styles.cta, otp.length !== 6 && styles.ctaDisabled]}
-                    disabled={otp.length !== 6}
+                    style={[styles.cta, (otp.length !== 6 || loading) && styles.ctaDisabled]}
+                    disabled={otp.length !== 6 || loading}
                     onPress={handleVerifyOtp}
                     activeOpacity={0.88}
                   >
                     <LinearGradient
-                      colors={otp.length === 6 ? ['#22C55E', '#15803D'] : ['#D1FAE5', '#D1FAE5']}
+                      colors={otp.length === 6 && !loading ? ['#22C55E', '#15803D'] : ['#D1FAE5', '#D1FAE5']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.ctaInner}
                     >
-                      <Text style={[styles.ctaText, otp.length !== 6 && styles.ctaTextOff]}>
-                        Verify & Sign In
-                      </Text>
-                      <View style={[styles.ctaArrow, otp.length !== 6 && styles.ctaArrowOff]}>
-                        <Feather
-                          name="arrow-right"
-                          size={15}
-                          color={otp.length === 6 ? '#052E16' : '#6EE7B7'}
-                        />
-                      </View>
+                      {loading ? (
+                        <ActivityIndicator color="#052E16" />
+                      ) : (
+                        <Text style={[styles.ctaText, otp.length !== 6 && styles.ctaTextOff]}>
+                          Verify & Sign In
+                        </Text>
+                      )}
+
+                      {!loading && (
+                        <View style={[styles.ctaArrow, otp.length !== 6 && styles.ctaArrowOff]}>
+                          <Feather
+                            name="arrow-right"
+                            size={15}
+                            color={otp.length === 6 ? '#052E16' : '#6EE7B7'}
+                          />
+                        </View>
+                      )}
                     </LinearGradient>
                   </TouchableOpacity>
                 </>

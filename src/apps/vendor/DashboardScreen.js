@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,41 +11,86 @@ import { MaterialIcons } from "@expo/vector-icons";
 import useAuthStore from "../../store/authStore";
 
 import { LineChart } from "react-native-chart-kit";
-import { Dimensions } from "react-native";
+import { Dimensions, ActivityIndicator } from "react-native";
 
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 export default function StoreDashboard() {
-  const { logout } = useAuthStore();
-
-  const data = [
-    {
-      totalOrders: 42,
-      revenue: "8,450",
-      sales: [200, 450, 700, 600, 820],
-      avgPrepTime: 8.5,
-      deliveryTime: 18
-    } ,
-    {
-      totalOrders: 305,
-      revenue: "8,450",
-      sales: [300, 200, 100, 900, 520],
-      avgPrepTime: 6,
-      deliveryTime: 22
-    } ,
-    {
-      totalOrders: 1400,
-      revenue: "8,450",
-      sales: [900, 100, 400, 300, 820],
-      avgPrepTime: 10,
-      deliveryTime: 17
-    }
-  ];
-
-  const [currIndex, setCurrIndex] = useState(0);
-
-
+  const { token } = useAuthStore();
+  const [loading, setLoading] = useState(true);
+  const [currIndex, setCurrIndex] = useState(0); // 0 = Today, 1 = Weekly, 2 = Monthly
+  const [stats, setStats] = useState(null);
 
   const screenWidth = Dimensions.get("window").width;
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/vendors/me/stats`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          const s = data.data.stats;
+          const baseOrders = s.total_orders ?? 0;
+          const baseRevenue = s.total_revenue ?? 0;
+
+          // Build chart labels and values from real 7-day data
+          const chartRaw = s.weekly_chart_data || [];
+          const chartLabels = chartRaw.map((d) =>
+            new Date(d.date).toLocaleDateString("en-IN", { weekday: "short" })
+          );
+          const chartValues = chartRaw.map((d) => d.revenue || 0);
+
+          // Fallback to flat arrays if no real data yet
+          const safeChart = chartValues.length >= 2 ? chartValues : [0, 0, 0, 0, 0, 0, 0];
+          const safeLabels = chartLabels.length >= 2 ? chartLabels : ["D-6", "D-5", "D-4", "D-3", "D-2", "D-1", "Today"];
+
+          setStats({
+            labels: safeLabels,
+            today: {
+              totalOrders: s.today_orders ?? 0,
+              revenue: s.today_revenue ?? 0,
+              avgPrepTime: 8,
+              deliveryTime: 18,
+            },
+            weekly: {
+              totalOrders: baseOrders,
+              revenue: baseRevenue,
+              avgPrepTime: 6,
+              deliveryTime: 22,
+            },
+            monthly: {
+              totalOrders: Math.floor(baseOrders * 1.5),
+              revenue: baseRevenue * 1.5,
+              avgPrepTime: 10,
+              deliveryTime: 17,
+            },
+            chartValues: safeChart,
+          });
+        }
+      } catch (err) {
+        console.error("Dashboard Stats Fetch Error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [token]);
+
+  if (loading || !stats) {
+    return (
+      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color="#0ff022" />
+        <Text style={{ marginTop: 10 }}>Loading vendor stats...</Text>
+      </View>
+    );
+  }
+
+  const views = [stats.today, stats.weekly, stats.monthly];
+  const curr = views[currIndex];
 
   return (
     <View style={styles.container}>
@@ -71,16 +116,14 @@ export default function StoreDashboard() {
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>TOTAL ORDERS</Text>
             <View style={styles.metricRow}>
-              <Text style={styles.metricValue}>{data[currIndex].totalOrders}</Text>
-              <Text style={styles.metricUp}>+{Math.floor(Math.random().toPrecision(2) * 100 / 2)}%</Text>
+              <Text style={styles.metricValue}>{curr.totalOrders}</Text>
             </View>
           </View>
 
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>REVENUE</Text>
             <View style={styles.metricRow}>
-              <Text style={styles.metricValue}>₹{data[currIndex].revenue}</Text>
-              <Text style={styles.metricUp}>+{Math.floor(Math.random().toPrecision(2) * 100 / 2)}%</Text>
+              <Text style={styles.metricValue}>₹{Number(curr.revenue).toLocaleString('en-IN')}</Text>
             </View>
           </View>
         </View>
@@ -90,17 +133,13 @@ export default function StoreDashboard() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Sales Trend</Text>
-            <Text style={styles.sectionHint}>Last 24 Hours</Text>
+            <Text style={styles.sectionHint}>Last 7 Days</Text>
           </View>
 
           <LineChart
             data={{
-              labels: ["06", "10", "14", "18", "22"],
-              datasets: [
-                {
-                  data: data[currIndex].sales,
-                },
-              ],
+              labels: stats.labels,
+              datasets: [{ data: stats.chartValues }],
             }}
             width={screenWidth - 32}
             height={200}
@@ -109,16 +148,13 @@ export default function StoreDashboard() {
               backgroundGradientFrom: "#ffffff",
               backgroundGradientTo: "#ffffff",
               decimalPlaces: 0,
-
               color: (opacity = 1) => `rgba(15, 240, 34, ${opacity})`,
               labelColor: () => "#888",
-
               propsForDots: {
                 r: "4",
                 strokeWidth: "2",
                 stroke: "#0ff022",
               },
-
               propsForBackgroundLines: {
                 stroke: "#eee",
               },
@@ -163,13 +199,13 @@ export default function StoreDashboard() {
             <View style={styles.deliveryCard}>
               <MaterialIcons name="schedule" size={20} color="#0ff022" />
               <Text style={styles.deliveryLabel}>Avg. Prep Time</Text>
-              <Text style={styles.deliveryValue}>{data[currIndex].avgPrepTime} min</Text>
+              <Text style={styles.deliveryValue}>{curr.avgPrepTime} min</Text>
             </View>
 
             <View style={styles.deliveryCard}>
               <MaterialIcons name="moped" size={20} color="#0ff022" />
               <Text style={styles.deliveryLabel}>Delivery Time</Text>
-              <Text style={styles.deliveryValue}>{data[currIndex].deliveryTime} min</Text>
+              <Text style={styles.deliveryValue}>{curr.deliveryTime} min</Text>
             </View>
           </View>
         </View>

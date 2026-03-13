@@ -6,15 +6,16 @@ import {
 } from 'react-native';
 import useAuthStore from '../../store/authStore';
 
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const PRIMARY = '#1ca049';
 const BG = '#f6f6f6';
 
 const STEPS = [
-  { id: 1, title: 'Store Details',    icon: '🏪', desc: 'Tell us about your shop' },
-  { id: 2, title: 'Bank Details',     icon: '🏦', desc: 'For receiving payments' },
-  { id: 3, title: 'Product Catalog',  icon: '📦', desc: 'Add your products' },
-  { id: 4, title: 'Inventory',        icon: '📊', desc: 'Set stock & pricing' },
-  { id: 5, title: 'Go Live!',         icon: '🚀', desc: 'Start receiving orders' },
+  { id: 1, title: 'Store Details', icon: '🏪', desc: 'Tell us about your shop' },
+  { id: 2, title: 'Bank Details', icon: '🏦', desc: 'For receiving payments' },
+  { id: 3, title: 'Product Catalog', icon: '📦', desc: 'Add your products' },
+  { id: 4, title: 'Inventory', icon: '📊', desc: 'Set stock & pricing' },
+  { id: 5, title: 'Go Live!', icon: '🚀', desc: 'Start receiving orders' },
 ];
 
 const CATEGORIES = [
@@ -98,11 +99,36 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
   const validateStep = () => {
     if (currentStep === 1) {
-      if (!shopName.trim()) { Alert.alert('Required', 'Enter your shop name'); return false; }
-      if (selectedCategories.length === 0) { Alert.alert('Required', 'Select at least one category'); return false; }
-      if (!address.trim()) { Alert.alert('Required', 'Enter your shop address'); return false; }
-      if (!city.trim()) { Alert.alert('Required', 'Enter your city'); return false; }
-      if (pincode.length !== 6) { Alert.alert('Required', 'Enter a valid 6-digit pincode'); return false; }
+
+      if (!shopName.trim()) {
+        console.log("Validation Failed: Shop name empty");
+        Alert.alert('Required', 'Enter your shop name');
+        return false;
+      }
+
+      if (selectedCategories.length === 0) {
+        console.log("Validation Failed: No category selected");
+        Alert.alert('Required', 'Select at least one category');
+        return false;
+      }
+
+      if (!address.trim()) {
+        console.log("Validation Failed: Address empty");
+        Alert.alert('Required', 'Enter your shop address');
+        return false;
+      }
+
+      if (!city.trim()) {
+        console.log("Validation Failed: City empty");
+        Alert.alert('Required', 'Enter your city');
+        return false;
+      }
+
+      if (pincode.length !== 6) {
+        console.log("Validation Failed: Invalid pincode", pincode);
+        Alert.alert('Required', 'Enter a valid 6-digit pincode');
+        return false;
+      }
     }
     if (currentStep === 2) {
       if (!upiId.trim() && !accountNumber.trim()) {
@@ -120,20 +146,22 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
   const handleNext = async () => {
     if (!validateStep()) return;
-    if (currentStep < 5) {
+
+    if (currentStep < STEPS.length) {
       setCurrentStep(prev => prev + 1);
       return;
     }
+
     // Final step — submit everything
     setLoading(true);
     try {
       // 1. Create vendor profile
-      const vendorRes = await fetch('http://localhost:3000/api/vendors', {
+      const vendorRes = await fetch(`${API_BASE}/vendors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           shop_name: shopName,
-          categories: selectedCategories,
+          categories: selectedCategories.join(','),
           address_line: address,
           city, pincode,
           phone: shopPhone,
@@ -149,7 +177,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
       // 2. Add products to inventory
       const validProducts = products.filter(p => p.name && p.price);
       for (const product of validProducts) {
-        await fetch('http://localhost:3000/api/inventory', {
+        await fetch(`${API_BASE}/products`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
@@ -587,8 +615,8 @@ export default function VendorOnboardingScreen({ onComplete }) {
           {loading
             ? <ActivityIndicator color="#fff" />
             : <Text style={styles.nextText}>
-                {currentStep === 5 ? '🚀 Submit & Go Live' : 'Save & Continue →'}
-              </Text>
+              {currentStep === 5 ? '🚀 Submit & Go Live' : 'Save & Continue →'}
+            </Text>
           }
         </TouchableOpacity>
       </View>

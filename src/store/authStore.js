@@ -11,10 +11,23 @@ const useAuthStore = create((set, get) => ({
   // Called on app start — checks if token exists in storage
   hydrate: async () => {
     try {
-      await AsyncStorage.removeItem("token");
-      await AsyncStorage.removeItem("user");
-      set({ isLoading: false });
-    } catch {
+      const token = await AsyncStorage.getItem("token");
+      const userJSON = await AsyncStorage.getItem("user");
+
+      if (token && userJSON) {
+        const user = JSON.parse(userJSON);
+        set({
+          token,
+          user,
+          role: user.role,
+          isAuthenticated: true,
+          isLoading: false
+        });
+      } else {
+        set({ isLoading: false });
+      }
+    } catch (err) {
+      console.error("Hydration Error:", err);
       set({ isLoading: false });
     }
   },

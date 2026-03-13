@@ -12,6 +12,8 @@ import {
   Dimensions,
   StatusBar,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -40,6 +42,9 @@ export default function SignupScreen({ navigation }) {
   const [selectedRole, setSelectedRole] = useState('customer');
   const [focusedField, setFocusedField] = useState(null);
   const [agreed, setAgreed] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const API_URL = 'http://192.168.29.215:3000/api';
 
   const register = useAuthStore((state) => state.register);
 
@@ -69,20 +74,37 @@ export default function SignupScreen({ navigation }) {
     gender !== '' &&
     agreed;
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     if (isValid) {
-      register(
-        {
-          id: Date.now().toString(),
-          name: name.trim(),
-          mobile,
-          address: address.trim(),
-          age: ageNum,
-          gender,
-          role: selectedRole,
-        },
-        'mock-jwt-token'
-      );
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name.trim(),
+            phone: mobile,
+            password: 'defaultPassword123', // We just use OTP to login actually, but register needs a password
+            role: selectedRole
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          Alert.alert('Error', data.msg || 'Registration failed');
+          return;
+        }
+
+        Alert.alert('Success', 'Account created successfully! Please login with your mobile number.', [
+          { text: 'OK', onPress: () => navigation?.navigate('Login') }
+        ]);
+
+      } catch (err) {
+        Alert.alert('Error', 'Network error. Please try again.');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -306,23 +328,30 @@ export default function SignupScreen({ navigation }) {
 
               {/* CTA */}
               <TouchableOpacity
-                style={[styles.cta, !isValid && styles.ctaDisabled]}
-                disabled={!isValid}
+                style={[styles.cta, (!isValid || loading) && styles.ctaDisabled]}
+                disabled={!isValid || loading}
                 onPress={handleSignup}
                 activeOpacity={0.88}
               >
                 <LinearGradient
-                  colors={isValid ? ['#22C55E', '#15803D'] : ['#D1FAE5', '#D1FAE5']}
+                  colors={isValid && !loading ? ['#22C55E', '#15803D'] : ['#D1FAE5', '#D1FAE5']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.ctaInner}
                 >
-                  <Text style={[styles.ctaText, !isValid && styles.ctaTextOff]}>
-                    Create Account
-                  </Text>
-                  <View style={[styles.ctaArrow, !isValid && styles.ctaArrowOff]}>
-                    <Feather name="arrow-right" size={15} color={isValid ? '#052E16' : '#6EE7B7'} />
-                  </View>
+                  {loading ? (
+                    <ActivityIndicator color="#052E16" />
+                  ) : (
+                    <Text style={[styles.ctaText, !isValid && styles.ctaTextOff]}>
+                      Create Account
+                    </Text>
+                  )}
+
+                  {!loading && (
+                    <View style={[styles.ctaArrow, !isValid && styles.ctaArrowOff]}>
+                      <Feather name="arrow-right" size={15} color={isValid ? '#052E16' : '#6EE7B7'} />
+                    </View>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
 
