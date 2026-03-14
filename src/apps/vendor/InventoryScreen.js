@@ -393,7 +393,8 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   statsRow: {
-    flexDirection: "row",
+    display : "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
     gap: 10,
     flexWrap: "wrap",
   },

@@ -16,7 +16,7 @@ export default function StatCard({
   iconBg,
 }) {
   return (
-    <View style={[styles.card, { borderLeftColor: accentColor }]}>
+    <View style={[styles.card]}>
       <View style={[styles.iconContainer, { backgroundColor: iconBg }]}>
         <Text style={{ color: accentColor, fontSize: 20 }}>{icon}</Text>
       </View>
