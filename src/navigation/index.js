@@ -15,14 +15,17 @@ import CheckoutScreen from '../apps/customer/Checkout';
 import OrderPlaced from '../apps/customer/OrderPlaced';
 import VendorOnboardingScreen from '../apps/vendor/VendorOnboardingScreen';
 
+// ── NEW ──────────────────────────────────────────────────────────────────────
+import DeliveryOnboarding from '../apps/delivery/OnBoardingScreen';
+// ─────────────────────────────────────────────────────────────────────────────
+
 const Stack = createNativeStackNavigator();
 
 export default function Navigation() {
   const { isAuthenticated, role, isLoading, token } = useAuthStore();
-  const [vendorOnboarded, setVendorOnboarded] = useState(null);
-  const [checkingOnboard, setCheckingOnboard] = useState(false);
+  const [vendorOnboarded,  setVendorOnboarded]  = useState(null);
+  const [checkingOnboard,  setCheckingOnboard]  = useState(false);
 
-  // Check vendor onboarding status when vendor logs in
   useEffect(() => {
     if (isAuthenticated && role?.toLowerCase() === 'vendor') {
       checkVendorProfile();
@@ -32,7 +35,7 @@ export default function Navigation() {
   const checkVendorProfile = async () => {
     setCheckingOnboard(true);
     try {
-      const res = await fetch('http://localhost:3000/api/vendors/me/profile', {
+      const res  = await fetch('http://localhost:3000/api/vendors/me/profile', {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -46,7 +49,6 @@ export default function Navigation() {
     }
   };
 
-  // Show spinner while checking stored token
   if (isLoading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }}>
@@ -55,7 +57,6 @@ export default function Navigation() {
     );
   }
 
-  // Show spinner while checking vendor onboarding status
   if (
     isAuthenticated &&
     role?.toLowerCase() === 'vendor' &&
@@ -71,15 +72,12 @@ export default function Navigation() {
   const getMainNavigator = () => {
     const normalizedRole = role?.toLowerCase();
 
-    // Vendor — check onboarding first
     if (normalizedRole === 'vendor') {
       if (!vendorOnboarded) {
         return (
           <Stack.Screen name="VendorOnboarding">
             {() => (
-              <VendorOnboardingScreen
-                onComplete={() => setVendorOnboarded(true)}
-              />
+              <VendorOnboardingScreen onComplete={() => setVendorOnboarded(true)} />
             )}
           </Stack.Screen>
         );
@@ -87,8 +85,8 @@ export default function Navigation() {
       return <Stack.Screen name="VendorApp" component={VendorTabs} />;
     }
 
-    switch (role) {
-      case USER_ROLES.DELIVERY:
+    switch (normalizedRole) {
+      case 'delivery':
         return <Stack.Screen name="DeliveryApp" component={DeliveryTabs} />;
       default:
         return <Stack.Screen name="CustomerApp" component={CustomerTabs} />;
@@ -98,16 +96,30 @@ export default function Navigation() {
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
+
         {!isAuthenticated ? (
           <>
-            <Stack.Screen name="Login" component={LoginScreen} />
-            <Stack.Screen name="Signup" component={SignupScreen} />
+            {/* ── Unauthenticated screens ── */}
+            <Stack.Screen name="Login"    component={LoginScreen} />
+            <Stack.Screen name="Signup"   component={SignupScreen} />
+
+            {/*
+              DeliveryOnboarding lives here (unauthenticated zone) because:
+              - User navigates here BEFORE register() is called
+              - register() is called inside DeliveryOnboarding on submit
+              - After register(), isAuthenticated becomes true and navigator
+                switches to the authenticated zone automatically
+            */}
+            <Stack.Screen name="DeliveryOnboarding" component={DeliveryOnboarding} />
           </>
         ) : (
           getMainNavigator()
         )}
-        <Stack.Screen name="Checkout" component={CheckoutScreen} />
+
+        {/* ── Screens accessible from any role ── */}
+        <Stack.Screen name="Checkout"    component={CheckoutScreen} />
         <Stack.Screen name="OrderPlaced" component={OrderPlaced} />
+
       </Stack.Navigator>
     </NavigationContainer>
   );

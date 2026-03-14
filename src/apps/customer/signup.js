@@ -70,19 +70,26 @@ export default function SignupScreen({ navigation }) {
     agreed;
 
   const handleSignup = () => {
-    if (isValid) {
-      register(
-        {
-          id: Date.now().toString(),
-          name: name.trim(),
-          mobile,
-          address: address.trim(),
-          age: ageNum,
-          gender,
-          role: selectedRole,
-        },
-        'mock-jwt-token'
-      );
+    if (!isValid) return;
+
+    const userDetails = {
+      id: Date.now().toString(),
+      name: name.trim(),
+      mobile,
+      address: address.trim(),
+      age: ageNum,
+      gender,
+      role: selectedRole,
+    };
+
+    if (selectedRole === 'delivery') {
+      // ── Delivery partners go to onboarding first ──────────────────────
+      // We pass userDetails so DeliveryOnboarding can include them in
+      // the final payload when calling onboardingService.submit()
+      navigation.navigate('DeliveryOnboarding', { userDetails });
+    } else {
+      // ── Customer & Vendor register immediately ────────────────────────
+      register(userDetails, 'mock-jwt-token');
     }
   };
 
@@ -152,6 +159,16 @@ export default function SignupScreen({ navigation }) {
                 })}
               </View>
 
+              {/* Delivery info banner — shown only when delivery tab is active */}
+              {selectedRole === 'delivery' && (
+                <View style={styles.deliveryBanner}>
+                  <Feather name="info" size={14} color="#16A34A" />
+                  <Text style={styles.deliveryBannerText}>
+                    After signing up you'll complete a quick onboarding — license, vehicle & bank details.
+                  </Text>
+                </View>
+              )}
+
               {/* Full Name */}
               <View style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>Full Name</Text>
@@ -205,7 +222,9 @@ export default function SignupScreen({ navigation }) {
 
               {/* Delivery Address */}
               <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Delivery Address</Text>
+                <Text style={styles.fieldLabel}>
+                  {selectedRole === 'delivery' ? 'Home Address' : 'Address'}
+                </Text>
                 <View style={[
                   styles.inputBox,
                   styles.inputBoxMultiline,
@@ -263,7 +282,7 @@ export default function SignupScreen({ navigation }) {
                   )}
                 </View>
 
-                {/* Gender label — sits above the chips */}
+                {/* Gender */}
                 <View style={[styles.fieldGroup, { flex: 1.6 }]}>
                   <Text style={styles.fieldLabel}>Gender</Text>
                   <View style={styles.genderRow}>
@@ -318,7 +337,7 @@ export default function SignupScreen({ navigation }) {
                   style={styles.ctaInner}
                 >
                   <Text style={[styles.ctaText, !isValid && styles.ctaTextOff]}>
-                    Create Account
+                    {selectedRole === 'delivery' ? 'Continue to Onboarding' : 'Create Account'}
                   </Text>
                   <View style={[styles.ctaArrow, !isValid && styles.ctaArrowOff]}>
                     <Feather name="arrow-right" size={15} color={isValid ? '#052E16' : '#6EE7B7'} />
@@ -430,7 +449,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     borderRadius: 14,
     padding: 4,
-    marginBottom: 20,
+    marginBottom: 14,
   },
   roleTab: {
     flex: 1,
@@ -452,6 +471,26 @@ const styles = StyleSheet.create({
   roleTabText: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
   roleTabTextActive: { color: '#FFFFFF', fontWeight: '700' },
 
+  // Delivery info banner
+  deliveryBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    padding: 10,
+    gap: 8,
+    marginBottom: 16,
+  },
+  deliveryBannerText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#166534',
+    lineHeight: 18,
+    fontWeight: '500',
+  },
+
   // Fields
   fieldGroup: { marginBottom: 14 },
   fieldLabel: {
@@ -468,14 +507,12 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
 
-  // Row layout for Age + Gender
   rowFields: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     marginBottom: 0,
   },
 
-  // Green-tinted input boxes
   inputBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -512,29 +549,15 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
 
-  // Mobile prefix
   prefixWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingRight: 10,
   },
-  prefixText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#374151',
-  },
-  prefixDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: '#BBF7D0',
-    marginLeft: 10,
-  },
+  prefixText: { fontSize: 13, fontWeight: '700', color: '#374151' },
+  prefixDivider: { width: 1, height: 20, backgroundColor: '#BBF7D0', marginLeft: 10 },
 
-  // Gender chips
-  genderRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
+  genderRow: { flexDirection: 'row', gap: 6 },
   genderChip: {
     flex: 1,
     alignItems: 'center',
@@ -545,15 +568,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDF4',
     gap: 3,
   },
-  genderChipActive: {
-    backgroundColor: '#16A34A',
-    borderColor: '#16A34A',
-  },
+  genderChipActive: { backgroundColor: '#16A34A', borderColor: '#16A34A' },
   genderEmoji: { fontSize: 16 },
   genderText: { fontSize: 10, color: '#6B7280', fontWeight: '600' },
   genderTextActive: { color: '#FFFFFF', fontWeight: '700' },
 
-  // Checkbox
   checkboxRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -573,14 +592,10 @@ const styles = StyleSheet.create({
     marginTop: 1,
     flexShrink: 0,
   },
-  checkboxActive: {
-    backgroundColor: '#16A34A',
-    borderColor: '#16A34A',
-  },
+  checkboxActive: { backgroundColor: '#16A34A', borderColor: '#16A34A' },
   checkboxText: { fontSize: 13, color: '#6B7280', flex: 1, lineHeight: 20 },
   checkboxLink: { color: '#16A34A', fontWeight: '700' },
 
-  // CTA
   cta: { borderRadius: 16, overflow: 'hidden', marginBottom: 20 },
   ctaDisabled: { opacity: 1 },
   ctaInner: {
@@ -602,17 +617,14 @@ const styles = StyleSheet.create({
   },
   ctaArrowOff: { backgroundColor: 'rgba(22,163,74,0.15)' },
 
-  // Or
   orRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 18, gap: 12 },
   orLine: { flex: 1, height: 1, backgroundColor: '#E5E7EB' },
   orText: { fontSize: 12, color: '#9CA3AF', fontWeight: '500' },
 
-  // Login link
   loginBtn: { alignItems: 'center' },
   loginText: { fontSize: 13, color: '#6B7280' },
   loginLink: { color: '#16A34A', fontWeight: '800' },
 
-  // Legal
   legal: { textAlign: 'center', fontSize: 11, color: '#9CA3AF', marginTop: 20, marginBottom: 10 },
   legalLink: { color: '#6B7280', fontWeight: '600' },
 });
