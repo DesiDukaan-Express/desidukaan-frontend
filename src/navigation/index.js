@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import SignupScreen from '../apps/customer/signup';
+import SignupScreen from '../apps/customer/SignUpScreen';
 import useAuthStore from '../store/authStore';
 import { USER_ROLES } from '../constants';
 import { colors } from '../styles/colors';

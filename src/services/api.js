@@ -4,6 +4,7 @@ const BASE_URL = "http://localhost:3000/api";
 const request = async (method, endpoint, body = null, token = null) => {
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  console.log("API REQUEST:", method, endpoint, "token:", token ? "YES" : "NO"); // ADD THIS
 
   const config = { method, headers };
   if (body) config.body = JSON.stringify(body);

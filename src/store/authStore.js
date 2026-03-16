@@ -6,14 +6,29 @@ const useAuthStore = create((set, get) => ({
   token: null,
   role: null,
   isAuthenticated: false,
-  isLoading: true, // loading while checking stored token
+  isLoading: true,
 
-  // Called on app start — checks if token exists in storage
+  // Called on app start — reads stored token and restores session
   hydrate: async () => {
     try {
-      await AsyncStorage.removeItem("token");
-      await AsyncStorage.removeItem("user");
-      set({ isLoading: false });
+      const token = await AsyncStorage.getItem("token");
+      const userStr = await AsyncStorage.getItem("user");
+
+      console.log("HYDRATE token:", token); // ADD THIS
+      console.log("HYDRATE user:", userStr); // ADD THIS
+
+      if (token && userStr) {
+        const user = JSON.parse(userStr);
+        set({
+          token,
+          user,
+          role: user.role,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+      } else {
+        set({ isLoading: false });
+      }
     } catch {
       set({ isLoading: false });
     }
