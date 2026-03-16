@@ -9,18 +9,23 @@ import SearchScreen from '../apps/customer/SearchScreen';
 import CartScreen from '../apps/customer/CartScreen';
 import OrdersScreen from '../apps/customer/OrdersScreen';
 import ProfileScreen from '../apps/customer/ProfileScreen';
-// import VendorScreen from '../apps/customer/VendorScreen';
-// import CheckoutScreen from '../apps/customer/CheckoutScreen';
+import VendorStoreScreen from '../apps/customer/VendorStoreScreen';
 
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
 
 const icon = (label) => ({ focused }) => (
   <Text style={{ fontSize: 20 }}>
-    {label === 'Home' ? '🏠' : label === 'Search' ? '🔍' : label === 'Cart' ? '🛒' : label === 'Orders' ? '📦' : '👤'}
+    {label === 'Home' ? '🏠'
+      : label === 'Search' ? '🔍'
+      : label === 'Cart' ? '🛒'
+      : label === 'Orders' ? '📦'
+      : '👤'}
   </Text>
 );
 
-export default function CustomerTabs() {
+// Bottom tabs
+function CustomerTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={{
@@ -30,11 +35,21 @@ export default function CustomerTabs() {
         tabBarStyle: { paddingBottom: 8, paddingTop: 4, height: 60 },
       }}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarIcon: icon('Home') }} />
-      <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarIcon: icon('Search') }} />
-      <Tab.Screen name="Cart" component={CartScreen} options={{ tabBarIcon: icon('Cart') }} />
-      <Tab.Screen name="Orders" component={OrdersScreen} options={{ tabBarIcon: icon('Orders') }} />
+      <Tab.Screen name="Home"    component={HomeScreen}    options={{ tabBarIcon: icon('Home') }} />
+      <Tab.Screen name="Search"  component={SearchScreen}  options={{ tabBarIcon: icon('Search') }} />
+      <Tab.Screen name="Cart"    component={CartScreen}    options={{ tabBarIcon: icon('Cart') }} />
+      <Tab.Screen name="Orders"  component={OrdersScreen}  options={{ tabBarIcon: icon('Orders') }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: icon('Profile') }} />
     </Tab.Navigator>
+  );
+}
+
+// Stack wrapping tabs — allows pushing full screens like VendorStore
+export default function CustomerTabs() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="CustomerTabNavigator" component={CustomerTabNavigator} />
+      <Stack.Screen name="VendorStore" component={VendorStoreScreen} />
+    </Stack.Navigator>
   );
 }
