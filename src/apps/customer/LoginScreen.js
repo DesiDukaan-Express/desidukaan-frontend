@@ -70,10 +70,13 @@ export default function LoginScreen({ navigation }) {
   const [selectedRole, setSelectedRole] = useState("customer");
   const [focusedField, setFocusedField] = useState(null);
   const [resendTimer,  setResendTimer]  = useState(0);
-  const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState("");
 
   const login = useAuthStore((state) => state.login);
+  const [loading, setLoading] = useState(false);
+
+  // Set the base URL dynamically or statically. Here we will use the local network IP for Android/iOS emulator accessibility.
+  const API_URL = 'http://192.168.29.215:3000/api';
 
   const logoAnim    = useRef(new Animated.Value(0)).current;
   const formAnim    = useRef(new Animated.Value(30)).current;

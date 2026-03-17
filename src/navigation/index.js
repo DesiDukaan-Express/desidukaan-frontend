@@ -7,6 +7,8 @@ import useAuthStore from '../store/authStore';
 import { USER_ROLES } from '../constants';
 import { colors } from '../styles/colors';
 
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+
 import LoginScreen from '../apps/customer/LoginScreen';
 import CustomerTabs from './CustomerTabs';
 import VendorTabs from './VendorTabs';
@@ -32,7 +34,7 @@ export default function Navigation() {
   const checkVendorProfile = async () => {
     setCheckingOnboard(true);
     try {
-      const res = await fetch('http://localhost:3000/api/vendors/me/profile', {
+      const res = await fetch(`${API_BASE}/vendors/me/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
