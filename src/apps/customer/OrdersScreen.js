@@ -9,7 +9,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import useAuthStore from "../../store/authStore";
 
-const BASE_URL = "http://localhost:3000/api";
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 const C = {
   orange:      "#F97316", orangeDark:  "#EA580C",
@@ -43,8 +43,8 @@ const getStatus = (s) => STATUS[s] || STATUS.pending;
 const TRACK_STEPS = [
   { key: "pending",   label: "Order Placed",    icon: "shopping-bag" },
   { key: "accepted",  label: "Accepted",         icon: "check-circle" },
-  { key: "preparing", label: "Being Prepared",   icon: "package"      },
-  { key: "ready",     label: "Ready to Pick Up", icon: "star"         },
+  { key: "packing", label: "Getting Packed",   icon: "package"      },
+  { key: "ready",     label: "Ready to Move", icon: "star"         },
   { key: "picked_up", label: "Out for Delivery", icon: "truck"        },
   { key: "delivered", label: "Delivered",         icon: "home"         },
 ];

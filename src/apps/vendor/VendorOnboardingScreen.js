@@ -703,7 +703,8 @@ const styles = StyleSheet.create({
   productRowNum: { fontSize: 13, fontWeight: '700', color: '#333' },
   removeBtn: { fontSize: 12, color: '#e53935', fontWeight: '600' },
   addRowBtn: {
-    borderWidth: 1.5, borderColor: PRIMARY, borderStyle: 'dashed',
+    borderWidth: 1.5, borderColor: PRIMARY,
+...Platform.select({ web: { borderStyle: 'dashed' }, default: { borderStyle: 'solid' } }),
     borderRadius: 10, padding: 14, alignItems: 'center', marginTop: 4,
   },
   addRowBtnText: { color: PRIMARY, fontWeight: '700', fontSize: 14 },

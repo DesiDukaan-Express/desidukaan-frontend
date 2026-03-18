@@ -12,9 +12,9 @@ import useAuthStore    from "../../store/authStore";
 import useCartStore    from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 
-const BASE_URL      = "http://localhost:3000/api";
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const NEARBY_RADIUS = 10;   // km — stores within this are shown normally
-const FAR_RADIUS    = 25;   // km — stores beyond NEARBY_RADIUS but within this show a warning
+const FAR_RADIUS    = 10;   // km — backend validation max is 10
 const MAX_HISTORY   = 8;
 
 // ─── Palette (matches app design system) ─────────────────────────────────────
@@ -90,8 +90,7 @@ function AddBtn({ product, vendorId, vendorName }) {
   };
   const doRemove = () => {
     pop();
-    if (qty <= 1) cart?.removeItem?.(product.id);
-    else cart?.updateQty?.(product.id, qty - 1);
+    cart?.removeItem?.(product.id);
   };
 
   return (
@@ -385,9 +384,12 @@ export default function SearchScreen() {
   // ── User location ─────────────────────────────────────────────────────────
   const selectedAddr = addressStore?.addresses?.find(a => a.id === addressStore?.selectedId)
     || addressStore?.addresses?.[0];
-  const userCoords = (selectedAddr?.latitude && selectedAddr?.longitude)
-    ? { lat: selectedAddr.latitude, lng: selectedAddr.longitude }
-    : null;
+  const userCoords =
+    (selectedAddr?.lat && selectedAddr?.lng)
+      ? { lat: selectedAddr.lat, lng: selectedAddr.lng }
+      : (selectedAddr?.latitude && selectedAddr?.longitude)
+      ? { lat: selectedAddr.latitude, lng: selectedAddr.longitude }
+      : null;
 
   // ── Handle category filter from HomeScreen ────────────────────────────────
   useEffect(() => {
@@ -402,7 +404,7 @@ export default function SearchScreen() {
   // ── Fetch all nearby vendors on mount ────────────────────────────────────
   useEffect(() => {
     if (!userCoords) return;
-    fetch(`${BASE_URL}/vendors/nearby?lat=${userCoords.lat}&lng=${userCoords.lng}&radius=${FAR_RADIUS}`, {
+    fetch(`${BASE_URL}/vendors?latitude=${userCoords.lat}&longitude=${userCoords.lng}&radius_km=${FAR_RADIUS}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then(r => r.json())
@@ -431,21 +433,62 @@ export default function SearchScreen() {
     try {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      // Use coords — fallback to Hyderabad if no address saved
-      const lat = userCoords?.lat || 17.3850;
-      const lng = userCoords?.lng || 78.4867;
+      // Always read coords fresh via getState() — never stale
+      const addrState = useAddressStore.getState();
+      const currentAddr =
+        addrState.addresses?.find(a => a.id === addrState.selectedId)
+        || addrState.addresses?.[0];
+      let lat = currentAddr?.lat || currentAddr?.latitude || null;
+      let lng = currentAddr?.lng || currentAddr?.longitude || null;
 
-      // Step 1: Get nearby vendors (up to FAR_RADIUS)
-      let vendorList = vendors;
-      if (vendorList.length === 0) {
-        const vRes  = await fetch(
-          `${BASE_URL}/vendors/nearby?lat=${lat}&lng=${lng}&radius=${FAR_RADIUS}`,
-          { headers }
-        );
-        const vData = await vRes.json();
-        vendorList  = Array.isArray(vData) ? vData : vData.data || vData.vendors || [];
-        setVendors(vendorList);
+      // If address has no coords, try geocoding, then fall back to device GPS
+      if (!lat || !lng) {
+        const addrText = currentAddr?.address_line || currentAddr?.address;
+        if (addrText) {
+          try {
+            const geoRes = await fetch(
+              `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addrText)}&format=json&limit=1`,
+              { headers: { "User-Agent": "DesiDukaan/1.0" } }
+            );
+            const geoData = await geoRes.json();
+            if (geoData?.[0]) {
+              lat = parseFloat(geoData[0].lat);
+              lng = parseFloat(geoData[0].lon);
+            }
+          } catch {}
+        }
       }
+
+      // Last resort — use device GPS
+      if (!lat || !lng) {
+        try {
+          const L = require("expo-location");
+          const { status } = await L.requestForegroundPermissionsAsync();
+          if (status === "granted") {
+            const loc = await L.getCurrentPositionAsync({ accuracy: L.Accuracy.Balanced });
+            lat = loc.coords.latitude;
+            lng = loc.coords.longitude;
+          }
+        } catch {}
+      }
+
+      console.log("Search coords:", lat, lng, "addr:", currentAddr?.address_line);
+
+      if (!lat || !lng) {
+        setProducts([]);
+        setMatchedVendors([]);
+        setLoading(false);
+        return;
+      }
+
+      // Step 1: Fetch vendors at current location (always fresh)
+      const vRes = await fetch(
+        `${BASE_URL}/vendors?latitude=${lat}&longitude=${lng}&radius_km=${FAR_RADIUS}`,
+        { headers }
+      );
+      const vData = await vRes.json();
+      let vendorList = Array.isArray(vData) ? vData : vData.data || vData.vendors || [];
+      setVendors(vendorList);
 
       // Step 2: Search across all vendor inventories in parallel
       // Each vendor's inventory endpoint already exists: GET /inventory/vendor/:id
@@ -457,13 +500,16 @@ export default function SearchScreen() {
             .then(d => {
               const inv = Array.isArray(d) ? d : d.data || d.inventory || [];
               // Filter to items matching query by name, brand, category
-              const matched = inv.filter(item => {
+              const matched = inv.filter((item) => {
                 const p = item.product || {};
+                const catName = typeof p.category === "object"
+                  ? (p.category?.name || "")
+                  : (p.category || "");
                 return (
                   p.name?.toLowerCase().includes(q_lower) ||
                   p.description?.toLowerCase().includes(q_lower) ||
-                  p.category?.name?.toLowerCase().includes(q_lower) ||
-                  p.category?.toLowerCase?.()?.includes(q_lower)
+                  catName.toLowerCase().includes(q_lower) ||
+                  p.unit?.toLowerCase().includes(q_lower)
                 );
               });
               return { vendor: v, matched };
@@ -520,7 +566,7 @@ export default function SearchScreen() {
     } finally {
       setLoading(false);
     }
-  }, [query, vendors, token, userCoords]);
+  }, [query, token]);
 
   // ── Navigate to vendor store ──────────────────────────────────────────────
   const goToStore = useCallback((vendor) => {
