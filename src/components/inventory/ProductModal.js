@@ -21,30 +21,34 @@ const LBL_STYLE = {
   marginBottom: 6,
 };
 
+const TYPE_OPTS = ["Loose", "Packed", "Packed (Branded)"];
+
 /**
  * ProductModal — Add or Edit product form, shown as a bottom-sheet style Modal.
  */
 export default function ProductModal({ editing, onClose, onSave, saving }) {
   const init = editing
     ? {
-        name: editing.name,
-        description: editing.description || "",
-        category: editing.category,
-        barcode: editing.barcode || "",
-        stock: editing.stock,
-        price: editing.price,
-        status: editing.status,
-      }
+      name: editing.name,
+      description: editing.description || "",
+      category: editing.category,
+      barcode: editing.barcode || "",
+      stock: editing.stock,
+      price: editing.price,
+      status: editing.status,
+      type : editing.type || "  "
+    }
     : {
-        name: "",
-        description: "",
-        category: "Vegetables",
-        barcode: "",
-        unit: "kg",
-        stock: "",
-        price: "",
-        status: "In Stock",
-      };
+      name: "",
+      description: "",
+      category: "Vegetables",
+      barcode: "",
+      unit: "kg",
+      stock: "",
+      price: "",
+      status: "In Stock",
+      type : "Packed"
+    };
 
   const [form, setForm] = useState(init);
   const [err, setErr] = useState("");
@@ -139,6 +143,23 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
                   onClick={() => set("unit", u)}
                 />
               ))}
+            </View>
+          </View>
+
+          <View>
+            <Text style={LBL_STYLE}>Type</Text>
+            <View style={styles.chipRow}>
+              {
+                TYPE_OPTS.map((elem , index) => {
+                  return (
+                  <SelectChip 
+                    key={index}
+                    label={elem}
+                    active={form.type === elem}
+                    onClick={() => set("type" , elem)}
+                  />)
+                })
+              }
             </View>
           </View>
 
