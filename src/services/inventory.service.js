@@ -43,6 +43,8 @@ export const inventoryService = {
           priceDisplay: `₹${p.price}`,
           updatedAt: new Date(p.updated_at ?? p.created_at).toLocaleDateString("en-IN"),
           status: stockStatus(qty),
+          type: p.item_type || "packed",
+          weight_options: p.weight_options || [],
         };
       });
 
@@ -110,6 +112,8 @@ export const inventoryService = {
           unit:        payload.unit || "kg",
           price:       parseFloat(String(payload.price).replace(/[^0-9.]/g, "")) || 0,
           stock_qty:   parseInt(payload.stock) || 0,
+          type:        payload.type || "packed",
+          weight_options: payload.weight_options || null,
         }),
       });
       const data = await res.json();
@@ -136,6 +140,8 @@ export const inventoryService = {
           unit:        payload.unit || "kg",
           price:       parseFloat(String(payload.price).replace(/[^0-9.]/g, "")) || 0,
           stock_qty:   parseInt(payload.stock) || 0,
+          type:        payload.type || "packed",
+          weight_options: payload.weight_options || null,
         }),
       });
       const data = await res.json();

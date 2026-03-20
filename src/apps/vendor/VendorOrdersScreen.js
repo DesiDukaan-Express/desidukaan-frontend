@@ -11,17 +11,20 @@ import {
   ScrollView,
   Image,
   TextInput,
-  Dimensions
+  Dimensions,
+  Alert
 } from "react-native";
 
 import VendorMapView from "../../components/VendorMapView";
 import { Ionicons, MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
+import { io } from "socket.io-client";
 
 const { width } = Dimensions.get("window");
 
 import useAuthStore from "../../store/authStore";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
 export default function VendorOrdersScreen() {
 
@@ -99,6 +102,39 @@ export default function VendorOrdersScreen() {
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  // Socket setup for real-time negotiation
+  useEffect(() => {
+    if (!token) return;
+
+    const socket = io(SOCKET_URL, { 
+      auth: { token },
+      transports: ['websocket']
+    });
+
+    socket.on("connect", () => console.log("Vendor Socket Connected"));
+
+    // Real-time order notifications
+    socket.on("order:new", (data) => {
+      console.log("New Order:", data);
+      fetchOrders();
+      // Optional: Add local notification/alert
+      if (data.has_loose_items) {
+        // Alert.alert("New Negotiation", `Order ${data.order_number} needs weight confirmation.`);
+      }
+    });
+
+    // Slot & Fee Negotiation updates
+    socket.on("slot:request", () => fetchOrders());
+    socket.on("fee:request", () => fetchOrders());
+    socket.on("phone:request", () => fetchOrders());
+    
+    // Customer responses
+    socket.on("slot:confirmed", () => fetchOrders());
+    socket.on("fee:confirmed", () => fetchOrders());
+
+    return () => socket.disconnect();
+  }, [token]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -274,6 +310,13 @@ export default function VendorOrdersScreen() {
             <Text style={styles.items}>
               {(item.items || []).map(i => `${i.quantity}x ${i.product_name}`).join(", ")}
             </Text>
+
+            {item.has_loose_items && (
+              <View style={styles.negotiationBadge}>
+                <MaterialIcons name="scale" size={12} color="#D97706" />
+                <Text style={styles.negotiationText}>WEIGHT NEGOTIATION NEEDED</Text>
+              </View>
+            )}
 
             <View style={styles.bottomRow}>
               <View style={styles.totalContainer}>
@@ -800,6 +843,23 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 12,
     color: "#6B7280"
+  },
+  negotiationBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEF3C7",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginTop: 8,
+    alignSelf: "flex-start",
+    gap: 4,
+  },
+  negotiationText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#D97706",
+    letterSpacing: 0.5,
   },
 
   statusTextPending: {
