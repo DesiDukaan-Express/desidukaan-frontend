@@ -56,7 +56,8 @@ export default function VendorProfileScreen() {
                 console.log(response.data);
 
                 setVendor(response.data.vendor);
-                setStoreOpen(response.data.vendor.is_open);
+                setStoreOpen(response.data.vendor.is_open === true || response.data.vendor.is_open === "true");
+                setNotifications(response.data.vendor.notifications_enabled === true || response.data.vendor.notifications_enabled === "true");
 
             } catch (err) {
                 console.log("Error fetching vendor:", err);
@@ -199,16 +200,16 @@ export default function VendorProfileScreen() {
                 <View style={styles.settingRow}>
                     <Text style={styles.settingText}>🟢 Store Open</Text>
                     <Switch
-                        value={storeOpen}
-                        onValueChange={setStoreOpen}
+                        value={storeOpen === true}
+                        onValueChange={(val) => setStoreOpen(val === true)}
                     />
                 </View>
 
                 <View style={styles.settingRow}>
                     <Text style={styles.settingText}>🔔 Notifications</Text>
                     <Switch
-                        value={notifications}
-                        onValueChange={setNotifications}
+                        value={notifications === true}
+                        onValueChange={(val) => setNotifications(val === true)}
                     />
                 </View>
 

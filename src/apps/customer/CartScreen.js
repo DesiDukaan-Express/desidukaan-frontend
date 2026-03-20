@@ -12,8 +12,8 @@ import useCartStore    from "../../store/cartStore";
 import useAuthStore    from "../../store/authStore";
 import useAddressStore from "../../store/addressStore";
 
-const BASE_URL   = "http://localhost:3000/api";
-const SOCKET_URL = "http://localhost:3000";
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
 const C = {
   orange:     "#F97316", orangeDark: "#EA580C",
@@ -215,7 +215,7 @@ const sm = StyleSheet.create({
   inputBox:           { flexDirection: "row", alignItems: "center", backgroundColor: C.gray100, borderRadius: 14, borderWidth: 1.5, borderColor: "transparent", minHeight: 52, paddingRight: 4 },
   inputBoxError:      { borderColor: C.red, backgroundColor: C.redLight },
   inputBoxValid:      { borderColor: C.green, backgroundColor: C.greenLight },
-  input:              { flex: 1, fontSize: 15, color: C.gray900, paddingLeft: 10, paddingVertical: 14, outlineStyle: "none" },
+  input:              { flex: 1, fontSize: 15, color: C.gray900, paddingLeft: 10, paddingVertical: 14, ...Platform.select({ web: { outlineStyle: "none" } }) },
   hints:              { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
   hintChip:           { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: C.gray100, borderWidth: 1, borderColor: C.gray200 },
   hintText:           { fontSize: 13, color: C.gray600, fontWeight: "600" },
@@ -308,7 +308,7 @@ const fm = StyleSheet.create({
   inputBox:           { flexDirection: "row", alignItems: "center", backgroundColor: C.gray100, borderRadius: 14, borderWidth: 1.5, borderColor: "transparent", minHeight: 56, paddingHorizontal: 18 },
   inputBoxValid:      { borderColor: C.green, backgroundColor: C.greenLight },
   rupee:              { fontSize: 22, fontWeight: "900", color: C.gray700, marginRight: 6 },
-  input:              { flex: 1, fontSize: 28, fontWeight: "900", color: C.gray900, outlineStyle: "none" },
+  input:              { flex: 1, fontSize: 28, fontWeight: "900", color: C.gray900, ...Platform.select({ web: { outlineStyle: "none" } }) },
   hints:              { flexDirection: "row", gap: 8, marginTop: 14 },
   hintChip:           { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 12, backgroundColor: C.gray100, borderWidth: 1, borderColor: C.gray200 },
   hintText:           { fontSize: 13, fontWeight: "700", color: C.gray600 },
@@ -1097,7 +1097,7 @@ const s = StyleSheet.create({
   slotSideCard:     { flexDirection: "row", alignItems: "flex-start", gap: 12, backgroundColor: C.greenLight, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: C.greenBorder },
   slotSideTitle:    { fontSize: 13, fontWeight: "700", color: C.green },
   slotSideTime:     { fontSize: 16, fontWeight: "900", color: C.greenDark, marginTop: 3 },
-  slotSideCTA:      { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: C.white, borderRadius: 14, padding: 16, borderWidth: 1.5, borderColor: C.green, borderStyle: "dashed" },
+  slotSideCTA:      { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: C.white, borderRadius: 14, padding: 16, borderWidth: 1.5, borderColor: C.green, ...Platform.select({ web: { borderStyle: "dashed" }, default: { borderStyle: "solid" } }) },
   slotSideCTATitle: { fontSize: 14, fontWeight: "700", color: C.green },
   slotSideCTASub:   { fontSize: 12, color: C.gray400, marginTop: 2 },
 

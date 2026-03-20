@@ -584,7 +584,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
                     {filtered.map((p) => {
                       const isSel = !!selectedProds[p.name];
                       return (
-                        
+
                         // <TouchableOpacity
                         //   key={p.name}
                         //   style={[styles.catalogItem, isSel && styles.catalogItemSel]}
@@ -718,7 +718,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
                                   style={[styles.chip, isSel && styles.chipActive]}
                                   onPress={() => {
                                     const curr = product.weight_options || [];
-                                    updateManualProd(index, 'weight_options', 
+                                    updateManualProd(index, 'weight_options',
                                       isSel ? curr.filter(x => x !== w) : [...curr, w]
                                     );
                                   }}
@@ -929,40 +929,40 @@ const styles = StyleSheet.create({
 
 
   catalogCard: {
-  flexDirection: 'row',
-  backgroundColor: '#fff',
-  borderRadius: 14,
-  padding: 10,
-  marginBottom: 10,
-  alignItems: 'center',
-  gap: 10,
-  borderWidth: 1,
-  borderColor: '#eee',
-},
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 10,
+    marginBottom: 10,
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
 
-catalogCardSelected: {
-  borderColor: PRIMARY,
-  backgroundColor: '#f1fff5',
-},
+  catalogCardSelected: {
+    borderColor: PRIMARY,
+    backgroundColor: '#f1fff5',
+  },
 
-catalogImage: {
-  width: 60,
-  height: 60,
-  borderRadius: 10,
-  backgroundColor: '#f0f0f0',
-},
+  catalogImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 10,
+    backgroundColor: '#f0f0f0',
+  },
 
-catalogTopRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-},
+  catalogTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
 
-mrp: {
-  textDecorationLine: 'line-through',
-  color: '#999',
-  fontSize: 12,
-},
+  mrp: {
+    textDecorationLine: 'line-through',
+    color: '#999',
+    fontSize: 12,
+  },
 
 
   container: { flex: 1, backgroundColor: BG },
@@ -1041,8 +1041,12 @@ mrp: {
 
   // Upload box
   uploadBox: {
-    borderWidth: 1, borderColor: '#ddd', borderStyle: 'dashed',
-    borderRadius: 10, padding: 20, alignItems: 'center', marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 6,
     backgroundColor: '#fafafa',
   },
   uploadIcon: { fontSize: 24, marginBottom: 6 },
@@ -1092,7 +1096,7 @@ mrp: {
   typeBadgeText: { fontSize: 11, fontWeight: '600' },
 
   cantFindBtn: {
-    borderWidth: 1, borderColor: PRIMARY, borderStyle: 'dashed',
+    borderWidth: 1, borderColor: PRIMARY, 
     borderRadius: 10, padding: 13, alignItems: 'center', marginTop: 8, marginBottom: 4,
   },
   cantFindText: { color: PRIMARY, fontWeight: '600', fontSize: 13 },
@@ -1110,7 +1114,7 @@ mrp: {
   photoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
   photoBox: {
     width: 56, height: 56, borderRadius: 10, borderWidth: 1,
-    borderColor: '#ddd', borderStyle: 'dashed', backgroundColor: '#fafafa',
+    borderColor: '#ddd', backgroundColor: '#fafafa',
     alignItems: 'center', justifyContent: 'center',
   },
   photoIcon: { fontSize: 24 },
@@ -1124,7 +1128,7 @@ mrp: {
   segBtnTextActive: { color: PRIMARY },
 
   addRowBtn: {
-    borderWidth: 1.5, borderColor: PRIMARY, borderStyle: 'dashed',
+    borderWidth: 1.5, borderColor: PRIMARY, 
     borderRadius: 10, padding: 13, alignItems: 'center', marginTop: 4,
   },
   addRowBtnText: { color: PRIMARY, fontWeight: '700', fontSize: 14 },

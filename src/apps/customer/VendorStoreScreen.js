@@ -10,7 +10,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import useCartStore from "../../store/cartStore";
 import useAuthStore from "../../store/authStore";
 
-const BASE_URL = "http://localhost:3000/api";
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -772,7 +772,7 @@ const s = StyleSheet.create({
   searchWrap:      { paddingHorizontal: 14, paddingVertical: 10, backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.gray100 },
   searchBox:       { flexDirection: "row", alignItems: "center", backgroundColor: C.gray100, borderRadius: 12, borderWidth: 1.5, borderColor: "transparent", paddingHorizontal: 12, paddingVertical: 9, gap: 9 },
   searchBoxActive: { borderColor: C.greenBorder, backgroundColor: C.greenLight },
-  searchInput:     { flex: 1, fontSize: 14, color: C.gray900, outlineStyle: "none" },
+  searchInput:     { flex: 1, fontSize: 14, color: C.gray900, ...Platform.select({ web: { outlineStyle: "none" } }) },
   searchClearBtn:  { width: 20, height: 20, borderRadius: 10, backgroundColor: C.gray300, alignItems: "center", justifyContent: "center" },
 
   // Category tabs

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import useAddressStore from "./addressStore";
 
 const useAuthStore = create((set, get) => ({
   user: null,
@@ -14,8 +15,8 @@ const useAuthStore = create((set, get) => ({
       const token = await AsyncStorage.getItem("token");
       const userStr = await AsyncStorage.getItem("user");
 
-      console.log("HYDRATE token:", token); // ADD THIS
-      console.log("HYDRATE user:", userStr); // ADD THIS
+      console.log("HYDRATE token:", token);
+      console.log("HYDRATE user:", userStr);
 
       if (token && userStr) {
         const user = JSON.parse(userStr);
@@ -26,6 +27,8 @@ const useAuthStore = create((set, get) => ({
           isAuthenticated: true,
           isLoading: false,
         });
+        // Load addresses from backend on every app start
+        await useAddressStore.getState().loadAddresses(token);
       } else {
         set({ isLoading: false });
       }
@@ -48,6 +51,7 @@ const useAuthStore = create((set, get) => ({
   logout: async () => {
     await AsyncStorage.removeItem("token");
     await AsyncStorage.removeItem("user");
+    useAddressStore.getState().clearAddresses();
     set({ user: null, token: null, role: null, isAuthenticated: false });
   },
 

@@ -20,6 +20,8 @@ import useAuthStore from "../../store/authStore";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
   orange:       "#F97316",
@@ -179,7 +181,7 @@ export default function SignupScreen({ navigation, route }) {
     if (!isFormValid) return;
     setLoading(true); setError("");
     try {
-      const res  = await fetch("http://localhost:3000/api/auth/register", {
+      const res  = await fetch(`${BASE_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -205,7 +207,7 @@ export default function SignupScreen({ navigation, route }) {
     if (otp.length !== 6) return;
     setLoading(true); setError("");
     try {
-      const res  = await fetch("http://localhost:3000/api/auth/verify", {
+      const res  = await fetch(`${BASE_URL}/auth/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: mobile, code: otp }),
@@ -222,7 +224,7 @@ export default function SignupScreen({ navigation, route }) {
     if (resendTimer > 0) return;
     setOtp(""); setResendTimer(30); setError("");
     try {
-      await fetch("http://localhost:3000/api/auth/login", {
+      await fetch(`${BASE_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: mobile, role: selectedRole }),
