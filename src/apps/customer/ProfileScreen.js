@@ -375,7 +375,7 @@ export default function ProfileScreen() {
   // Load notification preference from AsyncStorage
   useEffect(() => {
     AsyncStorage.getItem("notif_enabled")
-      .then(v => { if (v !== null) setNotifEnabled(v === "true"); })
+      .then(v => { if (v !== null) setNotifEnabled(v === "true" || v === true); })
       .catch(() => {});
   }, []);
 
@@ -586,10 +586,10 @@ export default function ProfileScreen() {
             onPress={() => handleNotifToggle(!notifEnabled)}
             right={
               <Switch
-                value={notifEnabled}
+                value={notifEnabled === true}
                 onValueChange={handleNotifToggle}
                 trackColor={{ false: C.gray200, true: C.greenMid }}
-                thumbColor={notifEnabled ? C.green : C.gray400}
+                thumbColor={notifEnabled === true ? C.green : C.gray400}
                 ios_backgroundColor={C.gray200}
               />
             }

@@ -21,19 +21,26 @@ const LBL_STYLE = {
   marginBottom: 6,
 };
 
+const TYPE_OPTS = [
+  { label: "Loose", value: "loose" },
+  { label: "Packed", value: "packed" },
+];
+
 /**
  * ProductModal — Add or Edit product form, shown as a bottom-sheet style Modal.
  */
 export default function ProductModal({ editing, onClose, onSave, saving }) {
-  const init = editing
+    const init = editing
     ? {
         name: editing.name,
         description: editing.description || "",
         category: editing.category,
         barcode: editing.barcode || "",
-        stock: editing.stock,
-        price: editing.price,
-        status: editing.status,
+        stock: String(editing.rawStock || 0),
+        price: String(editing.price || 0),
+        unit: editing.unit || "kg",
+        type: editing.type || "packed",
+        weight_options: editing.weight_options || [],
       }
     : {
         name: "",
@@ -43,7 +50,8 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
         unit: "kg",
         stock: "",
         price: "",
-        status: "In Stock",
+        type: "packed",
+        weight_options: [],
       };
 
   const [form, setForm] = useState(init);
@@ -63,7 +71,23 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
       setErr("Name, Stock and Price are required.");
       return;
     }
-    await onSave(form);
+
+    if (form.type === "loose" && form.weight_options.length === 0) {
+      setErr("Loose items must have at least one weight option.");
+      return;
+    }
+
+    // Clean up weight options: ensure weights are numbers
+    const cleanedOptions = form.weight_options
+      .filter(opt => opt.weight && !isNaN(parseFloat(opt.weight)))
+      .map(opt => ({ weight: parseFloat(opt.weight), unit: opt.unit }));
+
+    if (form.type === "loose" && cleanedOptions.length === 0) {
+      setErr("Please enter valid numeric weights.");
+      return;
+    }
+
+    await onSave({ ...form, weight_options: cleanedOptions });
   };
 
   return (
@@ -141,6 +165,82 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
               ))}
             </View>
           </View>
+
+          <View>
+            <Text style={LBL_STYLE}>Type</Text>
+            <View style={styles.chipRow}>
+              {TYPE_OPTS.map((opt) => (
+                <SelectChip
+                  key={opt.value}
+                  label={opt.label}
+                  active={form.type === opt.value}
+                  onClick={() => set("type", opt.value)}
+                />
+              ))}
+            </View>
+          </View>
+
+          {/* Weight Options (Only for Loose) */}
+          {form.type === "loose" && (
+            <View style={styles.weightSection}>
+              <View style={styles.weightHeader}>
+                <Text style={LBL_STYLE}>Weight Options (Customer Picks)</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    const next = [...form.weight_options, { weight: "", unit: "g" }];
+                    set("weight_options", next);
+                  }}
+                  style={styles.addWeightBtn}
+                >
+                  <Text style={styles.addWeightBtnText}>+ Add</Text>
+                </TouchableOpacity>
+              </View>
+
+              {form.weight_options.map((opt, idx) => (
+                <View key={idx} style={styles.weightRow}>
+                  <TextInput
+                    style={[styles.input, { flex: 2, paddingVertical: 6 }]}
+                    value={String(opt.weight)}
+                    onChangeText={(v) => {
+                      const next = [...form.weight_options];
+                      next[idx].weight = v;
+                      set("weight_options", next);
+                    }}
+                    placeholder="Value (e.g. 500)"
+                    keyboardType="numeric"
+                  />
+                  <View style={[styles.chipRow, { flex: 3, marginTop: 0 }]}>
+                    {["g", "kg"].map((u) => (
+                      <SelectChip
+                        key={u}
+                        label={u}
+                        active={opt.unit === u}
+                        onClick={() => {
+                          const next = [...form.weight_options];
+                          next[idx].unit = u;
+                          set("weight_options", next);
+                        }}
+                      />
+                    ))}
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => {
+                      const next = form.weight_options.filter((_, i) => i !== idx);
+                      set("weight_options", next);
+                    }}
+                    style={styles.removeWeightBtn}
+                  >
+                    <Text style={{ color: T.red, fontWeight: "800" }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {form.weight_options.length === 0 && (
+                <Text style={styles.hintText}>
+                  Add fixed weights (e.g. 250g, 500g) for customers to choose from.
+                </Text>
+              )}
+            </View>
+          )}
 
           {/* Stock & Price */}
           <View style={styles.row}>
@@ -301,5 +401,47 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "800",
+  },
+  weightSection: {
+    backgroundColor: "#F9FAFB",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: T.border,
+    gap: 10,
+  },
+  weightHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  addWeightBtn: {
+    backgroundColor: T.primaryLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  addWeightBtnText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: T.primary,
+  },
+  weightRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#fff",
+    padding: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  removeWeightBtn: {
+    padding: 6,
+  },
+  hintText: {
+    fontSize: 11,
+    color: T.textLight,
+    fontStyle: "italic",
   },
 });

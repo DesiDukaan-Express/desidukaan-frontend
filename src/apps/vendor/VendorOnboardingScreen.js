@@ -2,60 +2,149 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, Alert,
-  KeyboardAvoidingView, Platform
+  KeyboardAvoidingView, Platform, Image
 } from 'react-native';
 import useAuthStore from '../../store/authStore';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const PRIMARY = '#1ca049';
+const PRIMARY_LIGHT = '#e8f5e9';
 const BG = '#f6f6f6';
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const STEPS = [
-  { id: 1, title: 'Store Details', icon: '🏪', desc: 'Tell us about your shop' },
-  { id: 2, title: 'Bank Details', icon: '🏦', desc: 'For receiving payments' },
-  { id: 3, title: 'Product Catalog', icon: '📦', desc: 'Add your products' },
-  { id: 4, title: 'Inventory', icon: '📊', desc: 'Set stock & pricing' },
-  { id: 5, title: 'Go Live!', icon: '🚀', desc: 'Start receiving orders' },
+  { id: 1, title: 'Shop Info', icon: '🏪', desc: 'Basic store details' },
+  { id: 2, title: 'Compliance', icon: '📋', desc: 'FSSAI, GST & legal' },
+  { id: 3, title: 'Bank', icon: '🏦', desc: 'Payment setup' },
+  { id: 4, title: 'Catalog', icon: '📦', desc: 'Pick your products' },
+  { id: 5, title: 'Review', icon: '📊', desc: 'Inventory & pricing' },
+  { id: 6, title: 'Go Live', icon: '🚀', desc: 'Submit & launch' },
 ];
 
 const CATEGORIES = [
   'Grocery', 'Fruits & Vegetables', 'Dairy', 'Bakery',
-  'Meat & Fish', 'Snacks', 'Beverages', 'Household', 'Medicines', 'Other'
+  'Meat & Fish', 'Snacks', 'Beverages', 'Household', 'Medicines', 'Other',
 ];
 
-const SAMPLE_CSV = `name,price,unit,category,stock_qty
-Tata Salt 1kg,22,kg,Grocery,100
-Amul Milk 500ml,28,litre,Dairy,50
-Parle-G Biscuits,10,pack,Snacks,200`;
+const UNITS = [
+  'kg', 'g', 'litre', 'ml', 'pack', 'piece',
+  'dozen', 'bunch', 'box', 'bag', 'bottle', 'can', 'sachet', 'strip',
+];
+
+const VENDOR_TYPES = [
+  { id: 'ration', label: 'Ration (Atta, Sugar, etc.)' },
+  { id: 'vegetables', label: 'Vegetables' },
+  { id: 'fruits', label: 'Fruits' },
+  { id: 'all', label: 'ALL (Supermarket)' }
+];
+
+const DELIVERY_TYPES = [
+  { id: 'partner', label: 'Use Delivery Boy' },
+  { id: 'self', label: 'Own Staff / Self' }
+];
+
+// const GENERIC_PRODUCTS = [
+//   { name: 'Tata Salt 1kg',            mrp: 24,  sp: 22,  unit: 'kg',     cat: 'Grocery',              type: 'packed' },
+//   { name: 'Aashirvaad Atta 5kg',      mrp: 280, sp: 265, unit: 'kg',     cat: 'Grocery',              type: 'packed' },
+//   { name: 'Fortune Sunflower Oil 1L', mrp: 135, sp: 129, unit: 'litre',  cat: 'Grocery',              type: 'packed' },
+//   { name: 'Loose Sugar',              mrp: 46,  sp: 44,  unit: 'kg',     cat: 'Grocery',              type: 'loose'  },
+//   { name: 'Loose Atta (Wheat Flour)', mrp: 36,  sp: 34,  unit: 'kg',     cat: 'Grocery',              type: 'loose'  },
+//   { name: 'Loose Jeera (Cumin)',      mrp: 320, sp: 310, unit: 'kg',     cat: 'Grocery',              type: 'loose'  },
+//   { name: 'Loose Haldi (Turmeric)',   mrp: 160, sp: 150, unit: 'kg',     cat: 'Grocery',              type: 'loose'  },
+//   { name: 'Loose Chana Dal',          mrp: 90,  sp: 85,  unit: 'kg',     cat: 'Grocery',              type: 'loose'  },
+//   { name: 'Loose Moong Dal',          mrp: 110, sp: 105, unit: 'kg',     cat: 'Grocery',              type: 'loose'  },
+//   { name: 'Amul Milk 500ml',          mrp: 30,  sp: 28,  unit: 'litre',  cat: 'Dairy',                type: 'packed' },
+//   { name: 'Amul Butter 100g',         mrp: 58,  sp: 55,  unit: 'g',      cat: 'Dairy',                type: 'packed' },
+//   { name: 'Amul Cheese Slices',       mrp: 110, sp: 105, unit: 'pack',   cat: 'Dairy',                type: 'packed' },
+//   { name: 'Parle-G Biscuits 100g',    mrp: 15,  sp: 13,  unit: 'pack',   cat: 'Snacks',               type: 'packed' },
+//   { name: 'Haldiram Namkeen 200g',    mrp: 45,  sp: 42,  unit: 'pack',   cat: 'Snacks',               type: 'packed' },
+//   { name: 'Maggi Noodles 70g',        mrp: 15,  sp: 14,  unit: 'pack',   cat: 'Snacks',               type: 'packed' },
+//   { name: 'Bananas',                  mrp: 60,  sp: 50,  unit: 'kg',     cat: 'Fruits & Vegetables',  type: 'loose'  },
+//   { name: 'Tomatoes',                 mrp: 40,  sp: 35,  unit: 'kg',     cat: 'Fruits & Vegetables',  type: 'loose'  },
+//   { name: 'Onions',                   mrp: 30,  sp: 28,  unit: 'kg',     cat: 'Fruits & Vegetables',  type: 'loose'  },
+//   { name: 'Potatoes',                 mrp: 25,  sp: 22,  unit: 'kg',     cat: 'Fruits & Vegetables',  type: 'loose'  },
+//   { name: 'Tata Tea Premium 250g',    mrp: 130, sp: 125, unit: 'pack',   cat: 'Beverages',            type: 'packed' },
+//   { name: 'Coca-Cola 750ml',          mrp: 45,  sp: 40,  unit: 'bottle', cat: 'Beverages',            type: 'packed' },
+// ];
+
+const GENERIC_PRODUCTS = [
+  {
+    name: 'Tata Salt 1kg',
+    mrp: 24,
+    sp: 22,
+    unit: 'kg',
+    cat: 'Grocery',
+    type: 'packed',
+    image: 'https://m.media-amazon.com/images/I/614mm2hYHyL.jpg'
+  },
+  {
+    name: 'Aashirvaad Atta 5kg',
+    mrp: 280,
+    sp: 265,
+    unit: 'kg',
+    cat: 'Grocery',
+    type: 'packed',
+    image: 'https://www.quickpantry.in/cdn/shop/products/aashirvaad-whole-wheat-atta-5-kg-quick-pantry.jpg?v=1710537925'
+  },
+  {
+    name: 'Bananas',
+    mrp: 60,
+    sp: 50,
+    unit: 'kg',
+    cat: 'Fruits & Vegetables',
+    type: 'loose',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/8/8a/Banana-Single.jpg'
+  }
+];
+
+const EMPTY_PRODUCT = { name: '', mrp: '', sp: '', unit: 'kg', cat: '', stock: '', type: 'loose', weight_options: [] };
+
+const SAMPLE_CSV = `name,mrp,sp,unit,category,stock_qty,type
+Loose Basmati Rice,85,80,kg,Grocery,100,loose
+Amul Milk 500ml,30,28,litre,Dairy,50,packed`;
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function VendorOnboardingScreen({ onComplete }) {
   const { token, user } = useAuthStore();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  // Step 1 - Store Details
+  // Step 1 — Shop Info
   const [shopName, setShopName] = useState('');
-  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [ownerName, setOwnerName] = useState('');
+  const [estYear, setEstYear] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [altName, setAltName] = useState('');
+  const [altPhone, setAltPhone] = useState('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [pincode, setPincode] = useState('');
-  const [shopPhone, setShopPhone] = useState(user?.phone || '');
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [vendorType, setVendorType] = useState('all');
+  const [deliveryType, setDeliveryType] = useState('self');
 
-  // Step 2 - Bank Details
+  // Step 2 — Compliance
+  const [fssai, setFssai] = useState('');
+  const [gst, setGst] = useState('');
+
+  // Step 3 — Bank
+  const [upiId, setUpiId] = useState('');
   const [accountName, setAccountName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [ifsc, setIfsc] = useState('');
-  const [upiId, setUpiId] = useState('');
 
-  // Step 3 - Product Catalog
-  const [addMode, setAddMode] = useState('manual'); // 'manual' | 'csv'
-  const [products, setProducts] = useState([
-    { name: '', price: '', unit: 'kg', category: '', stock_qty: '' }
-  ]);
+  // Step 4 — Catalog
+  const [addMode, setAddMode] = useState('generic'); // 'generic' | 'manual' | 'csv'
+  const [selectedProds, setSelectedProds] = useState({}); // key = product name
+  const [manualProds, setManualProds] = useState([{ ...EMPTY_PRODUCT }]);
   const [csvText, setCsvText] = useState('');
   const [csvPreview, setCsvPreview] = useState([]);
+  const [prodSearch, setProdSearch] = useState('');
 
-  // Step 4 - Inventory review (uses products from step 3)
+  // ── Helpers ──────────────────────────────────────────────────────────────────
 
   const toggleCategory = (cat) => {
     setSelectedCategories(prev =>
@@ -65,84 +154,90 @@ export default function VendorOnboardingScreen({ onComplete }) {
     );
   };
 
-  const addProductRow = () => {
-    setProducts(prev => [...prev, { name: '', price: '', unit: 'kg', category: '', stock_qty: '' }]);
+  const toggleProduct = (product) => {
+    setSelectedProds(prev => {
+      const next = { ...prev };
+      if (next[product.name]) delete next[product.name];
+      else next[product.name] = { ...product, stock: 0 };
+      return next;
+    });
   };
 
-  const removeProductRow = (index) => {
-    setProducts(prev => prev.filter((_, i) => i !== index));
+  const selectAllProducts = () => {
+    const filtered = getFilteredCatalog();
+    const next = { ...selectedProds };
+    filtered.forEach(p => { next[p.name] = { ...p, stock: 0 }; });
+    setSelectedProds(next);
   };
 
-  const updateProduct = (index, field, value) => {
-    setProducts(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
-  };
+  const getFilteredCatalog = () =>
+    GENERIC_PRODUCTS.filter(p => {
+      const catMatch = selectedCategories.length === 0 || selectedCategories.includes(p.cat);
+      const searchMatch = prodSearch === '' || p.name.toLowerCase().includes(prodSearch.toLowerCase());
+      return catMatch && searchMatch;
+    });
 
-  const parseCSV = (text) => {
+  const addManualRow = () => setManualProds(prev => [...prev, { ...EMPTY_PRODUCT }]);
+
+  const removeManualRow = (i) => setManualProds(prev => prev.filter((_, idx) => idx !== i));
+
+  const updateManualProd = (i, field, value) =>
+    setManualProds(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: value } : p));
+
+  const parseCSV = () => {
     try {
-      const lines = text.trim().split('\n');
+      const lines = csvText.trim().split('\n');
       const headers = lines[0].split(',').map(h => h.trim());
       const parsed = lines.slice(1).map(line => {
         const vals = line.split(',').map(v => v.trim());
         const obj = {};
-        headers.forEach((h, i) => obj[h] = vals[i] || '');
+        headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
         return obj;
       }).filter(p => p.name);
       setCsvPreview(parsed);
-      if (parsed.length > 0) {
-        setProducts(parsed);
-        Alert.alert('✅ Parsed', `${parsed.length} products ready to import`);
-      }
+      if (parsed.length > 0) Alert.alert('✅ Parsed', `${parsed.length} products ready to import`);
     } catch (e) {
       Alert.alert('Error', 'Could not parse CSV. Check the format.');
     }
   };
 
+  const getAllProducts = () => {
+    const fromCatalog = Object.values(selectedProds);
+    const fromManual = manualProds.filter(p => p.name && p.sp);
+    const fromCSV = csvPreview.filter(p => p.name && p.sp);
+    return [...fromCatalog, ...fromManual, ...fromCSV];
+  };
+
+  // ── Validation ────────────────────────────────────────────────────────────────
+
   const validateStep = () => {
     if (currentStep === 1) {
-
-      if (!shopName.trim()) {
-        console.log("Validation Failed: Shop name empty");
-        Alert.alert('Required', 'Enter your shop name');
-        return false;
-      }
-
-      if (selectedCategories.length === 0) {
-        console.log("Validation Failed: No category selected");
-        Alert.alert('Required', 'Select at least one category');
-        return false;
-      }
-
-      if (!address.trim()) {
-        console.log("Validation Failed: Address empty");
-        Alert.alert('Required', 'Enter your shop address');
-        return false;
-      }
-
-      if (!city.trim()) {
-        console.log("Validation Failed: City empty");
-        Alert.alert('Required', 'Enter your city');
-        return false;
-      }
-
-      if (pincode.length !== 6) {
-        console.log("Validation Failed: Invalid pincode", pincode);
-        Alert.alert('Required', 'Enter a valid 6-digit pincode');
-        return false;
-      }
+      if (!shopName.trim()) { Alert.alert('Required', 'Enter your shop name'); return false; }
+      if (!ownerName.trim()) { Alert.alert('Required', 'Enter owner name'); return false; }
+      if (!email.trim()) { Alert.alert('Required', 'Enter email address'); return false; }
+      if (!address.trim()) { Alert.alert('Required', 'Enter shop address'); return false; }
+      if (!city.trim()) { Alert.alert('Required', 'Enter your city'); return false; }
+      if (pincode.length !== 6) { Alert.alert('Required', 'Enter a valid 6-digit pincode'); return false; }
+      if (selectedCategories.length === 0) { Alert.alert('Required', 'Select at least one category'); return false; }
     }
     if (currentStep === 2) {
+      if (!fssai.trim()) { Alert.alert('Required', 'Enter your FSSAI license number'); return false; }
+      if (!gst.trim()) { Alert.alert('Required', 'Enter your GST number'); return false; }
+    }
+    if (currentStep === 3) {
       if (!upiId.trim() && !accountNumber.trim()) {
         Alert.alert('Required', 'Enter UPI ID or bank account details'); return false;
       }
     }
-    if (currentStep === 3) {
-      const valid = products.filter(p => p.name && p.price);
-      if (valid.length === 0) {
+    if (currentStep === 4) {
+      if (getAllProducts().length === 0) {
         Alert.alert('Required', 'Add at least one product'); return false;
       }
     }
     return true;
   };
+
+  // ── Navigation ────────────────────────────────────────────────────────────────
 
   const handleNext = async () => {
     if (!validateStep()) return;
@@ -152,40 +247,50 @@ export default function VendorOnboardingScreen({ onComplete }) {
       return;
     }
 
-    // Final step — submit everything
+    // Final submit
     setLoading(true);
     try {
-      // 1. Create vendor profile
       const vendorRes = await fetch(`${API_BASE}/vendors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           shop_name: shopName,
+          owner_name: ownerName,
+          establishment_year: estYear,
+          email,
+          phone,
+          alt_contact_name: altName,
+          alt_phone: altPhone,
+          fssai_number: fssai,
+          gst_number: gst,
           categories: selectedCategories.join(','),
           address_line: address,
           city, pincode,
-          phone: shopPhone,
+          upi_id: upiId,
           bank_account_name: accountName,
           bank_account_number: accountNumber,
           bank_ifsc: ifsc,
-          upi_id: upiId,
+          vendor_type: vendorType,
+          delivery_type: deliveryType,
         }),
       });
       const vendorData = await vendorRes.json();
       if (!vendorRes.ok) throw new Error(vendorData.msg || 'Failed to create shop');
 
-      // 2. Add products to inventory
-      const validProducts = products.filter(p => p.name && p.price);
-      for (const product of validProducts) {
+      const allProds = getAllProducts();
+      for (const product of allProds) {
         await fetch(`${API_BASE}/products`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
             name: product.name,
-            price: parseFloat(product.price),
+            mrp: parseFloat(product.mrp || product.MRP || 0),
+            price: parseFloat(product.sp || product.SP || product.price || 0),
             unit: product.unit || 'kg',
-            category: product.category,
-            stock_qty: parseInt(product.stock_qty) || 0,
+            category: product.cat || product.category || '',
+            stock_qty: parseInt(product.stock || product.stock_qty || 0),
+            type: product.type || 'packed',
+            weight_options: product.weight_options && product.weight_options.length ? product.weight_options : null,
           }),
         });
       }
@@ -200,6 +305,8 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
   const progressPercent = ((currentStep - 1) / (STEPS.length - 1)) * 100;
 
+  // ── Render ────────────────────────────────────────────────────────────────────
+
   return (
     <View style={styles.container}>
 
@@ -209,7 +316,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
           <Text style={styles.brandEmoji}>🛕</Text>
           <View>
             <Text style={styles.brandName}>DesiDukaan</Text>
-            <Text style={styles.brandSub}>Seller Hub</Text>
+            <Text style={styles.brandSub}>Seller Registration</Text>
           </View>
         </View>
         <Text style={styles.stepCount}>{currentStep} of {STEPS.length}</Text>
@@ -222,10 +329,8 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
       {/* Step pills */}
       <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.stepsScroll}
-        contentContainerStyle={styles.stepsRow}
+        horizontal showsHorizontalScrollIndicator={false}
+        style={styles.stepsScroll} contentContainerStyle={styles.stepsRow}
       >
         {STEPS.map((step) => (
           <View key={step.id} style={styles.stepPillWrapper}>
@@ -234,12 +339,18 @@ export default function VendorOnboardingScreen({ onComplete }) {
               currentStep === step.id && styles.stepPillActive,
               currentStep > step.id && styles.stepPillDone,
             ]}>
-              <Text style={styles.stepPillIcon}>
-                {currentStep > step.id ? '✓' : step.icon}
-              </Text>
+              <View style={[
+                styles.stepNum,
+                currentStep === step.id && styles.stepNumActive,
+                currentStep > step.id && styles.stepNumDone,
+              ]}>
+                <Text style={[styles.stepNumText, (currentStep >= step.id) && styles.stepNumTextActive]}>
+                  {currentStep > step.id ? '✓' : step.id}
+                </Text>
+              </View>
               <Text style={[
                 styles.stepPillText,
-                (currentStep === step.id || currentStep > step.id) && styles.stepPillTextActive
+                (currentStep === step.id || currentStep > step.id) && styles.stepPillTextActive,
               ]}>
                 {step.title}
               </Text>
@@ -251,15 +362,9 @@ export default function VendorOnboardingScreen({ onComplete }) {
         ))}
       </ScrollView>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
-          style={styles.content}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
           {/* Step header */}
           <View style={styles.stepHeader}>
             <Text style={styles.stepIcon}>{STEPS[currentStep - 1].icon}</Text>
@@ -269,81 +374,157 @@ export default function VendorOnboardingScreen({ onComplete }) {
             </View>
           </View>
 
-          {/* ── STEP 1: Store Details ── */}
+          {/* ── STEP 1: Shop Info ── */}
           {currentStep === 1 && (
             <View style={styles.form}>
-              <Text style={styles.label}>Shop Name *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Sharma Kirana Store"
-                value={shopName}
-                onChangeText={setShopName}
-              />
+              <Text style={styles.label}>Shop Name <Text style={styles.req}>*</Text></Text>
+              <TextInput style={styles.input} placeholder="e.g. Sharma Kirana Store" value={shopName} onChangeText={setShopName} />
 
-              <Text style={styles.label}>Categories * (up to 10)</Text>
-              <View style={styles.categoryGrid}>
+              <Text style={styles.label}>Shop Owner Name <Text style={styles.req}>*</Text></Text>
+              <TextInput style={styles.input} placeholder="Full name as per ID" value={ownerName} onChangeText={setOwnerName} />
+
+              <Text style={styles.label}>Establishment Year</Text>
+              <TextInput style={styles.input} placeholder="e.g. 2015" keyboardType="numeric" maxLength={4} value={estYear} onChangeText={setEstYear} />
+
+              <Text style={styles.label}>Shop Email <Text style={styles.req}>*</Text></Text>
+              <TextInput style={styles.input} placeholder="For order notifications & updates" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
+
+              {/* Contacts */}
+              <Text style={styles.sectionSep}>📞 Contact Details</Text>
+              <View style={styles.row}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Primary Name <Text style={styles.req}>*</Text></Text>
+                  <TextInput style={styles.input} placeholder="Name 1" value={ownerName} onChangeText={setOwnerName} />
+                </View>
+                <View style={{ width: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Primary Phone <Text style={styles.req}>*</Text></Text>
+                  <TextInput style={styles.input} placeholder="10-digit" keyboardType="phone-pad" maxLength={10} value={phone} onChangeText={setPhone} />
+                </View>
+              </View>
+              <View style={styles.row}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Alternate Name</Text>
+                  <TextInput style={styles.input} placeholder="Name 2" value={altName} onChangeText={setAltName} />
+                </View>
+                <View style={{ width: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Alternate Phone</Text>
+                  <TextInput style={styles.input} placeholder="Backup number" keyboardType="phone-pad" maxLength={10} value={altPhone} onChangeText={setAltPhone} />
+                </View>
+              </View>
+              <View style={styles.infoBox}>
+                <Text style={styles.infoText}>💡 Two contacts ensure customers can always reach someone if one person is unavailable.</Text>
+              </View>
+
+              {/* Address */}
+              <Text style={styles.sectionSep}>📍 Shop Address</Text>
+              <Text style={styles.label}>Street Address <Text style={styles.req}>*</Text></Text>
+              <TextInput style={[styles.input, styles.textArea]} placeholder="Shop no., Street, Area, Landmark" value={address} onChangeText={setAddress} multiline numberOfLines={3} />
+              <View style={styles.row}>
+                <View style={{ flex: 2 }}>
+                  <Text style={styles.label}>City <Text style={styles.req}>*</Text></Text>
+                  <TextInput style={styles.input} placeholder="e.g. Noida" value={city} onChangeText={setCity} />
+                </View>
+                <View style={{ width: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Pincode <Text style={styles.req}>*</Text></Text>
+                  <TextInput style={styles.input} placeholder="6-digit" keyboardType="numeric" maxLength={6} value={pincode} onChangeText={setPincode} />
+                </View>
+              </View>
+
+              {/* Categories */}
+              <Text style={styles.sectionSep}>🏷️ Product Categories <Text style={styles.req}>*</Text></Text>
+              <View style={styles.chipGrid}>
                 {CATEGORIES.map(cat => (
                   <TouchableOpacity
                     key={cat}
                     style={[styles.chip, selectedCategories.includes(cat) && styles.chipActive]}
                     onPress={() => toggleCategory(cat)}
                   >
-                    <Text style={[styles.chipText, selectedCategories.includes(cat) && styles.chipTextActive]}>
-                      {cat}
+                    <Text style={[styles.chipText, selectedCategories.includes(cat) && styles.chipTextActive]}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.sectionSep}>🏪 Business Type</Text>
+              <Text style={styles.label}>What do you sell mostly? <Text style={styles.req}>*</Text></Text>
+              <View style={styles.segmentRow}>
+                {VENDOR_TYPES.map(vt => (
+                  <TouchableOpacity
+                    key={vt.id}
+                    style={[styles.segBtn, vendorType === vt.id && styles.segBtnActive]}
+                    onPress={() => setVendorType(vt.id)}
+                  >
+                    <Text style={[styles.segBtnText, vendorType === vt.id && styles.segBtnTextActive, { textAlign: 'center', fontSize: 11 }]}>
+                      {vt.label}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={styles.label}>Shop Address *</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Street, Area, Landmark"
-                value={address}
-                onChangeText={setAddress}
-                multiline
-                numberOfLines={3}
-              />
-
-              <View style={styles.row}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>City *</Text>
-                  <TextInput style={styles.input} placeholder="e.g. Noida" value={city} onChangeText={setCity} />
-                </View>
-                <View style={{ width: 12 }} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Pincode *</Text>
-                  <TextInput
-                    style={styles.input} placeholder="6-digit"
-                    keyboardType="numeric" maxLength={6}
-                    value={pincode} onChangeText={setPincode}
-                  />
-                </View>
+              <Text style={styles.label}>How will you deliver orders? <Text style={styles.req}>*</Text></Text>
+              <View style={styles.segmentRow}>
+                {DELIVERY_TYPES.map(dt => (
+                  <TouchableOpacity
+                    key={dt.id}
+                    style={[styles.segBtn, deliveryType === dt.id && styles.segBtnActive]}
+                    onPress={() => setDeliveryType(dt.id)}
+                  >
+                    <Text style={[styles.segBtnText, deliveryType === dt.id && styles.segBtnTextActive, { textAlign: 'center', fontSize: 11 }]}>
+                      {dt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
 
-              <Text style={styles.label}>Shop Contact Number</Text>
-              <TextInput
-                style={styles.input} placeholder="Customer-facing number"
-                keyboardType="phone-pad" maxLength={10}
-                value={shopPhone} onChangeText={setShopPhone}
-              />
             </View>
           )}
 
-          {/* ── STEP 2: Bank Details ── */}
+          {/* ── STEP 2: Compliance ── */}
           {currentStep === 2 && (
             <View style={styles.form}>
               <View style={styles.infoBox}>
+                <Text style={styles.infoText}>📋 These details are required for shop verification. Your shop will be reviewed by our team before going live.</Text>
+              </View>
+
+              <Text style={styles.label}>FSSAI License Number <Text style={styles.req}>*</Text></Text>
+              <TextInput style={styles.input} placeholder="14-digit FSSAI number" keyboardType="numeric" maxLength={14} value={fssai} onChangeText={setFssai} />
+              <Text style={styles.hintText}>Required for food businesses.</Text>
+
+              <Text style={styles.label}>GST Number <Text style={styles.req}>*</Text></Text>
+              <TextInput style={styles.input} placeholder="15-character GST number" maxLength={15} autoCapitalize="characters" value={gst} onChangeText={v => setGst(v.toUpperCase())} />
+
+              <View style={[styles.infoBox, { marginTop: 16 }]}>
+                <Text style={[styles.infoText, { fontWeight: '700', marginBottom: 4 }]}>⏳ Admin Approval Process</Text>
                 <Text style={styles.infoText}>
-                  💡 Payments settled within 2 business days after delivery confirmation.
+                  Once you submit, our team will verify your FSSAI & GST details within <Text style={{ fontWeight: '700' }}>24–48 hours</Text>. You'll receive an email once approved. Your shop will not be visible to customers until then.
                 </Text>
               </View>
 
-              <Text style={styles.sectionLabel}>UPI (Recommended)</Text>
-              <TextInput
-                style={styles.input} placeholder="yourname@upi"
-                value={upiId} onChangeText={setUpiId} autoCapitalize="none"
-              />
+              <Text style={styles.sectionSep}>📄 Document Upload (optional — speeds up approval)</Text>
+              {['FSSAI Certificate', 'GST Registration Certificate'].map(doc => (
+                <View key={doc}>
+                  <Text style={styles.label}>{doc}</Text>
+                  <TouchableOpacity style={styles.uploadBox}>
+                    <Text style={styles.uploadIcon}>📁</Text>
+                    <Text style={styles.uploadText}>Tap to upload PDF or image</Text>
+                    <Text style={styles.uploadHint}>Max 5MB</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* ── STEP 3: Bank Details ── */}
+          {currentStep === 3 && (
+            <View style={styles.form}>
+              <View style={styles.infoBox}>
+                <Text style={styles.infoText}>💡 Payments settled within 2 business days after delivery confirmation.</Text>
+              </View>
+
+              <Text style={styles.sectionLabel}>UPI ID (Recommended)</Text>
+              <TextInput style={styles.input} placeholder="yourname@upi or phone@paytm" value={upiId} onChangeText={setUpiId} autoCapitalize="none" />
 
               <View style={styles.dividerRow}>
                 <View style={styles.dividerLine} />
@@ -355,137 +536,271 @@ export default function VendorOnboardingScreen({ onComplete }) {
               <TextInput style={styles.input} placeholder="As per bank records" value={accountName} onChangeText={setAccountName} />
 
               <Text style={styles.label}>Account Number</Text>
-              <TextInput
-                style={styles.input} placeholder="Enter account number"
-                keyboardType="numeric" value={accountNumber}
-                onChangeText={setAccountNumber} secureTextEntry
-              />
+              <TextInput style={styles.input} placeholder="Enter account number" keyboardType="numeric" secureTextEntry value={accountNumber} onChangeText={setAccountNumber} />
 
               <Text style={styles.label}>IFSC Code</Text>
-              <TextInput
-                style={styles.input} placeholder="e.g. SBIN0001234"
-                autoCapitalize="characters" value={ifsc} onChangeText={setIfsc}
-              />
+              <TextInput style={styles.input} placeholder="e.g. SBIN0001234" autoCapitalize="characters" value={ifsc} onChangeText={v => setIfsc(v.toUpperCase())} />
             </View>
           )}
 
-          {/* ── STEP 3: Product Catalog ── */}
-          {currentStep === 3 && (
+          {/* ── STEP 4: Product Catalog ── */}
+          {currentStep === 4 && (
             <View style={styles.form}>
-
               {/* Mode toggle */}
               <View style={styles.modeToggle}>
-                <TouchableOpacity
-                  style={[styles.modeBtn, addMode === 'manual' && styles.modeBtnActive]}
-                  onPress={() => setAddMode('manual')}
-                >
-                  <Text style={[styles.modeBtnText, addMode === 'manual' && styles.modeBtnTextActive]}>
-                    ✏️ Add Manually
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modeBtn, addMode === 'csv' && styles.modeBtnActive]}
-                  onPress={() => setAddMode('csv')}
-                >
-                  <Text style={[styles.modeBtnText, addMode === 'csv' && styles.modeBtnTextActive]}>
-                    📂 Bulk CSV Upload
-                  </Text>
-                </TouchableOpacity>
+                {[
+                  { key: 'generic', label: '🛒 Catalog' },
+                  { key: 'manual', label: '✏️ Manual' },
+                  { key: 'csv', label: '📂 CSV' },
+                ].map(m => (
+                  <TouchableOpacity
+                    key={m.key}
+                    style={[styles.modeBtn, addMode === m.key && styles.modeBtnActive]}
+                    onPress={() => setAddMode(m.key)}
+                  >
+                    <Text style={[styles.modeBtnText, addMode === m.key && styles.modeBtnTextActive]}>{m.label}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
 
-              {/* Manual entry */}
+              {/* ── Generic catalog ── */}
+              {addMode === 'generic' && (() => {
+                const filtered = getFilteredCatalog();
+                const selCount = Object.keys(selectedProds).length;
+                return (
+                  <View>
+                    <View style={styles.selAllRow}>
+                      <Text style={styles.catalogMeta}>{filtered.length} items for your categories · {selCount} selected</Text>
+                      <TouchableOpacity onPress={selectAllProducts}>
+                        <Text style={styles.selAllBtn}>Select all</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <TextInput
+                      style={[styles.input, { marginBottom: 10 }]}
+                      placeholder="🔍  Search products..."
+                      value={prodSearch}
+                      onChangeText={setProdSearch}
+                    />
+                    {filtered.map((p) => {
+                      const isSel = !!selectedProds[p.name];
+                      return (
+
+                        // <TouchableOpacity
+                        //   key={p.name}
+                        //   style={[styles.catalogItem, isSel && styles.catalogItemSel]}
+                        //   onPress={() => toggleProduct(p)}
+                        // >
+                        //   <View style={styles.catalogLeft}>
+                        //     <View style={[styles.checkbox, isSel && styles.checkboxSel]}>
+                        //       {isSel && <Text style={styles.checkmark}>✓</Text>}
+                        //     </View>
+                        //     <View style={{ flex: 1 }}>
+                        //       <View style={styles.catalogNameRow}>
+                        //         <Text style={styles.catalogName}>{p.name}</Text>
+                        //         <View style={[styles.typeBadge, p.type === 'loose' ? styles.badgeLoose : styles.badgePacked]}>
+                        //           <Text style={[styles.typeBadgeText, p.type === 'loose' ? styles.badgeLooseText : styles.badgePackedText]}>
+                        //             {p.type}
+                        //           </Text>
+                        //         </View>
+                        //       </View>
+                        //       <Text style={styles.catalogMeta}>MRP ₹{p.mrp}  ·  SP ₹{p.sp}  ·  per {p.unit}</Text>
+                        //     </View>
+                        //   </View>
+                        // </TouchableOpacity>
+                        <TouchableOpacity
+                          key={p.name}
+                          style={[styles.catalogCard, isSel && styles.catalogCardSelected]}
+                          onPress={() => toggleProduct(p)}
+                        >
+                          <Image source={{ uri: p.image }} style={styles.catalogImage} />
+
+                          <View style={{ flex: 1 }}>
+                            <View style={styles.catalogTopRow}>
+                              <Text style={styles.catalogName}>{p.name}</Text>
+
+                              <View style={[
+                                styles.typeBadge,
+                                p.type === 'loose' ? styles.badgeLoose : styles.badgePacked
+                              ]}>
+                                <Text style={styles.typeBadgeText}>
+                                  {p.type}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <Text style={styles.catalogMeta}>
+                              ₹{p.sp} <Text style={styles.mrp}>₹{p.mrp}</Text> · {p.unit}
+                            </Text>
+                          </View>
+
+                          <View style={[styles.checkbox, isSel && styles.checkboxSel]}>
+                            {isSel && <Text style={styles.checkmark}>✓</Text>}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    <TouchableOpacity style={styles.cantFindBtn} onPress={() => setAddMode('manual')}>
+                      <Text style={styles.cantFindText}>+ Can't find your product? Add it manually</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })()}
+
+              {/* ── Manual entry ── */}
               {addMode === 'manual' && (
                 <View>
-                  {products.map((product, index) => (
-                    <View key={index} style={styles.productRow}>
-                      <View style={styles.productRowHeader}>
-                        <Text style={styles.productRowNum}>Product {index + 1}</Text>
-                        {products.length > 1 && (
-                          <TouchableOpacity onPress={() => removeProductRow(index)}>
+                  {manualProds.map((product, index) => (
+                    <View key={index} style={styles.productCard}>
+                      <View style={styles.productCardHeader}>
+                        <Text style={styles.productCardNum}>Product {index + 1}</Text>
+                        {manualProds.length > 1 && (
+                          <TouchableOpacity onPress={() => removeManualRow(index)}>
                             <Text style={styles.removeBtn}>✕ Remove</Text>
                           </TouchableOpacity>
                         )}
                       </View>
 
+                      {/* Photo upload */}
+                      <View style={styles.photoRow}>
+                        <TouchableOpacity style={styles.photoBox}>
+                          <Text style={styles.photoIcon}>📷</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.photoHint}>
+                          Add a photo for better visibility.{'\n'}Customers trust shops with product photos.
+                        </Text>
+                      </View>
+
+                      <Text style={styles.label}>Product Name <Text style={styles.req}>*</Text></Text>
                       <TextInput
-                        style={styles.input} placeholder="Product name *"
-                        value={product.name}
-                        onChangeText={v => updateProduct(index, 'name', v)}
+                        style={styles.input} placeholder="e.g. Loose Basmati Rice"
+                        value={product.name} onChangeText={v => updateManualProd(index, 'name', v)}
                       />
+
+                      {/* Type & Unit */}
                       <View style={styles.row}>
                         <View style={{ flex: 1 }}>
+                          <Text style={styles.label}>Item Type</Text>
+                          <View style={styles.segmentRow}>
+                            {['loose', 'packed'].map(t => (
+                              <TouchableOpacity
+                                key={t}
+                                style={[styles.segBtn, product.type === t && styles.segBtnActive]}
+                                onPress={() => updateManualProd(index, 'type', t)}
+                              >
+                                <Text style={[styles.segBtnText, product.type === t && styles.segBtnTextActive]}>
+                                  {t === 'loose' ? 'Loose' : 'Packed'}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </View>
+                        <View style={{ width: 12 }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.label}>Unit <Text style={styles.req}>*</Text></Text>
+                          {/* Native Picker would go here; using TextInput as fallback */}
                           <TextInput
-                            style={styles.input} placeholder="Price ₹ *"
-                            keyboardType="numeric" value={product.price}
-                            onChangeText={v => updateProduct(index, 'price', v)}
+                            style={styles.input} placeholder="kg / litre / piece..."
+                            value={product.unit} onChangeText={v => updateManualProd(index, 'unit', v)}
+                          />
+                          <Text style={styles.hintText}>Options: {UNITS.join(', ')}</Text>
+                        </View>
+                      </View>
+
+                      {product.type === 'loose' && (
+                        <View style={{ marginTop: 10 }}>
+                          <Text style={styles.label}>Available Quantities (for fixed pricing)</Text>
+                          <View style={styles.chipGrid}>
+                            {['50g', '100g', '200g', '250g', '500g', '1kg'].map(w => {
+                              const isSel = product.weight_options?.includes(w);
+                              return (
+                                <TouchableOpacity
+                                  key={w}
+                                  style={[styles.chip, isSel && styles.chipActive]}
+                                  onPress={() => {
+                                    const curr = product.weight_options || [];
+                                    updateManualProd(index, 'weight_options',
+                                      isSel ? curr.filter(x => x !== w) : [...curr, w]
+                                    );
+                                  }}
+                                >
+                                  <Text style={[styles.chipText, isSel && styles.chipTextActive]}>{w}</Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                          <Text style={styles.hintText}>Customers can pick these exact quantities.</Text>
+                        </View>
+                      )}
+
+                      {/* MRP + SP */}
+                      <View style={styles.row}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.label}>MRP (₹) <Text style={styles.req}>*</Text></Text>
+                          <TextInput
+                            style={styles.input} placeholder="Max retail price"
+                            keyboardType="numeric" value={product.mrp}
+                            onChangeText={v => updateManualProd(index, 'mrp', v)}
                           />
                         </View>
-                        <View style={{ width: 10 }} />
+                        <View style={{ width: 12 }} />
                         <View style={{ flex: 1 }}>
+                          <Text style={styles.label}>Selling Price (₹) <Text style={styles.req}>*</Text></Text>
                           <TextInput
-                            style={styles.input} placeholder="Unit (kg/litre)"
-                            value={product.unit}
-                            onChangeText={v => updateProduct(index, 'unit', v)}
+                            style={styles.input} placeholder="Your price"
+                            keyboardType="numeric" value={product.sp}
+                            onChangeText={v => updateManualProd(index, 'sp', v)}
                           />
                         </View>
                       </View>
+
+                      {/* Category + Stock */}
                       <View style={styles.row}>
                         <View style={{ flex: 1 }}>
+                          <Text style={styles.label}>Category</Text>
                           <TextInput
-                            style={styles.input} placeholder="Category"
-                            value={product.category}
-                            onChangeText={v => updateProduct(index, 'category', v)}
+                            style={styles.input} placeholder="e.g. Grocery"
+                            value={product.cat} onChangeText={v => updateManualProd(index, 'cat', v)}
                           />
                         </View>
-                        <View style={{ width: 10 }} />
+                        <View style={{ width: 12 }} />
                         <View style={{ flex: 1 }}>
+                          <Text style={styles.label}>Stock Qty</Text>
                           <TextInput
-                            style={styles.input} placeholder="Stock qty"
-                            keyboardType="numeric" value={product.stock_qty}
-                            onChangeText={v => updateProduct(index, 'stock_qty', v)}
+                            style={styles.input} placeholder="Available qty"
+                            keyboardType="numeric" value={product.stock}
+                            onChangeText={v => updateManualProd(index, 'stock', v)}
                           />
                         </View>
                       </View>
                     </View>
                   ))}
-
-                  <TouchableOpacity style={styles.addRowBtn} onPress={addProductRow}>
+                  <TouchableOpacity style={styles.addRowBtn} onPress={addManualRow}>
                     <Text style={styles.addRowBtnText}>+ Add Another Product</Text>
                   </TouchableOpacity>
                 </View>
               )}
 
-              {/* CSV upload */}
+              {/* ── CSV upload ── */}
               {addMode === 'csv' && (
                 <View>
                   <View style={styles.infoBox}>
-                    <Text style={styles.infoText}>📋 Paste your CSV below. Format:</Text>
+                    <Text style={styles.infoText}>📋 Paste CSV with headers:</Text>
                     <Text style={[styles.infoText, styles.codeText]}>{SAMPLE_CSV}</Text>
                   </View>
-
                   <TextInput
                     style={[styles.input, styles.csvInput]}
                     placeholder="Paste CSV data here..."
-                    value={csvText}
-                    onChangeText={setCsvText}
-                    multiline
-                    numberOfLines={8}
+                    value={csvText} onChangeText={setCsvText}
+                    multiline numberOfLines={8}
                   />
-
-                  <TouchableOpacity
-                    style={styles.parseBtn}
-                    onPress={() => parseCSV(csvText)}
-                  >
+                  <TouchableOpacity style={styles.parseBtn} onPress={parseCSV}>
                     <Text style={styles.parseBtnText}>📥 Parse & Preview</Text>
                   </TouchableOpacity>
-
                   {csvPreview.length > 0 && (
                     <View style={styles.previewBox}>
                       <Text style={styles.previewTitle}>✅ {csvPreview.length} products ready</Text>
                       {csvPreview.slice(0, 3).map((p, i) => (
-                        <Text key={i} style={styles.previewItem}>
-                          • {p.name} — ₹{p.price} / {p.unit}
-                        </Text>
+                        <Text key={i} style={styles.previewItem}>• {p.name} — MRP ₹{p.mrp} / SP ₹{p.sp} / {p.unit}</Text>
                       ))}
                       {csvPreview.length > 3 && (
                         <Text style={styles.previewMore}>...and {csvPreview.length - 3} more</Text>
@@ -497,96 +812,84 @@ export default function VendorOnboardingScreen({ onComplete }) {
             </View>
           )}
 
-          {/* ── STEP 4: Inventory Review ── */}
-          {currentStep === 4 && (
+          {/* ── STEP 5: Inventory Review ── */}
+          {currentStep === 5 && (
             <View style={styles.form}>
               <View style={styles.infoBox}>
-                <Text style={styles.infoText}>
-                  📊 Review your inventory below. You can update stock and pricing anytime from your dashboard.
-                </Text>
+                <Text style={styles.infoText}>📊 Review pricing and stock. You can edit anytime from your dashboard.</Text>
               </View>
-
-              {products.filter(p => p.name).map((product, index) => (
-                <View key={index} style={styles.inventoryCard}>
-                  <View style={styles.inventoryLeft}>
-                    <Text style={styles.inventoryName}>{product.name}</Text>
-                    <Text style={styles.inventoryMeta}>{product.category} · {product.unit}</Text>
-                  </View>
-                  <View style={styles.inventoryRight}>
-                    <Text style={styles.inventoryPrice}>₹{product.price}</Text>
-                    <Text style={styles.inventoryStock}>
-                      {product.stock_qty > 0 ? `${product.stock_qty} in stock` : 'Out of stock'}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-
-              {products.filter(p => p.name).length === 0 && (
+              {getAllProducts().length === 0 ? (
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyEmoji}>📦</Text>
                   <Text style={styles.emptyTitle}>No products added</Text>
-                  <TouchableOpacity onPress={() => setCurrentStep(3)}>
+                  <TouchableOpacity onPress={() => setCurrentStep(4)}>
                     <Text style={{ color: PRIMARY, fontWeight: '700', marginTop: 8 }}>← Go back and add products</Text>
                   </TouchableOpacity>
                 </View>
+              ) : (
+                getAllProducts().map((product, index) => (
+                  <View key={index} style={styles.inventoryCard}>
+                    <View style={styles.inventoryLeft}>
+                      <Text style={styles.inventoryName}>{product.name}</Text>
+                      <Text style={styles.inventoryMeta}>
+                        {product.cat || product.category || '—'} · {product.unit}
+                      </Text>
+                      <View style={[styles.typeBadge, product.type === 'loose' ? styles.badgeLoose : styles.badgePacked, { marginTop: 4 }]}>
+                        <Text style={[styles.typeBadgeText, product.type === 'loose' ? styles.badgeLooseText : styles.badgePackedText]}>
+                          {product.type || 'packed'}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.inventoryRight}>
+                      <Text style={styles.inventoryMrp}>MRP ₹{product.mrp}</Text>
+                      <Text style={styles.inventoryPrice}>SP ₹{product.sp || product.price}</Text>
+                      <Text style={styles.inventoryStock}>
+                        {(product.stock || product.stock_qty) > 0
+                          ? `${product.stock || product.stock_qty} in stock`
+                          : 'Stock not set'}
+                      </Text>
+                    </View>
+                  </View>
+                ))
               )}
             </View>
           )}
 
-          {/* ── STEP 5: Go Live ── */}
-          {currentStep === 5 && (
-            <View style={styles.goLiveContainer}>
-              <Text style={styles.goLiveEmoji}>🎉</Text>
-              <Text style={styles.goLiveTitle}>You're almost live!</Text>
-              <Text style={styles.goLiveSub}>
-                Here's a summary of your setup:
-              </Text>
+          {/* ── STEP 6: Go Live ── */}
+          {currentStep === 6 && (
+            <View>
+              <View style={styles.goLiveContainer}>
+                <Text style={styles.goLiveEmoji}>🎉</Text>
+                <Text style={styles.goLiveTitle}>Almost live!</Text>
+                <Text style={styles.goLiveSub}>Here's your shop summary before submission.</Text>
+              </View>
 
               <View style={styles.summaryCard}>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryIcon}>🏪</Text>
-                  <View>
-                    <Text style={styles.summaryLabel}>Shop Name</Text>
-                    <Text style={styles.summaryValue}>{shopName || '—'}</Text>
+                {[
+                  { icon: '🏪', label: 'Shop Name', value: shopName || '—' },
+                  { icon: '👤', label: 'Owner', value: ownerName || '—' },
+                  { icon: '📍', label: 'Location', value: city && pincode ? `${city}, ${pincode}` : '—' },
+                  { icon: '📋', label: 'FSSAI / GST', value: `${fssai || '—'} / ${gst || '—'}` },
+                  { icon: '🏷️', label: 'Categories', value: selectedCategories.join(', ') || '—' },
+                  { icon: '📦', label: 'Products', value: `${getAllProducts().length} products ready` },
+                  { icon: '💰', label: 'Payment', value: upiId || (accountNumber ? 'Bank account' : 'Not set') },
+                ].map((row, i, arr) => (
+                  <View key={row.label}>
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryIcon}>{row.icon}</Text>
+                      <View>
+                        <Text style={styles.summaryLabel}>{row.label}</Text>
+                        <Text style={styles.summaryValue}>{row.value}</Text>
+                      </View>
+                    </View>
+                    {i < arr.length - 1 && <View style={styles.summaryDivider} />}
                   </View>
-                </View>
-                <View style={styles.summaryDivider} />
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryIcon}>📍</Text>
-                  <View>
-                    <Text style={styles.summaryLabel}>Location</Text>
-                    <Text style={styles.summaryValue}>{city}, {pincode}</Text>
-                  </View>
-                </View>
-                <View style={styles.summaryDivider} />
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryIcon}>🏷️</Text>
-                  <View>
-                    <Text style={styles.summaryLabel}>Categories</Text>
-                    <Text style={styles.summaryValue}>{selectedCategories.join(', ') || '—'}</Text>
-                  </View>
-                </View>
-                <View style={styles.summaryDivider} />
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryIcon}>📦</Text>
-                  <View>
-                    <Text style={styles.summaryLabel}>Products</Text>
-                    <Text style={styles.summaryValue}>{products.filter(p => p.name).length} products added</Text>
-                  </View>
-                </View>
-                <View style={styles.summaryDivider} />
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryIcon}>💰</Text>
-                  <View>
-                    <Text style={styles.summaryLabel}>Payment</Text>
-                    <Text style={styles.summaryValue}>{upiId || (accountNumber ? 'Bank account' : 'Not set')}</Text>
-                  </View>
-                </View>
+                ))}
               </View>
 
               <View style={[styles.infoBox, { marginTop: 16 }]}>
                 <Text style={styles.infoText}>
-                  ✅ Your shop will go live immediately after submission. Customers nearby will be able to discover and order from you.
+                  ✅ Your shop will be reviewed within <Text style={{ fontWeight: '700' }}>24–48 hours</Text>. You'll be notified at <Text style={{ fontWeight: '700' }}>{email || 'your email'}</Text> once approved and live.
                 </Text>
               </View>
             </View>
@@ -596,17 +899,13 @@ export default function VendorOnboardingScreen({ onComplete }) {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Bottom actions */}
+      {/* Bottom bar */}
       <View style={styles.bottomBar}>
         {currentStep > 1 && (
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => setCurrentStep(prev => prev - 1)}
-          >
+          <TouchableOpacity style={styles.backBtn} onPress={() => setCurrentStep(prev => prev - 1)}>
             <Text style={styles.backText}>← Back</Text>
           </TouchableOpacity>
         )}
-
         <TouchableOpacity
           style={[styles.nextBtn, loading && { opacity: 0.7 }]}
           onPress={handleNext}
@@ -615,7 +914,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
           {loading
             ? <ActivityIndicator color="#fff" />
             : <Text style={styles.nextText}>
-              {currentStep === 5 ? '🚀 Submit & Go Live' : 'Save & Continue →'}
+              {currentStep === STEPS.length ? '🚀 Submit & Go Live' : 'Save & Continue →'}
             </Text>
           }
         </TouchableOpacity>
@@ -624,136 +923,264 @@ export default function VendorOnboardingScreen({ onComplete }) {
   );
 }
 
+// ─── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
+
+
+  catalogCard: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 10,
+    marginBottom: 10,
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+
+  catalogCardSelected: {
+    borderColor: PRIMARY,
+    backgroundColor: '#f1fff5',
+  },
+
+  catalogImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 10,
+    backgroundColor: '#f0f0f0',
+  },
+
+  catalogTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  mrp: {
+    textDecorationLine: 'line-through',
+    color: '#999',
+    fontSize: 12,
+  },
+
+
   container: { flex: 1, backgroundColor: BG },
+
+  // Top bar
   topBar: {
     backgroundColor: PRIMARY, paddingTop: 50, paddingBottom: 14,
     paddingHorizontal: 20, flexDirection: 'row',
     justifyContent: 'space-between', alignItems: 'center',
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  brandEmoji: { fontSize: 28 },
-  brandName: { fontSize: 18, fontWeight: '800', color: '#fff' },
-  brandSub: { fontSize: 12, color: 'rgba(255,255,255,0.75)' },
+  brandEmoji: { fontSize: 26 },
+  brandName: { fontSize: 17, fontWeight: '800', color: '#fff' },
+  brandSub: { fontSize: 11, color: 'rgba(255,255,255,0.75)' },
   stepCount: { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: '700' },
-  progressTrack: { height: 4, backgroundColor: '#c8e6c9' },
-  progressFill: { height: 4, backgroundColor: PRIMARY },
-  stepsScroll: { backgroundColor: '#fff', maxHeight: 70 },
-  stepsRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 12, gap: 0,
-  },
+
+  // Progress
+  progressTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.25)' },
+  progressFill: { height: 3, backgroundColor: '#fff' },
+
+  // Step tabs
+  stepsScroll: { backgroundColor: '#fff', maxHeight: 60, borderBottomWidth: 0.5, borderBottomColor: '#eee' },
+  stepsRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8 },
   stepPillWrapper: { flexDirection: 'row', alignItems: 'center' },
-  stepPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: 20, backgroundColor: '#f0f0f0',
+  stepPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5 },
+  stepPillActive: {},
+  stepPillDone: {},
+  stepNum: {
+    width: 20, height: 20, borderRadius: 10, backgroundColor: '#f0f0f0',
+    alignItems: 'center', justifyContent: 'center',
   },
-  stepPillActive: { backgroundColor: '#e8f5e9' },
-  stepPillDone: { backgroundColor: PRIMARY },
-  stepPillIcon: { fontSize: 14 },
-  stepPillText: { fontSize: 12, fontWeight: '600', color: '#aaa' },
+  stepNumActive: { backgroundColor: PRIMARY },
+  stepNumDone: { backgroundColor: PRIMARY },
+  stepNumText: { fontSize: 10, fontWeight: '700', color: '#aaa' },
+  stepNumTextActive: { color: '#fff' },
+  stepPillText: { fontSize: 11, fontWeight: '600', color: '#aaa' },
   stepPillTextActive: { color: PRIMARY },
-  connector: { width: 16, height: 2, backgroundColor: '#e0e0e0', marginHorizontal: 4 },
+  connector: { width: 14, height: 1.5, backgroundColor: '#e0e0e0', marginHorizontal: 2 },
   connectorDone: { backgroundColor: PRIMARY },
+
+  // Content
   content: { flex: 1, paddingHorizontal: 20 },
-  stepHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    marginTop: 20, marginBottom: 16,
-  },
-  stepIcon: { fontSize: 36 },
+  stepHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, marginBottom: 16 },
+  stepIcon: { fontSize: 34 },
   stepTitle: { fontSize: 20, fontWeight: '800', color: '#222' },
   stepDesc: { fontSize: 13, color: '#888', marginTop: 2 },
   form: { gap: 2 },
-  label: { fontSize: 13, fontWeight: '600', color: '#444', marginBottom: 6, marginTop: 12 },
+
+  // Form elements
+  label: { fontSize: 13, fontWeight: '600', color: '#444', marginBottom: 6, marginTop: 14 },
   sectionLabel: { fontSize: 15, fontWeight: '700', color: '#222', marginTop: 12, marginBottom: 4 },
+  sectionSep: { fontSize: 14, fontWeight: '700', color: '#333', marginTop: 20, marginBottom: 6, paddingTop: 14, borderTopWidth: 0.5, borderTopColor: '#eee' },
+  req: { color: '#e53935' },
+  hintText: { fontSize: 11, color: '#999', marginTop: -4, marginBottom: 6 },
   input: {
     backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e0e0e0',
-    borderRadius: 10, padding: 14, fontSize: 15, color: '#333', marginBottom: 8,
+    borderRadius: 10, padding: 13, fontSize: 14, color: '#333', marginBottom: 6,
   },
   textArea: { height: 80, textAlignVertical: 'top' },
   row: { flexDirection: 'row' },
-  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+
+  // Categories
+  chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   chip: {
-    paddingHorizontal: 14, paddingVertical: 8,
+    paddingHorizontal: 13, paddingVertical: 7,
     borderRadius: 20, borderWidth: 1.5, borderColor: '#ddd', backgroundColor: '#fff',
   },
-  chipActive: { backgroundColor: '#e8f5e9', borderColor: PRIMARY },
-  chipText: { fontSize: 13, color: '#555', fontWeight: '500' },
+  chipActive: { backgroundColor: PRIMARY_LIGHT, borderColor: PRIMARY },
+  chipText: { fontSize: 12, color: '#555', fontWeight: '500' },
   chipTextActive: { color: PRIMARY, fontWeight: '700' },
-  infoBox: { backgroundColor: '#e8f5e9', borderRadius: 10, padding: 14, marginBottom: 8, marginTop: 4 },
+
+  // Info boxes
+  infoBox: { backgroundColor: PRIMARY_LIGHT, borderRadius: 10, padding: 13, marginBottom: 8, marginTop: 4 },
   infoText: { fontSize: 13, color: '#2e7d32', lineHeight: 20 },
-  codeText: { fontFamily: 'monospace', fontSize: 11, marginTop: 6, color: '#1b5e20' },
+  codeText: { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, marginTop: 6, color: '#1b5e20' },
+
+  // Upload box
+  uploadBox: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 6,
+    backgroundColor: '#fafafa',
+  },
+  uploadIcon: { fontSize: 24, marginBottom: 6 },
+  uploadText: { fontSize: 13, color: '#888' },
+  uploadHint: { fontSize: 11, color: '#bbb', marginTop: 3 },
+
+  // Bank divider
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 16, gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#e0e0e0' },
   dividerText: { fontSize: 13, color: '#999', fontWeight: '600' },
+
+  // Mode toggle
   modeToggle: {
     flexDirection: 'row', backgroundColor: '#f0f0f0',
-    borderRadius: 12, padding: 4, marginBottom: 16, marginTop: 8,
+    borderRadius: 12, padding: 4, marginBottom: 14, marginTop: 4,
   },
-  modeBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  modeBtnActive: { backgroundColor: '#fff' },
-  modeBtnText: { fontSize: 13, fontWeight: '600', color: '#888' },
+  modeBtn: { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' },
+  modeBtnActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+  modeBtnText: { fontSize: 12, fontWeight: '600', color: '#888' },
   modeBtnTextActive: { color: PRIMARY },
-  productRow: {
+
+  // Generic catalog
+  selAllRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  catalogMeta: { fontSize: 12, color: '#888' },
+  selAllBtn: { fontSize: 13, color: PRIMARY, fontWeight: '700' },
+  catalogItem: {
+    backgroundColor: '#fff', borderWidth: 1, borderColor: '#eee',
+    borderRadius: 10, padding: 12, marginBottom: 7,
+  },
+  catalogItemSel: { borderColor: PRIMARY, backgroundColor: PRIMARY_LIGHT },
+  catalogLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  checkbox: {
+    width: 20, height: 20, borderRadius: 5, borderWidth: 1.5,
+    borderColor: '#ccc', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  checkboxSel: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  checkmark: { fontSize: 11, color: '#fff', fontWeight: '700' },
+  catalogNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  catalogName: { fontSize: 14, fontWeight: '600', color: '#222' },
+
+  // Type badges
+  typeBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
+  badgeLoose: { backgroundColor: '#fff3e0' },
+  badgeLooseText: { color: '#e65100', fontSize: 11, fontWeight: '600' },
+  badgePacked: { backgroundColor: '#e3f2fd' },
+  badgePackedText: { color: '#1565c0', fontSize: 11, fontWeight: '600' },
+  typeBadgeText: { fontSize: 11, fontWeight: '600' },
+
+  cantFindBtn: {
+    borderWidth: 1, borderColor: PRIMARY, 
+    borderRadius: 10, padding: 13, alignItems: 'center', marginTop: 8, marginBottom: 4,
+  },
+  cantFindText: { color: PRIMARY, fontWeight: '600', fontSize: 13 },
+
+  // Product manual card
+  productCard: {
     backgroundColor: '#fff', borderRadius: 12, padding: 14,
     marginBottom: 12, borderWidth: 1, borderColor: '#eaeaea',
   },
-  productRowHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  productRowNum: { fontSize: 13, fontWeight: '700', color: '#333' },
+  productCardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  productCardNum: { fontSize: 13, fontWeight: '700', color: '#333' },
   removeBtn: { fontSize: 12, color: '#e53935', fontWeight: '600' },
+
+  // Photo upload row
+  photoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
+  photoBox: {
+    width: 56, height: 56, borderRadius: 10, borderWidth: 1,
+    borderColor: '#ddd', backgroundColor: '#fafafa',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  photoIcon: { fontSize: 24 },
+  photoHint: { fontSize: 12, color: '#888', flex: 1, lineHeight: 18 },
+
+  // Segment (type toggle)
+  segmentRow: { flexDirection: 'row', backgroundColor: '#f0f0f0', borderRadius: 8, padding: 3 },
+  segBtn: { flex: 1, paddingVertical: 7, borderRadius: 6, alignItems: 'center' },
+  segBtnActive: { backgroundColor: '#fff' },
+  segBtnText: { fontSize: 12, color: '#888', fontWeight: '600' },
+  segBtnTextActive: { color: PRIMARY },
+
   addRowBtn: {
-    borderWidth: 1.5, borderColor: PRIMARY,
-...Platform.select({ web: { borderStyle: 'dashed' }, default: { borderStyle: 'solid' } }),
-    borderRadius: 10, padding: 14, alignItems: 'center', marginTop: 4,
+    borderWidth: 1.5, borderColor: PRIMARY, 
+    borderRadius: 10, padding: 13, alignItems: 'center', marginTop: 4,
   },
   addRowBtnText: { color: PRIMARY, fontWeight: '700', fontSize: 14 },
-  csvInput: { height: 160, textAlignVertical: 'top', fontFamily: 'monospace', fontSize: 12 },
-  parseBtn: {
-    backgroundColor: PRIMARY, padding: 14,
-    borderRadius: 10, alignItems: 'center', marginTop: 4,
-  },
+
+  // CSV
+  csvInput: { height: 160, textAlignVertical: 'top', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12 },
+  parseBtn: { backgroundColor: PRIMARY, padding: 13, borderRadius: 10, alignItems: 'center', marginTop: 4 },
   parseBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  previewBox: {
-    backgroundColor: '#e8f5e9', borderRadius: 10,
-    padding: 14, marginTop: 12,
-  },
+  previewBox: { backgroundColor: PRIMARY_LIGHT, borderRadius: 10, padding: 13, marginTop: 12 },
   previewTitle: { fontSize: 14, fontWeight: '700', color: PRIMARY, marginBottom: 8 },
   previewItem: { fontSize: 13, color: '#333', marginBottom: 4 },
   previewMore: { fontSize: 12, color: '#666', marginTop: 4 },
+
+  // Inventory review
   inventoryCard: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 14,
+    backgroundColor: '#fff', borderRadius: 12, padding: 13,
     marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', borderWidth: 1, borderColor: '#eaeaea',
+    alignItems: 'flex-start', borderWidth: 1, borderColor: '#eaeaea',
   },
   inventoryLeft: { flex: 1 },
   inventoryName: { fontSize: 15, fontWeight: '700', color: '#222' },
   inventoryMeta: { fontSize: 12, color: '#888', marginTop: 2 },
   inventoryRight: { alignItems: 'flex-end' },
+  inventoryMrp: { fontSize: 12, color: '#999', textDecorationLine: 'line-through' },
   inventoryPrice: { fontSize: 15, fontWeight: '800', color: PRIMARY },
   inventoryStock: { fontSize: 12, color: '#666', marginTop: 2 },
   emptyState: { alignItems: 'center', paddingVertical: 40 },
   emptyEmoji: { fontSize: 48 },
   emptyTitle: { fontSize: 16, color: '#888', marginTop: 12 },
-  goLiveContainer: { alignItems: 'center', paddingTop: 10 },
-  goLiveEmoji: { fontSize: 64, marginBottom: 16 },
-  goLiveTitle: { fontSize: 26, fontWeight: '800', color: '#222', marginBottom: 8 },
-  goLiveSub: { fontSize: 15, color: '#666', marginBottom: 20 },
+
+  // Go live
+  goLiveContainer: { alignItems: 'center', paddingTop: 10, marginBottom: 20 },
+  goLiveEmoji: { fontSize: 60, marginBottom: 14 },
+  goLiveTitle: { fontSize: 24, fontWeight: '800', color: '#222', marginBottom: 6 },
+  goLiveSub: { fontSize: 14, color: '#666' },
   summaryCard: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 4,
-    width: '100%', borderWidth: 1, borderColor: '#eaeaea',
+    backgroundColor: '#fff', borderRadius: 16,
+    borderWidth: 1, borderColor: '#eaeaea', overflow: 'hidden',
   },
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14 },
-  summaryIcon: { fontSize: 24 },
-  summaryLabel: { fontSize: 12, color: '#888' },
-  summaryValue: { fontSize: 14, fontWeight: '700', color: '#222', marginTop: 2 },
+  summaryIcon: { fontSize: 22 },
+  summaryLabel: { fontSize: 11, color: '#888' },
+  summaryValue: { fontSize: 13, fontWeight: '700', color: '#222', marginTop: 2 },
   summaryDivider: { height: 1, backgroundColor: '#f0f0f0', marginHorizontal: 14 },
+
+  // Bottom bar
   bottomBar: {
-    flexDirection: 'row', padding: 16, gap: 10,
+    flexDirection: 'row', padding: 14, gap: 10,
     backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#eee',
   },
   backBtn: {
-    paddingHorizontal: 16, paddingVertical: 14,
+    paddingHorizontal: 16, paddingVertical: 13,
     borderRadius: 10, borderWidth: 1.5, borderColor: '#ddd', justifyContent: 'center',
   },
   backText: { fontSize: 14, fontWeight: '600', color: '#555' },
@@ -762,4 +1189,4 @@ const styles = StyleSheet.create({
     borderRadius: 10, alignItems: 'center', justifyContent: 'center',
   },
   nextText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-});
+}); 
