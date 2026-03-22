@@ -618,6 +618,13 @@ const CAT_FALLBACK_IMGS = {
     "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80",
 };
 
+// ─── Vendor type display config ──────────────────────────────────────────────
+const VENDOR_TYPE_META = {
+  ration:     { label: "Ration Store",   bg: "#FEF9C3", color: "#92400E" },
+  vegetables: { label: "Vegetables",    bg: "#DCFCE7", color: "#14532D" },
+  fruits:     { label: "Fruits",        bg: "#ECFDF5", color: "#065F46" },
+};
+
 // ─── Item Card ─────────────────────────────────────────────────────────────────
 function ItemCard({ item, onAdd, onRemove, qty, cardWidth }) {
   const size = cardWidth || 130;
@@ -928,6 +935,14 @@ export default function HomeScreen() {
     try {
       const res = await vendorsAPI.getNearby(lat, lng, 10);
       const list = res.data || [];
+      // ── TEMP DEBUG — remove after checking terminal ──
+      if (list.length > 0) {
+        console.log("🔍 VENDOR:", JSON.stringify({
+          shop_name: list[0].shop_name,
+          vendor_type: list[0].vendor_type,
+          delivery_type: list[0].delivery_type,
+        }, null, 2));
+      }
       setVendors(list);
       // Pass list directly — state update is async, list is synchronous
       await fetchInventoryForVendors(list);
@@ -1569,6 +1584,27 @@ export default function HomeScreen() {
                         </Text>
                       </View>
                     )}
+                    {vendor.vendor_type && vendor.vendor_type !== "all" &&
+                      VENDOR_TYPE_META[vendor.vendor_type] && (
+                        <View
+                          style={[
+                            s.storeTag,
+                            {
+                              backgroundColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
+                              borderColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              s.storeTagText,
+                              { color: VENDOR_TYPE_META[vendor.vendor_type].color },
+                            ]}
+                          >
+                            {VENDOR_TYPE_META[vendor.vendor_type].label}
+                          </Text>
+                        </View>
+                      )}
                   </View>
                 </View>
               </TouchableOpacity>
