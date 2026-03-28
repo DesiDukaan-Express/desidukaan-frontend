@@ -24,42 +24,42 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
-  orange:       "#F97316",
-  orangeDark:   "#EA580C",
-  green:        "#16A34A",
-  greenDark:    "#15803D",
-  greenDeep:    "#14532D",
-  greenLight:   "#F0FDF4",
-  greenMid:     "#DCFCE7",
-  greenBorder:  "#BBF7D0",
-  navy:         "#1E3A5F",
-  white:        "#FFFFFF",
-  gray100:      "#F3F4F6",
-  gray200:      "#E5E7EB",
-  gray400:      "#9CA3AF",
-  gray500:      "#6B7280",
-  gray700:      "#374151",
-  gray900:      "#111827",
-  errorBg:      "#FEF2F2",
-  errorBorder:  "#FCA5A5",
-  errorText:    "#DC2626",
+  orange: "#F97316",
+  orangeDark: "#EA580C",
+  green: "#16A34A",
+  greenDark: "#15803D",
+  greenDeep: "#14532D",
+  greenLight: "#F0FDF4",
+  greenMid: "#DCFCE7",
+  greenBorder: "#BBF7D0",
+  navy: "#1E3A5F",
+  white: "#FFFFFF",
+  gray100: "#F3F4F6",
+  gray200: "#E5E7EB",
+  gray400: "#9CA3AF",
+  gray500: "#6B7280",
+  gray700: "#374151",
+  gray900: "#111827",
+  errorBg: "#FEF2F2",
+  errorBorder: "#FCA5A5",
+  errorText: "#DC2626",
 };
 
 const ROLES = [
   { key: "customer", label: "Customer", icon: "shopping-bag" },
-  { key: "vendor",   label: "Vendor",   icon: "home"         },
-  { key: "delivery", label: "Delivery", icon: "truck"        },
+  { key: "vendor", label: "Vendor", icon: "home" },
+  { key: "delivery", label: "Delivery", icon: "truck" },
 ];
 
 const GENDERS = [
-  { key: "male",   label: "Male",   icon: "👨" },
+  { key: "male", label: "Male", icon: "👨" },
   { key: "female", label: "Female", icon: "👩" },
-  { key: "other",  label: "Other",  icon: "🧑" },
+  { key: "other", label: "Other", icon: "🧑" },
 ];
 
 const ROLE_HOME = {
   customer: "CustomerApp",
-  vendor:   "VendorApp",
+  vendor: "VendorApp",
   delivery: "DeliveryApp",
 };
 
@@ -67,23 +67,23 @@ const isValidIndianMobile = (num) => /^[6-9]\d{9}$/.test(num);
 
 export default function SignupScreen({ navigation, route }) {
   const prefillPhone = route?.params?.phone || "";
-  const prefillRole  = route?.params?.role  || "customer";
+  const prefillRole = route?.params?.role || "customer";
 
-  const [name,         setName]         = useState("");
-  const [mobile,       setMobile]       = useState(prefillPhone);
-  const [address,      setAddress]      = useState("");
-  const [age,          setAge]          = useState("");
-  const [gender,       setGender]       = useState("");
+  const [name, setName] = useState("");
+  const [mobile, setMobile] = useState(prefillPhone);
+  const [address, setAddress] = useState("");
+  const [age, setAge] = useState("");
+  const [gender, setGender] = useState("");
   const [selectedRole, setSelectedRole] = useState(prefillRole);
   const [focusedField, setFocusedField] = useState(null);
-  const [agreed,       setAgreed]       = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
-  const [step,        setStep]        = useState("form");
-  const [otp,         setOtp]         = useState("");
+  const [step, setStep] = useState("form");
+  const [otp, setOtp] = useState("");
   const [resendTimer, setResendTimer] = useState(0);
 
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState("");
+  const [error, setError] = useState("");
 
   const [winW, setWinW] = useState(SCREEN_W);
   useEffect(() => {
@@ -92,27 +92,27 @@ export default function SignupScreen({ navigation, route }) {
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);
   }, []);
-  const tablet      = winW > 600;
-  const hPad        = tablet ? 60 : 22;
-  const cardHPad    = tablet ? 32 : 20;
-  const brandSize   = tablet ? 32 : 26;
+  const tablet = winW > 600;
+  const hPad = tablet ? 60 : 22;
+  const cardHPad = tablet ? 32 : 20;
+  const brandSize = tablet ? 32 : 26;
   const headingSize = tablet ? 22 : 20;
 
   const login = useAuthStore((state) => state.login);
 
-  const logoAnim    = useRef(new Animated.Value(0)).current;
+  const logoAnim = useRef(new Animated.Value(0)).current;
   const formOpacity = useRef(new Animated.Value(0)).current;
-  const formAnim    = useRef(new Animated.Value(30)).current;
-  const shakeAnim   = useRef(new Animated.Value(0)).current;
-  const stepAnim    = useRef(new Animated.Value(0)).current;
-  const timerRef    = useRef(null);
+  const formAnim = useRef(new Animated.Value(30)).current;
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const stepAnim = useRef(new Animated.Value(0)).current;
+  const timerRef = useRef(null);
 
   useEffect(() => {
     Animated.stagger(100, [
       Animated.spring(logoAnim, { toValue: 1, tension: 55, friction: 7, useNativeDriver: true }),
       Animated.parallel([
-        Animated.spring(formAnim,    { toValue: 0, tension: 50, friction: 9, useNativeDriver: true }),
-        Animated.timing(formOpacity, { toValue: 1, duration: 400,            useNativeDriver: true }),
+        Animated.spring(formAnim, { toValue: 0, tension: 50, friction: 9, useNativeDriver: true }),
+        Animated.timing(formOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
       ]),
     ]).start();
   }, []);
@@ -140,18 +140,18 @@ export default function SignupScreen({ navigation, route }) {
 
   const shakeError = () => {
     Animated.sequence([
-      Animated.timing(shakeAnim, { toValue:  8, duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 8, duration: 55, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: -8, duration: 55, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue:  5, duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 5, duration: 55, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: -5, duration: 55, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue:  0, duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 55, useNativeDriver: true }),
     ]).start();
   };
 
   const animateStep = (cb) => {
     Animated.sequence([
       Animated.timing(stepAnim, { toValue: -20, duration: 130, useNativeDriver: true }),
-      Animated.timing(stepAnim, { toValue:   0, duration: 220, useNativeDriver: true }),
+      Animated.timing(stepAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
     ]).start(() => cb && cb());
   };
 
@@ -160,18 +160,18 @@ export default function SignupScreen({ navigation, route }) {
     setError("");
   };
 
-  const ageNum        = parseInt(age, 10);
-  const isAgeValid    = age.length > 0 && !isNaN(ageNum) && ageNum >= 16 && ageNum <= 100;
-  const isAgeError    = age.length > 0 && !isAgeValid;
+  const ageNum = parseInt(age, 10);
+  const isAgeValid = age.length > 0 && !isNaN(ageNum) && ageNum >= 16 && ageNum <= 100;
+  const isAgeError = age.length > 0 && !isAgeValid;
   const isMobileReady = isValidIndianMobile(mobile);
   const mobileStartError =
-    mobile.length > 0 && !["6","7","8","9"].includes(mobile[0])
+    mobile.length > 0 && !["6", "7", "8", "9"].includes(mobile[0])
       ? "Must start with 6, 7, 8, or 9" : "";
 
   const isFormValid =
     name.trim().length >= 2 &&
     isMobileReady &&
-    address.trim().length >= 5 &&
+    (selectedRole === 'vendor' || address.trim().length >= 5) &&
     isAgeValid &&
     gender !== "" &&
     agreed;
@@ -181,7 +181,7 @@ export default function SignupScreen({ navigation, route }) {
     if (!isFormValid) return;
     setLoading(true); setError("");
     try {
-      const res  = await fetch(`${BASE_URL}/auth/register`, {
+      const res = await fetch(`${BASE_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -199,7 +199,7 @@ export default function SignupScreen({ navigation, route }) {
         setResendTimer(30);
       });
     } catch (e) { setError(e.message); shakeError(); }
-    finally     { setLoading(false); }
+    finally { setLoading(false); }
   };
 
   // Step 2: verify OTP → issue JWT → navigate to dashboard
@@ -207,7 +207,7 @@ export default function SignupScreen({ navigation, route }) {
     if (otp.length !== 6) return;
     setLoading(true); setError("");
     try {
-      const res  = await fetch(`${BASE_URL}/auth/verify`, {
+      const res = await fetch(`${BASE_URL}/auth/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: mobile, code: otp }),
@@ -217,7 +217,7 @@ export default function SignupScreen({ navigation, route }) {
       login(data.user, data.token);
       navigation.replace(ROLE_HOME[selectedRole] || "CustomerApp");
     } catch (e) { setError(e.message); shakeError(); }
-    finally     { setLoading(false); }
+    finally { setLoading(false); }
   };
 
   const handleResend = async () => {
@@ -229,7 +229,7 @@ export default function SignupScreen({ navigation, route }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: mobile, role: selectedRole }),
       });
-    } catch (_) {}
+    } catch (_) { }
   };
 
   return (
@@ -333,8 +333,8 @@ export default function SignupScreen({ navigation, route }) {
                         <View style={[
                           s.inputBox,
                           focusedField === "mobile" && s.inputBoxFocused,
-                          mobileStartError           && s.inputBoxError,
-                          prefillPhone               && s.inputBoxLocked,
+                          mobileStartError && s.inputBoxError,
+                          prefillPhone && s.inputBoxLocked,
                         ]}>
                           <IIcon name="smartphone" focused={focusedField === "mobile"} error={!!mobileStartError} />
                           <View style={s.prefixWrap}>
@@ -359,30 +359,36 @@ export default function SignupScreen({ navigation, route }) {
                       </Field>
 
                       {/* Address */}
-                      <Field label="Address">
-                        <View style={[
-                          s.inputBox, s.inputBoxMultiline,
-                          focusedField === "address" && s.inputBoxFocused,
-                        ]}>
-                          <View style={[s.inputIconWrap, { alignSelf: "flex-start", paddingTop: 13 }]}>
-                            <Feather name="map-pin" size={14}
-                              color={focusedField === "address" ? C.green : C.gray400} />
-                          </View>
-                          <TextInput
-                            placeholder="House no., street, area, city"
-                            placeholderTextColor={C.gray400}
-                            autoCapitalize="sentences"
-                            multiline
-                            numberOfLines={3}
-                            value={address}
-                            onChangeText={(t) => { setAddress(t); setError(""); }}
-                            onFocus={() => setFocusedField("address")}
-                            onBlur={() => setFocusedField(null)}
-                            style={[s.fieldInput, s.fieldInputMultiline]}
-                            underlineColorAndroid="transparent"
-                          />
-                        </View>
-                      </Field>
+
+                      {
+                        selectedRole !== 'vendor' && 
+                        (
+                          <Field label="Address">
+                            <View style={[
+                              s.inputBox, s.inputBoxMultiline,
+                              focusedField === "address" && s.inputBoxFocused,
+                            ]}>
+                              <View style={[s.inputIconWrap, { alignSelf: "flex-start", paddingTop: 13 }]}>
+                                <Feather name="map-pin" size={14}
+                                  color={focusedField === "address" ? C.green : C.gray400} />
+                              </View>
+                              <TextInput
+                                placeholder="House no., street, area, city"
+                                placeholderTextColor={C.gray400}
+                                autoCapitalize="sentences"
+                                multiline
+                                numberOfLines={3}
+                                value={address}
+                                onChangeText={(t) => { setAddress(t); setError(""); }}
+                                onFocus={() => setFocusedField("address")}
+                                onBlur={() => setFocusedField(null)}
+                                style={[s.fieldInput, s.fieldInputMultiline]}
+                                underlineColorAndroid="transparent"
+                              />
+                            </View>
+                          </Field>
+                        )
+                      }
 
                       {/* Age + Gender */}
                       <View style={s.rowFields}>
@@ -391,7 +397,7 @@ export default function SignupScreen({ navigation, route }) {
                           <View style={[
                             s.inputBox,
                             focusedField === "age" && s.inputBoxFocused,
-                            isAgeError             && s.inputBoxError,
+                            isAgeError && s.inputBoxError,
                           ]}>
                             <IIcon name="calendar" focused={focusedField === "age"} error={isAgeError} />
                             <TextInput
@@ -494,7 +500,7 @@ export default function SignupScreen({ navigation, route }) {
                         <View style={[
                           s.inputBox,
                           focusedField === "otp" && s.inputBoxFocused,
-                          error                  && s.inputBoxError,
+                          error && s.inputBoxError,
                         ]}>
                           <IIcon name="lock" focused={focusedField === "otp"} error={!!error} />
                           <TextInput
@@ -574,7 +580,7 @@ function Field({ label, error, hint, children }) {
       {children}
       {error ? <Text style={s.fieldError}>{error}</Text>
         : hint ? <Text style={s.fieldHint}>{hint}</Text>
-        : null}
+          : null}
     </View>
   );
 }
@@ -634,7 +640,7 @@ function ErrorBox({ msg }) {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.white },
   safe: { flex: 1 },
-  kav:  { flex: 1 },
+  kav: { flex: 1 },
   scroll: { flexGrow: 1, paddingTop: 24, paddingBottom: 32 },
 
   inner: {
@@ -650,8 +656,8 @@ const s = StyleSheet.create({
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.3, shadowRadius: 10, elevation: 7,
   },
-  logoInner:    { flex: 1, alignItems: "center", justifyContent: "center" },
-  brandName:    { fontWeight: "900", color: C.greenDeep, letterSpacing: -1 },
+  logoInner: { flex: 1, alignItems: "center", justifyContent: "center" },
+  brandName: { fontWeight: "900", color: C.greenDeep, letterSpacing: -1 },
   brandTagline: { fontSize: 12, color: C.gray500, marginTop: 2 },
 
   // Card — accent strip removed, direct paddingTop instead
@@ -673,7 +679,7 @@ const s = StyleSheet.create({
   },
   backBtnText: { fontSize: 12, color: C.gray700, fontWeight: "600" },
 
-  formHeading:    { fontSize: 20, fontWeight: "800", color: C.gray900, letterSpacing: -0.4, marginBottom: 2 },
+  formHeading: { fontSize: 20, fontWeight: "800", color: C.gray900, letterSpacing: -0.4, marginBottom: 2 },
   formSubheading: { fontSize: 12, color: C.gray500, marginBottom: 14 },
 
   successBanner: {
@@ -699,16 +705,16 @@ const s = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3, shadowRadius: 5, elevation: 3,
   },
-  roleTabText:       { fontSize: 12, color: C.gray500, fontWeight: "600" },
+  roleTabText: { fontSize: 12, color: C.gray500, fontWeight: "600" },
   roleTabTextActive: { color: C.white, fontWeight: "700" },
 
-  fieldGroup:  { marginBottom: 12 },
+  fieldGroup: { marginBottom: 12 },
   fieldLabel: {
     fontSize: 12, fontWeight: "700", color: C.gray700,
     marginBottom: 6, letterSpacing: 0.2,
   },
   fieldError: { fontSize: 11, color: C.errorText, fontWeight: "600", marginTop: 4 },
-  fieldHint:  { fontSize: 11, color: C.gray400, marginTop: 4 },
+  fieldHint: { fontSize: 11, color: C.gray400, marginTop: 4 },
 
   inputBox: {
     flexDirection: "row", alignItems: "center",
@@ -717,10 +723,10 @@ const s = StyleSheet.create({
     minHeight: 50,
   },
   inputBoxMultiline: { alignItems: "flex-start", minHeight: 80 },
-  inputBoxFocused:   { borderColor: C.green, backgroundColor: C.greenMid },
-  inputBoxError:     { borderColor: C.errorBorder, backgroundColor: C.errorBg },
-  inputBoxLocked:    { backgroundColor: C.gray100, borderColor: C.gray200 },
-  inputIconWrap:     { width: 42, alignItems: "center", justifyContent: "center" },
+  inputBoxFocused: { borderColor: C.green, backgroundColor: C.greenMid },
+  inputBoxError: { borderColor: C.errorBorder, backgroundColor: C.errorBg },
+  inputBoxLocked: { backgroundColor: C.gray100, borderColor: C.gray200 },
+  inputIconWrap: { width: 42, alignItems: "center", justifyContent: "center" },
   fieldInput: {
     flex: 1, fontSize: 14, color: C.gray900,
     paddingVertical: 13, paddingRight: 12, fontWeight: "500",
@@ -729,21 +735,21 @@ const s = StyleSheet.create({
   fieldInputMultiline: { paddingTop: 13, paddingBottom: 12, textAlignVertical: "top" },
   otpInput: { letterSpacing: 6, fontSize: 18, fontWeight: "700" },
 
-  prefixWrap:    { flexDirection: "row", alignItems: "center", paddingRight: 8 },
-  prefixText:    { fontSize: 12, fontWeight: "700", color: C.gray700 },
+  prefixWrap: { flexDirection: "row", alignItems: "center", paddingRight: 8 },
+  prefixText: { fontSize: 12, fontWeight: "700", color: C.gray700 },
   prefixDivider: { width: 1, height: 18, backgroundColor: C.greenBorder, marginLeft: 8 },
 
   otpDots: { flexDirection: "row", marginTop: 8, justifyContent: "center" },
-  otpDot:       { width: 7, height: 7, borderRadius: 4, backgroundColor: C.greenMid, marginHorizontal: 3 },
+  otpDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.greenMid, marginHorizontal: 3 },
   otpDotFilled: { backgroundColor: C.green },
-  otpDotError:  { backgroundColor: C.errorBorder },
+  otpDotError: { backgroundColor: C.errorBorder },
 
   resendRow: {
     flexDirection: "row", alignItems: "center",
     justifyContent: "center", marginBottom: 8,
   },
-  resendText:         { fontSize: 12, color: C.gray500 },
-  resendLink:         { fontSize: 12, color: C.green, fontWeight: "700" },
+  resendText: { fontSize: 12, color: C.gray500 },
+  resendLink: { fontSize: 12, color: C.green, fontWeight: "700" },
   resendLinkDisabled: { color: C.gray400 },
 
   rowFields: { flexDirection: "row", alignItems: "flex-start" },
@@ -755,8 +761,8 @@ const s = StyleSheet.create({
     borderColor: C.greenBorder, backgroundColor: C.greenLight, gap: 3,
   },
   genderChipActive: { backgroundColor: C.green, borderColor: C.green },
-  genderEmoji:      { fontSize: 15 },
-  genderText:       { fontSize: 11, color: C.gray500, fontWeight: "600" },
+  genderEmoji: { fontSize: 15 },
+  genderText: { fontSize: 11, color: C.gray500, fontWeight: "600" },
   genderTextActive: { color: C.white, fontWeight: "700" },
 
   checkboxRow: {
@@ -771,8 +777,8 @@ const s = StyleSheet.create({
     marginTop: 1, flexShrink: 0,
   },
   checkboxActive: { backgroundColor: C.green, borderColor: C.green },
-  checkboxText:   { fontSize: 13, color: C.gray500, flex: 1, lineHeight: 20 },
-  checkboxLink:   { color: C.green, fontWeight: "700" },
+  checkboxText: { fontSize: 13, color: C.gray500, flex: 1, lineHeight: 20 },
+  checkboxLink: { color: C.green, fontWeight: "700" },
 
   errorBox: {
     flexDirection: "row", alignItems: "center",
@@ -783,14 +789,14 @@ const s = StyleSheet.create({
   },
   errorBoxText: { fontSize: 12, color: C.errorText, flex: 1, fontWeight: "500" },
 
-  cta:         { borderRadius: 14, overflow: "hidden", marginBottom: 16 },
+  cta: { borderRadius: 14, overflow: "hidden", marginBottom: 16 },
   ctaDisabled: { opacity: 1 },
   ctaInner: {
     flexDirection: "row", alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 15, paddingHorizontal: 20, minHeight: 52,
   },
-  ctaText:    { fontSize: 15, fontWeight: "800", color: C.white, letterSpacing: 0.2 },
+  ctaText: { fontSize: 15, fontWeight: "800", color: C.white, letterSpacing: 0.2 },
   ctaTextOff: { color: "#86EFAC" },
   ctaArrow: {
     width: 32, height: 32, borderRadius: 9,
@@ -807,8 +813,8 @@ const s = StyleSheet.create({
   loginLink: { color: C.green, fontWeight: "800" },
 
   footer: { alignItems: "center", marginTop: 20, marginBottom: 8, gap: 5 },
-  legalText:      { fontSize: 12, color: C.gray500, textAlign: "center", lineHeight: 18 },
-  legalLink:      { color: C.gray700, fontWeight: "600" },
-  poweredBy:      { fontSize: 12, color: C.gray500, textAlign: "center" },
+  legalText: { fontSize: 12, color: C.gray500, textAlign: "center", lineHeight: 18 },
+  legalLink: { color: C.gray700, fontWeight: "600" },
+  poweredBy: { fontSize: 12, color: C.gray500, textAlign: "center" },
   poweredByBrand: { fontWeight: "800", color: C.navy },
 });

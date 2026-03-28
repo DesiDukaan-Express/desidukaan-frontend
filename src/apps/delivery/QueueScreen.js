@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,15 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Animated,
+  ActivityIndicator,
 } from 'react-native';
+import { io } from 'socket.io-client';
+import useAuthStore from '../../store/authStore';
 
-// ── Colors (same white + green theme) ────────────────────────────────────────
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3000';
+
+// ── Colors ────────────────────────────────────────────────────────────────────
 const C = {
   bg:           '#F5F7F5',
   white:        '#FFFFFF',
@@ -31,75 +36,27 @@ const C = {
   border:       '#E8EDE8',
 };
 
-// ── Dummy Queue Data ──────────────────────────────────────────────────────────
-const INITIAL_QUEUE = [
-  {
-    id: '#ORD-2845',
-    pickup: 'Sharma Kirana',
-    drop: 'Sector 12, B-44',
-    distance: '1.2 km',
-    earning: '₹55',
-    items: 3,
-    eta: '5 min',
-    priority: 'high',
-    expiresIn: 30,
-  },
-  {
-    id: '#ORD-2846',
-    pickup: 'Green Grocers',
-    drop: 'MG Road, Apt 7C',
-    distance: '2.8 km',
-    earning: '₹70',
-    items: 5,
-    eta: '10 min',
-    priority: 'normal',
-    expiresIn: 45,
-  },
-  {
-    id: '#ORD-2847',
-    pickup: 'Fresh Basket',
-    drop: 'Park Street, C-11',
-    distance: '0.9 km',
-    earning: '₹45',
-    items: 2,
-    eta: '4 min',
-    priority: 'normal',
-    expiresIn: 25,
-  },
-  {
-    id: '#ORD-2848',
-    pickup: 'Vijay Fruits',
-    drop: 'Hill Road, E-22',
-    distance: '3.5 km',
-    earning: '₹90',
-    items: 8,
-    eta: '14 min',
-    priority: 'high',
-    expiresIn: 60,
-  },
-];
-
 // ── Priority Badge ────────────────────────────────────────────────────────────
-function PriorityBadge({ priority }) {
-  const isHigh = priority === 'high';
+function PriorityBadge({ label }) {
   return (
-    <View style={[styles.badge, { backgroundColor: isHigh ? C.orangeLight : C.blueLight }]}>
-      <Text style={[styles.badgeText, { color: isHigh ? C.orangeText : C.blueText }]}>
-        {isHigh ? '🔥 High demand' : '🆕 New'}
-      </Text>
+    <View style={[styles.badge, { backgroundColor: C.blueLight }]}>
+      <Text style={[styles.badgeText, { color: C.blueText }]}>🆕 {label}</Text>
     </View>
   );
 }
 
 // ── Timer Bar ─────────────────────────────────────────────────────────────────
-function TimerBar({ seconds }) {
+function TimerBar({ seconds, onExpire }) {
   const [remaining, setRemaining] = useState(seconds);
 
   useEffect(() => {
-    if (remaining <= 0) return;
+    if (remaining <= 0) {
+      onExpire && onExpire();
+      return;
+    }
     const interval = setInterval(() => setRemaining(r => r - 1), 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [remaining]);
 
   const pct = Math.max(0, (remaining / seconds) * 100);
   const barColor = pct > 50 ? C.primary : pct > 20 ? C.orange : C.red;
@@ -109,9 +66,7 @@ function TimerBar({ seconds }) {
       <View style={styles.timerTrack}>
         <View style={[styles.timerFill, { width: `${pct}%`, backgroundColor: barColor }]} />
       </View>
-      <Text style={[styles.timerText, { color: barColor }]}>
-        {remaining}s
-      </Text>
+      <Text style={[styles.timerText, { color: barColor }]}>{remaining}s</Text>
     </View>
   );
 }
@@ -120,92 +75,124 @@ function TimerBar({ seconds }) {
 function QueueCard({ order, onAccept, onDecline }) {
   return (
     <View style={styles.queueCard}>
-
       {/* Top row */}
       <View style={styles.cardTop}>
-        <Text style={styles.orderId}>{order.id}</Text>
-        <PriorityBadge priority={order.priority} />
+        <Text style={styles.orderId}>{order.orderNumber}</Text>
+        <PriorityBadge label="New Order" />
       </View>
 
       {/* Route */}
       <View style={styles.routeRow}>
         <View style={[styles.dot, { backgroundColor: C.blue }]} />
-        <Text style={styles.routeText} numberOfLines={1}>{order.pickup}</Text>
+        <Text style={styles.routeText} numberOfLines={1}>{order.pickup?.name}</Text>
         <View style={styles.routeLine} />
         <View style={[styles.dot, { backgroundColor: C.red }]} />
-        <Text style={styles.routeText} numberOfLines={1}>{order.drop}</Text>
+        <Text style={styles.routeText} numberOfLines={1}>{order.dropoff?.city || order.dropoff?.address}</Text>
       </View>
 
       {/* Info pills */}
       <View style={styles.infoRow}>
         <View style={styles.infoPill}>
-          <Text style={styles.infoPillText}>📍 {order.distance}</Text>
+          <Text style={styles.infoPillText}>📍 {order.pickup?.address}</Text>
         </View>
         <View style={styles.infoPill}>
-          <Text style={styles.infoPillText}>🕐 {order.eta}</Text>
-        </View>
-        <View style={styles.infoPill}>
-          <Text style={styles.infoPillText}>📦 {order.items} items</Text>
+          <Text style={styles.infoPillText}>📦 {order.itemCount} items</Text>
         </View>
         <View style={[styles.infoPill, { backgroundColor: C.primaryLight }]}>
           <Text style={[styles.infoPillText, { color: C.primaryText, fontWeight: '700' }]}>
-            {order.earning}
+            ₹{order.deliveryFee} fee
           </Text>
+        </View>
+        <View style={styles.infoPill}>
+          <Text style={styles.infoPillText}>🛒 ₹{order.total} total</Text>
         </View>
       </View>
 
-      {/* Timer bar */}
-      <TimerBar seconds={order.expiresIn} />
+      {/* Timer bar — 60 seconds to decide */}
+      <TimerBar seconds={60} onExpire={() => onDecline(order.orderId)} />
 
       {/* Action buttons */}
       <View style={styles.btnRow}>
-        <TouchableOpacity
-          style={styles.btnDecline}
-          onPress={() => onDecline(order.id)}
-        >
+        <TouchableOpacity style={styles.btnDecline} onPress={() => onDecline(order.orderId)}>
           <Text style={styles.btnDeclineText}>✕  Decline</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.btnAccept}
-          onPress={() => onAccept(order.id)}
-        >
+        <TouchableOpacity style={styles.btnAccept} onPress={() => onAccept(order.orderId)}>
           <Text style={styles.btnAcceptText}>✓  Accept</Text>
         </TouchableOpacity>
       </View>
-
     </View>
   );
 }
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function QueueScreen() {
-  const [queue, setQueue] = useState(INITIAL_QUEUE);
+  const { token } = useAuthStore();
+  const [queue, setQueue] = useState([]);
   const [accepted, setAccepted] = useState(0);
   const [declined, setDeclined] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const socketRef = useRef(null);
 
-  const handleAccept = (id) => {
-    const order = queue.find(o => o.id === id);
-    Alert.alert(
-      '✅ Order Accepted!',
-      `${order.id} from ${order.pickup} → ${order.drop}\nEarning: ${order.earning}`,
-      [{ text: 'OK' }]
-    );
-    setQueue(prev => prev.filter(o => o.id !== id));
-    setAccepted(a => a + 1);
+  // ── Connect socket to listen for incoming orders ──
+  useEffect(() => {
+    if (!token) return;
+
+    const socket = io(SOCKET_URL, {
+      auth: { token },
+      transports: ['websocket'],
+    });
+    socketRef.current = socket;
+
+    socket.on('connect', () => console.log('QueueScreen socket connected'));
+
+    // Real-time: vendor broadcasts auto-assign to this partner
+    socket.on('order:incoming', (data) => {
+      setQueue(prev => {
+        // Avoid duplicate entries
+        if (prev.find(o => o.orderId === data.orderId)) return prev;
+        return [data, ...prev];
+      });
+    });
+
+    // If someone else accepts this order, remove from queue
+    socket.on('order_assigned_to_delivery', (data) => {
+      setQueue(prev => prev.filter(o => o.orderId !== data.order?.id));
+    });
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [token]);
+
+  const handleAccept = async (orderId) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/delivery/accept/${orderId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setQueue(prev => prev.filter(o => o.orderId !== orderId));
+        setAccepted(a => a + 1);
+        Alert.alert('✅ Order Accepted!', 'Head to the pickup location.');
+      } else {
+        Alert.alert('Error', data.message || 'Could not accept order');
+        // Remove from queue if it's no longer available
+        setQueue(prev => prev.filter(o => o.orderId !== orderId));
+      }
+    } catch (e) {
+      console.log(e);
+      Alert.alert('Error', 'Network error');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDecline = (id) => {
-    Alert.alert('Decline order?', 'This order will be removed from your queue.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Decline',
-        style: 'destructive',
-        onPress: () => {
-          setQueue(prev => prev.filter(o => o.id !== id));
-          setDeclined(d => d + 1);
-        },
-      },
-    ]);
+  const handleDecline = (orderId) => {
+    setQueue(prev => prev.filter(o => o.orderId !== orderId));
+    setDeclined(d => d + 1);
   };
 
   return (
@@ -214,10 +201,11 @@ export default function QueueScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-
       {/* ── Header ── */}
       <Text style={styles.screenTitle}>Order Queue</Text>
-      <Text style={styles.screenSub}>Incoming orders waiting for your response</Text>
+      <Text style={styles.screenSub}>
+        {queue.length > 0 ? 'New orders waiting for your response' : 'Listening for incoming orders...'}
+      </Text>
 
       {/* ── Session Stats ── */}
       <View style={styles.statsRow}>
@@ -244,11 +232,21 @@ export default function QueueScreen() {
       </View>
 
       {/* ── Queue Cards ── */}
+      {loading && (
+        <ActivityIndicator size="small" color={C.primary} style={{ marginVertical: 8 }} />
+      )}
+
       {queue.length === 0 ? (
         <View style={styles.emptyBox}>
           <Text style={styles.emptyEmoji}>🛵</Text>
           <Text style={styles.emptyTitle}>Queue is empty</Text>
-          <Text style={styles.emptyText}>New orders will appear here when available</Text>
+          <Text style={styles.emptyText}>
+            When a vendor auto-assigns, orders will appear here in real-time
+          </Text>
+          <View style={styles.liveBadge}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>LISTENING LIVE</Text>
+          </View>
         </View>
       ) : (
         <>
@@ -257,7 +255,7 @@ export default function QueueScreen() {
           </Text>
           {queue.map(order => (
             <QueueCard
-              key={order.id}
+              key={order.orderId}
               order={order}
               onAccept={handleAccept}
               onDecline={handleDecline}
@@ -265,7 +263,6 @@ export default function QueueScreen() {
           ))}
         </>
       )}
-
     </ScrollView>
   );
 }
@@ -322,5 +319,8 @@ const styles = StyleSheet.create({
   emptyBox:     { alignItems: 'center', paddingVertical: 60 },
   emptyEmoji:   { fontSize: 48, marginBottom: 12 },
   emptyTitle:   { fontSize: 16, fontWeight: '700', color: C.textPrimary, marginBottom: 6 },
-  emptyText:    { fontSize: 13, color: C.textLight, textAlign: 'center' },
+  emptyText:    { fontSize: 13, color: C.textLight, textAlign: 'center', marginBottom: 20, paddingHorizontal: 20 },
+  liveBadge:    { flexDirection: 'row', alignItems: 'center', backgroundColor: C.primaryLight, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+  liveDot:      { width: 6, height: 6, borderRadius: 3, backgroundColor: C.primary, marginRight: 6 },
+  liveText:     { fontSize: 11, fontWeight: '800', color: C.primaryText, letterSpacing: 1 },
 });

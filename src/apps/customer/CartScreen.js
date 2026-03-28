@@ -602,6 +602,7 @@ export default function CartScreen() {
     navigation.goBack();
   };
 
+
   // ── Qty helpers ────────────────────────────────────────────────────────────
   const handleIncrease = useCallback((item) => {
     cart?.addItem?.({ id: item.id, name: item.name, price: item.price, image: item.image, unit: item.unit }, cart.vendorId);
@@ -849,7 +850,8 @@ export default function CartScreen() {
                 <Text style={[s.proceedTotal, { fontSize: Math.round(20 * fs) }]}>₹{grandTotal}</Text>
                 <Text style={[s.proceedSub, { fontSize: Math.round(11 * fs) }]}>total</Text>
               </View>
-              <TouchableOpacity style={s.proceedBtn} onPress={() => navigation.navigate("Checkout")} activeOpacity={0.88}>
+
+              <TouchableOpacity onPress={() => navigation.navigate("Checkout")} activeOpacity={0.88} style={[s.proceedBtn, { flex: 1 }]}>
                 <LinearGradient
                   colors={[C.green, C.greenDark]}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
@@ -881,6 +883,7 @@ export default function CartScreen() {
                 fs={fs}
               />
             </View>
+
 
             {/* Proceed button in sidebar */}
             <TouchableOpacity onPress={() => navigation.navigate("Checkout")} activeOpacity={0.88} style={s.proceedBtnSide}>
@@ -1105,7 +1108,7 @@ const s = StyleSheet.create({
   proceedBar:   { flexDirection: "row", alignItems: "center", backgroundColor: C.white, paddingTop: 12, paddingBottom: Platform.OS === "ios" ? 28 : 14, borderTopWidth: 1, borderTopColor: C.gray100, gap: 14 },
   proceedTotal: { fontSize: 20, fontWeight: "900", color: C.gray900 },
   proceedSub:   { fontSize: 10, color: C.gray400, fontWeight: "600" },
-  proceedBtn:   { flex: 1 },
+  proceedBtn:   { },
   proceedGrad:  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 15 },
   proceedText:  { fontSize: 15, fontWeight: "900", color: C.white },
 

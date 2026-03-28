@@ -1,17 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, Animated, TouchableOpacity,
-  Platform, StatusBar, Dimensions,
+  Platform, StatusBar, Dimensions, ActivityIndicator,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { io } from "socket.io-client";
+import useAuthStore from "../../store/authStore";
+
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
 const C = {
   green:      "#16A34A", greenDark:  "#15803D",
   greenLight: "#F0FDF4", greenMid:   "#DCFCE7",
   greenBorder:"#BBF7D0",
   orange:     "#F97316", orangeDark: "#EA580C",
+  red:        "#EF4444", redLight:   "#FEF2F2",
   white:      "#FFFFFF", bg:         "#F8FAFC",
   gray100:    "#F3F4F6", gray200:    "#E5E7EB",
   gray400:    "#9CA3AF", gray500:    "#6B7280",
@@ -19,35 +24,37 @@ const C = {
 };
 
 // ─── Countdown ring ───────────────────────────────────────────────────────────
-function CountdownRing({ seconds, total }) {
+function CountdownRing({ seconds, total, color = C.green }) {
   const pct = seconds / total;
-  // Simple animated border approach for RN
   return (
     <View style={cr.wrap}>
-      <View style={[cr.track]} />
+      <View style={[cr.track, { borderColor: color + '40' }]} />
       <View style={cr.inner}>
-        <Text style={cr.num}>{seconds}</Text>
+        <Text style={[cr.num, { color: color }]}>{seconds}</Text>
       </View>
     </View>
   );
 }
 const cr = StyleSheet.create({
-  wrap:  { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  track: { position: "absolute", width: 40, height: 40, borderRadius: 20, borderWidth: 2.5, borderColor: C.greenBorder },
+  wrap:  { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  track: { position: "absolute", width: 44, height: 44, borderRadius: 22, borderWidth: 3 },
   inner: { alignItems: "center", justifyContent: "center" },
-  num:   { fontSize: 13, fontWeight: "900", color: C.green },
+  num:   { fontSize: 13, fontWeight: "900" },
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function OrderPlaced() {
   const navigation  = useNavigation();
   const route       = useRoute();
+  const { token }   = useAuthStore();
 
-  const orderNumber = route.params?.orderNumber || null;
+  const orderId     = route.params?.orderId     || null;
+  const orderNumber = route.params?.orderNumber || "ORD-000";
   const vendorName  = route.params?.vendorName  || "Store";
-  const slot        = route.params?.slot        || null; // { start, end }
+  const slot        = route.params?.slot        || null;
 
-  const [countdown, setCountdown] = useState(5);
+  const [countdown, setCountdown] = useState(90);
+  const [status, setStatus] = useState("waiting"); // waiting, accepted, rejected, expired
 
   // ── Animations ─────────────────────────────────────────────────────────────
   const scaleAnim    = useRef(new Animated.Value(0)).current;
@@ -58,7 +65,6 @@ export default function OrderPlaced() {
   const cardScale    = useRef(new Animated.Value(0.95)).current;
 
   useEffect(() => {
-    // Sequence: ring expands → circle bounces in → content slides up
     Animated.sequence([
       Animated.parallel([
         Animated.spring(ringScale, { toValue: 1, friction: 5, tension: 40, useNativeDriver: true }),
@@ -73,23 +79,44 @@ export default function OrderPlaced() {
     ]).start();
   }, []);
 
-  // ── Auto-redirect countdown ─────────────────────────────────────────────────
+  // ── Sockets ─────────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (!token || !orderId) return;
+
+    const socket = io(SOCKET_URL, {
+      auth: { token },
+      transports: ['websocket']
+    });
+
+    socket.on("connect", () => console.log("OrderPlaced: Socket connected"));
+
+    socket.on("order:update", (data) => {
+      console.log("Order update received:", data);
+      if (String(data.order_id) === String(orderId)) {
+        if (data.status === "accepted") setStatus("accepted");
+        if (data.status === "rejected") setStatus("rejected");
+      }
+    });
+
+    return () => socket.disconnect();
+  }, [token, orderId]);
+
+  // ── Timer ──────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (status !== "waiting") return;
+
     const interval = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
           clearInterval(interval);
-          navigation.navigate("CustomerApp", {
-            screen: "CustomerTabNavigator",
-            params: { screen: "Home" },
-          });
+          setStatus("expired");
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [status]);
 
   const goHome = () => navigation.navigate("CustomerApp", {
     screen: "CustomerTabNavigator",
@@ -101,7 +128,10 @@ export default function OrderPlaced() {
     params: { screen: "Orders" },
   });
 
-  // ── Slot formatter ──────────────────────────────────────────────────────────
+  const handlePayment = () => {
+    alert("Payment feature coming soon!");
+  };
+
   const fmtTime = (iso) => {
     if (!iso) return "";
     return new Date(iso).toLocaleTimeString("en-IN", {
@@ -112,132 +142,112 @@ export default function OrderPlaced() {
   const { width: W } = Dimensions.get("window");
   const isWide = W >= 640;
 
+  // ── Helper for status UI ────────────────────────────────────────────────────
+  const getStatusConfig = () => {
+    switch(status) {
+      case "accepted": return { title: "Order Confirmed!", sub: "The store has accepted your order.", icon: "check-circle", color: C.green, bg: C.greenLight };
+      case "rejected": return { title: "Order Declined", sub: "The store couldn't fulfill your order.", icon: "x-circle", color: C.red, bg: C.redLight };
+      case "expired":  return { title: "Request Expired", sub: "The store didn't respond in time.", icon: "clock", color: C.orange, bg: "#FFF7ED" };
+      default:         return { title: "Order Sent! 🚀", sub: "Waiting for store confirmation...", icon: "loader", color: C.orange, bg: "#FEF3C7" };
+    }
+  };
+  const cfg = getStatusConfig();
+
   return (
     <View style={s.root}>
       <StatusBar barStyle="dark-content" backgroundColor={C.white} />
 
-      {/* Subtle gradient background */}
       <LinearGradient
-        colors={[C.greenLight, C.white, C.white]}
+        colors={[cfg.bg, C.white, C.white]}
         start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
         style={StyleSheet.absoluteFillObject}
       />
 
       <View style={[s.content, isWide && { maxWidth: 480, alignSelf: "center", width: "100%" }]}>
 
-        {/* ── Check circle ─────────────────────────────────────────────── */}
+        {/* ── Visual indicator ─────────────────────────────────────────── */}
         <View style={s.circleWrap}>
-          {/* Outer glow ring */}
-          <Animated.View style={[s.ring, {
-            transform: [{ scale: ringScale }],
-            opacity: ringOpacity,
-          }]} />
-          {/* Green circle */}
+          <Animated.View style={[s.ring, { transform: [{ scale: ringScale }], opacity: ringOpacity, borderColor: cfg.color + '40' }]} />
           <Animated.View style={[s.circle, { transform: [{ scale: scaleAnim }] }]}>
             <LinearGradient
-              colors={[C.green, C.greenDark]}
+              colors={[status === 'rejected' ? C.red : (status === 'accepted' ? C.green : C.orange), status === 'rejected' ? '#DC2626' : (status === 'accepted' ? C.greenDark : C.orangeDark)]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={s.circleGrad}
             >
-              <Feather name="check" size={52} color={C.white} strokeWidth={3} />
+              {status === 'waiting' ? (
+                <ActivityIndicator size="large" color={C.white} />
+              ) : (
+                <Feather name={status === 'accepted' ? "check" : (status === 'rejected' ? "x" : "alert-circle")} size={52} color={C.white} strokeWidth={3} />
+              )}
             </LinearGradient>
           </Animated.View>
         </View>
 
-        {/* ── Text content ─────────────────────────────────────────────── */}
-        <Animated.View style={[s.textWrap, {
-          opacity: opacityAnim,
-          transform: [{ translateY: slideUp }],
-        }]}>
-          <Text style={s.title}>Order Placed! 🎉</Text>
+        {/* ── Status Text ──────────────────────────────────────────────── */}
+        <Animated.View style={[s.textWrap, { opacity: opacityAnim, transform: [{ translateY: slideUp }] }]}>
+          <Text style={s.title}>{cfg.title}</Text>
 
           {orderNumber && (
-            <View style={s.orderNumWrap}>
-              <Feather name="hash" size={13} color={C.green} />
-              <Text style={s.orderNum}>{orderNumber}</Text>
+            <View style={[s.orderNumWrap, { backgroundColor: cfg.color + '20' }]}>
+              <Feather name="hash" size={13} color={cfg.color} />
+              <Text style={[s.orderNum, { color: cfg.color }]}>{orderNumber}</Text>
             </View>
           )}
 
           <Text style={s.subtitle}>
-            Your order has been placed with{" "}
-            <Text style={s.subtitleBold}>{vendorName}</Text>.
-            {"\n"}We'll notify you once it's confirmed.
+            Order with <Text style={s.subtitleBold}>{vendorName}</Text>.{"\n"}
+            {cfg.sub}
           </Text>
         </Animated.View>
 
-        {/* ── Info card ────────────────────────────────────────────────── */}
-        <Animated.View style={[s.infoCard, {
-          opacity: opacityAnim,
-          transform: [{ scale: cardScale }],
-        }]}>
+        {/* ── Negotiation Timer (only if waiting) ────────────────────────── */}
+        {status === "waiting" && (
+          <Animated.View style={[s.timerRow, { opacity: opacityAnim }]}>
+            <CountdownRing seconds={countdown} total={90} color={C.orange} />
+            <Text style={s.timerText}>Store response expected in {countdown}s</Text>
+          </Animated.View>
+        )}
 
-          {/* Delivery slot row — only if slot was confirmed */}
-          {slot?.start && slot?.end ? (
-            <View style={s.infoRow}>
-              <View style={s.infoIconWrap}>
-                <Feather name="clock" size={15} color={C.green} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.infoLabel}>Delivery window</Text>
-                <Text style={s.infoValue}>{fmtTime(slot.start)} – {fmtTime(slot.end)}</Text>
-              </View>
-              <View style={s.confirmedBadge}>
-                <Text style={s.confirmedText}>Confirmed</Text>
-              </View>
+        {/* ── Detail Card ───────────────────────────────────────────────── */}
+        <Animated.View style={[s.infoCard, { opacity: opacityAnim, transform: [{ scale: cardScale }] }]}>
+          <View style={s.infoRow}>
+            <View style={s.infoIconWrap}>
+              <Feather name="shopping-bag" size={15} color={C.green} />
             </View>
-          ) : (
-            <View style={s.infoRow}>
-              <View style={s.infoIconWrap}>
-                <Feather name="clock" size={15} color={C.green} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.infoLabel}>Estimated delivery</Text>
-                <Text style={s.infoValue}>~30 minutes</Text>
-              </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.infoLabel}>Estimated Delivery</Text>
+              <Text style={s.infoValue}>~30 minutes</Text>
             </View>
-          )}
+          </View>
 
           <View style={s.infoDivider} />
 
-          {/* Status row */}
           <View style={s.infoRow}>
-            <View style={[s.infoIconWrap, { backgroundColor: "#FEF3C7" }]}>
-              <Feather name="loader" size={15} color="#D97706" />
+            <View style={[s.infoIconWrap, { backgroundColor: cfg.bg }]}>
+              <Feather name={cfg.icon} size={15} color={cfg.color} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.infoLabel}>Order status</Text>
-              <Text style={s.infoValue}>Waiting for vendor confirmation</Text>
+              <Text style={s.infoLabel}>Current Status</Text>
+              <Text style={[s.infoValue, { color: cfg.color }]}>{status === 'waiting' ? 'Waiting for store…' : status.toUpperCase()}</Text>
             </View>
           </View>
         </Animated.View>
 
-        {/* ── Action buttons ───────────────────────────────────────────── */}
+        {/* ── Actions ──────────────────────────────────────────────────── */}
         <Animated.View style={[s.actions, { opacity: opacityAnim }]}>
+          {status === "accepted" && (
+            <TouchableOpacity style={s.trackBtn} onPress={handlePayment} activeOpacity={0.88}>
+              <LinearGradient colors={[C.green, C.greenDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.trackGrad}>
+                <Feather name="credit-card" size={16} color={C.white} />
+                <Text style={s.trackText}>Proceed to Payment</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
 
-          {/* Track order */}
-          <TouchableOpacity style={s.trackBtn} onPress={goOrders} activeOpacity={0.88}>
-            <LinearGradient
-              colors={[C.green, C.greenDark]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={s.trackGrad}
-            >
-              <Feather name="map-pin" size={16} color={C.white} />
-              <Text style={s.trackText}>Track Order</Text>
-            </LinearGradient>
+          <TouchableOpacity style={s.homeBtn} onPress={(status === 'rejected' || status === 'expired') ? goHome : goOrders} activeOpacity={0.8}>
+            <Feather name={(status === 'rejected' || status === 'expired') ? "home" : "list"} size={15} color={C.gray600} />
+            <Text style={s.homeBtnText}>{(status === 'rejected' || status === 'expired') ? "Back to Home" : "Go to My Orders"}</Text>
           </TouchableOpacity>
-
-          {/* Back to home */}
-          <TouchableOpacity style={s.homeBtn} onPress={goHome} activeOpacity={0.8}>
-            <Feather name="home" size={15} color={C.gray600} />
-            <Text style={s.homeBtnText}>Back to Home</Text>
-          </TouchableOpacity>
-
-        </Animated.View>
-
-        {/* ── Auto-redirect note ───────────────────────────────────────── */}
-        <Animated.View style={[s.redirectRow, { opacity: opacityAnim }]}>
-          <CountdownRing seconds={countdown} total={5} />
-          <Text style={s.redirectText}>Redirecting to home in {countdown}s</Text>
         </Animated.View>
 
       </View>
@@ -249,40 +259,28 @@ export default function OrderPlaced() {
 const s = StyleSheet.create({
   root:    { flex: 1, backgroundColor: C.white },
   content: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28, gap: 20 },
-
-  // Circle
   circleWrap:  { alignItems: "center", justifyContent: "center", marginBottom: 4 },
-  ring:        { position: "absolute", width: 160, height: 160, borderRadius: 80, backgroundColor: C.greenLight, borderWidth: 2, borderColor: C.greenBorder },
-  circle:      { width: 120, height: 120, borderRadius: 60, overflow: "hidden", shadowColor: C.green, shadowOpacity: 0.4, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 12 },
+  ring:        { position: "absolute", width: 160, height: 160, borderRadius: 80, backgroundColor: C.white, borderWidth: 2 },
+  circle:      { width: 120, height: 120, borderRadius: 60, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10, elevation: 8 },
   circleGrad:  { flex: 1, alignItems: "center", justifyContent: "center" },
-
-  // Text
   textWrap:    { alignItems: "center", gap: 8 },
   title:       { fontSize: 30, fontWeight: "900", color: C.gray900, letterSpacing: -0.5, textAlign: "center" },
-  orderNumWrap:{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.greenMid, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
-  orderNum:    { fontSize: 13, fontWeight: "800", color: C.green },
+  orderNumWrap:{ flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
+  orderNum:    { fontSize: 13, fontWeight: "800" },
   subtitle:    { fontSize: 15, color: C.gray500, textAlign: "center", lineHeight: 22 },
   subtitleBold:{ fontWeight: "700", color: C.gray900 },
-
-  // Info card
+  timerRow:    { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#FFF7ED", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 25, borderWidth: 1, borderColor: "#FFEDD5" },
+  timerText:   { fontSize: 13, fontWeight: "700", color: C.orange },
   infoCard:    { width: "100%", backgroundColor: C.white, borderRadius: 20, borderWidth: 1.5, borderColor: C.gray200, padding: 18, gap: 4, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 12, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   infoRow:     { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 6 },
   infoIconWrap:{ width: 36, height: 36, borderRadius: 10, backgroundColor: C.greenLight, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   infoLabel:   { fontSize: 11, color: C.gray400, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.3 },
   infoValue:   { fontSize: 15, fontWeight: "800", color: C.gray900, marginTop: 1 },
   infoDivider: { height: 1, backgroundColor: C.gray100, marginVertical: 4 },
-  confirmedBadge: { backgroundColor: C.greenMid, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  confirmedText:  { fontSize: 11, fontWeight: "700", color: C.green },
-
-  // Buttons
   actions:     { width: "100%", gap: 10 },
   trackBtn:    { borderRadius: 16, overflow: "hidden" },
   trackGrad:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16 },
   trackText:   { fontSize: 16, fontWeight: "900", color: C.white },
-  homeBtn:     { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 13, borderRadius: 16, backgroundColor: C.gray100 },
+  homeBtn:     { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 16, backgroundColor: C.gray100 },
   homeBtnText: { fontSize: 15, fontWeight: "700", color: C.gray600 },
-
-  // Redirect
-  redirectRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  redirectText:{ fontSize: 12, color: C.gray400, fontWeight: "500" },
 });

@@ -39,39 +39,119 @@ export default function VendorOrdersScreen() {
 
   const [isDeliveryModalVisible, setIsDeliveryModalVisible] = useState(false);
 
-  const riders = [
-    {
-      id: 1,
-      name: "Sameer Khan",
-      status: "2 mins away",
-      image: "https://xsgames.co/randomusers/assets/avatars/male/2.jpg",
-      coordinate: { latitude: 28.6149, longitude: 77.2100 },
-      distance: "0.8 km",
-      fastest: true,
-    },
-    {
-      id: 2,
-      name: "Amit Sharma",
-      status: "5 mins away",
-      image: "https://xsgames.co/randomusers/assets/avatars/male/5.jpg",
-      coordinate: { latitude: 28.6129, longitude: 77.2120 },
-      distance: "2.1 km",
-      fastest: false,
-    },
-    {
-      id: 3,
-      name: "Priya Das",
-      status: "9 mins away",
-      image: "https://xsgames.co/randomusers/assets/avatars/female/8.jpg",
-      coordinate: { latitude: 28.6189, longitude: 77.2080 },
-      distance: "3.5 km",
-      fastest: false,
-    }
-  ];
-
-  const storeLocation = { latitude: 28.6139, longitude: 77.2090 };
-
   const [counterModalVisible, setCounterModalVisible] = useState(false);
+  const [liveRiderLocations, setLiveRiderLocations] = useState({});
+  const [nearbyRiders, setNearbyRiders] = useState([]);
+  const [autoAssigning, setAutoAssigning] = useState(false);
+  const [broadcastStatus, setBroadcastStatus] = useState(null); // { count, message }
+
+  // Fetch nearby riders when modal opens and storeLocation is available
+  useEffect(() => {
+    if (isDeliveryModalVisible && (!selectedOrder?.delivery?.partner) && storeLocation) {
+      fetchNearbyRiders();
+      setBroadcastStatus(null);
+    }
+  }, [isDeliveryModalVisible, selectedOrder]);
+
+  const fetchNearbyRiders = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/delivery/nearby?latitude=${storeLocation.latitude}&longitude=${storeLocation.longitude}&radius_km=10`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const result = await res.json();
+      if (result.success) {
+        setNearbyRiders(result.data.riders || []);
+      }
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  const storeLocation = {
+    latitude: selectedOrder?.vendor?.latitude || 28.6139,
+    longitude: selectedOrder?.vendor?.longitude || 77.2090
+  };
+
+  // Dynamic riders list derived from backend + sockets instead of mocks
+  const riders = selectedOrder?.delivery?.partner ? [
+    {
+      id: selectedOrder.delivery.partner.id,
+      name: selectedOrder.delivery.partner.user?.name || "Delivery Partner",
+      status: selectedOrder.delivery.status === "assigned" ? "On the way to pickup" : "Out for delivery",
+      image: "https://cdn-icons-png.flaticon.com/512/3208/3208726.png",
+      coordinate: liveRiderLocations[selectedOrder.delivery.id] || {
+        latitude: selectedOrder.delivery.partner.current_lat || 28.6149,
+        longitude: selectedOrder.delivery.partner.current_lng || 77.2100
+      },
+      distance: "Live",
+      fastest: true,
+    }
+  ] : nearbyRiders.map((r, i) => ({
+    id: r.id,
+    name: r.name || "Delivery Partner",
+    status: "Available",
+    image: "https://cdn-icons-png.flaticon.com/512/3208/3208726.png",
+    coordinate: {
+      latitude: r.latitude,
+      longitude: r.longitude
+    },
+    distance: `${r.distance_km} km`,
+    fastest: i === 0,
+  }));
+
+  const handleAssignRider = async (partnerId) => {
+    try {
+      const res = await fetch(`${API_BASE}/delivery/assign/${selectedOrder.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ partnerId })
+      });
+      const result = await res.json();
+      if (result.success) {
+        Alert.alert("Success", "Rider assigned successfully");
+        setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, delivery: result.data.delivery } : o));
+        setSelectedOrder(prev => ({ ...prev, delivery: result.data.delivery }));
+      } else {
+        Alert.alert("Error", result.message || "Failed to assign rider");
+      }
+    } catch (err) {
+      console.log(err);
+      Alert.alert("Error", "Something went wrong while assigning");
+    }
+  };
+
+  const handleAutoAssign = async () => {
+    if (!selectedOrder) return;
+    setAutoAssigning(true);
+    setBroadcastStatus(null);
+    try {
+      const res = await fetch(`${API_BASE}/delivery/auto-assign/${selectedOrder.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ radius_km: 10 })
+      });
+      const result = await res.json();
+      if (result.success) {
+        setBroadcastStatus({
+          count: result.data.broadcastCount,
+          message: `Sent to ${result.data.broadcastCount} nearby rider${result.data.broadcastCount !== 1 ? 's' : ''}. Waiting for acceptance...`
+        });
+      } else {
+        Alert.alert("Auto Assign Failed", result.message || "No available riders found nearby");
+      }
+    } catch (err) {
+      console.log(err);
+      Alert.alert("Error", "Could not broadcast to riders");
+    } finally {
+      setAutoAssigning(false);
+    }
+  };
 
   const [counterItems, setCounterItems] = useState([]);
   const [counterDeliveryFee, setCounterDeliveryFee] = useState("");
@@ -107,7 +187,7 @@ export default function VendorOrdersScreen() {
   useEffect(() => {
     if (!token) return;
 
-    const socket = io(SOCKET_URL, { 
+    const socket = io(SOCKET_URL, {
       auth: { token },
       transports: ['websocket']
     });
@@ -128,10 +208,22 @@ export default function VendorOrdersScreen() {
     socket.on("slot:request", () => fetchOrders());
     socket.on("fee:request", () => fetchOrders());
     socket.on("phone:request", () => fetchOrders());
-    
+
     // Customer responses
     socket.on("slot:confirmed", () => fetchOrders());
     socket.on("fee:confirmed", () => fetchOrders());
+
+    // Delivery Updates
+    socket.on("order_assigned_to_delivery", () => fetchOrders());
+    socket.on("delivery_status_update", () => fetchOrders());
+    socket.on("delivery_location_update", (data) => {
+      if (data.deliveryId) {
+        setLiveRiderLocations(prev => ({
+          ...prev,
+          [data.deliveryId]: { latitude: data.latitude, longitude: data.longitude }
+        }));
+      }
+    });
 
     return () => socket.disconnect();
   }, [token]);
@@ -278,7 +370,7 @@ export default function VendorOrdersScreen() {
               item.status === "pending" && styles.orderCardPending
             ]}
 
-            onPress={item.status === 'accepted' ? () => {
+            onPress={['accepted', 'preparing', 'ready', 'picked_up'].includes(item.status) ? () => {
               setSelectedOrder(item);
               setIsDeliveryModalVisible(true)
             } : () => {
@@ -390,11 +482,16 @@ export default function VendorOrdersScreen() {
                   storeLocation={storeLocation}
                   riders={riders}
                   silverMapStyle={silverMapStyle}
+                  destinationLocation={
+                    selectedOrder?.delivery_address?.latitude
+                      ? { latitude: selectedOrder.delivery_address.latitude, longitude: selectedOrder.delivery_address.longitude }
+                      : null
+                  }
                 />
 
                 {/* Status Bar */}
                 <View style={styles.activeStatusBar}>
-                  <Text style={styles.partnersCount}>3 PARTNERS NEARBY</Text>
+                  <Text style={styles.partnersCount}>{riders.length} {riders.length === 1 ? 'PARTNER' : 'PARTNERS'} NEARBY</Text>
                   <View style={styles.activeIndicator}>
                     <View style={styles.activeDot} />
                     <Text style={styles.activeTextStatus}>Active</Text>
@@ -409,7 +506,33 @@ export default function VendorOrdersScreen() {
                   <Text style={styles.liveUpdatesText}>LIVE UPDATES</Text>
                 </View>
 
-                {riders.map((rider, index) => (
+                {/* ── AUTO ASSIGN BUTTON ── */}
+                {!selectedOrder?.delivery?.partner && (
+                  <View style={styles.autoAssignSection}>
+                    <TouchableOpacity
+                      style={[styles.autoAssignBtn, autoAssigning && { opacity: 0.7 }]}
+                      onPress={handleAutoAssign}
+                      disabled={autoAssigning}
+                    >
+                      {autoAssigning ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <MaterialIcons name="near-me" size={18} color="#fff" />
+                      )}
+                      <Text style={styles.autoAssignBtnText}>
+                        {autoAssigning ? 'Broadcasting...' : 'Auto Assign Nearby Rider'}
+                      </Text>
+                    </TouchableOpacity>
+                    {broadcastStatus && (
+                      <View style={styles.broadcastStatus}>
+                        <View style={styles.broadcastDot} />
+                        <Text style={styles.broadcastText}>{broadcastStatus.message}</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {riders.length > 0 ? riders.map((rider, index) => (
                   <View key={rider.id} style={[
                     styles.riderCard,
                     index === 0 && styles.firstRiderCard
@@ -419,36 +542,43 @@ export default function VendorOrdersScreen() {
                       <View style={styles.riderDetails}>
                         <Text style={styles.riderName}>{rider.name}</Text>
                         <View style={styles.timeRow}>
-                          {rider.fastest ? (
-                            <FontAwesome5 name="bolt" size={12} color="#16A34A" />
-                          ) : (
-                            <Ionicons name="time-outline" size={14} color="#6B7280" />
-                          )}
-                          <Text style={[
-                            styles.riderStatus,
-                            rider.fastest && styles.fastestText
-                          ]}>{rider.status}</Text>
+                          <FontAwesome5 name="bolt" size={12} color="#16A34A" />
+                          <Text style={[styles.riderStatus, styles.fastestText]}>
+                            {rider.status} · {rider.distance}
+                          </Text>
                         </View>
                       </View>
-                      <TouchableOpacity style={styles.callRiderBtn}>
+                      <TouchableOpacity style={styles.callRiderBtn} onPress={() => Alert.alert("Call", `Calling ${rider.name}...`)}>
                         <Ionicons name="call" size={20} color="#1F2937" />
                       </TouchableOpacity>
-                    </View>
 
-                    <TouchableOpacity
-                      style={[
-                        styles.assignToOrderBtn
-                      ]}
-                      onPress={() => {
-                        Alert.alert("Assigned", `${rider.name} has been assigned.`);
-                        setIsDeliveryModalVisible(false);
-                        updateOrderStatus(selectedOrder.id, "shipped");
-                      }}
-                    >
-                      <Text style={styles.assignBtnText}>Assign to Order</Text>
-                    </TouchableOpacity>
+                      {rider.status === "Available" && (
+                        <TouchableOpacity
+                          style={styles.assignBtnSmall}
+                          onPress={() => handleAssignRider(rider.id)}
+                        >
+                          <Text style={styles.assignBtnTextSmall}>Assign</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
-                ))}
+                )) : (
+                  <View style={{ padding: 20, alignItems: 'center' }}>
+                    {selectedOrder?.delivery?.partner ? (
+                      <Text style={{ color: '#16A34A', fontWeight: '600' }}>✓ Rider is on the way</Text>
+                    ) : (
+                      <Text style={{ color: '#6B7280', textAlign: 'center' }}>No riders assigned yet.{"\n"}Tap Auto Assign above to broadcast to nearby riders.</Text>
+                    )}
+                    {!selectedOrder?.delivery?.partner && selectedOrder?.status !== 'ready' && (
+                      <TouchableOpacity
+                        style={{ marginTop: 12, backgroundColor: '#0F172A', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 }}
+                        onPress={() => updateOrderStatus(selectedOrder.id, "ready")}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: 'bold' }}>Mark Order as Ready</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
               </View>
             </ScrollView>
           </View>
@@ -972,6 +1102,43 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
 
+  // ── Auto Assign ──
+  autoAssignSection: {
+    marginBottom: 14,
+  },
+  autoAssignBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0F172A',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    gap: 8,
+  },
+  autoAssignBtnText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 14,
+    letterSpacing: 0.3,
+  },
+  broadcastStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    gap: 8,
+  },
+  broadcastDot: {
+    width: 8, height: 8, borderRadius: 4, backgroundColor: '#16A34A',
+  },
+  broadcastText: {
+    fontSize: 12, color: '#166534', fontWeight: '600', flex: 1,
+  },
+
   counterItem: {
     flexDirection: "row",
     backgroundColor: "#fff",
@@ -1201,18 +1368,10 @@ const styles = StyleSheet.create({
     color: "#1F2937",
   },
 
-  headerIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: "#E5E7EB",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerIconInner: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  callRiderBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#F3F4F6", justifyContent: "center", alignItems: "center", marginRight: 8 },
+  assignBtnSmall: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: "#0F172A" },
+  assignBtnTextSmall: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
 
   mapWrapper: {
     height: 220,

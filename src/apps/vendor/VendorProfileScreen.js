@@ -7,7 +7,10 @@ import {
     Image,
     TouchableOpacity,
     Animated,
-    Switch
+    Switch,
+    Alert,
+    Modal,
+    TextInput
 } from "react-native";
 
 import { colors } from "../../styles/colors";
@@ -20,7 +23,7 @@ const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 export default function VendorProfileScreen() {
 
-    const { token , logout } = useAuthStore();
+    const { token, logout } = useAuthStore();
 
     const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -28,6 +31,10 @@ export default function VendorProfileScreen() {
     const [notifications, setNotifications] = useState(true);
 
     const [vendor, setVendor] = useState(null);
+    const [timeModalVisible, setTimeModalVisible] = useState(false);
+    const [activeField, setActiveField] = useState("");
+    const [customTime, setCustomTime] = useState("");
+    const [deliveryModalVisible, setDeliveryModalVisible] = useState(false);
 
     const pressIn = () => {
         Animated.spring(scaleAnim, {
@@ -44,26 +51,90 @@ export default function VendorProfileScreen() {
     };
 
     useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch(`${API_BASE}/vendors/me/profile`, {
-                    method: "GET",
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-
-                const response = await res.json();
-
-                console.log(response.data);
-
-                setVendor(response.data.vendor);
-                setStoreOpen(response.data.vendor.is_open === true || response.data.vendor.is_open === "true");
-                setNotifications(response.data.vendor.notifications_enabled === true || response.data.vendor.notifications_enabled === "true");
-
-            } catch (err) {
-                console.log("Error fetching vendor:", err);
-            }
-        })();
+        fetchProfile();
     }, []);
+
+    const fetchProfile = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/vendors/me/profile`, {
+                method: "GET",
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const response = await res.json();
+            if (response.success) {
+                setVendor(response.data.vendor);
+                setStoreOpen(response.data.vendor.is_open);
+            }
+        } catch (err) {
+            console.log("Error fetching vendor:", err);
+        }
+    };
+
+    const handleToggleOpen = async (val) => {
+        if (!vendor) return;
+        const previousState = storeOpen;
+        setStoreOpen(val);
+        try {
+            const res = await fetch(`${API_BASE}/vendors/${vendor.id}/toggle`, {
+                method: "PATCH",
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const response = await res.json();
+            if (!response.success) {
+                setStoreOpen(previousState);
+                Alert.alert("Error", "Failed to toggle shop status");
+            }
+        } catch (err) {
+            setStoreOpen(previousState);
+            console.log("Error toggling shop status:", err);
+        }
+    };
+
+    const handleUpdateField = async (field, value) => {
+        if (!vendor) return;
+        console.log(`Updating field ${field} to ${value}...`);
+        try {
+            const res = await fetch(`${API_BASE}/vendors/${vendor.id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ [field]: value })
+            });
+            const response = await res.json();
+            console.log("Update response:", response);
+            if (response.success) {
+                setVendor(response.data.vendor);
+                Alert.alert("Success", `${field.replace('_', ' ')} updated successfully`);
+            } else {
+                Alert.alert("Error", response.message || "Failed to update setting");
+            }
+        } catch (err) {
+            console.log(`Error updating ${field}:`, err);
+            Alert.alert("Error", "Check your connection and try again.");
+        }
+    };
+
+    const selectDeliveryType = () => {
+        setDeliveryModalVisible(true);
+    };
+
+    const editTime = (field) => {
+        setActiveField(field);
+        setCustomTime(vendor[field] || "");
+        setTimeModalVisible(true);
+    };
+
+    const saveTime = () => {
+        if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(customTime)) {
+            Alert.alert("Invalid Format", "Please use HH:MM format (e.g. 09:30)");
+            return;
+        }
+        handleUpdateField(activeField, customTime);
+        setTimeModalVisible(false);
+    };
 
     if (!vendor) {
         return (
@@ -198,27 +269,108 @@ export default function VendorProfileScreen() {
             <View style={styles.card}>
 
                 <View style={styles.settingRow}>
-                    <Text style={styles.settingText}>🟢 Store Open</Text>
+                    <Text style={styles.settingText}>🟢 Store Manual Status (Override)</Text>
                     <Switch
-                        value={storeOpen === true}
-                        onValueChange={(val) => setStoreOpen(val === true)}
+                        value={storeOpen}
+                        onValueChange={handleToggleOpen}
+                        trackColor={{ true: "#22c55e", false: "#ccc" }}
                     />
                 </View>
 
-                <View style={styles.settingRow}>
-                    <Text style={styles.settingText}>🔔 Notifications</Text>
-                    <Switch
-                        value={notifications === true}
-                        onValueChange={(val) => setNotifications(val === true)}
-                    />
-                </View>
+                <TouchableOpacity 
+                    style={styles.settingRow} 
+                    onPress={() => editTime("opening_time")}
+                    activeOpacity={0.6}
+                >
+                    <Text style={styles.settingText}>🕒 Opening Time</Text>
+                    <Text style={styles.arrow}>{vendor.opening_time || "Not set"} ›</Text>
+                </TouchableOpacity>
 
-                <View style={styles.settingRow}>
+                <TouchableOpacity 
+                    style={styles.settingRow} 
+                    onPress={() => editTime("closing_time")}
+                    activeOpacity={0.6}
+                >
+                    <Text style={styles.settingText}>🕒 Closing Time</Text>
+                    <Text style={styles.arrow}>{vendor.closing_time || "Not set"} ›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                    style={styles.settingRow} 
+                    onPress={selectDeliveryType}
+                    activeOpacity={0.6}
+                >
                     <Text style={styles.settingText}>🚚 Delivery Options</Text>
-                    <Text style={styles.arrow}>Self Delivery ›</Text>
-                </View>
+                    <Text style={styles.arrow}>
+                        {vendor.delivery_type === "self" ? "Self Delivery" : "Partner Delivery"} ›
+                    </Text>
+                </TouchableOpacity>
 
             </View>
+
+            {/* TIME PICKER MODAL */}
+            <Modal
+                transparent={true}
+                visible={timeModalVisible}
+                animationType="fade"
+                onRequestClose={() => setTimeModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Set {activeField === "opening_time" ? "Opening" : "Closing"} Time</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={customTime}
+                            onChangeText={setCustomTime}
+                            placeholder="HH:MM (e.g. 09:00)"
+                            autoFocus
+                        />
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity onPress={() => setTimeModalVisible(false)} style={styles.cancelBtn}>
+                                <Text>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={saveTime} style={styles.saveBtn}>
+                                <Text style={{ color: "#fff" }}>Save</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* DELIVERY TYPE MODAL */}
+            <Modal
+                transparent={true}
+                visible={deliveryModalVisible}
+                animationType="fade"
+                onRequestClose={() => setDeliveryModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Delivery Method</Text>
+                        <TouchableOpacity 
+                            style={styles.modalOption} 
+                            onPress={() => {
+                                handleUpdateField("delivery_type", "self");
+                                setDeliveryModalVisible(false);
+                            }}
+                        >
+                            <Text style={styles.optionText}>Self Delivery</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={styles.modalOption} 
+                            onPress={() => {
+                                handleUpdateField("delivery_type", "partner");
+                                setDeliveryModalVisible(false);
+                            }}
+                        >
+                            <Text style={styles.optionText}>Partner Delivery</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setDeliveryModalVisible(false)} style={styles.closeBtn}>
+                            <Text>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
 
 
             {/* ACCOUNT SETTINGS */}
@@ -395,6 +547,67 @@ const styles = StyleSheet.create({
     logoutText: {
         color: "#fff",
         fontWeight: "700"
+    },
+
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 20
+    },
+    modalContent: {
+        backgroundColor: "#fff",
+        width: "90%",
+        borderRadius: radius.md,
+        padding: 20,
+        ...shadows.lg
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: "700",
+        marginBottom: 15,
+        color: "#1f2937"
+    },
+    input: {
+        backgroundColor: "#f9fafb",
+        borderWidth: 1,
+        borderColor: "#e5e7eb",
+        borderRadius: radius.sm,
+        padding: 12,
+        fontSize: 16,
+        marginBottom: 20
+    },
+    modalActions: {
+        flexDirection: "row",
+        justifyContent: "flex-end",
+        gap: 10
+    },
+    cancelBtn: {
+        padding: 10,
+        backgroundColor: "#f3f4f6",
+        borderRadius: radius.sm
+    },
+    saveBtn: {
+        padding: 10,
+        backgroundColor: "#22c55e",
+        borderRadius: radius.sm,
+        minWidth: 70,
+        alignItems: "center"
+    },
+    modalOption: {
+        padding: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: "#f3f4f6"
+    },
+    optionText: {
+        fontSize: 16,
+        color: "#374151"
+    },
+    closeBtn: {
+        marginTop: 15,
+        alignItems: "center"
     }
 
 });

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { FontAwesome5 } from "@expo/vector-icons";
 
-const VendorMapView = ({ storeLocation, riders, silverMapStyle }) => {
+const VendorMapView = ({ storeLocation, riders, silverMapStyle, destinationLocation }) => {
   return (
     <MapView
       style={styles.map}
@@ -36,6 +36,19 @@ const VendorMapView = ({ storeLocation, riders, silverMapStyle }) => {
           </View>
         </Marker>
       ))}
+
+      {destinationLocation?.latitude && (
+        <Marker coordinate={destinationLocation}>
+          <View style={styles.destMarker}>
+            <View style={styles.destMarkerIcon}>
+              <FontAwesome5 name="map-marker-alt" size={12} color="#fff" />
+            </View>
+            <View style={styles.destLabel}>
+              <Text style={styles.destLabelText}>Deliver here</Text>
+            </View>
+          </View>
+        </Marker>
+      )}
     </MapView>
   );
 };
@@ -98,6 +111,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#fff",
   },
+  destMarker: { alignItems: 'center' },
+  destMarkerIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#E24B4A', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff' },
+  destLabel: { backgroundColor: '#E24B4A', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, marginTop: 3 },
+  destLabelText: { color: '#fff', fontSize: 9, fontWeight: '700' },
 });
 
 export default VendorMapView;

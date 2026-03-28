@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, Alert,
@@ -14,34 +14,24 @@ const BG = '#f6f6f6';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STEPS = [
-  { id: 1, title: 'Shop Info',   icon: '🏪', desc: 'Basic store details' },
+  { id: 1, title: 'Shop Info', icon: '🏪', desc: 'Basic store details' },
   { id: 2, title: 'Compliance', icon: '📋', desc: 'FSSAI, GST & legal' },
-  { id: 3, title: 'Bank',       icon: '🏦', desc: 'Payment setup' },
-  { id: 4, title: 'Catalog',    icon: '📦', desc: 'Pick your products' },
-  { id: 5, title: 'Review',     icon: '📊', desc: 'Inventory & pricing' },
-  { id: 6, title: 'Go Live',    icon: '🚀', desc: 'Submit & launch' },
+  { id: 3, title: 'Bank', icon: '🏦', desc: 'Payment setup' },
+  { id: 4, title: 'Catalog', icon: '📦', desc: 'Pick your products' },
+  { id: 5, title: 'Review', icon: '📊', desc: 'Inventory & pricing' },
+  { id: 6, title: 'Go Live', icon: '🚀', desc: 'Submit & launch' },
 ];
 
-const CATEGORIES = [
-  'Grocery', 'Fruits & Vegetables', 'Dairy', 'Bakery',
-  'Meat & Fish', 'Snacks', 'Beverages', 'Household', 'Medicines', 'Other',
-];
 
 const UNITS = [
   'kg', 'g', 'litre', 'ml', 'pack', 'piece',
   'dozen', 'bunch', 'box', 'bag', 'bottle', 'can', 'sachet', 'strip',
 ];
 
-const VENDOR_TYPES = [
-  { id: 'ration',     label: 'Ration (Atta, Sugar, etc.)' },
-  { id: 'vegetables', label: 'Vegetables' },
-  { id: 'fruits',     label: 'Fruits' },
-  { id: 'all',        label: 'ALL (Supermarket)' },
-];
 
 const DELIVERY_TYPES = [
   { id: 'partner', label: 'Use Delivery Boy' },
-  { id: 'self',    label: 'Own Staff / Self' },
+  { id: 'self', label: 'Own Staff / Self' },
 ];
 
 // ─── Full generic product catalog ────────────────────────────────────────────
@@ -191,11 +181,11 @@ async function geocodeAddress(city, pincode) {
     const data = await res.json();
     if (data?.length > 0) {
       return {
-        latitude:  parseFloat(data[0].lat),
+        latitude: parseFloat(data[0].lat),
         longitude: parseFloat(data[0].lon),
       };
     }
-  } catch {}
+  } catch { }
   return { latitude: null, longitude: null };
 }
 
@@ -208,50 +198,110 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const [geocoding, setGeocoding] = useState(false);
 
   // Step 1 — Shop Info
-  const [shopName,            setShopName]            = useState('');
-  const [ownerName,           setOwnerName]           = useState('');
-  const [estYear,             setEstYear]             = useState('');
-  const [email,               setEmail]               = useState('');
-  const [phone,               setPhone]               = useState(user?.phone || '');
-  const [altName,             setAltName]             = useState('');
-  const [altPhone,            setAltPhone]            = useState('');
-  const [address,             setAddress]             = useState('');
-  const [city,                setCity]                = useState('');
-  const [pincode,             setPincode]             = useState('');
-  const [selectedCategories,  setSelectedCategories]  = useState([]);
-  const [vendorType,          setVendorType]          = useState('all');
-  const [deliveryType,        setDeliveryType]        = useState('self');
+  const [shopName, setShopName] = useState('');
+  const [ownerName, setOwnerName] = useState('');
+  const [estYear, setEstYear] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [altName, setAltName] = useState('');
+  const [altPhone, setAltPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [landmark, setLandmark] = useState('');
+  const [city, setCity] = useState('');
+  const [pincode, setPincode] = useState('');
+  const [deliveryType, setDeliveryType] = useState('self');
   // Geocoded coords — auto-set on submit
-  const [resolvedLat,         setResolvedLat]         = useState(null);
-  const [resolvedLng,         setResolvedLng]         = useState(null);
+  const [resolvedLat, setResolvedLat] = useState(null);
+  const [resolvedLng, setResolvedLng] = useState(null);
 
   // Step 2 — Compliance
   const [fssai, setFssai] = useState('');
-  const [gst,   setGst]   = useState('');
+  const [gst, setGst] = useState('');
+  const [aadhar, setAadhar] = useState('');
+  const [pan, setPan] = useState('');
+  const [tradeLicense, setTradeLicense] = useState('');
 
   // Step 3 — Bank
-  const [upiId,         setUpiId]         = useState('');
-  const [accountName,   setAccountName]   = useState('');
+  const [upiId, setUpiId] = useState('');
+  const [accountName, setAccountName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
-  const [ifsc,          setIfsc]          = useState('');
+  const [ifsc, setIfsc] = useState('');
 
   // Step 4 — Catalog
-  const [addMode,      setAddMode]      = useState('generic');
+  const [addMode, setAddMode] = useState('generic');
   const [selectedProds, setSelectedProds] = useState({});
-  const [manualProds,  setManualProds]  = useState([{ ...EMPTY_PRODUCT }]);
-  const [csvText,      setCsvText]      = useState('');
-  const [csvPreview,   setCsvPreview]   = useState([]);
-  const [prodSearch,   setProdSearch]   = useState('');
+  const [manualProds, setManualProds] = useState([{ ...EMPTY_PRODUCT }]);
+  const [csvText, setCsvText] = useState('');
+  const [csvPreview, setCsvPreview] = useState([]);
+  const [prodSearch, setProdSearch] = useState('');
+  const [masterCategories, setMasterCategories] = useState([]);
+  const [categoryStack, setCategoryStack] = useState([]);
+  const [currentCategory, setCurrentCategory] = useState(null);
+  const [loadingCatalog, setLoadingCatalog] = useState(false);
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
-  const toggleCategory = (cat) => {
-    setSelectedCategories(prev =>
-      prev.includes(cat)
-        ? prev.filter(c => c !== cat)
-        : prev.length < 10 ? [...prev, cat] : prev
-    );
+  useEffect(() => {
+    if (currentStep === 4 && masterCategories.length === 0) {
+      fetchCategories();
+    }
+  }, [currentStep]);
+
+  const fetchCategories = async (parentId = null) => {
+    setLoadingCatalog(true);
+    try {
+      const url = `${API_BASE}/master/categories${parentId ? `?parentId=${parentId}` : ''}`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setMasterCategories(data);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+    } finally {
+      setLoadingCatalog(false);
+    }
   };
+
+  const handleCategoryClick = async (cat) => {
+    setLoadingCatalog(true);
+    try {
+      const res = await fetch(`${API_BASE}/master/categories/${cat.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+
+      if (data.children && data.children.length > 0) {
+        setCategoryStack(prev => [...prev, cat]);
+        setMasterCategories(data.children);
+        setCurrentCategory(cat);
+      } else if (data.master_products && data.master_products.length > 0) {
+        setCategoryStack(prev => [...prev, cat]);
+        setMasterCategories([]); // clear categories
+        setSelectedProds(prev => {
+          // We keep existing selections
+          return prev;
+        });
+        // We'll handle product display in the UI based on whether categories or products are present
+        setCurrentCategory({ ...cat, products: data.master_products });
+      }
+    } catch (err) {
+      console.error('Error fetching category details:', err);
+    } finally {
+      setLoadingCatalog(false);
+    }
+  };
+
+  const handleBackCategory = () => {
+    const newStack = [...categoryStack];
+    newStack.pop();
+    const parent = newStack[newStack.length - 1];
+    setCategoryStack(newStack);
+    setCurrentCategory(parent || null);
+    fetchCategories(parent ? parent.id : null);
+  };
+
+
 
   const toggleProduct = (product) => {
     setSelectedProds(prev => {
@@ -271,23 +321,22 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
   const getFilteredCatalog = () =>
     GENERIC_PRODUCTS.filter(p => {
-      const catMatch    = selectedCategories.length === 0 || selectedCategories.includes(p.cat);
       const searchMatch = prodSearch === '' || p.name.toLowerCase().includes(prodSearch.toLowerCase());
-      return catMatch && searchMatch;
+      return searchMatch;
     });
 
-  const addManualRow    = () => setManualProds(prev => [...prev, { ...EMPTY_PRODUCT }]);
+  const addManualRow = () => setManualProds(prev => [...prev, { ...EMPTY_PRODUCT }]);
   const removeManualRow = (i) => setManualProds(prev => prev.filter((_, idx) => idx !== i));
   const updateManualProd = (i, field, value) =>
     setManualProds(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: value } : p));
 
   const parseCSV = () => {
     try {
-      const lines   = csvText.trim().split('\n');
+      const lines = csvText.trim().split('\n');
       const headers = lines[0].split(',').map(h => h.trim());
-      const parsed  = lines.slice(1).map(line => {
+      const parsed = lines.slice(1).map(line => {
         const vals = line.split(',').map(v => v.trim());
-        const obj  = {};
+        const obj = {};
         headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
         return obj;
       }).filter(p => p.name);
@@ -300,8 +349,8 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
   const getAllProducts = () => {
     const fromCatalog = Object.values(selectedProds);
-    const fromManual  = manualProds.filter(p => p.name && p.sp);
-    const fromCSV     = csvPreview.filter(p => p.name && p.sp);
+    const fromManual = manualProds.filter(p => p.name && p.sp);
+    const fromCSV = csvPreview.filter(p => p.name && p.sp);
     return [...fromCatalog, ...fromManual, ...fromCSV];
   };
 
@@ -309,17 +358,16 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
   const validateStep = () => {
     if (currentStep === 1) {
-      if (!shopName.trim())       { Alert.alert('Required', 'Enter your shop name');           return false; }
-      if (!ownerName.trim())      { Alert.alert('Required', 'Enter owner name');               return false; }
-      if (!email.trim())          { Alert.alert('Required', 'Enter email address');            return false; }
-      if (!address.trim())        { Alert.alert('Required', 'Enter shop address');             return false; }
-      if (!city.trim())           { Alert.alert('Required', 'Enter your city');                return false; }
-      if (pincode.length !== 6)   { Alert.alert('Required', 'Enter a valid 6-digit pincode'); return false; }
-      if (selectedCategories.length === 0) { Alert.alert('Required', 'Select at least one category'); return false; }
+      if (!shopName.trim()) { Alert.alert('Required', 'Enter your shop name'); return false; }
+      if (!ownerName.trim()) { Alert.alert('Required', 'Enter owner name'); return false; }
+      if (!email.trim()) { Alert.alert('Required', 'Enter email address'); return false; }
+      if (!address.trim()) { Alert.alert('Required', 'Enter shop address'); return false; }
+      if (!city.trim()) { Alert.alert('Required', 'Enter your city'); return false; }
+      if (pincode.length !== 6) { Alert.alert('Required', 'Enter a valid 6-digit pincode'); return false; }
     }
     if (currentStep === 2) {
       if (!fssai.trim()) { Alert.alert('Required', 'Enter your FSSAI license number'); return false; }
-      if (!gst.trim())   { Alert.alert('Required', 'Enter your GST number');           return false; }
+      if (!gst.trim()) { Alert.alert('Required', 'Enter your GST number'); return false; }
     }
     if (currentStep === 3) {
       if (!upiId.trim() && !accountNumber.trim()) {
@@ -367,27 +415,29 @@ export default function VendorOnboardingScreen({ onComplete }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          shop_name:           shopName,
-          owner_name:          ownerName,
-          establishment_year:  estYear,
+          shop_name: shopName,
+          owner_name: ownerName,
+          establishment_year: estYear,
           email,
           phone,
-          alt_contact_name:    altName,
-          alt_phone:           altPhone,
-          fssai_number:        fssai,
-          gst_number:          gst,
-          categories:          selectedCategories.join(','),
-          address_line:        address,
+          alt_contact_name: altName,
+          alt_phone: altPhone,
+          fssai_number: fssai,
+          gst_number: gst,
+          aadhar_number: aadhar,
+          pan_number: pan,
+          trade_license_number: tradeLicense,
+          address_line: address,
+          landmark: landmark,
           city,
           pincode,
           latitude,            // ← from geocoder
           longitude,           // ← from geocoder
-          upi_id:              upiId,
-          bank_account_name:   accountName,
+          upi_id: upiId,
+          bank_account_name: accountName,
           bank_account_number: accountNumber,
-          bank_ifsc:           ifsc,
-          vendor_type:         vendorType,
-          delivery_type:       deliveryType,
+          bank_ifsc: ifsc,
+          delivery_type: deliveryType,
         }),
       });
 
@@ -402,18 +452,15 @@ export default function VendorOnboardingScreen({ onComplete }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
-            name:         product.name,
-            mrp:          parseFloat(product.mrp || product.MRP || 0),
-            price:        parseFloat(product.sp || product.SP || product.price || 0),
-            unit:         product.unit || 'kg',
-            category:     product.cat || product.category || '',
-            stock_qty:    parseInt(product.stock || product.stock_qty || 0),
-            // Send BOTH field names so backend handles either
-            item_type:    product.type || 'packed',
-            type:         product.type || 'packed',
-            weight_options: (product.weight_options && product.weight_options.length > 0)
-              ? product.weight_options
-              : null,
+            name: product.name,
+            mrp: parseFloat(product.mrp || 0),
+            price: parseFloat(product.price || product.base_price || 0),
+            unit: product.unit || 'kg',
+            category: product.category?.name || currentCategory?.name || '',
+            category_id: product.category_id || currentCategory?.id,
+            stock_qty: parseInt(product.stock || 0),
+            type: product.item_type || 'packed',
+            weight_options: product.weight_options,
           }),
         });
       }
@@ -544,7 +591,10 @@ export default function VendorOnboardingScreen({ onComplete }) {
               {/* Address */}
               <Text style={styles.sectionSep}>📍 Shop Address</Text>
               <Text style={styles.label}>Street Address <Text style={styles.req}>*</Text></Text>
-              <TextInput style={[styles.input, styles.textArea]} placeholder="Shop no., Street, Area, Landmark" value={address} onChangeText={setAddress} multiline numberOfLines={3} />
+              <TextInput style={[styles.input, styles.textArea]} placeholder="Shop no., Street, Area" value={address} onChangeText={setAddress} multiline numberOfLines={2} />
+
+              <Text style={styles.label}>Landmark</Text>
+              <TextInput style={styles.input} placeholder="e.g. Near Hanuman Temple" value={landmark} onChangeText={setLandmark} />
               <View style={styles.row}>
                 <View style={{ flex: 2 }}>
                   <Text style={styles.label}>City <Text style={styles.req}>*</Text></Text>
@@ -564,35 +614,6 @@ export default function VendorOnboardingScreen({ onComplete }) {
                 </Text>
               </View>
 
-              {/* Categories */}
-              <Text style={styles.sectionSep}>🏷️ Product Categories <Text style={styles.req}>*</Text></Text>
-              <View style={styles.chipGrid}>
-                {CATEGORIES.map(cat => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[styles.chip, selectedCategories.includes(cat) && styles.chipActive]}
-                    onPress={() => toggleCategory(cat)}
-                  >
-                    <Text style={[styles.chipText, selectedCategories.includes(cat) && styles.chipTextActive]}>{cat}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={styles.sectionSep}>🏪 Business Type</Text>
-              <Text style={styles.label}>What do you sell mostly? <Text style={styles.req}>*</Text></Text>
-              <View style={styles.segmentGrid}>
-                {VENDOR_TYPES.map(vt => (
-                  <TouchableOpacity
-                    key={vt.id}
-                    style={[styles.segGridBtn, vendorType === vt.id && styles.segGridBtnActive]}
-                    onPress={() => setVendorType(vt.id)}
-                  >
-                    <Text style={[styles.segGridText, vendorType === vt.id && styles.segGridTextActive]}>
-                      {vt.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
 
               <Text style={styles.label}>How will you deliver orders? <Text style={styles.req}>*</Text></Text>
               <View style={styles.segmentRow}>
@@ -623,6 +644,15 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
               <Text style={styles.label}>GST Number <Text style={styles.req}>*</Text></Text>
               <TextInput style={styles.input} placeholder="15-character GST number" maxLength={15} autoCapitalize="characters" value={gst} onChangeText={v => setGst(v.toUpperCase())} />
+
+              <Text style={styles.label}>Aadhaar Number (Optional)</Text>
+              <TextInput style={styles.input} placeholder="12-digit Aadhaar number" keyboardType="numeric" maxLength={12} value={aadhar} onChangeText={setAadhar} />
+
+              <Text style={styles.label}>PAN Number (Optional)</Text>
+              <TextInput style={styles.input} placeholder="10-character PAN number" maxLength={10} autoCapitalize="characters" value={pan} onChangeText={v => setPan(v.toUpperCase())} />
+
+              <Text style={styles.label}>Trade License Number (Optional)</Text>
+              <TextInput style={styles.input} placeholder="Enter Trade License number" maxLength={50} value={tradeLicense} onChangeText={setTradeLicense} />
 
               <View style={[styles.infoBox, { marginTop: 16 }]}>
                 <Text style={[styles.infoText, { fontWeight: '700', marginBottom: 4 }]}>⏳ Admin Approval Process</Text>
@@ -673,8 +703,8 @@ export default function VendorOnboardingScreen({ onComplete }) {
               <View style={styles.modeToggle}>
                 {[
                   { key: 'generic', label: '🛒 Catalog' },
-                  { key: 'manual',  label: '✏️ Manual' },
-                  { key: 'csv',     label: '📂 CSV' },
+                  { key: 'manual', label: '✏️ Manual' },
+                  { key: 'csv', label: '📂 CSV' },
                 ].map(m => (
                   <TouchableOpacity
                     key={m.key}
@@ -687,64 +717,107 @@ export default function VendorOnboardingScreen({ onComplete }) {
               </View>
 
               {/* ── Generic catalog ── */}
-              {addMode === 'generic' && (() => {
-                const filtered = getFilteredCatalog();
-                const selCount = Object.keys(selectedProds).length;
-                return (
-                  <View>
-                    <View style={styles.selAllRow}>
-                      <Text style={styles.catalogMeta}>{filtered.length} items · {selCount} selected</Text>
-                      <TouchableOpacity onPress={selectAllProducts}>
-                        <Text style={styles.selAllBtn}>Select all</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <TextInput
-                      style={[styles.input, { marginBottom: 10 }]}
-                      placeholder="🔍  Search products..."
-                      value={prodSearch} onChangeText={setProdSearch}
-                    />
-                    {filtered.map((p) => {
-                      const isSel = !!selectedProds[p.name];
-                      return (
-                        <TouchableOpacity
-                          key={p.name}
-                          style={[styles.catalogCard, isSel && styles.catalogCardSelected]}
-                          onPress={() => toggleProduct(p)}
-                        >
-                          <Image source={{ uri: p.image }} style={styles.catalogImage} />
-                          <View style={{ flex: 1 }}>
-                            <View style={styles.catalogTopRow}>
-                              <Text style={styles.catalogName} numberOfLines={1}>{p.name}</Text>
-                              <View style={[styles.typeBadge, p.type === 'loose' ? styles.badgeLoose : styles.badgePacked]}>
-                                <Text style={styles.typeBadgeText}>{p.type}</Text>
-                              </View>
-                            </View>
-                            <Text style={styles.catalogMeta}>
-                              ₹{p.sp} <Text style={styles.mrpStrike}>₹{p.mrp}</Text> · {p.unit}
-                            </Text>
-                            {/* Show weight chips inline for loose items */}
-                            {p.type === 'loose' && p.weight_options?.length > 0 && (
-                              <View style={styles.weightChipsRow}>
-                                {p.weight_options.map(w => (
-                                  <View key={w} style={styles.weightChipSmall}>
-                                    <Text style={styles.weightChipSmallText}>{w}</Text>
-                                  </View>
-                                ))}
-                              </View>
-                            )}
-                          </View>
-                          <View style={[styles.checkbox, isSel && styles.checkboxSel]}>
-                            {isSel && <Text style={styles.checkmark}>✓</Text>}
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                    <TouchableOpacity style={styles.cantFindBtn} onPress={() => setAddMode('manual')}>
-                      <Text style={styles.cantFindText}>+ Can't find your product? Add it manually</Text>
+              {addMode === 'generic' && (
+                <View>
+                  {/* Category Navigation / Breadcrumbs */}
+                  {categoryStack.length > 0 && (
+                    <TouchableOpacity onPress={handleBackCategory} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                      <Text style={{ fontSize: 16, color: PRIMARY, fontWeight: '700' }}>← {currentCategory?.name || 'Back'}</Text>
                     </TouchableOpacity>
-                  </View>
-                );
-              })()}
+                  )}
+
+                  {loadingCatalog ? (
+                    <ActivityIndicator size="large" color={PRIMARY} style={{ marginVertical: 30 }} />
+                  ) : (
+                    <View>
+                      {/* Hierarchical Categories */}
+                      {masterCategories.length > 0 && (
+                        <View>
+                          <Text style={styles.sectionLabel}>Select Category</Text>
+                          <View style={styles.segmentGrid}>
+                            {masterCategories.map(cat => (
+                              <TouchableOpacity
+                                key={cat.id}
+                                style={styles.segGridBtn}
+                                onPress={() => handleCategoryClick(cat)}
+                              >
+                                {cat.image_url ? (
+                                  <Image source={{ uri: cat.image_url }} style={styles.segGridImage} />
+                                ) : (
+                                  <View style={[styles.segGridImage, { alignItems: 'center', justifyContent: 'center' }]}>
+                                    <Text style={{ fontSize: 24 }}>📦</Text>
+                                  </View>
+                                )}
+                                <Text style={styles.segGridText}>{cat.name}</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Master Products */}
+                      {currentCategory?.products && currentCategory.products.length > 0 && (
+                        <View>
+                          <TextInput
+                            style={[styles.input, { marginBottom: 16 }]}
+                            placeholder={`Search in ${currentCategory.name}...`}
+                            value={prodSearch}
+                            onChangeText={setProdSearch}
+                          />
+                          <View style={styles.selAllRow}>
+                            <Text style={styles.catalogMeta}>{currentCategory.products.length} items available</Text>
+                            <TouchableOpacity onPress={() => currentCategory.products.forEach(p => toggleProduct(p))}>
+                              <Text style={styles.selAllBtn}>Select all</Text>
+                            </TouchableOpacity>
+                          </View>
+
+                          {currentCategory.products
+                            .filter(p => p.name.toLowerCase().includes(prodSearch.toLowerCase()))
+                            .map((p) => {
+                              const isSel = !!selectedProds[p.name];
+                              return (
+                                <TouchableOpacity
+                                  key={p.id}
+                                  style={[styles.catalogCard, isSel && styles.catalogCardSelected]}
+                                  onPress={() => toggleProduct(p)}
+                                >
+                                  {p.image_url ? (
+                                    <Image source={{ uri: p.image_url }} style={styles.catalogImage} />
+                                  ) : (
+                                    <View style={[styles.catalogImage, { alignItems: 'center', justifyContent: 'center' }]}>
+                                      <Text style={{ fontSize: 24 }}>📦</Text>
+                                    </View>
+                                  )}
+                                  <View style={{ flex: 1 }}>
+                                    <View style={styles.catalogTopRow}>
+                                      <Text style={styles.catalogName} numberOfLines={1}>{p.name}</Text>
+                                      <Text style={styles.inventoryPrice}>₹{p.mrp}</Text>
+                                    </View>
+                                    <Text style={styles.catalogMeta}>{p.unit} • {p.item_type}</Text>
+                                  </View>
+                                  <View style={[styles.checkbox, isSel && styles.checkboxSel]}>
+                                    {isSel && <Text style={styles.checkmark}>✓</Text>}
+                                  </View>
+                                </TouchableOpacity>
+                              );
+                            })}
+                        </View>
+                      )}
+
+                      {masterCategories.length === 0 && (!currentCategory?.products || currentCategory.products.length === 0) && !loadingCatalog && (
+                        <View style={styles.emptyState}>
+                          <Text style={styles.emptyEmoji}>🔍</Text>
+                          <Text style={styles.emptyTitle}>No items found</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  <TouchableOpacity style={[styles.cantFindBtn, { marginTop: 20 }]} onPress={() => setAddMode('manual')}>
+                    <Text style={styles.cantFindText}>+ Can't find your product? Add it manually</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {/* ── Manual entry ── */}
               {addMode === 'manual' && (
@@ -799,11 +872,9 @@ export default function VendorOnboardingScreen({ onComplete }) {
                             style={styles.input} placeholder="kg / litre / piece..."
                             value={product.unit} onChangeText={v => updateManualProd(index, 'unit', v)}
                           />
-                          <Text style={styles.hintText}>Options: {UNITS.slice(0, 6).join(', ')}…</Text>
                         </View>
                       </View>
 
-                      {/* Weight options — only shown when type = loose */}
                       {product.type === 'loose' && (
                         <View style={{ marginTop: 10 }}>
                           <Text style={styles.label}>Available Quantities <Text style={styles.req}>*</Text></Text>
@@ -826,7 +897,6 @@ export default function VendorOnboardingScreen({ onComplete }) {
                               );
                             })}
                           </View>
-                          <Text style={styles.hintText}>Customers pick these exact quantities from a weight picker.</Text>
                         </View>
                       )}
 
@@ -846,25 +916,6 @@ export default function VendorOnboardingScreen({ onComplete }) {
                             style={styles.input} placeholder="Your price"
                             keyboardType="numeric" value={product.sp}
                             onChangeText={v => updateManualProd(index, 'sp', v)}
-                          />
-                        </View>
-                      </View>
-
-                      <View style={styles.row}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.label}>Category</Text>
-                          <TextInput
-                            style={styles.input} placeholder="e.g. Grocery"
-                            value={product.cat} onChangeText={v => updateManualProd(index, 'cat', v)}
-                          />
-                        </View>
-                        <View style={{ width: 12 }} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.label}>Stock Qty</Text>
-                          <TextInput
-                            style={styles.input} placeholder="Available qty"
-                            keyboardType="numeric" value={product.stock}
-                            onChangeText={v => updateManualProd(index, 'stock', v)}
                           />
                         </View>
                       </View>
@@ -898,9 +949,6 @@ export default function VendorOnboardingScreen({ onComplete }) {
                       {csvPreview.slice(0, 3).map((p, i) => (
                         <Text key={i} style={styles.previewItem}>• {p.name} — MRP ₹{p.mrp} / SP ₹{p.sp} / {p.unit}</Text>
                       ))}
-                      {csvPreview.length > 3 && (
-                        <Text style={styles.previewMore}>...and {csvPreview.length - 3} more</Text>
-                      )}
                     </View>
                   )}
                 </View>
@@ -971,14 +1019,16 @@ export default function VendorOnboardingScreen({ onComplete }) {
               </View>
               <View style={styles.summaryCard}>
                 {[
-                  { icon: '🏪', label: 'Shop Name',   value: shopName || '—' },
-                  { icon: '👤', label: 'Owner',        value: ownerName || '—' },
-                  { icon: '📍', label: 'Location',     value: city && pincode ? `${city} – ${pincode}` : '—' },
-                  { icon: '📋', label: 'FSSAI / GST',  value: `${fssai || '—'} / ${gst || '—'}` },
-                  { icon: '🏷️', label: 'Categories',   value: selectedCategories.join(', ') || '—' },
-                  { icon: '📦', label: 'Products',     value: `${getAllProducts().length} products ready` },
-                  { icon: '💰', label: 'Payment',      value: upiId || (accountNumber ? 'Bank account' : 'Not set') },
-                  { icon: '🚚', label: 'Delivery',     value: deliveryType === 'partner' ? 'Via Delivery Boy' : 'Own Staff / Self' },
+                  { icon: '🏪', label: 'Shop Name', value: shopName || '—' },
+                  { icon: '👤', label: 'Owner', value: ownerName || '—' },
+                  { icon: '📍', label: 'Location', value: city && pincode ? `${city} – ${pincode}` : '—' },
+                  { icon: '📋', label: 'FSSAI / GST', value: `${fssai || '—'} / ${gst || '—'}` },
+                  ...(aadhar ? [{ icon: '🆔', label: 'Aadhaar', value: aadhar }] : []),
+                  ...(pan ? [{ icon: '📑', label: 'PAN', value: pan }] : []),
+                  ...(tradeLicense ? [{ icon: '📜', label: 'Trade License', value: tradeLicense }] : []),
+                  { icon: '📦', label: 'Products', value: `${getAllProducts().length} products ready` },
+                  { icon: '💰', label: 'Payment', value: upiId || (accountNumber ? 'Bank account' : 'Not set') },
+                  { icon: '🚚', label: 'Delivery', value: deliveryType === 'partner' ? 'Via Delivery Boy' : 'Own Staff / Self' },
                 ].map((row, i, arr) => (
                   <View key={row.label}>
                     <View style={styles.summaryRow}>
@@ -1043,171 +1093,172 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, flexDirection: 'row',
     justifyContent: 'space-between', alignItems: 'center',
   },
-  brandRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  brandEmoji:{ fontSize: 26 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  brandEmoji: { fontSize: 26 },
   brandName: { fontSize: 17, fontWeight: '800', color: '#fff' },
-  brandSub:  { fontSize: 11, color: 'rgba(255,255,255,0.75)' },
+  brandSub: { fontSize: 11, color: 'rgba(255,255,255,0.75)' },
   stepCount: { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: '700' },
 
   progressTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.25)' },
-  progressFill:  { height: 3, backgroundColor: '#fff' },
+  progressFill: { height: 3, backgroundColor: '#fff' },
 
   stepsScroll: { backgroundColor: '#fff', maxHeight: 60, borderBottomWidth: 0.5, borderBottomColor: '#eee' },
-  stepsRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8 },
+  stepsRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8 },
   stepPillWrapper: { flexDirection: 'row', alignItems: 'center' },
-  stepPill:        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5 },
-  stepPillActive:  {},
-  stepPillDone:    {},
-  stepNum:         { width: 20, height: 20, borderRadius: 10, backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' },
-  stepNumActive:   { backgroundColor: PRIMARY },
-  stepNumDone:     { backgroundColor: PRIMARY },
-  stepNumText:     { fontSize: 10, fontWeight: '700', color: '#aaa' },
+  stepPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5 },
+  stepPillActive: {},
+  stepPillDone: {},
+  stepNum: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' },
+  stepNumActive: { backgroundColor: PRIMARY },
+  stepNumDone: { backgroundColor: PRIMARY },
+  stepNumText: { fontSize: 10, fontWeight: '700', color: '#aaa' },
   stepNumTextActive: { color: '#fff' },
-  stepPillText:    { fontSize: 11, fontWeight: '600', color: '#aaa' },
+  stepPillText: { fontSize: 11, fontWeight: '600', color: '#aaa' },
   stepPillTextActive: { color: PRIMARY },
-  connector:       { width: 14, height: 1.5, backgroundColor: '#e0e0e0', marginHorizontal: 2 },
-  connectorDone:   { backgroundColor: PRIMARY },
+  connector: { width: 14, height: 1.5, backgroundColor: '#e0e0e0', marginHorizontal: 2 },
+  connectorDone: { backgroundColor: PRIMARY },
 
-  content:    { flex: 1, paddingHorizontal: 20 },
+  content: { flex: 1, paddingHorizontal: 20 },
   stepHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, marginBottom: 16 },
-  stepIcon:   { fontSize: 34 },
-  stepTitle:  { fontSize: 20, fontWeight: '800', color: '#222' },
-  stepDesc:   { fontSize: 13, color: '#888', marginTop: 2 },
-  form:       { gap: 2 },
+  stepIcon: { fontSize: 34 },
+  stepTitle: { fontSize: 20, fontWeight: '800', color: '#222' },
+  stepDesc: { fontSize: 13, color: '#888', marginTop: 2 },
+  form: { gap: 2 },
 
-  label:        { fontSize: 13, fontWeight: '600', color: '#444', marginBottom: 6, marginTop: 14 },
+  label: { fontSize: 13, fontWeight: '600', color: '#444', marginBottom: 6, marginTop: 14 },
   sectionLabel: { fontSize: 15, fontWeight: '700', color: '#222', marginTop: 12, marginBottom: 4 },
-  sectionSep:   { fontSize: 14, fontWeight: '700', color: '#333', marginTop: 20, marginBottom: 6, paddingTop: 14, borderTopWidth: 0.5, borderTopColor: '#eee' },
-  req:          { color: '#e53935' },
-  hintText:     { fontSize: 11, color: '#999', marginTop: -4, marginBottom: 6 },
+  sectionSep: { fontSize: 14, fontWeight: '700', color: '#333', marginTop: 20, marginBottom: 6, paddingTop: 14, borderTopWidth: 0.5, borderTopColor: '#eee' },
+  req: { color: '#e53935' },
+  hintText: { fontSize: 11, color: '#999', marginTop: -4, marginBottom: 6 },
   input: {
     backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e0e0e0',
     borderRadius: 10, padding: 13, fontSize: 14, color: '#333', marginBottom: 6,
   },
   textArea: { height: 80, textAlignVertical: 'top' },
-  row:      { flexDirection: 'row' },
+  row: { flexDirection: 'row' },
 
   // Geocoding note
-  geoNote:     { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#FFF8E1', borderRadius: 10, padding: 12, marginTop: 6, marginBottom: 4 },
+  geoNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#FFF8E1', borderRadius: 10, padding: 12, marginTop: 6, marginBottom: 4 },
   geoNoteIcon: { fontSize: 14, marginTop: 1 },
   geoNoteText: { fontSize: 12, color: '#7B5800', flex: 1, lineHeight: 18 },
 
-  chipGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
-  chip:        { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: '#ddd', backgroundColor: '#fff' },
-  chipActive:  { backgroundColor: PRIMARY_LIGHT, borderColor: PRIMARY },
-  chipText:    { fontSize: 12, color: '#555', fontWeight: '500' },
+  chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  chip: { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: '#ddd', backgroundColor: '#fff' },
+  chipActive: { backgroundColor: PRIMARY_LIGHT, borderColor: PRIMARY },
+  chipText: { fontSize: 12, color: '#555', fontWeight: '500' },
   chipTextActive: { color: PRIMARY, fontWeight: '700' },
 
   // Vendor type — 2x2 grid
-  segmentGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
-  segGridBtn:      { width: '48%', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 10, borderWidth: 1.5, borderColor: '#ddd', backgroundColor: '#fff', alignItems: 'center' },
-  segGridBtnActive:{ borderColor: PRIMARY, backgroundColor: PRIMARY_LIGHT },
-  segGridText:     { fontSize: 12, color: '#666', fontWeight: '600', textAlign: 'center' },
+  segmentGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  segGridBtn: { width: '48%', paddingVertical: 12, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1.5, borderColor: '#eee', backgroundColor: '#fff', alignItems: 'center' },
+  segGridBtnActive: { borderColor: PRIMARY, backgroundColor: PRIMARY_LIGHT },
+  segGridImage: { width: 50, height: 50, borderRadius: 10, marginBottom: 8, backgroundColor: '#f9f9f9' },
+  segGridText: { fontSize: 13, color: '#333', fontWeight: '700', textAlign: 'center' },
   segGridTextActive: { color: PRIMARY },
 
-  infoBox:  { backgroundColor: PRIMARY_LIGHT, borderRadius: 10, padding: 13, marginBottom: 8, marginTop: 4 },
+  infoBox: { backgroundColor: PRIMARY_LIGHT, borderRadius: 10, padding: 13, marginBottom: 8, marginTop: 4 },
   infoText: { fontSize: 13, color: '#2e7d32', lineHeight: 20 },
   codeText: { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, marginTop: 6, color: '#1b5e20' },
 
-  uploadBox:  { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 20, alignItems: 'center', marginBottom: 6, backgroundColor: '#fafafa' },
+  uploadBox: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 20, alignItems: 'center', marginBottom: 6, backgroundColor: '#fafafa' },
   uploadIcon: { fontSize: 24, marginBottom: 6 },
   uploadText: { fontSize: 13, color: '#888' },
   uploadHint: { fontSize: 11, color: '#bbb', marginTop: 3 },
 
-  dividerRow:  { flexDirection: 'row', alignItems: 'center', marginVertical: 16, gap: 10 },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 16, gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#e0e0e0' },
   dividerText: { fontSize: 13, color: '#999', fontWeight: '600' },
 
-  modeToggle:       { flexDirection: 'row', backgroundColor: '#f0f0f0', borderRadius: 12, padding: 4, marginBottom: 14, marginTop: 4 },
-  modeBtn:          { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' },
-  modeBtnActive:    { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
-  modeBtnText:      { fontSize: 12, fontWeight: '600', color: '#888' },
-  modeBtnTextActive:{ color: PRIMARY },
+  modeToggle: { flexDirection: 'row', backgroundColor: '#f0f0f0', borderRadius: 12, padding: 4, marginBottom: 14, marginTop: 4 },
+  modeBtn: { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' },
+  modeBtnActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+  modeBtnText: { fontSize: 12, fontWeight: '600', color: '#888' },
+  modeBtnTextActive: { color: PRIMARY },
 
-  selAllRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  catalogMeta:{ fontSize: 12, color: '#888' },
-  selAllBtn:  { fontSize: 13, color: PRIMARY, fontWeight: '700' },
+  selAllRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  catalogMeta: { fontSize: 12, color: '#888' },
+  selAllBtn: { fontSize: 13, color: PRIMARY, fontWeight: '700' },
 
-  catalogCard:         { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 14, padding: 10, marginBottom: 10, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#eee' },
+  catalogCard: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 14, padding: 10, marginBottom: 10, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#eee' },
   catalogCardSelected: { borderColor: PRIMARY, backgroundColor: '#f1fff5' },
-  catalogImage:        { width: 60, height: 60, borderRadius: 10, backgroundColor: '#f0f0f0' },
-  catalogTopRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 },
-  catalogName:         { fontSize: 13, fontWeight: '600', color: '#222', flex: 1, marginRight: 6 },
-  mrpStrike:           { textDecorationLine: 'line-through', color: '#999', fontSize: 11 },
+  catalogImage: { width: 60, height: 60, borderRadius: 10, backgroundColor: '#f0f0f0' },
+  catalogTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 },
+  catalogName: { fontSize: 13, fontWeight: '600', color: '#222', flex: 1, marginRight: 6 },
+  mrpStrike: { textDecorationLine: 'line-through', color: '#999', fontSize: 11 },
 
   // Weight chips shown inline in catalog + review
-  weightChipsRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 5 },
-  weightChipSmall:       { backgroundColor: '#FFF3E0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  weightChipSmallText:   { fontSize: 10, fontWeight: '700', color: '#E65100' },
+  weightChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 5 },
+  weightChipSmall: { backgroundColor: '#FFF3E0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  weightChipSmallText: { fontSize: 10, fontWeight: '700', color: '#E65100' },
 
-  checkbox:    { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: '#ccc', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: '#ccc', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   checkboxSel: { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  checkmark:   { fontSize: 11, color: '#fff', fontWeight: '700' },
+  checkmark: { fontSize: 11, color: '#fff', fontWeight: '700' },
 
-  typeBadge:       { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
-  badgeLoose:      { backgroundColor: '#fff3e0' },
-  badgeLooseText:  { color: '#e65100', fontSize: 11, fontWeight: '600' },
-  badgePacked:     { backgroundColor: '#e3f2fd' },
+  typeBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
+  badgeLoose: { backgroundColor: '#fff3e0' },
+  badgeLooseText: { color: '#e65100', fontSize: 11, fontWeight: '600' },
+  badgePacked: { backgroundColor: '#e3f2fd' },
   badgePackedText: { color: '#1565c0', fontSize: 11, fontWeight: '600' },
-  typeBadgeText:   { fontSize: 11, fontWeight: '600' },
+  typeBadgeText: { fontSize: 11, fontWeight: '600' },
 
-  cantFindBtn:  { borderWidth: 1, borderColor: PRIMARY, borderRadius: 10, padding: 13, alignItems: 'center', marginTop: 8, marginBottom: 4 },
+  cantFindBtn: { borderWidth: 1, borderColor: PRIMARY, borderRadius: 10, padding: 13, alignItems: 'center', marginTop: 8, marginBottom: 4 },
   cantFindText: { color: PRIMARY, fontWeight: '600', fontSize: 13 },
 
-  productCard:       { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#eaeaea' },
+  productCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#eaeaea' },
   productCardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  productCardNum:    { fontSize: 13, fontWeight: '700', color: '#333' },
-  removeBtn:         { fontSize: 12, color: '#e53935', fontWeight: '600' },
+  productCardNum: { fontSize: 13, fontWeight: '700', color: '#333' },
+  removeBtn: { fontSize: 12, color: '#e53935', fontWeight: '600' },
 
-  photoRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
-  photoBox:  { width: 56, height: 56, borderRadius: 10, borderWidth: 1, borderColor: '#ddd', backgroundColor: '#fafafa', alignItems: 'center', justifyContent: 'center' },
+  photoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
+  photoBox: { width: 56, height: 56, borderRadius: 10, borderWidth: 1, borderColor: '#ddd', backgroundColor: '#fafafa', alignItems: 'center', justifyContent: 'center' },
   photoIcon: { fontSize: 24 },
   photoHint: { fontSize: 12, color: '#888', flex: 1, lineHeight: 18 },
 
-  segmentRow:       { flexDirection: 'row', backgroundColor: '#f0f0f0', borderRadius: 8, padding: 3 },
-  segBtn:           { flex: 1, paddingVertical: 7, borderRadius: 6, alignItems: 'center' },
-  segBtnActive:     { backgroundColor: '#fff' },
-  segBtnText:       { fontSize: 12, color: '#888', fontWeight: '600' },
+  segmentRow: { flexDirection: 'row', backgroundColor: '#f0f0f0', borderRadius: 8, padding: 3 },
+  segBtn: { flex: 1, paddingVertical: 7, borderRadius: 6, alignItems: 'center' },
+  segBtnActive: { backgroundColor: '#fff' },
+  segBtnText: { fontSize: 12, color: '#888', fontWeight: '600' },
   segBtnTextActive: { color: PRIMARY },
 
-  addRowBtn:     { borderWidth: 1.5, borderColor: PRIMARY, borderRadius: 10, padding: 13, alignItems: 'center', marginTop: 4 },
+  addRowBtn: { borderWidth: 1.5, borderColor: PRIMARY, borderRadius: 10, padding: 13, alignItems: 'center', marginTop: 4 },
   addRowBtnText: { color: PRIMARY, fontWeight: '700', fontSize: 14 },
 
-  csvInput:     { height: 160, textAlignVertical: 'top', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12 },
-  parseBtn:     { backgroundColor: PRIMARY, padding: 13, borderRadius: 10, alignItems: 'center', marginTop: 4 },
+  csvInput: { height: 160, textAlignVertical: 'top', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12 },
+  parseBtn: { backgroundColor: PRIMARY, padding: 13, borderRadius: 10, alignItems: 'center', marginTop: 4 },
   parseBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  previewBox:   { backgroundColor: PRIMARY_LIGHT, borderRadius: 10, padding: 13, marginTop: 12 },
+  previewBox: { backgroundColor: PRIMARY_LIGHT, borderRadius: 10, padding: 13, marginTop: 12 },
   previewTitle: { fontSize: 14, fontWeight: '700', color: PRIMARY, marginBottom: 8 },
-  previewItem:  { fontSize: 13, color: '#333', marginBottom: 4 },
-  previewMore:  { fontSize: 12, color: '#666', marginTop: 4 },
+  previewItem: { fontSize: 13, color: '#333', marginBottom: 4 },
+  previewMore: { fontSize: 12, color: '#666', marginTop: 4 },
 
-  inventoryCard:  { backgroundColor: '#fff', borderRadius: 12, padding: 13, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', borderWidth: 1, borderColor: '#eaeaea' },
-  inventoryLeft:  { flex: 1 },
-  inventoryName:  { fontSize: 15, fontWeight: '700', color: '#222' },
-  inventoryMeta:  { fontSize: 12, color: '#888', marginTop: 2 },
+  inventoryCard: { backgroundColor: '#fff', borderRadius: 12, padding: 13, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', borderWidth: 1, borderColor: '#eaeaea' },
+  inventoryLeft: { flex: 1 },
+  inventoryName: { fontSize: 15, fontWeight: '700', color: '#222' },
+  inventoryMeta: { fontSize: 12, color: '#888', marginTop: 2 },
   inventoryRight: { alignItems: 'flex-end' },
-  inventoryMrp:   { fontSize: 12, color: '#999', textDecorationLine: 'line-through' },
+  inventoryMrp: { fontSize: 12, color: '#999', textDecorationLine: 'line-through' },
   inventoryPrice: { fontSize: 15, fontWeight: '800', color: PRIMARY },
   inventoryStock: { fontSize: 12, color: '#666', marginTop: 2 },
-  emptyState:     { alignItems: 'center', paddingVertical: 40 },
-  emptyEmoji:     { fontSize: 48 },
-  emptyTitle:     { fontSize: 16, color: '#888', marginTop: 12 },
+  emptyState: { alignItems: 'center', paddingVertical: 40 },
+  emptyEmoji: { fontSize: 48 },
+  emptyTitle: { fontSize: 16, color: '#888', marginTop: 12 },
 
   goLiveContainer: { alignItems: 'center', paddingTop: 10, marginBottom: 20 },
-  goLiveEmoji:     { fontSize: 60, marginBottom: 14 },
-  goLiveTitle:     { fontSize: 24, fontWeight: '800', color: '#222', marginBottom: 6 },
-  goLiveSub:       { fontSize: 14, color: '#666' },
+  goLiveEmoji: { fontSize: 60, marginBottom: 14 },
+  goLiveTitle: { fontSize: 24, fontWeight: '800', color: '#222', marginBottom: 6 },
+  goLiveSub: { fontSize: 14, color: '#666' },
 
-  summaryCard:    { backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#eaeaea', overflow: 'hidden' },
-  summaryRow:     { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14 },
-  summaryIcon:    { fontSize: 22 },
-  summaryLabel:   { fontSize: 11, color: '#888' },
-  summaryValue:   { fontSize: 13, fontWeight: '700', color: '#222', marginTop: 2 },
+  summaryCard: { backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#eaeaea', overflow: 'hidden' },
+  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14 },
+  summaryIcon: { fontSize: 22 },
+  summaryLabel: { fontSize: 11, color: '#888' },
+  summaryValue: { fontSize: 13, fontWeight: '700', color: '#222', marginTop: 2 },
   summaryDivider: { height: 1, backgroundColor: '#f0f0f0', marginHorizontal: 14 },
 
   bottomBar: { flexDirection: 'row', padding: 14, gap: 10, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#eee' },
-  backBtn:   { paddingHorizontal: 16, paddingVertical: 13, borderRadius: 10, borderWidth: 1.5, borderColor: '#ddd', justifyContent: 'center' },
-  backText:  { fontSize: 14, fontWeight: '600', color: '#555' },
-  nextBtn:   { flex: 1, backgroundColor: PRIMARY, paddingVertical: 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  nextText:  { color: '#fff', fontWeight: '700', fontSize: 15 },
+  backBtn: { paddingHorizontal: 16, paddingVertical: 13, borderRadius: 10, borderWidth: 1.5, borderColor: '#ddd', justifyContent: 'center' },
+  backText: { fontSize: 14, fontWeight: '600', color: '#555' },
+  nextBtn: { flex: 1, backgroundColor: PRIMARY, paddingVertical: 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  nextText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });

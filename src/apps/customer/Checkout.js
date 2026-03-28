@@ -377,6 +377,201 @@ const osc = StyleSheet.create({
   totalVal: { fontSize: 16, fontWeight: "900", color: C.gray900 },
 });
 
+// ─── Negotiation Banner (Shown while waiting or after response) ──────────────
+function NegotiationBanner({ status, countdown, vendorName, onDismiss }) {
+  const configs = {
+    pending: {
+      title: "Waiting for Store...",
+      sub: `Waiting for ${vendorName} to accept your order.`,
+      icon: "clock",
+      color: C.orange,
+      bg: "#FFF7ED",
+      border: "#FFEDD5",
+    },
+    accepted: {
+      title: "Order Confirmed!",
+      sub: "The store has accepted your order. Please complete the payment.",
+      icon: "check-circle",
+      color: C.green,
+      bg: C.greenLight,
+      border: C.greenBorder,
+    },
+    rejected: {
+      title: "Order Declined",
+      sub: "The store couldn't fulfill your order right now.",
+      icon: "x-circle",
+      color: C.red,
+      bg: C.redLight,
+      border: "#FCA5A5",
+    },
+    expired: {
+      title: "Request Expired",
+      sub: "The store didn't respond in time. Please try again.",
+      icon: "alert-triangle",
+      color: C.gray600,
+      bg: C.gray100,
+      border: C.gray200,
+    },
+    countered: {
+      title: "Review Adjustments",
+      sub: "The store suggested some changes to your order.",
+      icon: "edit-3",
+      color: "#7C3AED",
+      bg: "#F5F3FF",
+      border: "#DDD6FE",
+    },
+  };
+
+  const cfg = configs[status];
+  if (!cfg) return null;
+
+  return (
+    <View style={[nb.wrap, { backgroundColor: cfg.bg, borderColor: cfg.border }]}>
+      <View style={[nb.iconWrap, { backgroundColor: cfg.color + "20" }]}>
+        {status === "pending" ? (
+          <Text style={[nb.timer, { color: cfg.color }]}>{countdown}s</Text>
+        ) : (
+          <Feather name={cfg.icon} size={18} color={cfg.color} />
+        )}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[nb.title, { color: cfg.color }]}>{cfg.title}</Text>
+        <Text style={nb.sub}>{cfg.sub}</Text>
+      </View>
+      {onDismiss && (
+        <TouchableOpacity onPress={onDismiss}>
+          <Feather name="x" size={16} color={C.gray400} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+const nb = StyleSheet.create({
+  wrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginVertical: 10,
+  },
+  iconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  timer: { fontSize: 13, fontWeight: "900" },
+  title: { fontSize: 15, fontWeight: "900" },
+  sub: { fontSize: 12, color: C.gray500, marginTop: 1 },
+});
+
+// ─── Counter Offer Review Component ──────────────────────────────────────────
+function CounterOfferReview({ data, onAccept, onReject, placing, fs = 1 }) {
+  if (!data) return null;
+  const { items = [], delivery_fee = 0, total = 0, note = "" } = data;
+
+  return (
+    <View style={cor.wrap}>
+      <View style={cor.header}>
+        <Feather name="info" size={16} color="#7C3AED" />
+        <Text style={cor.headerText}>Vendor Adjustments</Text>
+      </View>
+
+      {note ? <Text style={cor.note}>"{note}"</Text> : null}
+
+      <View style={cor.items}>
+        {items.map((it, idx) => (
+          <View key={idx} style={cor.itemRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={cor.itemName}>{it.product_name}</Text>
+              <Text style={cor.itemSub}>
+                {it.available ? `${it.new_quantity} units` : "Out of stock"}
+              </Text>
+            </View>
+            <Text
+              style={[
+                cor.itemPrice,
+                !it.available && { textDecorationLine: "line-through", opacity: 0.5 },
+              ]}
+            >
+              ₹{it.subtotal || it.product_price * it.new_quantity}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={{ gap: 4, marginBottom: 12 }}>
+        <View style={cor.totalRow}>
+          <Text style={cor.totalLbl}>New Delivery Fee</Text>
+          <Text style={cor.totalVal}>₹{delivery_fee}</Text>
+        </View>
+        <View style={[cor.totalRow, { marginTop: 4 }]}>
+          <Text style={cor.grandLbl}>New Total</Text>
+          <Text style={cor.grandVal}>₹{total}</Text>
+        </View>
+      </View>
+
+      <View style={cor.actions}>
+        <TouchableOpacity
+          style={[cor.btn, cor.btnReject]}
+          onPress={() => onReject()}
+          disabled={placing}
+        >
+          <Text style={cor.btnRejectText}>Reject</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[cor.btn, cor.btnAccept]}
+          onPress={() => onAccept()}
+          disabled={placing}
+        >
+          <Text style={cor.btnAcceptText}>Accept & Pay</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const cor = StyleSheet.create({
+  wrap: {
+    backgroundColor: "#F5F3FF",
+    borderRadius: 16,
+    padding: 16,
+    marginVertical: 12,
+    borderWidth: 1.5,
+    borderColor: "#DDD6FE",
+  },
+  header: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
+  headerText: { fontSize: 13, fontWeight: "800", color: "#7C3AED", letterSpacing: 0.5 },
+  note: {
+    fontSize: 13,
+    color: C.gray600,
+    fontStyle: "italic",
+    backgroundColor: "#fff",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  items: { gap: 8, marginBottom: 12, borderBottomWidth: 1, borderBottomColor: "#DDD6FE", paddingBottom: 12 },
+  itemRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  itemName: { fontSize: 14, fontWeight: "600", color: C.gray900 },
+  itemSub: { fontSize: 12, color: C.gray500, marginTop: 2 },
+  itemPrice: { fontSize: 14, fontWeight: "700", color: C.gray900 },
+  totalRow: { flexDirection: "row", justifyContent: "space-between" },
+  totalLbl: { fontSize: 13, color: C.gray500 },
+  totalVal: { fontSize: 13, fontWeight: "600", color: C.gray900 },
+  grandLbl: { fontSize: 15, fontWeight: "800", color: C.gray900 },
+  grandVal: { fontSize: 18, fontWeight: "900", color: "#7C3AED" },
+  actions: { flexDirection: "row", gap: 10, marginTop: 16 },
+  btn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  btnReject: { backgroundColor: C.white, borderWidth: 1, borderColor: C.gray300 },
+  btnRejectText: { color: C.gray600, fontWeight: "700" },
+  btnAccept: { backgroundColor: "#7C3AED" },
+  btnAcceptText: { color: C.white, fontWeight: "800" },
+});
+
 // ═══════════════════════════════════════════════════════════════════════════ //
 export default function CheckoutScreen() {
   const navigation = useNavigation();
@@ -394,13 +589,25 @@ export default function CheckoutScreen() {
   const vendorId = cart?.vendorId;
   const vendorName = items[0]?.vendorName || "Store";
 
+  // ── Order state ────────────────────────────────────────────────────────────
+  const [placing, setPlacing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [orderId, setOrderId] = useState(null);
+  const [orderStatus, setOrderStatus] = useState("idle"); // idle, pending, accepted, rejected, expired, countered
+  const [countdown, setCountdown] = useState(90);
+  const [counterData, setCounterData] = useState(null);
+  const timerRef = useRef(null);
+  const isAccepted = orderStatus === "accepted";
+
   // ── Computed totals ────────────────────────────────────────────────────────
   const subtotal = items.reduce(
     (s, i) => s + i.price * (i.qty ?? i.quantity ?? 0),
     0,
   );
   const baseFee = confirmedFee ?? (subtotal >= 299 ? 0 : 30);
-  const total = subtotal + baseFee;
+  const cartTotal = subtotal + baseFee;
+  const total =
+    orderStatus === "accepted" && counterData ? counterData.total : cartTotal;
 
   // ── Address state ──────────────────────────────────────────────────────────
   const savedAddresses = addressStore?.addresses || [];
@@ -429,29 +636,85 @@ export default function CheckoutScreen() {
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCVV, setCardCVV] = useState("");
 
-  // ── Order state ────────────────────────────────────────────────────────────
-  const [placing, setPlacing] = useState(false);
-  const [errorMsg, setErrorMsg] = useState(null);
-
-  // ── Socket — listen for vendor order acceptance ────────────────────────────
+  // ── Socket — listen for vendor order responses ────────────────────────────
   useEffect(() => {
     if (!token) return;
     const socket = io(SOCKET_URL, { auth: { token } });
-    socket.on("order:accepted", (data) => {
-      navigation.replace("OrderPlaced", {
-        orderNumber: data.order_number || data.id,
-        vendorName,
-        slot: confirmedSlot,
-      });
+
+    socket.on("order:update", (data) => {
+      if (orderId && String(data.order_id) !== String(orderId)) return;
+      if (data.status === "accepted") {
+        setOrderStatus("accepted");
+        setPlacing(false);
+        if (timerRef.current) clearInterval(timerRef.current);
+      } else if (data.status === "rejected") {
+        setOrderStatus("rejected");
+        setPlacing(false);
+        setErrorMsg(data.reason || "Vendor couldn't accept your order.");
+        if (timerRef.current) clearInterval(timerRef.current);
+      }
     });
-    socket.on("order:rejected", () => {
-      setErrorMsg(
-        "Vendor couldn't accept your order right now. Please try again.",
-      );
-      setPlacing(false);
+
+    socket.on("order:countered", async (data) => {
+      if (orderId && String(data.order_id) !== String(orderId)) return;
+      if (data.counter_offer) {
+        setCounterData({
+          items: data.counter_offer.items,
+          delivery_fee: data.counter_offer.delivery_fee,
+          total: data.counter_offer.total,
+          note: data.counter_offer.note,
+        });
+        setOrderStatus("countered");
+        setPlacing(false);
+      } else {
+        // Fallback to fetch if data not in socket
+        try {
+          const res = await fetch(`${BASE_URL}/orders/${data.order_id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const d = await res.json();
+          if (d.success || d.data) {
+            const order = d.data?.order || d.order;
+            setCounterData({
+              items: order.counter_offer_items,
+              delivery_fee: order.delivery_fee,
+              total: order.total,
+              note: order.vendor_note,
+            });
+            setOrderStatus("countered");
+            setPlacing(false);
+          }
+        } catch (e) {
+          console.error("Fetch counter error:", e);
+        }
+      }
     });
+
     return () => socket.disconnect();
-  }, [token]);
+  }, [token, orderId]);
+
+  // ── Negotiation Timer Logic ────────────────────────────────────────────────
+  useEffect(() => {
+    if (orderStatus === "pending") {
+      setCountdown(90);
+      timerRef.current = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current);
+            setOrderStatus("expired");
+            setPlacing(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [orderStatus]);
 
   // ── Detect GPS location ────────────────────────────────────────────────────
   const detectLocation = () => {
@@ -568,18 +831,10 @@ export default function CheckoutScreen() {
       const data = await res.json();
       if (res.ok) {
         cart?.clearCart?.();
-        // Navigate immediately — don't wait for vendor socket in dev/test
-        const orderNumber =
-          data.data?.order?.order_number ||
-          data.data?.order?.id ||
-          data.order_number ||
-          data.order?.id ||
-          "ORD-" + Date.now().toString().slice(-6);
-        navigation.replace("OrderPlaced", {
-          orderNumber,
-          vendorName,
-          slot: confirmedSlot,
-        });
+        const newOrderId = data.data?.order?.id || data.order?.id || data.id;
+        setOrderId(newOrderId);
+        setOrderStatus("pending");
+        // Navigation removed — we stay on Checkout for negotiation
       } else {
         setErrorMsg(
           data.message || data.msg || "Order failed. Please try again.",
@@ -592,6 +847,56 @@ export default function CheckoutScreen() {
     }
   };
 
+  // ── Handle Payment ─────────────────────────────────────────────────────────
+  const handlePayment = async () => {
+    if (!selectedPay) {
+      setErrorMsg("Please select a payment method to proceed.");
+      return;
+    }
+    setErrorMsg(null);
+    setPlacing(true);
+    // Simulate payment processing for now as requested
+    setTimeout(() => {
+      setPlacing(false);
+      navigation.replace("OrderPlaced", {
+        orderId,
+        orderNumber: `ORD-${orderId}`,
+        vendorName,
+        slot: confirmedSlot,
+      });
+    }, 1500);
+  };
+
+  // ── Handle Counter Response ────────────────────────────────────────────────
+  const handleRespondCounter = async (action) => {
+    setErrorMsg(null);
+    setPlacing(true);
+    try {
+      const res = await fetch(`${BASE_URL}/orders/${orderId}/respond-counter`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        if (action === "accept") {
+          setOrderStatus("accepted");
+        } else {
+          setOrderStatus("rejected");
+        }
+      } else {
+        setErrorMsg(d.message || "Failed to respond. Please try again.");
+      }
+    } catch (e) {
+      setErrorMsg(e.message);
+    } finally {
+      setPlacing(false);
+    }
+  };
+
   // ── Breakpoint ────────────────────────────────────────────────────────────
   const { isDesktop, isTablet } = useBreakpoint();
   const px = isDesktop ? 40 : isTablet ? 28 : 16;
@@ -599,6 +904,40 @@ export default function CheckoutScreen() {
   const fs = isDesktop ? 1.15 : isTablet ? 1.07 : 1;
 
   const canPlace = true; // validation disabled for testing
+
+  // ── Status Polling Fallback ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!orderId || !token) return;
+    if (orderStatus !== "pending" && orderStatus !== "countered") return;
+
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/orders/${orderId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const d = await res.json();
+        const order = d.data?.order || d.order;
+        if (!order) return;
+
+        if (order.status !== orderStatus) {
+          if (order.status === "countered") {
+            setCounterData({
+              items: order.counter_offer_items,
+              delivery_fee: order.delivery_fee,
+              total: order.total,
+              note: order.vendor_note,
+            });
+          }
+          setOrderStatus(order.status);
+          setPlacing(false);
+        }
+      } catch (e) {
+        // fail silently for polling
+      }
+    }, 5000); // poll every 5s
+
+    return () => clearInterval(poll);
+  }, [orderId, orderStatus, token]);
 
   // ── Address label display ─────────────────────────────────────────────────
   const getAddrLabel = (addr) => {
@@ -644,6 +983,33 @@ export default function CheckoutScreen() {
           {confirmedSlot && (
             <View style={{ marginHorizontal: px, marginBottom: 12 }}>
               <SlotBanner slot={confirmedSlot} />
+            </View>
+          )}
+
+          {/* Negotiation Banner */}
+          {orderStatus !== "idle" && (
+            <View style={{ marginHorizontal: px }}>
+              <NegotiationBanner
+                status={orderStatus}
+                countdown={countdown}
+                vendorName={vendorName}
+                onDismiss={
+                  orderStatus === "rejected" || orderStatus === "expired"
+                    ? () => setOrderStatus("idle")
+                    : null
+                }
+              />
+            </View>
+          )}
+
+          {orderStatus === "countered" && (
+            <View style={{ marginHorizontal: px }}>
+              <CounterOfferReview
+                data={counterData}
+                onAccept={() => handleRespondCounter("accept")}
+                onReject={() => handleRespondCounter("reject")}
+                placing={placing}
+              />
             </View>
           )}
 
@@ -898,302 +1264,277 @@ export default function CheckoutScreen() {
             )}
           </Section>
 
-          {/* ── SECTION 2: PAYMENT METHOD ───────────────────────────── */}
-          <Section
-            num="2"
-            title="Payment Method"
-            icon="credit-card"
-            cardR={cardR}
-            px={px}
-          >
-            {PAYMENT_METHODS.map((pm) => {
-              const active = selectedPay === pm.id;
-              return (
-                <View key={pm.id}>
-                  <TouchableOpacity
-                    style={[
-                      s.payOption,
-                      active && s.payOptionActive,
-                      { borderRadius: cardR - 4 },
-                    ]}
-                    onPress={() => setSelectedPay(active ? null : pm.id)}
-                    activeOpacity={0.85}
-                  >
-                    <View
+          {/* ── SECTION 2: PAYMENT METHOD (Only shown after acceptance) ── */}
+          {orderStatus === "accepted" && (
+            <Section
+              num="2"
+              title="Payment Method"
+              icon="credit-card"
+              cardR={cardR}
+              px={px}
+            >
+              {PAYMENT_METHODS.map((pm) => {
+                const active = selectedPay === pm.id;
+                return (
+                  <View key={pm.id}>
+                    <TouchableOpacity
                       style={[
-                        s.payIcon,
-                        {
-                          backgroundColor: pm.color + "18",
-                          borderRadius: cardR - 6,
-                        },
+                        s.payOption,
+                        active && s.payOptionActive,
+                        { borderRadius: cardR - 4 },
                       ]}
+                      onPress={() => setSelectedPay(active ? null : pm.id)}
+                      activeOpacity={0.85}
                     >
-                      <Feather
-                        name={pm.icon}
-                        size={isDesktop ? 22 : 19}
-                        color={pm.color}
-                      />
-                    </View>
-                    <View style={s.payBody}>
-                      <Text
-                        style={[s.payLabel, { fontSize: Math.round(15 * fs) }]}
-                      >
-                        {pm.label}
-                      </Text>
-                      <Text
-                        style={[s.paySub, { fontSize: Math.round(12 * fs) }]}
-                      >
-                        {pm.sub}
-                      </Text>
-                    </View>
-                    <View style={[s.radioOuter, active && s.radioOuterActive]}>
-                      {active && <View style={s.radioDot} />}
-                    </View>
-                  </TouchableOpacity>
-
-                  {/* ── UPI expanded panel ── */}
-                  {active && pm.id === "upi" && (
-                    <View style={[s.upiPanel, { borderRadius: cardR - 4 }]}>
-                      {/* UPI ID input + verify */}
-                      <Text
-                        style={[
-                          s.upiFieldLabel,
-                          { fontSize: Math.round(12 * fs) },
-                        ]}
-                      >
-                        Enter UPI ID
-                      </Text>
+                      {/* ... existing pay option content ... */}
                       <View
                         style={[
-                          s.upiInputRow,
-                          upiError && s.upiInputRowErr,
-                          upiValidated && s.upiInputRowOk,
+                          s.payIcon,
+                          {
+                            backgroundColor: pm.color + "18",
+                            borderRadius: cardR - 6,
+                          },
                         ]}
                       >
                         <Feather
-                          name="at-sign"
-                          size={15}
-                          color={
-                            upiValidated
-                              ? C.green
-                              : upiError
-                                ? C.red
-                                : C.gray400
-                          }
+                          name={pm.icon}
+                          size={isDesktop ? 22 : 19}
+                          color={pm.color}
                         />
-                        <TextInput
-                          style={[
-                            s.upiInput,
-                            { fontSize: Math.round(14 * fs) },
-                          ]}
-                          placeholder="yourname@upi"
-                          placeholderTextColor={C.gray400}
-                          value={upiId}
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          onChangeText={(t) => {
-                            setUpiId(t);
-                            setUpiValidated(false);
-                            setUpiError(null);
-                            setSelectedUPI(null);
-                          }}
-                          underlineColorAndroid="transparent"
-                          selectionColor={C.green}
-                        />
-                        {upiValidating && (
-                          <ActivityIndicator size="small" color={C.green} />
-                        )}
-                        {upiValidated && !upiValidating && (
-                          <Feather
-                            name="check-circle"
-                            size={16}
-                            color={C.green}
-                          />
-                        )}
                       </View>
-                      {upiError && (
-                        <Text style={s.upiErrorText}>{upiError}</Text>
-                      )}
+                      <View style={s.payBody}>
+                        <Text
+                          style={[
+                            s.payLabel,
+                            { fontSize: Math.round(15 * fs) },
+                          ]}
+                        >
+                          {pm.label}
+                        </Text>
+                        <Text
+                          style={[s.paySub, { fontSize: Math.round(12 * fs) }]}
+                        >
+                          {pm.sub}
+                        </Text>
+                      </View>
+                      <View style={[s.radioOuter, active && s.radioOuterActive]}>
+                        {active && <View style={s.radioDot} />}
+                      </View>
+                    </TouchableOpacity>
 
-                      {/* Verify button — only when ID entered and not yet validated */}
-                      {upiId.trim().length > 3 &&
-                        !upiValidated &&
-                        !upiValidating && (
-                          <TouchableOpacity
-                            style={s.verifyBtn}
-                            activeOpacity={0.85}
-                            onPress={async () => {
-                              setUpiValidating(true);
+                    {/* expansion logic remains same... */}
+                    {active && pm.id === "upi" && (
+                      <View style={[s.upiPanel, { borderRadius: cardR - 4 }]}>
+                        <Text
+                          style={[
+                            s.upiFieldLabel,
+                            { fontSize: Math.round(12 * fs) },
+                          ]}
+                        >
+                          Enter UPI ID
+                        </Text>
+                        <View
+                          style={[
+                            s.upiInputRow,
+                            upiError && s.upiInputRowErr,
+                            upiValidated && s.upiInputRowOk,
+                          ]}
+                        >
+                          <Feather
+                            name="at-sign"
+                            size={15}
+                            color={
+                              upiValidated
+                                ? C.green
+                                : upiError
+                                  ? C.red
+                                  : C.gray400
+                            }
+                          />
+                          <TextInput
+                            style={[
+                              s.upiInput,
+                              { fontSize: Math.round(14 * fs) },
+                            ]}
+                            placeholder="yourname@upi"
+                            placeholderTextColor={C.gray400}
+                            value={upiId}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            onChangeText={(t) => {
+                              setUpiId(t);
+                              setUpiValidated(false);
                               setUpiError(null);
-                              try {
-                                const res = await fetch(
-                                  `${BASE_URL}/payments/verify-upi`,
-                                  {
-                                    method: "POST",
-                                    headers: {
-                                      "Content-Type": "application/json",
-                                      Authorization: `Bearer ${token}`,
-                                    },
-                                    body: JSON.stringify({
-                                      upi_id: upiId.trim(),
-                                    }),
-                                  },
-                                );
-                                const d = await res.json();
-                                if (d.valid || d.data?.valid) {
-                                  setUpiValidated(true);
-                                  setSelectedUPI("upi_id");
-                                } else {
-                                  setUpiError(
-                                    d.message ||
-                                      "Invalid UPI ID. Please check and try again.",
-                                  );
-                                }
-                              } catch {
-                                // Razorpay can't verify in test mode — allow anyway
-                                setUpiValidated(true);
-                                setSelectedUPI("upi_id");
-                              } finally {
-                                setUpiValidating(false);
-                              }
+                              setSelectedUPI(null);
                             }}
-                          >
-                            <Text
-                              style={[
-                                s.verifyBtnText,
-                                { fontSize: Math.round(13 * fs) },
-                              ]}
-                            >
-                              Verify UPI ID
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-
-                      {/* Validated: show name + QR (web) / deep-link (mobile) */}
-                      {upiValidated && (
-                        <>
-                          <View style={s.upiVerifiedRow}>
+                            underlineColorAndroid="transparent"
+                            selectionColor={C.green}
+                          />
+                          {upiValidating && (
+                            <ActivityIndicator size="small" color={C.green} />
+                          )}
+                          {upiValidated && !upiValidating && (
                             <Feather
                               name="check-circle"
-                              size={14}
+                              size={16}
                               color={C.green}
                             />
-                            <Text
-                              style={[
-                                s.upiVerifiedText,
-                                { fontSize: Math.round(13 * fs) },
-                              ]}
-                            >
-                              UPI ID verified
-                            </Text>
-                          </View>
+                          )}
+                        </View>
+                        {upiError && (
+                          <Text style={s.upiErrorText}>{upiError}</Text>
+                        )}
 
-                          {/* Web: Show QR button */}
-                          {Platform.OS === "web" && (
+                        {upiId.trim().length > 3 &&
+                          !upiValidated &&
+                          !upiValidating && (
                             <TouchableOpacity
-                              style={s.qrBtn}
-                              onPress={() => setShowQR(true)}
+                              style={s.verifyBtn}
                               activeOpacity={0.85}
+                              onPress={async () => {
+                                setUpiValidating(true);
+                                setUpiError(null);
+                                try {
+                                  const res = await fetch(
+                                    `${BASE_URL}/payments/verify-upi`,
+                                    {
+                                      method: "POST",
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                        Authorization: `Bearer ${token}`,
+                                      },
+                                      body: JSON.stringify({
+                                        upi_id: upiId.trim(),
+                                      }),
+                                    },
+                                  );
+                                  const d = await res.json();
+                                  if (d.valid || d.data?.valid) {
+                                    setUpiValidated(true);
+                                    setSelectedUPI("upi_id");
+                                  } else {
+                                    setUpiError(
+                                      d.message ||
+                                        "Invalid UPI ID. Please check and try again.",
+                                    );
+                                  }
+                                } catch {
+                                  setUpiValidated(true);
+                                  setSelectedUPI("upi_id");
+                                } finally {
+                                  setUpiValidating(false);
+                                }
+                              }}
                             >
-                              <Feather name="grid" size={16} color="#7C3AED" />
                               <Text
                                 style={[
-                                  s.qrBtnText,
+                                  s.verifyBtnText,
                                   { fontSize: Math.round(13 * fs) },
                                 ]}
                               >
-                                Show QR to scan & pay
+                                Verify UPI ID
                               </Text>
                             </TouchableOpacity>
                           )}
-                        </>
-                      )}
 
-                      <View style={s.upiDividerRow}>
-                        <View style={s.upiDividerLine} />
-                        <Text style={s.upiDividerText}>or pay using app</Text>
-                        <View style={s.upiDividerLine} />
-                      </View>
-
-                      {/* App chips */}
-                      <View style={s.paySubRow}>
-                        {pm.options.map((app) => {
-                          const deepLinks = {
-                            "Google Pay": `tez://upi/pay?pa=${upiId || "merchant@upi"}&pn=DesiDukaan&am=${total}&cu=INR`,
-                            PhonePe: `phonepe://pay?pa=${upiId || "merchant@upi"}&pn=DesiDukaan&am=${total}&cu=INR`,
-                            Paytm: `paytmmp://pay?pa=${upiId || "merchant@upi"}&pn=DesiDukaan&am=${total}&cu=INR`,
-                            "Other UPI": `upi://pay?pa=${upiId || "merchant@upi"}&pn=DesiDukaan&am=${total}&cu=INR`,
-                          };
-                          const appActive = selectedUPI === app;
-                          return (
-                            <TouchableOpacity
-                              key={app}
-                              style={[s.upiChip, appActive && s.upiChipActive]}
-                              onPress={() => {
-                                setSelectedUPI(app);
-                                // On mobile, attempt deep-link redirect
-                                if (Platform.OS !== "web") {
-                                  const { Linking } = require("react-native");
-                                  Linking.canOpenURL(deepLinks[app]).then(
-                                    (ok) => {
-                                      if (ok) Linking.openURL(deepLinks[app]);
-                                    },
-                                  );
-                                }
-                              }}
-                              activeOpacity={0.8}
-                            >
+                        {upiValidated && (
+                          <>
+                            <View style={s.upiVerifiedRow}>
+                              <Feather
+                                name="check-circle"
+                                size={14}
+                                color={C.green}
+                              />
                               <Text
                                 style={[
-                                  s.upiChipText,
-                                  appActive && s.upiChipTextActive,
+                                  s.upiVerifiedText,
                                   { fontSize: Math.round(13 * fs) },
                                 ]}
                               >
-                                {app}
+                                UPI ID verified
                               </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  )}
+                            </View>
 
-                  {/* Card form */}
-                  {active && pm.id === "card" && (
-                    <View style={[s.cardForm, { borderRadius: cardR - 4 }]}>
-                      <View style={s.inputWrap}>
-                        <Feather
-                          name="credit-card"
-                          size={15}
-                          color={C.gray400}
-                        />
-                        <TextInput
-                          style={[
-                            s.cardInput,
-                            { fontSize: Math.round(14 * fs) },
-                          ]}
-                          placeholder="Card number"
-                          placeholderTextColor={C.gray400}
-                          keyboardType="number-pad"
-                          maxLength={19}
-                          value={cardNum}
-                          onChangeText={(t) =>
-                            setCardNum(
-                              t
-                                .replace(/\D/g, "")
-                                .replace(/(.{4})/g, "$1 ")
-                                .trim(),
-                            )
-                          }
-                          underlineColorAndroid="transparent"
-                          selectionColor={C.green}
-                        />
+                            {Platform.OS === "web" && (
+                              <TouchableOpacity
+                                style={s.qrBtn}
+                                onPress={() => setShowQR(true)}
+                                activeOpacity={0.85}
+                              >
+                                <Feather
+                                  name="grid"
+                                  size={16}
+                                  color="#7C3AED"
+                                />
+                                <Text
+                                  style={[
+                                    s.qrBtnText,
+                                    { fontSize: Math.round(13 * fs) },
+                                  ]}
+                                >
+                                  Show QR to scan & pay
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </>
+                        )}
+
+                        <View style={s.upiDividerRow}>
+                          <View style={s.upiDividerLine} />
+                          <Text style={s.upiDividerText}>or pay using app</Text>
+                          <View style={s.upiDividerLine} />
+                        </View>
+
+                        <View style={s.paySubRow}>
+                          {pm.options.map((app) => {
+                            const deepLinks = {
+                              "Google Pay": `tez://upi/pay?pa=${upiId || "merchant@upi"}&pn=DesiDukaan&am=${total}&cu=INR`,
+                              PhonePe: `phonepe://pay?pa=${upiId || "merchant@upi"}&pn=DesiDukaan&am=${total}&cu=INR`,
+                              Paytm: `paytmmp://pay?pa=${upiId || "merchant@upi"}&pn=DesiDukaan&am=${total}&cu=INR`,
+                              "Other UPI": `upi://pay?pa=${upiId || "merchant@upi"}&pn=DesiDukaan&am=${total}&cu=INR`,
+                            };
+                            const appActive = selectedUPI === app;
+                            return (
+                              <TouchableOpacity
+                                key={app}
+                                style={[
+                                  s.upiChip,
+                                  appActive && s.upiChipActive,
+                                ]}
+                                onPress={() => {
+                                  setSelectedUPI(app);
+                                  if (Platform.OS !== "web") {
+                                    const { Linking } = require("react-native");
+                                    Linking.canOpenURL(deepLinks[app]).then(
+                                      (ok) => {
+                                        if (ok) Linking.openURL(deepLinks[app]);
+                                      },
+                                    );
+                                  }
+                                }}
+                                activeOpacity={0.8}
+                              >
+                                <Text
+                                  style={[
+                                    s.upiChipText,
+                                    appActive && s.upiChipTextActive,
+                                    { fontSize: Math.round(13 * fs) },
+                                  ]}
+                                >
+                                  {app}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
                       </View>
-                      <View style={s.inputRow}>
-                        <View style={[s.inputWrap, { flex: 1 }]}>
+                    )}
+
+                    {active && pm.id === "card" && (
+                      <View style={[s.cardForm, { borderRadius: cardR - 4 }]}>
+                        <View style={s.inputWrap}>
                           <Feather
-                            name="calendar"
+                            name="credit-card"
                             size={15}
                             color={C.gray400}
                           />
@@ -1202,48 +1543,78 @@ export default function CheckoutScreen() {
                               s.cardInput,
                               { fontSize: Math.round(14 * fs) },
                             ]}
-                            placeholder="MM/YY"
+                            placeholder="Card number"
                             placeholderTextColor={C.gray400}
                             keyboardType="number-pad"
-                            maxLength={5}
-                            value={cardExpiry}
-                            onChangeText={(t) => {
-                              const c = t.replace(/\D/g, "");
-                              setCardExpiry(
-                                c.length > 2
-                                  ? `${c.slice(0, 2)}/${c.slice(2)}`
-                                  : c,
-                              );
-                            }}
+                            maxLength={19}
+                            value={cardNum}
+                            onChangeText={(t) =>
+                              setCardNum(
+                                t
+                                  .replace(/\D/g, "")
+                                  .replace(/(.{4})/g, "$1 ")
+                                  .trim(),
+                              )
+                            }
                             underlineColorAndroid="transparent"
                             selectionColor={C.green}
                           />
                         </View>
-                        <View style={[s.inputWrap, { flex: 1 }]}>
-                          <Feather name="lock" size={15} color={C.gray400} />
-                          <TextInput
-                            style={[
-                              s.cardInput,
-                              { fontSize: Math.round(14 * fs) },
-                            ]}
-                            placeholder="CVV"
-                            placeholderTextColor={C.gray400}
-                            keyboardType="number-pad"
-                            maxLength={4}
-                            secureTextEntry
-                            value={cardCVV}
-                            onChangeText={setCardCVV}
-                            underlineColorAndroid="transparent"
-                            selectionColor={C.green}
-                          />
+                        <View style={s.inputRow}>
+                          <View style={[s.inputWrap, { flex: 1 }]}>
+                            <Feather
+                              name="calendar"
+                              size={15}
+                              color={C.gray400}
+                            />
+                            <TextInput
+                              style={[
+                                s.cardInput,
+                                { fontSize: Math.round(14 * fs) },
+                              ]}
+                              placeholder="MM/YY"
+                              placeholderTextColor={C.gray400}
+                              keyboardType="number-pad"
+                              maxLength={5}
+                              value={cardExpiry}
+                              onChangeText={(t) => {
+                                const c = t.replace(/\D/g, "");
+                                setCardExpiry(
+                                  c.length > 2
+                                    ? `${c.slice(0, 2)}/${c.slice(2)}`
+                                    : c,
+                                );
+                              }}
+                              underlineColorAndroid="transparent"
+                              selectionColor={C.green}
+                            />
+                          </View>
+                          <View style={[s.inputWrap, { flex: 1 }]}>
+                            <Feather name="lock" size={15} color={C.gray400} />
+                            <TextInput
+                              style={[
+                                s.cardInput,
+                                { fontSize: Math.round(14 * fs) },
+                              ]}
+                              placeholder="CVV"
+                              placeholderTextColor={C.gray400}
+                              keyboardType="number-pad"
+                              maxLength={4}
+                              secureTextEntry
+                              value={cardCVV}
+                              onChangeText={setCardCVV}
+                              underlineColorAndroid="transparent"
+                              selectionColor={C.green}
+                            />
+                          </View>
                         </View>
                       </View>
-                    </View>
-                  )}
-                </View>
-              );
-            })}
-          </Section>
+                    )}
+                  </View>
+                );
+              })}
+            </Section>
+          )}
 
           {/* ── SECTION 3: ORDER SUMMARY (mobile/tablet inline) ─────── */}
           {!isDesktop && (
@@ -1275,10 +1646,11 @@ export default function CheckoutScreen() {
           {!isDesktop && (
             <View style={{ marginHorizontal: px }}>
               <PlaceOrderBtn
+                status={orderStatus}
                 total={total}
                 canPlace={canPlace}
                 placing={placing}
-                onPress={placeOrder}
+                onPress={orderStatus === "accepted" ? handlePayment : placeOrder}
                 fs={fs}
               />
             </View>
@@ -1310,10 +1682,11 @@ export default function CheckoutScreen() {
 
             {/* Place order button in sidebar */}
             <PlaceOrderBtn
+              status={orderStatus}
               total={total}
               canPlace={canPlace}
               placing={placing}
-              onPress={placeOrder}
+              onPress={isAccepted ? handlePayment : placeOrder}
               fs={fs}
             />
           </View>
@@ -1374,24 +1747,36 @@ export default function CheckoutScreen() {
 }
 
 // ─── Place Order Button (shared mobile + desktop) ─────────────────────────────
-function PlaceOrderBtn({ total, canPlace, placing, onPress, fs = 1 }) {
+function PlaceOrderBtn({ status, total, canPlace, placing, onPress, fs = 1 }) {
+  const isAccepted = status === "accepted";
+  const label = isAccepted
+    ? "Pay Now"
+    : status === "pending"
+      ? "Waiting for store..."
+      : "Send Order Request";
+  const icon = isAccepted ? "credit-card" : "send";
+
   return (
     <TouchableOpacity
-      style={[pob.btn, !canPlace && pob.btnDisabled]}
+      style={[pob.btn, (!canPlace || status === "pending") && pob.btnDisabled]}
       onPress={onPress}
       activeOpacity={0.88}
-      disabled={placing || !canPlace}
+      disabled={placing || !canPlace || status === "pending"}
     >
       {placing ? (
         <View style={pob.grad}>
           <ActivityIndicator color={C.white} />
           <Text style={[pob.text, { fontSize: Math.round(16 * fs) }]}>
-            Placing order…
+            Processing...
           </Text>
         </View>
       ) : (
         <LinearGradient
-          colors={canPlace ? [C.green, C.greenDark] : [C.gray300, C.gray300]}
+          colors={
+            canPlace && status !== "pending"
+              ? [C.green, C.greenDark]
+              : [C.gray300, C.gray300]
+          }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={pob.grad}
@@ -1406,10 +1791,10 @@ function PlaceOrderBtn({ total, canPlace, placing, onPress, fs = 1 }) {
           </View>
           <View style={pob.divider} />
           <Text style={[pob.text, { fontSize: Math.round(16 * fs) }]}>
-            Place Order
+            {label}
           </Text>
           <Feather
-            name="check-circle"
+            name={icon}
             size={isFinite(fs) ? Math.round(18 * fs) : 18}
             color={C.white}
           />
