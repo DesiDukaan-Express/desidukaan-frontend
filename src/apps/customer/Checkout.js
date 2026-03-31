@@ -123,8 +123,7 @@ const sec = StyleSheet.create({
   title: { fontSize: 17, fontWeight: "900", color: C.gray900, flex: 1 },
 });
 
-// ─── Slot summary banner (shown at top of checkout) ───────────────────────────
-function SlotBanner({ slot, onEdit }) {
+function SlotBanner({ slot }) {
   if (!slot) return null;
   const fmt = (iso) =>
     new Date(iso).toLocaleTimeString("en-IN", {
@@ -132,27 +131,22 @@ function SlotBanner({ slot, onEdit }) {
       minute: "2-digit",
       hour12: true,
     });
+  const isToday =
+    new Date(slot.start).toDateString() === new Date().toDateString();
+
   return (
     <View style={slb.wrap}>
       <View style={slb.iconWrap}>
         <Feather name="clock" size={16} color={C.green} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={slb.label}>Delivery window confirmed</Text>
+        <Text style={slb.label}>
+          Delivery window: {isToday ? "Today" : "Tomorrow"}
+        </Text>
         <Text style={slb.time}>
           {fmt(slot.start)} – {fmt(slot.end)}
         </Text>
       </View>
-      {onEdit && (
-        <TouchableOpacity
-          style={slb.editBtn}
-          onPress={onEdit}
-          activeOpacity={0.8}
-        >
-          <Feather name="edit-2" size={13} color={C.green} />
-          <Text style={slb.editText}>Change</Text>
-        </TouchableOpacity>
-      )}
     </View>
   );
 }
@@ -471,7 +465,7 @@ const nb = StyleSheet.create({
 // ─── Counter Offer Review Component ──────────────────────────────────────────
 function CounterOfferReview({ data, onAccept, onReject, placing, fs = 1 }) {
   if (!data) return null;
-  const { items = [], delivery_fee = 0, total = 0, note = "" } = data;
+  const { items = [], delivery_fee = 0, total = 0, note = "", slot = null } = data;
 
   return (
     <View style={cor.wrap}>
@@ -508,6 +502,14 @@ function CounterOfferReview({ data, onAccept, onReject, placing, fs = 1 }) {
           <Text style={cor.totalLbl}>New Delivery Fee</Text>
           <Text style={cor.totalVal}>₹{delivery_fee}</Text>
         </View>
+        {slot && (
+          <View style={[cor.totalRow, { marginTop: 4 }]}>
+            <Text style={cor.totalLbl}>New Delivery Window</Text>
+            <Text style={cor.totalVal}>
+              {new Date(slot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(slot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </View>
+        )}
         <View style={[cor.totalRow, { marginTop: 4 }]}>
           <Text style={cor.grandLbl}>New Total</Text>
           <Text style={cor.grandVal}>₹{total}</Text>
@@ -581,9 +583,20 @@ export default function CheckoutScreen() {
   const addressStore = useAddressStore();
 
   // Slot passed from CartScreen via navigation params or cartStore
-  const confirmedSlot =
-    route.params?.confirmedSlot || cart?.confirmedSlot || null;
+  const [confirmedSlot, setConfirmedSlot] = useState(
+    route.params?.confirmedSlot || cart?.confirmedSlot || null
+  );
+  const [slotId, setSlotId] = useState(
+    route.params?.slotId || cart?.slotId || null
+  );
   const confirmedFee = route.params?.confirmedFee ?? cart?.confirmedFee ?? null;
+
+  const [vendorPhone, setVendorPhone] = useState(
+    route.params?.vendorPhone || null
+  );
+  const [phoneStatus, setPhoneStatus] = useState(
+    route.params?.phoneStatus || null // 'pending', 'approved', 'rejected'
+  );
 
   const items = cart?.items || [];
   const vendorId = cart?.vendorId;
@@ -597,6 +610,11 @@ export default function CheckoutScreen() {
   const [countdown, setCountdown] = useState(90);
   const [counterData, setCounterData] = useState(null);
   const timerRef = useRef(null);
+
+  // Slot management states
+  const [slotModalVisible, setSlotModalVisible] = useState(false);
+  const [requestingSlot, setRequestingSlot] = useState(false);
+  const [requestingPhone, setRequestingPhone] = useState(false);
   const isAccepted = orderStatus === "accepted";
 
   // ── Computed totals ────────────────────────────────────────────────────────
@@ -618,6 +636,20 @@ export default function CheckoutScreen() {
   const [detectedAddr, setDetectedAddr] = useState(null);
   const [detectedCoords, setDetectedCoords] = useState(null);
   const [manualOpen, setManualOpen] = useState(false);
+
+  // ── Socket: listen for vendor responses ────────────────────────────────────
+  useEffect(() => {
+    if (!token) return;
+    const socket = io(SOCKET_URL, { auth: { token } });
+
+    socket.on("phone:approved", (data) => {
+      setPhoneStatus("approved");
+      setVendorPhone(data.phone);
+    });
+    socket.on("phone:rejected", () => setPhoneStatus("rejected"));
+
+    return () => socket.disconnect();
+  }, [token]);
   const [addrLine, setAddrLine] = useState("");
   const [addrCity, setAddrCity] = useState("");
   const [addrState, setAddrState] = useState("");
@@ -687,6 +719,15 @@ export default function CheckoutScreen() {
         } catch (e) {
           console.error("Fetch counter error:", e);
         }
+      }
+    });
+
+    socket.on("phone:update", (data) => {
+      if (data.status === "approved" && data.phone) {
+        setPhoneStatus("approved");
+        setVendorPhone(data.phone);
+      } else if (data.status === "rejected") {
+        setPhoneStatus("rejected");
       }
     });
 
@@ -796,6 +837,7 @@ export default function CheckoutScreen() {
 
   // ── Place order ────────────────────────────────────────────────────────────
   const placeOrder = async () => {
+    console.log("placeOrder function INVOKED"); // START LOG
     setErrorMsg(null);
     setPlacing(true);
     try {
@@ -810,16 +852,21 @@ export default function CheckoutScreen() {
       const addrId = rawAddrId ? parseInt(rawAddrId, 10) : 10;
 
       const payload = {
-        vendor_id: vendorId,
+        vendor_id: parseInt(vendorId, 10),
         delivery_address_id: addrId,
         payment_method: selectedPay || "cod", // fallback so it's never null
+        delivery_slot_id: null,
+        proposed_delivery_fee: confirmedFee !== undefined ? confirmedFee : null,
+        proposed_slot: confirmedSlot ? { start: confirmedSlot.start, end: confirmedSlot.end } : null,
         items: items.map((i) => ({
-          product_id: i.id,
+          product_id: parseInt(i.id, 10),
           quantity: Math.max(1, i.qty ?? i.quantity ?? 1),
           // price NOT sent — backend uses its own price from DB
         })),
         special_instructions: "",
       };
+      console.log("PLACING ORDER PAYLOAD:", JSON.stringify(payload, null, 2)); // LOG PAYLOAD
+
       const res = await fetch(`${BASE_URL}/orders`, {
         method: "POST",
         headers: {
@@ -836,12 +883,14 @@ export default function CheckoutScreen() {
         setOrderStatus("pending");
         // Navigation removed — we stay on Checkout for negotiation
       } else {
+        console.log("ORDER CREATION FAILED", data); // LOG ERROR DATA
         setErrorMsg(
-          data.message || data.msg || "Order failed. Please try again.",
+          data.errors?.join(', ') || data.message || data.msg || "Order failed. Please try again.",
         );
         setPlacing(false);
       }
     } catch (e) {
+      console.error("placeOrder EXCEPTION:", e); // LOG EXCEPTION
       setErrorMsg(e.message);
       setPlacing(false);
     }
@@ -867,7 +916,32 @@ export default function CheckoutScreen() {
     }, 1500);
   };
 
-  // ── Handle Counter Response ────────────────────────────────────────────────
+  // ── Slot actions ───────────────────────────────────────────────────────────
+  const handleRequestSlot = async ({ slot_start, slot_end }) => {
+    setConfirmedSlot({ start: slot_start, end: slot_end });
+    setSlotModalVisible(false);
+  };
+
+  const handleRequestPhone = async () => {
+    if (!vendorId) return;
+    setRequestingPhone(true);
+    try {
+      await fetch(`${BASE_URL}/slots/phone-request`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ vendor_id: vendorId }),
+      });
+      setPhoneStatus("pending");
+    } catch (e) {
+      console.error("phone request:", e.message);
+    } finally {
+      setRequestingPhone(false);
+    }
+  };
+
   const handleRespondCounter = async (action) => {
     setErrorMsg(null);
     setPlacing(true);
@@ -926,6 +1000,10 @@ export default function CheckoutScreen() {
               delivery_fee: order.delivery_fee,
               total: order.total,
               note: order.vendor_note,
+              slot: order.delivery_slot && order.delivery_slot.start_time ? {
+                start: order.delivery_slot.start_time,
+                end: order.delivery_slot.end_time,
+              } : null,
             });
           }
           setOrderStatus(order.status);
@@ -1264,10 +1342,90 @@ export default function CheckoutScreen() {
             )}
           </Section>
 
-          {/* ── SECTION 2: PAYMENT METHOD (Only shown after acceptance) ── */}
+          {/* ── SECTION 2: DELIVERY SLOT ─────────────────────────────── */}
+          <Section
+            num="2"
+            title="Delivery Slot"
+            icon="clock"
+            cardR={cardR}
+            px={px}
+          >
+            {confirmedSlot ? (
+              <View style={s.slotDisplay}>
+                <View style={s.slotInfo}>
+                  <Text style={s.slotTimeText}>
+                    {new Date(confirmedSlot.start).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    -{" "}
+                    {new Date(confirmedSlot.end).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </Text>
+                  <Text style={s.slotDateText}>
+                    {new Date(confirmedSlot.start).toDateString() ===
+                    new Date().toDateString()
+                      ? "Today"
+                      : "Tomorrow"}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setSlotModalVisible(true)}
+                  style={s.slotChangeBtn}
+                >
+                  <Text style={s.slotChangeText}>Change</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={s.slotPickBtn}
+                onPress={() => setSlotModalVisible(true)}
+              >
+                <Feather name="plus-circle" size={18} color={C.green} />
+                <Text style={s.slotPickText}>Choose a delivery window</Text>
+              </TouchableOpacity>
+            )}
+          </Section>
+
+          {/* ── SECTION 3: VENDOR CONTACT ────────────────────────────── */}
+          <Section
+            num="3"
+            title="Vendor Contact"
+            icon="phone"
+            cardR={cardR}
+            px={px}
+          >
+            {phoneStatus === "approved" ? (
+              <View style={s.phoneBox}>
+                <Feather name="phone-call" size={18} color={C.green} />
+                <Text style={s.phoneValue}>{vendorPhone || "Shared"}</Text>
+                <Text style={s.phoneLabel}>Call vendor for any queries</Text>
+              </View>
+            ) : phoneStatus === "pending" ? (
+              <View style={s.phoneWait}>
+                <ActivityIndicator size="small" color={C.amber} />
+                <Text style={s.phoneWaitText}>Request pending approval...</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={s.phoneRequestBtn}
+                onPress={handleRequestPhone}
+                disabled={requestingPhone}
+              >
+                <Feather name="shield" size={16} color={C.gray600} />
+                <Text style={s.phoneRequestText}>
+                  {requestingPhone ? "Requesting..." : "Request Shop Contact"}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </Section>
+
+          {/* ── SECTION 4: PAYMENT METHOD (Only shown after acceptance) ── */}
           {orderStatus === "accepted" && (
             <Section
-              num="2"
+              num="4"
               title="Payment Method"
               icon="credit-card"
               cardR={cardR}
@@ -1742,6 +1900,13 @@ export default function CheckoutScreen() {
           </Pressable>
         </Modal>
       )}
+
+      <SlotModal
+        visible={slotModalVisible}
+        onClose={() => setSlotModalVisible(false)}
+        onConfirm={handleRequestSlot}
+        loading={requestingSlot}
+      />
     </View>
   );
 }
@@ -1837,9 +2002,386 @@ const pob = StyleSheet.create({
   },
 });
 
+/* Additional Styles for Slot/Contact */
+const extraStyles = {
+  slotPickBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: C.greenLight,
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: C.green,
+  },
+  slotPickText: { fontSize: 15, fontWeight: "700", color: C.green },
+  slotDisplay: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: C.bg,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.gray200,
+  },
+  slotInfo: { gap: 2 },
+  slotTimeText: { fontSize: 16, fontWeight: "900", color: C.gray900 },
+  slotDateText: { fontSize: 12, color: C.gray500, fontWeight: "600" },
+  slotChangeBtn: {
+    backgroundColor: C.white,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.gray300,
+  },
+  slotChangeText: { fontSize: 13, fontWeight: "700", color: C.gray600 },
+  phoneBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: C.greenLight,
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.greenBorder,
+    flexWrap: "wrap",
+  },
+  phoneValue: { fontSize: 18, fontWeight: "900", color: C.greenDark },
+  phoneLabel: { fontSize: 12, color: C.green, width: "100%", marginTop: 2 },
+  phoneWait: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: C.amberLight,
+  },
+  phoneWaitText: { fontSize: 14, color: C.amber, fontWeight: "700" },
+  phoneRequestBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: C.gray100,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.gray200,
+  },
+  phoneRequestText: { fontSize: 14, fontWeight: "700", color: C.gray700 },
+};
+
+// ─── Local time parser (fallback) ───────────────────────────────────────────
+function parseSlotLocally(input) {
+  if (!input?.trim()) return null;
+  const txt = input.trim().toLowerCase();
+  const now = new Date();
+  const baseDate = new Date(now);
+  if (txt.includes("tomorrow")) baseDate.setDate(baseDate.getDate() + 1);
+  const timeRe = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/g;
+  const times = [];
+  let m;
+  while ((m = timeRe.exec(txt)) !== null) {
+    let h = parseInt(m[1]);
+    const min = parseInt(m[2] || "0");
+    const ap = m[3];
+    if (ap === "pm" && h < 12) h += 12;
+    if (ap === "am" && h === 12) h = 0;
+    times.push({ h, min });
+  }
+  if (times.length < 2) return null;
+  const [s, e] = times;
+  const start = new Date(baseDate);
+  start.setHours(s.h, s.min, 0, 0);
+  const end = new Date(baseDate);
+  end.setHours(e.h, e.min, 0, 0);
+  if (end <= start) return null;
+  if (start <= now) return null;
+  const fmt = (d) =>
+    d.toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  return {
+    valid: true,
+    slot_start: start.toISOString(),
+    slot_end: end.toISOString(),
+    start_label: fmt(start),
+    end_label: fmt(end),
+  };
+}
+
+// ─── Slot picker modal ────────────────────────────────────────────────────────
+function SlotModal({ visible, onClose, onConfirm, loading }) {
+  const [input, setInput] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const debounceRef = useRef(null);
+
+  useEffect(() => {
+    if (!visible) {
+      setInput("");
+      setPreview(null);
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    if (!input.trim()) {
+      setPreview(null);
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setChecking(true);
+      try {
+        const res = await fetch(`${BASE_URL}/slots/parse`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ input: input.trim() }),
+        });
+        const data = await res.json();
+        if (data.data?.valid !== undefined) {
+          setPreview(data.data);
+        } else {
+          const local = parseSlotLocally(input);
+          setPreview(
+            local || {
+              valid: false,
+              message: "Couldn't understand that. Try '3pm to 5pm'",
+            },
+          );
+        }
+      } catch {
+        const local = parseSlotLocally(input);
+        setPreview(
+          local || {
+            valid: false,
+            message: "Couldn't understand that. Try '3pm to 5pm'",
+          },
+        );
+      } finally {
+        setChecking(false);
+      }
+    }, 400);
+  }, [input]);
+
+  const handleConfirm = () => {
+    if (!preview?.valid) return;
+    onConfirm({ slot_start: preview.slot_start, slot_end: preview.slot_end });
+  };
+
+  const HINTS = ["3pm to 5pm", "today 6pm to 8pm", "tomorrow 10am to 11am"];
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <Pressable style={sm.backdrop} onPress={onClose}>
+        <Pressable style={sm.sheet} onPress={() => {}}>
+          <View style={sm.handle} />
+          <Text style={sm.title}>Choose delivery window</Text>
+          <Text style={sm.sub}>Type your preferred time window</Text>
+
+          <View
+            style={[
+              sm.inputBox,
+              preview?.valid === false && sm.inputBoxError,
+              preview?.valid === true && sm.inputBoxValid,
+            ]}
+          >
+            <Feather
+              name="clock"
+              size={16}
+              color={
+                preview?.valid === true
+                  ? C.green
+                  : preview?.valid === false
+                  ? C.red
+                  : C.gray400
+              }
+              style={{ marginLeft: 14 }}
+            />
+            <TextInput
+              style={sm.input}
+              placeholder={`e.g. "3pm to 5pm" or "tomorrow 2pm to 3pm"`}
+              placeholderTextColor={C.gray400}
+              value={input}
+              onChangeText={setInput}
+              autoFocus
+              underlineColorAndroid="transparent"
+              selectionColor={C.green}
+            />
+            {checking ? (
+              <ActivityIndicator
+                size="small"
+                color={C.gray400}
+                style={{ marginRight: 14 }}
+              />
+            ) : input.length > 0 ? (
+              <TouchableOpacity
+                onPress={() => setInput("")}
+                style={{ marginRight: 14 }}
+              >
+                <Feather name="x" size={14} color={C.gray400} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {!input.trim() && (
+            <View style={sm.hints}>
+              {HINTS.map((h) => (
+                <TouchableOpacity
+                  key={h}
+                  style={sm.hintChip}
+                  onPress={() => setInput(h)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={sm.hintText}>{h}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {preview && (
+            <View
+              style={[
+                sm.preview,
+                preview.valid ? sm.previewValid : sm.previewInvalid,
+              ]}
+            >
+              <Feather
+                name={preview.valid ? "check-circle" : "alert-circle"}
+                size={15}
+                color={preview.valid ? C.green : C.red}
+              />
+              {preview.valid ? (
+                <Text style={sm.previewText}>
+                  <Text style={sm.previewBold}>{preview.start_label}</Text>
+                  {"  →  "}
+                  <Text style={sm.previewBold}>{preview.end_label}</Text>
+                </Text>
+              ) : (
+                <Text style={sm.previewTextErr}>{preview.message}</Text>
+              )}
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[
+              sm.confirmBtn,
+              (!preview?.valid || loading) && sm.confirmBtnDisabled,
+            ]}
+            onPress={handleConfirm}
+            disabled={!preview?.valid || loading}
+            activeOpacity={0.85}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={C.white} />
+            ) : (
+              <Text style={sm.confirmBtnText}>
+                {preview?.valid ? "Request this window →" : "Enter a window"}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+const sm = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.48)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: C.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 36,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: C.gray200,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: C.gray900,
+    marginBottom: 4,
+  },
+  sub: { fontSize: 13, color: C.gray400, marginBottom: 16 },
+  inputBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: "transparent",
+    minHeight: 52,
+    paddingRight: 4,
+  },
+  inputBoxError: { borderColor: C.red, backgroundColor: C.redLight },
+  inputBoxValid: { borderColor: C.green, backgroundColor: C.greenLight },
+  input: {
+    flex: 1,
+    fontSize: 15,
+    color: C.gray900,
+    paddingLeft: 10,
+    paddingVertical: 14,
+    ...Platform.select({ web: { outlineStyle: "none" } }),
+  },
+  hints: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
+  hintChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: C.gray100,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+  },
+  hintText: { fontSize: 13, color: C.gray600, fontWeight: "600" },
+  preview: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 12,
+  },
+  previewValid: { backgroundColor: C.greenLight },
+  previewInvalid: { backgroundColor: C.redLight },
+  previewText: { fontSize: 14, color: C.greenDark },
+  previewBold: { fontWeight: "800" },
+  previewTextErr: { fontSize: 13, color: C.red, flex: 1 },
+  confirmBtn: {
+    marginTop: 18,
+    backgroundColor: C.green,
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+  confirmBtnDisabled: { backgroundColor: C.greenMid },
+  confirmBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
+});
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
+  ...extraStyles,
 
   // Header
   header: {

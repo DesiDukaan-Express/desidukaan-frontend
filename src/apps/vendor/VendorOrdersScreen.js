@@ -45,6 +45,10 @@ export default function VendorOrdersScreen() {
   const [autoAssigning, setAutoAssigning] = useState(false);
   const [broadcastStatus, setBroadcastStatus] = useState(null); // { count, message }
 
+  const [activeTab, setActiveTab] = useState("orders"); // orders | requests
+  const [requests, setRequests] = useState({ phones: [], slots: [] });
+  const [loadingRequests, setLoadingRequests] = useState(false);
+
   // Fetch nearby riders when modal opens and storeLocation is available
   useEffect(() => {
     if (isDeliveryModalVisible && (!selectedOrder?.delivery?.partner) && storeLocation) {
@@ -156,6 +160,35 @@ export default function VendorOrdersScreen() {
   const [counterItems, setCounterItems] = useState([]);
   const [counterDeliveryFee, setCounterDeliveryFee] = useState("");
   const [counterNote, setCounterNote] = useState("");
+  const [counterSlotInput, setCounterSlotInput] = useState("");
+
+  // Helper to parse simple slot strings
+  const parseSlotLocally = (input) => {
+    if (!input?.trim()) return null;
+    const txt = input.trim().toLowerCase();
+    const now = new Date();
+    const baseDate = new Date(now);
+    if (txt.includes("tomorrow")) baseDate.setDate(baseDate.getDate() + 1);
+    const timeRe = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/g;
+    const times = [];
+    let m;
+    while ((m = timeRe.exec(txt)) !== null) {
+      let h = parseInt(m[1]);
+      const min = parseInt(m[2] || "0");
+      const ap = m[3];
+      if (ap === "pm" && h < 12) h += 12;
+      if (ap === "am" && h === 12) h = 0;
+      times.push({ h, min });
+    }
+    if (times.length < 2) return null;
+    const [s, e] = times;
+    const start = new Date(baseDate);
+    start.setHours(s.h, s.min, 0, 0);
+    const end = new Date(baseDate);
+    end.setHours(e.h, e.min, 0, 0);
+    if (end <= start) return null;
+    return { start: start.toISOString(), end: end.toISOString() };
+  };
 
   const fetchOrders = async () => {
     try {
@@ -179,8 +212,26 @@ export default function VendorOrdersScreen() {
     }
   };
 
+  const fetchRequests = async () => {
+    setLoadingRequests(true);
+    try {
+      const res = await fetch(`${API_BASE}/slots/vendor/requests`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const result = await res.json();
+      if (result.data) {
+        setRequests(result.data);
+      }
+    } catch (err) {
+      console.log("fetchRequests err:", err);
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
+
   useEffect(() => {
     fetchOrders();
+    fetchRequests();
   }, []);
 
   // Socket setup for real-time negotiation
@@ -205,9 +256,9 @@ export default function VendorOrdersScreen() {
     });
 
     // Slot & Fee Negotiation updates
-    socket.on("slot:request", () => fetchOrders());
+    socket.on("slot:request", () => { fetchOrders(); fetchRequests(); });
     socket.on("fee:request", () => fetchOrders());
-    socket.on("phone:request", () => fetchOrders());
+    socket.on("phone:request", () => fetchRequests());
 
     // Customer responses
     socket.on("slot:confirmed", () => fetchOrders());
@@ -272,6 +323,14 @@ export default function VendorOrdersScreen() {
           : ""
       );
 
+      if (selectedOrder.delivery_slot && selectedOrder.delivery_slot.start_time) {
+        const st = new Date(selectedOrder.delivery_slot.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const ed = new Date(selectedOrder.delivery_slot.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setCounterSlotInput(`${st} to ${ed}`);
+      } else {
+        setCounterSlotInput("");
+      }
+
     }
 
   }, [selectedOrder]);
@@ -287,8 +346,15 @@ export default function VendorOrdersScreen() {
   };
 
   const sendCounterOffer = async () => {
-
     try {
+      let slot_start, slot_end;
+      if (counterSlotInput) {
+        const parsed = parseSlotLocally(counterSlotInput);
+        if (parsed) {
+          slot_start = parsed.start;
+          slot_end = parsed.end;
+        }
+      }
 
       const res = await fetch(`${API_BASE}/orders/${selectedOrder.id}/counter`, {
         method: "PATCH",
@@ -299,7 +365,9 @@ export default function VendorOrdersScreen() {
         body: JSON.stringify({
           items: counterItems,
           delivery_fee: parseFloat(counterDeliveryFee),
-          note: counterNote
+          note: counterNote,
+          slot_start,
+          slot_end
         })
       });
 
@@ -336,9 +404,41 @@ export default function VendorOrdersScreen() {
     if (diffHours < 24) return `${diffHours}h ago`;
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
-
   const formatStatus = (status) => {
+    if (!status) return "";
     return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  const handlePhoneRequest = async (id, status) => {
+    try {
+      await fetch(`${API_BASE}/slots/phone-request/${id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ status })
+      });
+      fetchRequests();
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  const handleSlotRequest = async (id, action) => {
+    try {
+      await fetch(`${API_BASE}/slots/${id}/${action}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        }
+      });
+      fetchRequests();
+      fetchOrders();
+    } catch (err) {
+      console.log(err);
+    }
   };
 
   if (loading) {
@@ -353,23 +453,46 @@ export default function VendorOrdersScreen() {
 
     <View style={styles.container}>
 
-      <Text style={styles.header}>Orders</Text>
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === "orders" && styles.activeTab]}
+          onPress={() => setActiveTab("orders")}
+        >
+          <Text style={[styles.tabText, activeTab === "orders" && styles.activeTabText]}>Orders</Text>
+          {orders.length > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{orders.length}</Text></View>}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === "requests" && styles.activeTab]}
+          onPress={() => setActiveTab("requests")}
+        >
+          <Text style={[styles.tabText, activeTab === "requests" && styles.activeTabText]}>Requests</Text>
+          {(requests.phones.length + requests.slots.length) > 0 && (
+            <View style={[styles.badge, { backgroundColor: "#D97706" }]}>
+              <Text style={styles.badgeText}>{requests.phones.length + requests.slots.length}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
 
       <FlatList
-        data={orders}
-        keyExtractor={(item) => String(item.id)}
+        data={activeTab === "orders" ? orders : [...requests.phones.map(p => ({ ...p, type: 'phone' })), ...requests.slots.map(s => ({ ...s, type: 'slot' }))]}
+        keyExtractor={(item) => item.type ? `${item.type}-${item.id}` : String(item.id)}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={refreshing || loadingRequests} onRefresh={activeTab === "orders" ? onRefresh : fetchRequests} />
         }
         contentContainerStyle={{ padding: 16 }}
-        renderItem={({ item }) => (
+        ListEmptyComponent={activeTab === "requests" ? (
+          <View style={{ padding: 40, alignItems: 'center' }}>
+            <Ionicons name="notifications-off-outline" size={48} color="#D1D5DB" />
+            <Text style={{ marginTop: 12, color: "#6B7280", fontWeight: '600' }}>No pending requests</Text>
+          </View>
+        ) : null}
+        renderItem={({ item }) => activeTab === "orders" ? (
           <TouchableOpacity
-
             style={[
               styles.orderCard,
               item.status === "pending" && styles.orderCardPending
             ]}
-
             onPress={['accepted', 'preparing', 'ready', 'picked_up'].includes(item.status) ? () => {
               setSelectedOrder(item);
               setIsDeliveryModalVisible(true)
@@ -378,7 +501,6 @@ export default function VendorOrdersScreen() {
               setModalVisible(true);
             }}
           >
-
             <View style={styles.orderHeader}>
               <View style={styles.orderIdContainer}>
                 {item.status === "pending" && <View style={styles.pendingDot} />}
@@ -389,27 +511,31 @@ export default function VendorOrdersScreen() {
                   {item.order_number || `Order #${item.id}`}
                 </Text>
               </View>
-
               <Text style={styles.orderTime}>
                 {formatOrderTime(item.created_at)}
               </Text>
             </View>
-
             <Text style={styles.customer}>
               👤 {item.customer?.name}
             </Text>
-
+            {item.delivery_slot && (
+              <View style={styles.slotBadge}>
+                <Ionicons name="time-outline" size={14} color="#059669" />
+                <Text style={styles.slotBadgeText}>
+                  {new Date(item.delivery_slot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - 
+                  {new Date(item.delivery_slot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </View>
+            )}
             <Text style={styles.items}>
               {(item.items || []).map(i => `${i.quantity}x ${i.product_name}`).join(", ")}
             </Text>
-
             {item.has_loose_items && (
               <View style={styles.negotiationBadge}>
                 <MaterialIcons name="scale" size={12} color="#D97706" />
                 <Text style={styles.negotiationText}>WEIGHT NEGOTIATION NEEDED</Text>
               </View>
             )}
-
             <View style={styles.bottomRow}>
               <View style={styles.totalContainer}>
                 <Text style={styles.totalLabel}>Total</Text>
@@ -433,8 +559,45 @@ export default function VendorOrdersScreen() {
                 </Text>
               </View>
             </View>
-
           </TouchableOpacity>
+        ) : (
+          <View style={styles.requestCard}>
+             <View style={styles.requestHeader}>
+                <View style={styles.requestIcon}>
+                   <Ionicons name={item.type === 'phone' ? "phone-portrait-outline" : "alarm-outline"} size={20} color="#1F2937" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                   <Text style={styles.requestTitle}>{item.type === 'phone' ? "Phone Request" : "Delivery Slot Request"}</Text>
+                   <Text style={styles.requestCustomer}>{item.customer?.name}</Text>
+                </View>
+                <Text style={styles.orderTime}>{formatOrderTime(item.created_at)}</Text>
+             </View>
+
+             {item.type === 'slot' && (
+                <View style={styles.requestDetails}>
+                   <Text style={styles.slotRange}>
+                      {new Date(item.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - 
+                      {new Date(item.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                   </Text>
+                   <Text style={styles.slotDay}>{new Date(item.start).toDateString() === new Date().toDateString() ? "Today" : "Tomorrow"}</Text>
+                </View>
+             )}
+
+             <View style={styles.requestActions}>
+                <TouchableOpacity 
+                   style={[styles.actionBtn, styles.rejectBtn]} 
+                   onPress={() => item.type === 'phone' ? handlePhoneRequest(item.id, 'rejected') : handleSlotRequest(item.id, 'reject')}
+                >
+                   <Text style={styles.rejectBtnText}>Reject</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                   style={[styles.actionBtn, styles.approveBtn]} 
+                   onPress={() => item.type === 'phone' ? handlePhoneRequest(item.id, 'approved') : handleSlotRequest(item.id, 'confirm')}
+                >
+                   <Text style={styles.approveBtnText}>Approve</Text>
+                </TouchableOpacity>
+             </View>
+          </View>
         )}
       />
 
@@ -800,6 +963,15 @@ export default function VendorOrdersScreen() {
                 onChangeText={setCounterDeliveryFee}
                 keyboardType="numeric"
                 placeholder="Enter delivery fee"
+              />
+
+              <Text style={styles.sectionTitle}>Delivery Window (Optional)</Text>
+
+              <TextInput
+                style={styles.input}
+                value={counterSlotInput}
+                onChangeText={setCounterSlotInput}
+                placeholder="e.g. 3pm to 5pm"
               />
 
               <Text style={styles.sectionTitle}>Note (Optional)</Text>
@@ -1392,32 +1564,183 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    borderWidth: 1,
     borderColor: "#F3F4F6",
   },
   partnersCount: {
     fontSize: 11,
-    fontWeight: "800",
-    color: "#475569",
+    fontWeight: "700",
+    color: "#6B7280",
     letterSpacing: 0.5,
   },
   activeIndicator: {
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "#DCFCE7",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   activeDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#22C55E",
+    backgroundColor: "#16A34A",
     marginRight: 6,
   },
   activeTextStatus: {
-    fontSize: 11,
-    fontWeight: "800",
+    fontSize: 10,
+    fontWeight: "700",
     color: "#16A34A",
   },
+
+  // NEW STYLES
+  tabContainer: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    padding: 4,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
+  },
+  tab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 8,
+  },
+  activeTab: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  activeTabText: {
+    color: "#0F172A",
+    fontWeight: "800",
+  },
+  badge: {
+    backgroundColor: "#1D4ED8",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    minWidth: 20,
+    alignItems: "center",
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  slotBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ECFDF5",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: "flex-start",
+    marginTop: 8,
+    gap: 4,
+  },
+  slotBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#059669",
+  },
+  requestCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  requestHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  requestIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  requestTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#1F2937",
+  },
+  requestCustomer: {
+    fontSize: 13,
+    color: "#64748B",
+    marginTop: 2,
+  },
+  requestDetails: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  slotRange: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  slotDay: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  requestActions: {
+    flexDirection: "row",
+    marginTop: 16,
+    gap: 12,
+  },
+  actionBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rejectBtn: {
+    backgroundColor: "#FFF1F2",
+    borderWidth: 1,
+    borderColor: "#FECDD3",
+  },
+  rejectBtnText: {
+    color: "#E11D48",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  approveBtn: {
+    backgroundColor: "#0F172A",
+  },
+  approveBtnText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+
   riderListContainer: {
     padding: 16,
     backgroundColor: "#F8FAFC",

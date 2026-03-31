@@ -13,7 +13,6 @@ import useAuthStore    from "../../store/authStore";
 import useAddressStore from "../../store/addressStore";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
-const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
 const C = {
   orange:     "#F97316", orangeDark: "#EA580C",
@@ -320,50 +319,6 @@ const fm = StyleSheet.create({
   confirmBtnText:     { fontSize: 15, fontWeight: "800", color: C.white },
 });
 
-// ─── Waiting modal (slot or fee) ──────────────────────────────────────────────
-function WaitingModal({ visible, countdown, vendorName, mode, onSwitchStore }) {
-  const pct = mode === "fee" ? (countdown / 60) * 100 : (countdown / 60) * 100;
-  return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={wm.backdrop}>
-        <View style={wm.card}>
-          <Text style={wm.timerNum}>{countdown}</Text>
-          <Text style={wm.timerLabel}>seconds remaining</Text>
-          <Text style={wm.title}>
-            {mode === "fee" ? "Waiting for fee response…" : `Waiting for ${vendorName || "vendor"}…`}
-          </Text>
-          <Text style={wm.sub}>
-            {mode === "fee"
-              ? "Vendor has 60 seconds to accept or counter your fee."
-              : "They have 60 seconds to confirm your slot."}
-          </Text>
-          <View style={wm.bar}>
-            <View style={[wm.barFill, { width: `${pct}%` }]} />
-          </View>
-          {countdown <= 15 && (
-            <TouchableOpacity style={wm.switchBtn} onPress={onSwitchStore} activeOpacity={0.85}>
-              <Text style={wm.switchBtnText}>Cancel & switch store</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-const wm = StyleSheet.create({
-  backdrop:     { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center" },
-  card:         { backgroundColor: C.white, borderRadius: 24, padding: 28, alignItems: "center", width: "80%", gap: 8 },
-  timerNum:     { fontSize: 56, fontWeight: "900", color: C.green },
-  timerLabel:   { fontSize: 12, color: C.gray400, fontWeight: "600", marginTop: -8 },
-  title:        { fontSize: 17, fontWeight: "800", color: C.gray900, textAlign: "center", marginTop: 8 },
-  sub:          { fontSize: 13, color: C.gray400, textAlign: "center" },
-  bar:          { width: "100%", height: 6, backgroundColor: C.gray100, borderRadius: 3, overflow: "hidden", marginTop: 8 },
-  barFill:      { height: "100%", backgroundColor: C.green, borderRadius: 3 },
-  switchBtn:    { marginTop: 12, backgroundColor: C.redLight, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
-  switchBtnText:{ fontSize: 14, fontWeight: "700", color: C.red },
-});
-
 // ═══════════════════════════════════════════════════════════════════════════ //
 export default function CartScreen() {
   const navigation   = useNavigation();
@@ -383,31 +338,17 @@ export default function CartScreen() {
   const [slotModalVisible, setSlotModalVisible] = useState(false);
   const [confirmedSlot,    setConfirmedSlot]    = useState(null);
   const [requestingSlot,   setRequestingSlot]   = useState(false);
-  const [slotId,           setSlotId]           = useState(null);
-  const [counterSlot,      setCounterSlot]      = useState(null);
-  const [showCounterSlot,  setShowCounterSlot]  = useState(false);
 
   // ── Fee negotiation state ──────────────────────────────────────────────────
   const [feeModalVisible,  setFeeModalVisible]  = useState(false);
   const [proposedFee,      setProposedFee]      = useState(null); // customer's proposal
   const [confirmedFee,     setConfirmedFee]     = useState(null); // agreed fee
   const [requestingFee,    setRequestingFee]    = useState(false);
-  const [feeNegId,         setFeeNegId]         = useState(null);
-  const [counterFee,       setCounterFee]       = useState(null);
-  const [showCounterFee,   setShowCounterFee]   = useState(false);
-  const [vendorFeeProposal,setVendorFeeProposal]= useState(null);
-
-  // ── Waiting modal (shared) ─────────────────────────────────────────────────
-  const [waiting,          setWaiting]          = useState(false);
-  const [waitingMode,      setWaitingMode]      = useState("slot"); // "slot" | "fee"
-  const [countdown,        setCountdown]        = useState(60);
 
   // ── Phone request ──────────────────────────────────────────────────────────
   const [phoneStatus,      setPhoneStatus]      = useState(null);
   const [vendorPhone,      setVendorPhone]      = useState(null);
   const [requestingPhone,  setRequestingPhone]  = useState(false);
-
-  const timerRef = useRef(null);
 
   // ── Computed ───────────────────────────────────────────────────────────────
   const selectedAddr = addressStore?.addresses?.find(a => a.id === addressStore?.selectedId)
@@ -435,43 +376,7 @@ export default function CartScreen() {
   // ── Socket: listen for all vendor responses ────────────────────────────────
   useEffect(() => {
     if (!token) return;
-    const socket = io(SOCKET_URL, { auth: { token } });
-
-    // Slot events
-    socket.on("slot:accepted", (data) => {
-      clearTimer();
-      setWaiting(false);
-      setConfirmedSlot({ start: data.slot_start, end: data.slot_end });
-    });
-    socket.on("slot:countered", (data) => {
-      clearTimer();
-      setWaiting(false);
-      setCounterSlot({ start: data.vendor_slot_start, end: data.vendor_slot_end });
-      setShowCounterSlot(true);
-    });
-    socket.on("slot:rejected", () => { clearTimer(); setWaiting(false); });
-    socket.on("slot:expired",  () => { clearTimer(); setWaiting(false); });
-
-    // Fee events
-    socket.on("fee:accepted", (data) => {
-      clearTimer();
-      setWaiting(false);
-      setConfirmedFee(data.agreed_fee);
-      setProposedFee(null);
-    });
-    socket.on("fee:countered", (data) => {
-      clearTimer();
-      setWaiting(false);
-      setCounterFee(data.vendor_fee);
-      setVendorFeeProposal(data.vendor_fee);
-      setShowCounterFee(true);
-    });
-    socket.on("fee:rejected", () => {
-      clearTimer();
-      setWaiting(false);
-      setProposedFee(null);
-    });
-    socket.on("fee:expired",  () => { clearTimer(); setWaiting(false); setProposedFee(null); });
+    const socket = io(`${BASE_URL.replace('/api', '')}`, { auth: { token } });
 
     // Phone events
     socket.on("phone:approved", (data) => { setPhoneStatus("approved"); setVendorPhone(data.phone); });
@@ -480,100 +385,16 @@ export default function CartScreen() {
     return () => socket.disconnect();
   }, [token]);
 
-  // ── Timer helpers ──────────────────────────────────────────────────────────
-  const clearTimer = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setCountdown(60);
-  };
-  const startTimer = () => {
-    setCountdown(60);
-    timerRef.current = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) { clearInterval(timerRef.current); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
   // ── Slot actions ───────────────────────────────────────────────────────────
   const handleRequestSlot = async ({ slot_start, slot_end }) => {
-    setRequestingSlot(true);
-    try {
-      const res  = await fetch(`${BASE_URL}/slots/request`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body:    JSON.stringify({ vendor_id: vendorId, slot_start, slot_end }),
-      });
-      const data = await res.json();
-      const id   = data.data?.slot?.id || data.slot?.id;
-      if (id) {
-        setSlotId(id);
-        setSlotModalVisible(false);
-        setWaitingMode("slot");
-        setWaiting(true);
-        startTimer();
-      }
-    } catch (e) { console.error("slot request:", e.message); }
-    finally { setRequestingSlot(false); }
-  };
-
-  const handleAcceptCounterSlot = async () => {
-    if (!slotId) return;
-    await fetch(`${BASE_URL}/slots/${slotId}/confirm`, {
-      method: "POST", headers: { Authorization: `Bearer ${token}` },
-    });
-    setConfirmedSlot(counterSlot);
-    setShowCounterSlot(false);
-    setCounterSlot(null);
-  };
-
-  const handleRejectCounterSlot = async () => {
-    if (slotId) await fetch(`${BASE_URL}/slots/${slotId}/reject`, {
-      method: "POST", headers: { Authorization: `Bearer ${token}` },
-    });
-    setShowCounterSlot(false);
-    setCounterSlot(null);
+    setConfirmedSlot({ start: slot_start, end: slot_end });
+    setSlotModalVisible(false);
   };
 
   // ── Fee actions ────────────────────────────────────────────────────────────
   const handleProposefee = async (amount) => {
-    setRequestingFee(true);
-    try {
-      const res  = await fetch(`${BASE_URL}/slots/fee-negotiate`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body:    JSON.stringify({ vendor_id: vendorId, proposed_fee: amount }),
-      });
-      const data = await res.json();
-      const id   = data.data?.negotiation_id || data.negotiation_id;
-      if (id) {
-        setFeeNegId(id);
-        setProposedFee(amount);
-        setFeeModalVisible(false);
-        setWaitingMode("fee");
-        setWaiting(true);
-        startTimer();
-      }
-    } catch (e) { console.error("fee propose:", e.message); }
-    finally { setRequestingFee(false); }
-  };
-
-  const handleAcceptCounterFee = async () => {
-    if (feeNegId) await fetch(`${BASE_URL}/slots/fee-negotiate/${feeNegId}/confirm`, {
-      method: "POST", headers: { Authorization: `Bearer ${token}` },
-    });
-    setConfirmedFee(counterFee);
-    setShowCounterFee(false);
-    setCounterFee(null);
-  };
-
-  const handleRejectCounterFee = async () => {
-    if (feeNegId) await fetch(`${BASE_URL}/slots/fee-negotiate/${feeNegId}/reject`, {
-      method: "POST", headers: { Authorization: `Bearer ${token}` },
-    });
-    setShowCounterFee(false);
-    setCounterFee(null);
-    setProposedFee(null);
+    setProposedFee(amount);
+    setFeeModalVisible(false);
   };
 
   // ── Phone ──────────────────────────────────────────────────────────────────
@@ -589,17 +410,6 @@ export default function CartScreen() {
       setPhoneStatus("pending");
     } catch {}
     finally { setRequestingPhone(false); }
-  };
-
-  // ── Cancel & switch ────────────────────────────────────────────────────────
-  const handleSwitchStore = async () => {
-    if (slotId) await fetch(`${BASE_URL}/slots/${slotId}/reject`, {
-      method: "POST", headers: { Authorization: `Bearer ${token}` },
-    });
-    setWaiting(false);
-    clearTimer();
-    cart?.clearCart?.();
-    navigation.goBack();
   };
 
 
@@ -714,40 +524,6 @@ export default function CartScreen() {
             </LinearGradient>
           </View>
 
-          {/* Counter slot banner */}
-          {showCounterSlot && counterSlot && (
-            <View style={[s.counterBanner, { borderRadius: cardR, marginHorizontal: px }]}>
-              <Feather name="clock" size={15} color="#92400E" />
-              <View style={{ flex: 1 }}>
-                <Text style={[s.counterTitle, { fontSize: Math.round(13 * fs) }]}>Vendor suggests {fmtSlot(counterSlot)}</Text>
-                <Text style={[s.counterSub, { fontSize: Math.round(11 * fs) }]}>Accept their window or pick another</Text>
-              </View>
-              <TouchableOpacity style={s.counterAccept} onPress={handleAcceptCounterSlot}>
-                <Text style={[s.counterAcceptText, { fontSize: Math.round(13 * fs) }]}>Accept</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.counterReject} onPress={handleRejectCounterSlot}>
-                <Feather name="x" size={14} color={C.red} />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Counter fee banner */}
-          {showCounterFee && counterFee != null && (
-            <View style={[s.counterBanner, { borderRadius: cardR, marginHorizontal: px }]}>
-              <Feather name="dollar-sign" size={15} color="#92400E" />
-              <View style={{ flex: 1 }}>
-                <Text style={[s.counterTitle, { fontSize: Math.round(13 * fs) }]}>Vendor counters with ₹{counterFee} delivery fee</Text>
-                <Text style={[s.counterSub, { fontSize: Math.round(11 * fs) }]}>Accept or reject their offer</Text>
-              </View>
-              <TouchableOpacity style={s.counterAccept} onPress={handleAcceptCounterFee}>
-                <Text style={[s.counterAcceptText, { fontSize: Math.round(13 * fs) }]}>Accept</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.counterReject} onPress={handleRejectCounterFee}>
-                <Feather name="x" size={14} color={C.red} />
-              </TouchableOpacity>
-            </View>
-          )}
-
           {/* Items + phone (scrollable part of main col) */}
           <ScrollView
             style={s.itemsScroll}
@@ -851,7 +627,16 @@ export default function CartScreen() {
                 <Text style={[s.proceedSub, { fontSize: Math.round(11 * fs) }]}>total</Text>
               </View>
 
-              <TouchableOpacity onPress={() => navigation.navigate("Checkout")} activeOpacity={0.88} style={[s.proceedBtn, { flex: 1 }]}>
+              <TouchableOpacity 
+                onPress={() => navigation.navigate("Checkout", { 
+                  confirmedSlot, 
+                  confirmedFee, 
+                  vendorPhone,
+                  phoneStatus
+                })} 
+                activeOpacity={0.88} 
+                style={[s.proceedBtn, { flex: 1 }]}
+              >
                 <LinearGradient
                   colors={[C.green, C.greenDark]}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
@@ -886,7 +671,16 @@ export default function CartScreen() {
 
 
             {/* Proceed button in sidebar */}
-            <TouchableOpacity onPress={() => navigation.navigate("Checkout")} activeOpacity={0.88} style={s.proceedBtnSide}>
+            <TouchableOpacity 
+              onPress={() => navigation.navigate("Checkout", { 
+                confirmedSlot, 
+                confirmedFee, 
+                vendorPhone,
+                phoneStatus
+              })} 
+              activeOpacity={0.88} 
+              style={s.proceedBtnSide}
+            >
               <LinearGradient colors={[C.green, C.greenDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.proceedGradSide}>
                 <Text style={s.proceedTextSide}>Proceed to checkout</Text>
                 <Feather name="arrow-right" size={18} color={C.white} />
@@ -934,13 +728,6 @@ export default function CartScreen() {
         onClose={() => setFeeModalVisible(false)}
         onPropose={handleProposefee}
         loading={requestingFee}
-      />
-      <WaitingModal
-        visible={waiting}
-        countdown={countdown}
-        vendorName={vendorName}
-        mode={waitingMode}
-        onSwitchStore={handleSwitchStore}
       />
     </View>
   );
