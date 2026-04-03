@@ -6,6 +6,7 @@ import ActiveDeliveryScreen from '../apps/delivery/ActiveDeliveryScreen';
 import HistoryScreen        from '../apps/delivery/HistoryScreen';
 import QueueScreen          from '../apps/delivery/QueueScreen';
 import DeliveryHomeScreen   from '../apps/delivery/DeliveryHomeScreen';
+import DeliveryOnboarding from '../apps/delivery/DeliveryOnboardingScreen';
 
 const Tab = createBottomTabNavigator();
 

@@ -12,7 +12,8 @@ import useCartStore    from "../../store/cartStore";
 import useAuthStore    from "../../store/authStore";
 import useAddressStore from "../../store/addressStore";
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+const BASE_URL   = process.env.EXPO_PUBLIC_API_URL    || "http://localhost:3000/api";
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
 const C = {
   orange:     "#F97316", orangeDark: "#EA580C",
@@ -341,8 +342,8 @@ export default function CartScreen() {
 
   // ── Fee negotiation state ──────────────────────────────────────────────────
   const [feeModalVisible,  setFeeModalVisible]  = useState(false);
-  const [proposedFee,      setProposedFee]      = useState(null); // customer's proposal
-  const [confirmedFee,     setConfirmedFee]     = useState(null); // agreed fee
+  const proposedFee      = cart?.proposedFee; // customer's proposal from store
+  const [confirmedFee,     setConfirmedFee]     = useState(null); // agreed fee from socket (TBD)
   const [requestingFee,    setRequestingFee]    = useState(false);
 
   // ── Phone request ──────────────────────────────────────────────────────────
@@ -376,11 +377,27 @@ export default function CartScreen() {
   // ── Socket: listen for all vendor responses ────────────────────────────────
   useEffect(() => {
     if (!token) return;
-    const socket = io(`${BASE_URL.replace('/api', '')}`, { auth: { token } });
+    const socket = io(SOCKET_URL, { 
+      auth: { token },
+      transports: ["websocket"]
+    });
 
     // Phone events
-    socket.on("phone:approved", (data) => { setPhoneStatus("approved"); setVendorPhone(data.phone); });
-    socket.on("phone:rejected", ()      => setPhoneStatus("rejected"));
+    socket.on("phone:approved", (data) => { 
+      setPhoneStatus("approved"); 
+      setVendorPhone(data.phone); 
+    });
+    socket.on("phone:rejected", () => setPhoneStatus("rejected"));
+    
+    // Modern combined event (from Checkout.js)
+    socket.on("phone:update", (data) => {
+      if (data.status === "approved" && data.phone) {
+        setPhoneStatus("approved");
+        setVendorPhone(data.phone);
+      } else if (data.status === "rejected") {
+        setPhoneStatus("rejected");
+      }
+    });
 
     return () => socket.disconnect();
   }, [token]);
@@ -393,7 +410,7 @@ export default function CartScreen() {
 
   // ── Fee actions ────────────────────────────────────────────────────────────
   const handleProposefee = async (amount) => {
-    setProposedFee(amount);
+    cart?.setProposedFee(amount);
     setFeeModalVisible(false);
   };
 
@@ -402,14 +419,22 @@ export default function CartScreen() {
     if (!vendorId) return;
     setRequestingPhone(true);
     try {
-      await fetch(`${BASE_URL}/slots/phone-request`, {
+      const res = await fetch(`${BASE_URL}/slots/phone-request`, {
         method:  "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body:    JSON.stringify({ vendor_id: vendorId }),
       });
-      setPhoneStatus("pending");
-    } catch {}
-    finally { setRequestingPhone(false); }
+      if (res.ok) {
+        setPhoneStatus("pending");
+      } else {
+        const err = await res.json();
+        console.error("Phone request failed:", err);
+      }
+    } catch (e) {
+      console.error("Phone request exception:", e.message);
+    } finally { 
+      setRequestingPhone(false); 
+    }
   };
 
 
@@ -630,7 +655,7 @@ export default function CartScreen() {
               <TouchableOpacity 
                 onPress={() => navigation.navigate("Checkout", { 
                   confirmedSlot, 
-                  confirmedFee, 
+                  confirmedFee: confirmedFee ?? proposedFee, 
                   vendorPhone,
                   phoneStatus
                 })} 
@@ -674,7 +699,7 @@ export default function CartScreen() {
             <TouchableOpacity 
               onPress={() => navigation.navigate("Checkout", { 
                 confirmedSlot, 
-                confirmedFee, 
+                confirmedFee: confirmedFee ?? proposedFee, 
                 vendorPhone,
                 phoneStatus
               })} 

@@ -44,7 +44,7 @@ const useCartStore = create((set, get) => ({
     }
   },
 
-  clearCart: () => set({ items: [], vendorId: null }),
+  clearCart: () => set({ items: [], vendorId: null, proposedFee: null }),
 
   getTotal: () => {
     const { items } = get();
@@ -55,6 +55,9 @@ const useCartStore = create((set, get) => ({
     const { items } = get();
     return items.reduce((sum, item) => sum + item.qty, 0);
   },
+
+  proposedFee: null,
+  setProposedFee: (fee) => set({ proposedFee: fee }),
 }));
 
 export default useCartStore;

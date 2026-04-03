@@ -630,11 +630,12 @@ export default function CheckoutScreen() {
   // ── Address state ──────────────────────────────────────────────────────────
   const savedAddresses = addressStore?.addresses || [];
   const [selectedAddrId, setSelectedAddrId] = useState(
-    addressStore?.selectedId ?? savedAddresses[0]?.id ?? null,
+    addressStore?.selectedId || (savedAddresses.length > 0 ? savedAddresses[0].id : null)
   );
+  const currentLocation = addressStore?.currentLocation || {};
   const [detectingLoc, setDetectingLoc] = useState(false);
-  const [detectedAddr, setDetectedAddr] = useState(null);
-  const [detectedCoords, setDetectedCoords] = useState(null);
+  const [detectedAddr, setDetectedAddr] = useState(currentLocation.displayName || null);
+  const [detectedCoords, setDetectedCoords] = useState(currentLocation.lat ? { lat: currentLocation.lat, lng: currentLocation.lng } : null);
   const [manualOpen, setManualOpen] = useState(false);
 
   // ── Socket: listen for vendor responses ────────────────────────────────────
@@ -758,68 +759,31 @@ export default function CheckoutScreen() {
   }, [orderStatus]);
 
   // ── Detect GPS location ────────────────────────────────────────────────────
-  const detectLocation = () => {
+  const detectLocation = async () => {
     setDetectingLoc(true);
-    const onSuccess = async (lat, lng) => {
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
-          { headers: { "User-Agent": "DesiDukaan/1.0" } },
-        );
-        const displayName = d.display_name || "Location detected";
-        setDetectedAddr(displayName);
-        setDetectedCoords({ lat, lng });
-        // Save to backend so order placement gets a real DB address id
-        const savedId = await addressStore?.addAddress?.(
-          { address: displayName, lat, lng, label: "Current Location" },
-          token,
+    try {
+      await addressStore.fetchLocation(true); // force fresh detect if they click the button
+      const fresh = addressStore.currentLocation;
+      if (fresh.lat) {
+        setDetectedAddr(fresh.displayName);
+        setDetectedCoords({ lat: fresh.lat, lng: fresh.lng });
+        const savedId = await addressStore.addAddress(
+          { address: fresh.displayName, lat: fresh.lat, lng: fresh.lng, label: "Current Location" },
+          token
         );
         if (savedId) {
           setSelectedAddrId(savedId);
-          addressStore?.setSelectedId?.(savedId);
+          addressStore.setSelectedId(savedId);
         } else {
           setSelectedAddrId("detected");
         }
-      } catch {
-        setDetectedAddr("Location detected");
-        setSelectedAddrId("detected");
-        // Try saving even without a display name
-        addressStore?.addAddress?.(
-          { address: "Current Location", lat, lng, label: "Current Location" },
-          token,
-        );
-      } finally {
-        setDetectingLoc(false);
+      } else {
+        setManualOpen(true);
       }
-    };
-    const onFail = () => {
-      setDetectingLoc(false);
+    } catch (e) {
       setManualOpen(true);
-    };
-
-    if (Platform.OS === "web") {
-      navigator.geolocation?.getCurrentPosition(
-        (p) => onSuccess(p.coords.latitude, p.coords.longitude),
-        onFail,
-        { timeout: 10000 },
-      );
-    } else {
-      (async () => {
-        try {
-          const L = require("expo-location");
-          const { status } = await L.requestForegroundPermissionsAsync();
-          if (status !== "granted") {
-            onFail();
-            return;
-          }
-          const loc = await L.getCurrentPositionAsync({
-            accuracy: L.Accuracy.Balanced,
-          });
-          onSuccess(loc.coords.latitude, loc.coords.longitude);
-        } catch {
-          onFail();
-        }
-      })();
+    } finally {
+      setDetectingLoc(false);
     }
   };
 
