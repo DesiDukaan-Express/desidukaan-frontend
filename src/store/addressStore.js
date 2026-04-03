@@ -1,10 +1,12 @@
 import { create } from "zustand";
+import { Platform } from "react-native";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 const useAddressStore = create((set, get) => ({
   addresses:  [],
   selectedId: null,
+  currentLocation: { lat: null, lng: null, displayName: "Detecting location...", loading: false, error: null },
 
   setSelectedId: (id) => set({ selectedId: id }),
 
@@ -92,6 +94,56 @@ const useAddressStore = create((set, get) => ({
   },
 
   clearAddresses: () => set({ addresses: [], selectedId: null }),
+
+  // ── Session-based location fetching ─────────────────────────────────────────
+  fetchLocation: async (force = false) => {
+    const { currentLocation } = get();
+    if (!force && currentLocation.lat && currentLocation.lng) return;
+
+    set(state => ({ currentLocation: { ...state.currentLocation, loading: true, error: null } }));
+
+    const onCoords = async (lat, lng) => {
+      let displayName = "Detected Location";
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+          { headers: { "User-Agent": "DesiDukaan/1.0" } }
+        );
+        const d = await res.json();
+        if (d?.display_name) {
+          const parts = d.display_name.split(",");
+          displayName = [parts[0]?.trim(), parts[1]?.trim()].filter(Boolean).join(", ");
+        }
+      } catch (e) {
+        console.error("Reverse geocode failed:", e);
+      }
+      set({ currentLocation: { lat, lng, displayName, loading: false, error: null } });
+    };
+
+    const fallback = () => {
+      set({ currentLocation: { lat: 28.5921, lng: 77.3196, displayName: "Noida, UP", loading: false, error: "Permission denied" } });
+    };
+
+    if (Platform.OS === "web") {
+      if (!navigator?.geolocation) { fallback(); return; }
+      navigator.geolocation.getCurrentPosition(
+        (p) => onCoords(p.coords.latitude, p.coords.longitude),
+        () => fallback(),
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    } else {
+      try {
+        const Location = require("expo-location");
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") { fallback(); return; }
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        onCoords(loc.coords.latitude, loc.coords.longitude);
+      } catch (e) {
+        console.error("Native location fail:", e);
+        fallback();
+      }
+    }
+  },
 }));
 
 export default useAddressStore;

@@ -125,7 +125,7 @@ function AddressPicker({
       onRequestClose={onClose}
     >
       <Pressable style={ap.backdrop} onPress={onClose}>
-        <Pressable style={ap.sheet} onPress={() => {}}>
+        <Pressable style={ap.sheet} onPress={() => { }}>
           <View style={ap.handle} />
           <View style={ap.titleRow}>
             <Text style={ap.title}>
@@ -444,7 +444,7 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
       onRequestClose={onClose}
     >
       <Pressable style={sp.backdrop} onPress={onClose}>
-        <Pressable style={sp.sheet} onPress={() => {}}>
+        <Pressable style={sp.sheet} onPress={() => { }}>
           <View style={sp.handle} />
           <Text style={sp.sheetTitle}>Choose a store</Text>
           <Text style={sp.sheetSub}>
@@ -620,9 +620,9 @@ const CAT_FALLBACK_IMGS = {
 
 // ─── Vendor type display config ──────────────────────────────────────────────
 const VENDOR_TYPE_META = {
-  ration:     { label: "Ration Store",   bg: "#FEF9C3", color: "#92400E" },
-  vegetables: { label: "Vegetables",    bg: "#DCFCE7", color: "#14532D" },
-  fruits:     { label: "Fruits",        bg: "#ECFDF5", color: "#065F46" },
+  ration: { label: "Ration Store", bg: "#FEF9C3", color: "#92400E" },
+  vegetables: { label: "Vegetables", bg: "#DCFCE7", color: "#14532D" },
+  fruits: { label: "Fruits", bg: "#ECFDF5", color: "#065F46" },
 };
 
 // ─── Item Card ─────────────────────────────────────────────────────────────────
@@ -745,14 +745,25 @@ const ic = StyleSheet.create({
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function HomeScreen() {
-  const [locationShort, setLocationShort] = useState(null);
-  const [locationCoords, setLocationCoords] = useState(null);
+  const { token, user } = useAuthStore();
+  const navigation = useNavigation();
+  const addressStore = useAddressStore();
+  const cart = useCartStore();
+
+  const { currentLocation, fetchLocation: triggerRefetch } = addressStore;
+  const locationShort = currentLocation.displayName;
+  const locationCoords = useMemo(() => {
+    return currentLocation.lat
+      ? { lat: currentLocation.lat, lng: currentLocation.lng }
+      : null;
+  }, [currentLocation.lat, currentLocation.lng]);
+  const locationLoading = currentLocation.loading;
+
   const [vendors, setVendors] = useState([]);
   const [recentOrders, setRecentOrders] = useState([]);
   const [popularFromAPI, setPopularFromAPI] = useState([]);
   const [loadingVendors, setLoadingVendors] = useState(false);
   const [loadingInventory, setLoadingInventory] = useState(false);
-  const [locationLoading, setLocationLoading] = useState(true);
 
   // Store picker
   const [pickerItem, setPickerItem] = useState(null);
@@ -775,11 +786,6 @@ export default function HomeScreen() {
     return () => window.removeEventListener("resize", h);
   }, []);
   const wide = winW > 700;
-
-  const { token, user } = useAuthStore();
-  const navigation = useNavigation();
-  const addressStore = useAddressStore();
-  const cart = useCartStore();
 
   // ── Single source of truth for cart — read directly from cartStore ──────────
   // Do NOT maintain local itemQtys — it diverges from VendorStoreScreen changes
@@ -831,76 +837,18 @@ export default function HomeScreen() {
   }, [cartCount, wide]);
 
   useEffect(() => {
-    fetchLocation();
-  }, []);
+    if (locationCoords) {
+      fetchNearbyVendors(locationCoords.lat, locationCoords.lng);
+      fetchPopularProducts(locationCoords.lat, locationCoords.lng);
+    }
+  }, [locationCoords?.lat, locationCoords?.lng]);
+
   useEffect(() => {
     if (token) fetchRecentOrders();
   }, [token]);
 
-  // ── Location ──────────────────────────────────────────────────────────────────
-  const fetchLocation = () => {
-    setLocationLoading(true);
-    if (Platform.OS === "web") {
-      if (!navigator?.geolocation) {
-        fallbackLocation();
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        (p) => onCoords(p.coords.latitude, p.coords.longitude),
-        () => fallbackLocation(),
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-      );
-    } else {
-      (async () => {
-        try {
-          const L = require("expo-location");
-          const { status } = await L.requestForegroundPermissionsAsync();
-          if (status !== "granted") {
-            fallbackLocation();
-            return;
-          }
-          const loc = await L.getCurrentPositionAsync({
-            accuracy: L.Accuracy.Balanced,
-          });
-          onCoords(loc.coords.latitude, loc.coords.longitude);
-        } catch {
-          fallbackLocation();
-        }
-      })();
-    }
-  };
+  // ── Handled by addressStore ──────────────────────────────────────────────────
 
-  const onCoords = async (lat, lng) => {
-    setLocationCoords({ lat, lng });
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
-        { headers: { "User-Agent": "DesiDukaan/1.0" } },
-      );
-      const d = await res.json();
-      if (d?.display_name) {
-        const p = d.display_name.split(",");
-        setLocationShort(
-          [p[0]?.trim(), p[1]?.trim()].filter(Boolean).join(", "),
-        );
-      } else {
-        setLocationShort("Set location");
-      }
-    } catch {
-      setLocationShort("Set location");
-    } finally {
-      setLocationLoading(false);
-    }
-    fetchNearbyVendors(lat, lng);
-    fetchPopularProducts(lat, lng);
-  };
-
-  const fallbackLocation = () => {
-    setLocationShort("Set location");
-    setLocationLoading(false);
-    fetchNearbyVendors(28.5921, 77.3196);
-    fetchPopularProducts(28.5921, 77.3196);
-  };
 
   // ── Fetch popular products via api.js (respects BASE_URL + headers) ──────────
   const fetchPopularProducts = async (lat, lng) => {
@@ -988,7 +936,7 @@ export default function HomeScreen() {
     try {
       const res = await ordersAPI.getMyOrders(token, 1);
       setRecentOrders(res.data?.orders?.slice(0, 3) || []);
-    } catch {}
+    } catch { }
   };
 
   // ── Derive categories from vendor inventories ──────────────────────────────
@@ -1112,7 +1060,7 @@ export default function HomeScreen() {
       .filter(Boolean);
   }, [popularFromAPI, allInventoryItems, getCategoryName]);
 
-  // ── Address picker ─────────────────────────────────────────────────────────
+  // ── Address Handlers ────────────────────────────────────────────────────────
   const openAddressPicker = () => {
     if (!selectedAddrId && addressStore?.addresses?.length > 0) {
       setSelectedAddrId(addressStore.addresses[0].id);
@@ -1123,12 +1071,6 @@ export default function HomeScreen() {
   const handleSelectAddress = (addr) => {
     setSelectedAddrId(addr.id);
     addressStore?.setSelectedId?.(addr.id);
-    const display = addr.address_line || addr.address || "";
-    const parts = display.split(",");
-    setLocationShort(
-      [parts[0]?.trim(), parts[1]?.trim()].filter(Boolean).join(", ") ||
-        display,
-    );
     setAddrPickerVisible(false);
     if (addr.lat && addr.lng) {
       fetchNearbyVendors(addr.lat, addr.lng);
@@ -1136,10 +1078,11 @@ export default function HomeScreen() {
     }
   };
 
-  const handleUseCurrentLocation = () => {
+  const handleUseCurrentLocation = async () => {
     setAddrPickerVisible(false);
-    fetchLocation();
+    if (triggerRefetch) await triggerRefetch(true);
   };
+
 
   // ── Cart helpers — reads from cartStore, no local qty state ───────────────
   // In handleAdd — check if THIS item is in cart, not just whether vendorId exists
@@ -1226,6 +1169,7 @@ export default function HomeScreen() {
 
   const showCategories = !loadingInventory && dynamicCategories.length > 0;
   const showPopular = !loadingInventory && popularItems.length > 0;
+
 
   return (
     <View style={s.root}>
@@ -1790,7 +1734,7 @@ export default function HomeScreen() {
               lat = parseFloat(results[0].lat);
               lng = parseFloat(results[0].lon);
             }
-          } catch {}
+          } catch { }
 
           // addAddress now returns the real ID
           const newId = await addressStore?.addAddress?.({ address: text, lat, lng }, token);
@@ -1801,7 +1745,7 @@ export default function HomeScreen() {
           const parts = text.split(",");
           setLocationShort(
             [parts[0]?.trim(), parts[1]?.trim()].filter(Boolean).join(", ") ||
-              text,
+            text,
           );
           if (lat && lng) {
             fetchNearbyVendors(lat, lng);

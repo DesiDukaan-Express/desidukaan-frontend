@@ -323,9 +323,9 @@ export default function VendorOrdersScreen() {
           : ""
       );
 
-      if (selectedOrder.delivery_slot && selectedOrder.delivery_slot.start_time) {
-        const st = new Date(selectedOrder.delivery_slot.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const ed = new Date(selectedOrder.delivery_slot.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      if (selectedOrder.delivery_slot && selectedOrder.delivery_slot.slot_start) {
+        const st = new Date(selectedOrder.delivery_slot.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const ed = new Date(selectedOrder.delivery_slot.slot_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         setCounterSlotInput(`${st} to ${ed}`);
       } else {
         setCounterSlotInput("");
@@ -374,14 +374,16 @@ export default function VendorOrdersScreen() {
       const result = await res.json();
 
       if (result.success) {
-
-        Alert.alert("Counter Sent");
-
+        Alert.alert("Success", "Counter offer sent to customer");
+        
+        // Update selectedOrder with the full response to prevent loss of details
+        setSelectedOrder(result.data.order);
         setCounterModalVisible(false);
+        // We keep the modal open so they can see the 'Countered' status
+        // or we close it as per current flow:
         setModalVisible(false);
 
         fetchOrders();
-
       }
 
     } catch (err) {
@@ -393,7 +395,9 @@ export default function VendorOrdersScreen() {
   };
 
   const formatOrderTime = (dateString) => {
+    if (!dateString) return "";
     const date = new Date(dateString);
+    if (isNaN(date)) return "";
     const now = new Date();
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);
@@ -403,6 +407,13 @@ export default function VendorOrdersScreen() {
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const isSlotActive = (slot) => {
+    if (!slot) return true; // No slot = skip check
+    const start = slot.slot_start || slot.start;
+    if (!start) return true;
+    return new Date() >= new Date(start);
   };
   const formatStatus = (status) => {
     if (!status) return "";
@@ -522,8 +533,8 @@ export default function VendorOrdersScreen() {
               <View style={styles.slotBadge}>
                 <Ionicons name="time-outline" size={14} color="#059669" />
                 <Text style={styles.slotBadgeText}>
-                  {new Date(item.delivery_slot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - 
-                  {new Date(item.delivery_slot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(item.delivery_slot.slot_start || item.delivery_slot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - 
+                  {new Date(item.delivery_slot.slot_end || item.delivery_slot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </Text>
               </View>
             )}
@@ -576,8 +587,8 @@ export default function VendorOrdersScreen() {
              {item.type === 'slot' && (
                 <View style={styles.requestDetails}>
                    <Text style={styles.slotRange}>
-                      {new Date(item.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - 
-                      {new Date(item.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(item.slot_start || item.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - 
+                      {new Date(item.slot_end || item.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                    </Text>
                    <Text style={styles.slotDay}>{new Date(item.start).toDateString() === new Date().toDateString() ? "Today" : "Tomorrow"}</Text>
                 </View>
@@ -633,9 +644,23 @@ export default function VendorOrdersScreen() {
                 {selectedOrder?.customer?.name}
               </Text>
 
-              <Text style={{ marginTop: 6, fontWeight: "700" }}>
+              <Text style={{ marginTop: 6, fontWeight: "800", color: "#111827", fontSize: 16 }}>
                 ₹{selectedOrder?.total}
               </Text>
+
+              {/* Added Items List for better context */}
+              <View style={{ marginTop: 12, borderTopWidth: 1, borderColor: "#F3F4F6", paddingTop: 8 }}>
+                {(selectedOrder?.items || []).slice(0, 3).map((item, i) => (
+                  <Text key={i} style={{ fontSize: 12, color: "#4B5563" }} numberOfLines={1}>
+                    • {item.quantity}x {item.product_name}
+                  </Text>
+                ))}
+                {(selectedOrder?.items || []).length > 3 && (
+                  <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
+                    + {(selectedOrder.items || []).length - 3} more items...
+                  </Text>
+                )}
+              </View>
             </View>
 
             <ScrollView bounces={false} style={{ flex: 1 }}>
@@ -673,9 +698,12 @@ export default function VendorOrdersScreen() {
                 {!selectedOrder?.delivery?.partner && (
                   <View style={styles.autoAssignSection}>
                     <TouchableOpacity
-                      style={[styles.autoAssignBtn, autoAssigning && { opacity: 0.7 }]}
+                      style={[
+                        styles.autoAssignBtn, 
+                        (autoAssigning || !isSlotActive(selectedOrder?.delivery_slot)) && { opacity: 0.5 }
+                      ]}
                       onPress={handleAutoAssign}
-                      disabled={autoAssigning}
+                      disabled={autoAssigning || !isSlotActive(selectedOrder?.delivery_slot)}
                     >
                       {autoAssigning ? (
                         <ActivityIndicator size="small" color="#fff" />
@@ -683,7 +711,9 @@ export default function VendorOrdersScreen() {
                         <MaterialIcons name="near-me" size={18} color="#fff" />
                       )}
                       <Text style={styles.autoAssignBtnText}>
-                        {autoAssigning ? 'Broadcasting...' : 'Auto Assign Nearby Rider'}
+                        {!isSlotActive(selectedOrder?.delivery_slot) 
+                          ? 'Slot not started yet' 
+                          : autoAssigning ? 'Broadcasting...' : 'Auto Assign Nearby Rider'}
                       </Text>
                     </TouchableOpacity>
                     {broadcastStatus && (
@@ -717,10 +747,16 @@ export default function VendorOrdersScreen() {
 
                       {rider.status === "Available" && (
                         <TouchableOpacity
-                          style={styles.assignBtnSmall}
+                          style={[
+                            styles.assignBtnSmall, 
+                            !isSlotActive(selectedOrder?.delivery_slot) && { backgroundColor: '#9CA3AF' }
+                          ]}
                           onPress={() => handleAssignRider(rider.id)}
+                          disabled={!isSlotActive(selectedOrder?.delivery_slot)}
                         >
-                          <Text style={styles.assignBtnTextSmall}>Assign</Text>
+                          <Text style={styles.assignBtnTextSmall}>
+                            {!isSlotActive(selectedOrder?.delivery_slot) ? 'Locked' : 'Assign'}
+                          </Text>
                         </TouchableOpacity>
                       )}
                     </View>

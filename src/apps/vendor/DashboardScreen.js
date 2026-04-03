@@ -33,9 +33,7 @@ export default function StoreDashboard() {
 
         if (data.success) {
           const s = data.data.stats;
-          const baseOrders = s.total_orders ?? 0;
-          const baseRevenue = s.total_revenue ?? 0;
-
+          
           // Build chart labels and values from real 7-day data
           const chartRaw = s.weekly_chart_data || [];
           const chartLabels = chartRaw.map((d) =>
@@ -43,7 +41,6 @@ export default function StoreDashboard() {
           );
           const chartValues = chartRaw.map((d) => d.revenue || 0);
 
-          // Fallback to flat arrays if no real data yet
           const safeChart = chartValues.length >= 2 ? chartValues : [0, 0, 0, 0, 0, 0, 0];
           const safeLabels = chartLabels.length >= 2 ? chartLabels : ["D-6", "D-5", "D-4", "D-3", "D-2", "D-1", "Today"];
 
@@ -52,22 +49,23 @@ export default function StoreDashboard() {
             today: {
               totalOrders: s.today_orders ?? 0,
               revenue: s.today_revenue ?? 0,
-              avgPrepTime: 8,
-              deliveryTime: 18,
+              avgPrepTime: s.delivery_efficiency?.avg_prep_time ?? 0,
+              deliveryTime: s.delivery_efficiency?.avg_delivery_time ?? 0,
             },
             weekly: {
-              totalOrders: baseOrders,
-              revenue: baseRevenue,
-              avgPrepTime: 6,
-              deliveryTime: 22,
+              totalOrders: s.weekly_orders ?? 0,
+              revenue: s.weekly_revenue ?? 0,
+              avgPrepTime: s.delivery_efficiency?.avg_prep_time ?? 0,
+              deliveryTime: s.delivery_efficiency?.avg_delivery_time ?? 0,
             },
             monthly: {
-              totalOrders: Math.floor(baseOrders * 1.5),
-              revenue: baseRevenue * 1.5,
-              avgPrepTime: 10,
-              deliveryTime: 17,
+              totalOrders: s.monthly_orders ?? 0,
+              revenue: s.monthly_revenue ?? 0,
+              avgPrepTime: s.delivery_efficiency?.avg_prep_time ?? 0,
+              deliveryTime: s.delivery_efficiency?.avg_delivery_time ?? 0,
             },
             chartValues: safeChart,
+            topProducts: s.top_products || []
           });
         }
       } catch (err) {
@@ -174,21 +172,20 @@ export default function StoreDashboard() {
             <Text style={styles.link}>View All</Text>
           </View>
 
-          <Product
-            name="Organic Tomatoes"
-            sold="124 units sold"
-            price="₹3,720"
-            tag="Best Seller"
-            image="https://lh3.googleusercontent.com/aida-public/AB6AXuArJb_YjUzyHc1EykEd8C-YI9CAx2GFurQX4vUzqad5rJrlxAEC9B1DBH0kXVpxybUryn3EWlZ5J49YdOv7oQPi3kQs-qODzKZLc9lcx3rX7_vrMWwIVDVacAWC5E0-c4f03sq8wn-JDaFjsktGx_ZyfK8aEw9siyxb4roc-XhIT2s57LgGZ0BgPA8pd7FalJD3FtFMvoyZ3tXymbleXKQDPl3ZHIU3jPxomkT0FmUSaKJLk7bHZe3lxwy1CJKZDg7pQcg3nszmOyY"
-          />
-
-          <Product
-            name="Local Red Onions"
-            sold="98 units sold"
-            price="₹1,960"
-            tag="Trending"
-            image="https://lh3.googleusercontent.com/aida-public/AB6AXuBN8BS8RTeTByuvZrCfBBVUkYKpRvz9b6RZcQLf_6CoZoAGyp5vQZwAvwJNqQI9thzGWvt8GA44JAoDrTVe9JcKOGHg5bvckedi_pXt-5rw-yDECY_ASw7zRzRQf20I2dky9lBAyYX9kbrDJ3T6BeOLuuIBpvHPHJTZb1zRaVrFKEHlfTK6sTH4tYOx0hb8PZr7VDlNzaQwWh6fbFE5PYGRXNlf7mO36z_Pz0czYL0sYnTTyW8fFZQRZ4F1A51-uRCdwXrAEYdOSS8"
-          />
+          {stats.topProducts && stats.topProducts.length > 0 ? (
+            stats.topProducts.map((p, i) => (
+              <Product
+                key={i}
+                name={p.name}
+                sold={`${p.sold} units sold`}
+                price={`₹${Number(p.revenue).toLocaleString()}`}
+                tag={i === 0 ? "Best Seller" : i < 3 ? "Trending" : ""}
+                image={p.image || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&q=80"}
+              />
+            ))
+          ) : (
+            <Text style={{ color: "#888", textAlign: "center", marginVertical: 20 }}>No sales data yet</Text>
+          )}
         </View>
 
         {/* DELIVERY EFFICIENCY */}

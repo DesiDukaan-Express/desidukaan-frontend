@@ -16,17 +16,28 @@ import DeliveryTabs       from './DeliveryTabs';
 import CheckoutScreen     from '../apps/customer/Checkout';
 import OrderPlaced        from '../apps/customer/OrderPlaced';
 import VendorOnboardingScreen from '../apps/vendor/VendorOnboardingScreen';
+import DeliveryOnboardingScreen from '../apps/delivery/DeliveryOnboardingScreen';
 
 const Stack = createNativeStackNavigator();
 
 export default function Navigation() {
-  const { isAuthenticated, role, isLoading, token } = useAuthStore();
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated);
+  const role            = useAuthStore(s => s.role);
+  const isLoading       = useAuthStore(s => s.isLoading);
+  const token           = useAuthStore(s => s.token);
+  const user            = useAuthStore(s => s.user);
+
   const [vendorOnboarded, setVendorOnboarded] = useState(null);
+  const [deliveryOnboarded, setDeliveryOnboarded] = useState(null);
   const [checkingOnboard, setCheckingOnboard] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated && role?.toLowerCase() === 'vendor') {
-      checkVendorProfile();
+    if (isAuthenticated) {
+      if (role?.toLowerCase() === 'vendor') {
+        checkVendorProfile();
+      } else if (role?.toLowerCase() === 'delivery') {
+        checkDeliveryProfile();
+      }
     }
   }, [isAuthenticated, role]);
 
@@ -45,6 +56,22 @@ export default function Navigation() {
     }
   };
 
+  const checkDeliveryProfile = async () => {
+    setCheckingOnboard(true);
+    try {
+      const res = await fetch(`${API_BASE}/delivery/me/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      // If profile exists and onboarding_submitted is true
+      setDeliveryOnboarded(!!(data.data?.profile?.onboarding_submitted));
+    } catch (err) {
+      setDeliveryOnboarded(false);
+    } finally {
+      setCheckingOnboard(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }}>
@@ -53,7 +80,7 @@ export default function Navigation() {
     );
   }
 
-  if (isAuthenticated && role?.toLowerCase() === 'vendor' && (vendorOnboarded === null || checkingOnboard)) {
+  if (isAuthenticated && (checkingOnboard || (role?.toLowerCase() === 'vendor' && vendorOnboarded === null) || (role?.toLowerCase() === 'delivery' && deliveryOnboarded === null))) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }}>
         <ActivityIndicator size="large" color="white" />
@@ -81,8 +108,12 @@ export default function Navigation() {
                 : <Stack.Screen name="VendorOnboarding">
                     {() => <VendorOnboardingScreen onComplete={() => setVendorOnboarded(true)} />}
                   </Stack.Screen>
-            ) : role === USER_ROLES.DELIVERY ? (
-              <Stack.Screen name="DeliveryApp" component={DeliveryTabs} />
+            ) : role?.toLowerCase() === 'delivery' ? (
+              deliveryOnboarded
+                ? <Stack.Screen name="DeliveryApp" component={DeliveryTabs} />
+                : <Stack.Screen name="DeliveryOnboarding">
+                    {() => <DeliveryOnboardingScreen onComplete={() => setDeliveryOnboarded(true)} />}
+                  </Stack.Screen>
             ) : (
               <Stack.Screen name="CustomerApp" component={CustomerTabs} />
             )}
