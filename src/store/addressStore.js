@@ -86,7 +86,17 @@ const useAddressStore = create((set, get) => ({
     }
   },
 
-  removeAddress: (id) => {
+  removeAddress: async (id, token) => {
+    if (token) {
+      try {
+        await fetch(`${BASE_URL}/addresses/${id}`, {
+          method:  "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch (e) {
+        console.error("removeAddress failed:", e.message);
+      }
+    }
     set(state => ({
       addresses:  state.addresses.filter(a => a.id !== id),
       selectedId: state.selectedId === id ? null : state.selectedId,
