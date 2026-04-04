@@ -264,7 +264,7 @@ const cp = StyleSheet.create({
 });
 
 // ─── Order Summary card ───────────────────────────────────────────────────────
-function OrderSummaryCard({ items, subtotal, deliveryFee, total, fs = 1 }) {
+function OrderSummaryCard({ items, subtotal, deliveryFee, total, onNegotiate, fs = 1 }) {
   return (
     <View style={osc.wrap}>
       {items.slice(0, 3).map((item, i) => (
@@ -303,9 +303,21 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, total, fs = 1 }) {
         </Text>
       </View>
       <View style={osc.row}>
-        <Text style={[osc.label, { fontSize: Math.round(13 * fs) }]}>
-          Delivery fee
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Text style={[osc.label, { fontSize: Math.round(13 * fs) }]}>
+            Delivery fee
+          </Text>
+          {deliveryFee > 0 && (
+            <TouchableOpacity 
+              style={osc.negotiateBtn} 
+              onPress={() => onNegotiate && onNegotiate()}
+              activeOpacity={0.7}
+            >
+              <Feather name="edit-2" size={10} color={C.green} />
+              <Text style={osc.negotiateBtnText}>Negotiate</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         {deliveryFee === 0 ? (
           <Text
             style={[
@@ -369,6 +381,8 @@ const osc = StyleSheet.create({
   value: { fontSize: 13, fontWeight: "600", color: C.gray900 },
   totalLabel: { fontSize: 16, fontWeight: "900", color: C.gray900 },
   totalVal: { fontSize: 16, fontWeight: "900", color: C.gray900 },
+  negotiateBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.greenLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  negotiateBtnText: { fontSize: 10, fontWeight: "700", color: C.green },
 });
 
 // ─── Negotiation Banner (Shown while waiting or after response) ──────────────
@@ -615,6 +629,9 @@ export default function CheckoutScreen() {
   const [slotModalVisible, setSlotModalVisible] = useState(false);
   const [requestingSlot, setRequestingSlot] = useState(false);
   const [requestingPhone, setRequestingPhone] = useState(false);
+  const [feeModalVisible, setFeeModalVisible] = useState(false);
+  const [requestingFee,   setRequestingFee]   = useState(false);
+  const [proposedFee,     setProposedFee]     = useState(null);
   const isAccepted = orderStatus === "accepted";
 
   // ── Computed totals ────────────────────────────────────────────────────────
@@ -623,12 +640,13 @@ export default function CheckoutScreen() {
     0,
   );
   const baseFee = confirmedFee ?? (subtotal >= 299 ? 0 : 30);
-  const cartTotal = subtotal + baseFee;
+  const activeFee = proposedFee !== null ? proposedFee : baseFee;
+  const cartTotal = subtotal + activeFee;
   const total =
     orderStatus === "accepted" && counterData ? counterData.total : cartTotal;
 
   // ── Address state ──────────────────────────────────────────────────────────
-  const savedAddresses = addressStore?.addresses || [];
+  const savedAddresses = (addressStore?.addresses || []).filter(a => a.label !== "Current Location");
   const [selectedAddrId, setSelectedAddrId] = useState(
     addressStore?.selectedId || (savedAddresses.length > 0 ? savedAddresses[0].id : null)
   );
@@ -767,16 +785,8 @@ export default function CheckoutScreen() {
       if (fresh.lat) {
         setDetectedAddr(fresh.displayName);
         setDetectedCoords({ lat: fresh.lat, lng: fresh.lng });
-        const savedId = await addressStore.addAddress(
-          { address: fresh.displayName, lat: fresh.lat, lng: fresh.lng, label: "Current Location" },
-          token
-        );
-        if (savedId) {
-          setSelectedAddrId(savedId);
-          addressStore.setSelectedId(savedId);
-        } else {
-          setSelectedAddrId("detected");
-        }
+        // Don't save to backend automatically anymore — keep it as "detected" session state
+        setSelectedAddrId("detected");
       } else {
         setManualOpen(true);
       }
@@ -805,22 +815,36 @@ export default function CheckoutScreen() {
     setErrorMsg(null);
     setPlacing(true);
     try {
-      // Always parseInt — id from store may come as string
-      const rawAddrId =
-        selectedAddrId &&
-        selectedAddrId !== "detected" &&
-        selectedAddrId !== "manual"
-          ? selectedAddrId
-          : savedAddresses[0]?.id;
-      // TEMP: hardcode address id for testing if store is empty
-      const addrId = rawAddrId ? parseInt(rawAddrId, 10) : 10;
+      let addrId = 0;
+      if (selectedAddrId === "detected") {
+        const allAddrs = addressStore?.addresses || [];
+        const existing = allAddrs.find(a => 
+          a.label === "Current Location" && 
+          (a.address_line === detectedAddr || a.address === detectedAddr)
+        );
+        if (existing) {
+          addrId = existing.id;
+        } else {
+          const savedId = await addressStore.addAddress(
+            { address: detectedAddr, lat: detectedCoords?.lat, lng: detectedCoords?.lng, label: "Current Location" },
+            token
+          );
+          addrId = savedId;
+        }
+      } else if (selectedAddrId === "manual") {
+        // Fallback for manual or use a default if not saved
+        addrId = savedAddresses[0]?.id || 10;
+      } else {
+        addrId = selectedAddrId || savedAddresses[0]?.id;
+      }
+      addrId = parseInt(addrId, 10) || 10;
 
       const payload = {
         vendor_id: parseInt(vendorId, 10),
         delivery_address_id: addrId,
         payment_method: selectedPay || "cod", // fallback so it's never null
         delivery_slot_id: null,
-        proposed_delivery_fee: confirmedFee !== undefined ? confirmedFee : null,
+        proposed_delivery_fee: proposedFee !== null ? proposedFee : (confirmedFee !== null ? confirmedFee : null),
         proposed_slot: confirmedSlot ? { start: confirmedSlot.start, end: confirmedSlot.end } : null,
         items: items.map((i) => ({
           product_id: parseInt(i.id, 10),
@@ -1002,7 +1026,7 @@ export default function CheckoutScreen() {
           <Text style={[s.headerTitle, { fontSize: Math.round(20 * fs) }]}>
             Checkout
           </Text>
-          <Text style={[s.headerSub, { fontSize: Math.round(12 * fs) }]}>
+          <Text style={[s.headerSub, { fontSize: Math.round(14 * fs), fontWeight: "800", color: C.greenDark }]}>
             {vendorName}
           </Text>
         </View>
@@ -1282,8 +1306,23 @@ export default function CheckoutScreen() {
                 />
                 <TouchableOpacity
                   style={s.useAddrBtn}
-                  onPress={() => {
-                    setSelectedAddrId("manual");
+                  onPress={async () => {
+                    const fullAddr = [addrLine, addrCity, addrState, addrPin].filter(Boolean).join(", ");
+                    if (!fullAddr) return;
+                    const savedId = await addressStore.addAddress(
+                      { 
+                        address: fullAddr, 
+                        city: addrCity, 
+                        state: addrState, 
+                        pincode: addrPin, 
+                        label: addrLabel 
+                      }, 
+                      token
+                    );
+                    if (savedId) {
+                      setSelectedAddrId(savedId);
+                      addressStore.setSelectedId(savedId);
+                    }
                     setManualOpen(false);
                   }}
                   activeOpacity={0.85}
@@ -1750,8 +1789,9 @@ export default function CheckoutScreen() {
               <OrderSummaryCard
                 items={items}
                 subtotal={subtotal}
-                deliveryFee={baseFee}
+                deliveryFee={activeFee}
                 total={total}
+                onNegotiate={() => setFeeModalVisible(true)}
                 fs={fs}
               />
             </Section>
@@ -1790,8 +1830,9 @@ export default function CheckoutScreen() {
               <OrderSummaryCard
                 items={items}
                 subtotal={subtotal}
-                deliveryFee={baseFee}
+                deliveryFee={activeFee}
                 total={total}
+                onNegotiate={() => setFeeModalVisible(true)}
                 fs={fs}
               />
             </View>
@@ -2078,6 +2119,51 @@ function parseSlotLocally(input) {
     end_label: fmt(end),
   };
 }
+
+// ─── Fee Modal ───────────────────────────────────────────────────────────────
+function FeeModal({ visible, currentFee, onClose, onPropose }) {
+  const [val, setVal] = useState(String(currentFee || ""));
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={fm.backdrop} onPress={onClose}>
+        <Pressable style={fm.sheet} onPress={(e) => e.stopPropagation()}>
+          <View style={fm.handle} />
+          <Text style={fm.title}>Negotiate delivery fee</Text>
+          <Text style={fm.sub}>Enter what you'd like to pay for delivery</Text>
+          <View style={fm.inputBox}>
+            <Text style={fm.rupee}>₹</Text>
+            <TextInput
+              style={fm.input}
+              value={val}
+              onChangeText={setVal}
+              keyboardType="number-pad"
+              autoFocus
+            />
+          </View>
+          <TouchableOpacity 
+            style={fm.confirmBtn} 
+            onPress={() => onPropose(parseInt(val || "0", 10))}
+          >
+            <Text style={fm.confirmBtnText}>Confirm Proposal</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const fm = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: C.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
+  title: { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 4 },
+  sub: { fontSize: 13, color: C.gray400, marginBottom: 16 },
+  inputBox: { flexDirection: "row", alignItems: "center", backgroundColor: C.gray100, borderRadius: 14, paddingHorizontal: 16, height: 60 },
+  rupee: { fontSize: 24, fontWeight: "900", color: C.gray500, marginRight: 8 },
+  input: { flex: 1, fontSize: 24, fontWeight: "900", color: C.gray900 },
+  confirmBtn: { marginTop: 20, backgroundColor: C.green, height: 56, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  confirmBtnText: { fontSize: 16, fontWeight: "800", color: C.white },
+});
 
 // ─── Slot picker modal ────────────────────────────────────────────────────────
 function SlotModal({ visible, onClose, onConfirm, loading }) {

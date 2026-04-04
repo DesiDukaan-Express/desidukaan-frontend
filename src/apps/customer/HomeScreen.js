@@ -93,6 +93,7 @@ function AddressPicker({
   onSelect,
   onSaveNew,
   onUseLocation,
+  onDelete,
 }) {
   const [showForm, setShowForm] = React.useState(false);
   const [inputText, setInputText] = React.useState("");
@@ -215,43 +216,54 @@ function AddressPicker({
                     const isActive = addr.id === selectedId;
                     const displayText = addr.address_line || addr.address || "";
                     return (
-                      <TouchableOpacity
-                        key={addr.id}
-                        style={[ap.addrRow, isActive && ap.addrRowActive]}
-                        onPress={() => onSelect(addr)}
-                        activeOpacity={0.8}
-                      >
-                        <View
-                          style={[
-                            ap.addrIconWrap,
-                            isActive && ap.addrIconActive,
-                          ]}
+                      <View key={addr.id} style={ap.addrRowWrapper}>
+                        <TouchableOpacity
+                          style={[ap.addrRow, isActive && { borderColor: C.green, backgroundColor: C.greenLight }]}
+                          onPress={() => onSelect(addr)}
+                          activeOpacity={0.8}
                         >
-                          <Feather
-                            name="map-pin"
-                            size={15}
-                            color={isActive ? C.white : C.gray500}
-                          />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text
+                          <View
                             style={[
-                              ap.addrLabel,
-                              isActive && ap.addrLabelActive,
+                              ap.addrIconWrap,
+                              isActive && { backgroundColor: C.green },
                             ]}
                           >
-                            {addr.label || "Home"}
-                          </Text>
-                          <Text style={ap.addrText} numberOfLines={2}>
-                            {displayText}
-                          </Text>
-                        </View>
-                        {isActive && (
-                          <View style={ap.activeTick}>
-                            <Feather name="check" size={12} color={C.white} />
+                            <Feather
+                              name="map-pin"
+                              size={15}
+                              color={isActive ? C.white : C.gray500}
+                            />
                           </View>
+                          <View style={{ flex: 1, paddingRight: 8 }}>
+                            <Text
+                              style={[
+                                ap.addrLabel,
+                                isActive && { color: C.greenDark },
+                              ]}
+                            >
+                              {addr.label || "Home"}
+                            </Text>
+                            <Text style={ap.addrText} numberOfLines={2}>
+                              {displayText}
+                            </Text>
+                          </View>
+                          {isActive && (
+                            <View style={ap.activeTick}>
+                              <Feather name="check" size={12} color={C.white} />
+                            </View>
+                          )}
+                        </TouchableOpacity>
+
+                        {!isActive && (
+                          <TouchableOpacity
+                            style={ap.deleteBtn}
+                            onPress={() => onDelete && onDelete(addr.id)}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          >
+                            <Feather name="trash-2" size={16} color={C.red} />
+                          </TouchableOpacity>
                         )}
-                      </TouchableOpacity>
+                      </View>
                     );
                   })
                 )}
@@ -293,6 +305,20 @@ const ap = StyleSheet.create({
     borderRadius: 2,
     alignSelf: "center",
     marginBottom: 20,
+  },
+  addrRowWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    gap: 8,
+  },
+  deleteBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: C.redLight,
+    alignItems: "center",
+    justifyContent: "center",
   },
   titleRow: {
     flexDirection: "row",
@@ -752,11 +778,21 @@ export default function HomeScreen() {
 
   const { currentLocation, fetchLocation: triggerRefetch } = addressStore;
   const locationShort = currentLocation.displayName;
+
+  // Address picker state moved up to avoid ReferenceError in locationCoords
+  const [selectedAddrId, setSelectedAddrId] = useState(null);
+
   const locationCoords = useMemo(() => {
+    // If a specific address is selected, use its coordinates
+    if (selectedAddrId) {
+      const found = addressStore?.addresses?.find(a => a.id === selectedAddrId);
+      if (found?.lat && found?.lng) return { lat: found.lat, lng: found.lng };
+    }
+    // Fallback to GPS detection
     return currentLocation.lat
       ? { lat: currentLocation.lat, lng: currentLocation.lng }
       : null;
-  }, [currentLocation.lat, currentLocation.lng]);
+  }, [currentLocation.lat, currentLocation.lng, selectedAddrId, addressStore.addresses]);
   const locationLoading = currentLocation.loading;
 
   const [vendors, setVendors] = useState([]);
@@ -771,7 +807,6 @@ export default function HomeScreen() {
 
   // Address picker
   const [addrPickerVisible, setAddrPickerVisible] = useState(false);
-  const [selectedAddrId, setSelectedAddrId] = useState(null);
 
   // Responsive
   const [winW, setWinW] = useState(() =>
@@ -796,6 +831,13 @@ export default function HomeScreen() {
     (itemId) => cartItems.find((i) => i.id === itemId)?.qty || 0,
     [cartItems],
   );
+
+  // Sync with addressStore
+  useEffect(() => {
+    if (addressStore.selectedId) {
+      setSelectedAddrId(addressStore.selectedId);
+    }
+  }, [addressStore.selectedId]);
 
   // ── Animations ───────────────────────────────────────────────────────────────
   const headerOpacity = useRef(new Animated.Value(0)).current;
@@ -1716,10 +1758,11 @@ export default function HomeScreen() {
       {/* ══ ADDRESS PICKER MODAL ═══════════════════════════════════════════ */}
       <AddressPicker
         visible={addrPickerVisible}
-        addresses={addressStore?.addresses || []}
+        addresses={(addressStore?.addresses || []).filter(a => a.label !== "Current Location")}
         selectedId={selectedAddrId}
         onClose={() => setAddrPickerVisible(false)}
         onSelect={handleSelectAddress}
+        onDelete={(id) => addressStore.removeAddress(id, token)}
         onSaveNew={async (text) => {
           let lat = null,
             lng = null;
