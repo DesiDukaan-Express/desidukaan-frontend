@@ -12,6 +12,7 @@ import useAuthStore from "../../store/authStore";
 
 import { LineChart } from "react-native-chart-kit";
 import { Dimensions, ActivityIndicator } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -20,6 +21,8 @@ export default function StoreDashboard() {
   const [loading, setLoading] = useState(true);
   const [currIndex, setCurrIndex] = useState(0); // 0 = Today, 1 = Weekly, 2 = Monthly
   const [stats, setStats] = useState(null);
+  const [noProfile, setNoProfile] = useState(false);
+  const navigation = useNavigation();
 
   const screenWidth = Dimensions.get("window").width;
 
@@ -31,21 +34,19 @@ export default function StoreDashboard() {
         });
         const data = await res.json();
 
+        if (res.status === 404) {
+          setNoProfile(true);
+          setLoading(false);
+          return;
+        }
+
         if (data.success) {
+          // ... (existing stats logic)
           const s = data.data.stats;
-          
-          // Build chart labels and values from real 7-day data
-          const chartRaw = s.weekly_chart_data || [];
-          const chartLabels = chartRaw.map((d) =>
-            new Date(d.date).toLocaleDateString("en-IN", { weekday: "short" })
-          );
-          const chartValues = chartRaw.map((d) => d.revenue || 0);
-
-          const safeChart = chartValues.length >= 2 ? chartValues : [0, 0, 0, 0, 0, 0, 0];
-          const safeLabels = chartLabels.length >= 2 ? chartLabels : ["D-6", "D-5", "D-4", "D-3", "D-2", "D-1", "Today"];
-
+          // ...
           setStats({
-            labels: safeLabels,
+            // ... (keep existing safe logic)
+            labels: s.weekly_chart_data?.map(d => new Date(d.date).toLocaleDateString("en-IN", { weekday: "short" })) || ["D-6", "D-5", "D-4", "D-3", "D-2", "D-1", "Today"],
             today: {
               totalOrders: s.today_orders ?? 0,
               revenue: s.today_revenue ?? 0,
@@ -64,7 +65,7 @@ export default function StoreDashboard() {
               avgPrepTime: s.delivery_efficiency?.avg_prep_time ?? 0,
               deliveryTime: s.delivery_efficiency?.avg_delivery_time ?? 0,
             },
-            chartValues: safeChart,
+            chartValues: s.weekly_chart_data?.map(d => d.revenue || 0) || [0,0,0,0,0,0,0],
             topProducts: s.top_products || []
           });
         }
@@ -78,11 +79,37 @@ export default function StoreDashboard() {
     fetchStats();
   }, [token]);
 
-  if (loading || !stats) {
+  if (loading) {
     return (
       <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
         <ActivityIndicator size="large" color="#0ff022" />
         <Text style={{ marginTop: 10 }}>Loading vendor stats...</Text>
+      </View>
+    );
+  }
+
+  if (noProfile) {
+    return (
+      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center', padding: 20 }]}>
+        <MaterialIcons name="store-mall-directory" size={80} color="#ccc" />
+        <Text style={{ fontSize: 20, fontWeight: '700', marginTop: 20, textAlign: 'center' }}>Welcome to DesiDukaan!</Text>
+        <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', marginTop: 10, marginBottom: 30 }}>
+          You haven't completed your shop registration yet. Complete it now to start selling!
+        </Text>
+        <TouchableOpacity 
+          style={{ backgroundColor: '#0ff022', paddingVertical: 15, paddingHorizontal: 40, borderRadius: 30 }}
+          onPress={() => navigation.navigate('VendorOnboarding')}
+        >
+          <Text style={{ color: '#000', fontWeight: '700', fontSize: 16 }}>Complete Registration</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+        <Text>Something went wrong loading your dashboard.</Text>
       </View>
     );
   }

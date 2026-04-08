@@ -4,6 +4,7 @@ import {
   TouchableOpacity, ActivityIndicator, Alert,
   KeyboardAvoidingView, Platform, Image
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import useAuthStore from '../../store/authStore';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
@@ -192,6 +193,7 @@ async function geocodeAddress(city, pincode) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function VendorOnboardingScreen({ onComplete }) {
+  const navigation = useNavigation();
   const { token, user } = useAuthStore();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -411,34 +413,41 @@ export default function VendorOnboardingScreen({ onComplete }) {
       }
 
       // 2. Create vendor
+      const body = {
+        shop_name: shopName,
+        owner_name: ownerName,
+        establishment_year: estYear || null,
+        email,
+        phone,
+        alt_contact_name: altName || null,
+        alt_phone: altPhone || null,
+        fssai_number: fssai || null,
+        gst_number: gst || null,
+        aadhar_number: aadhar || null,
+        pan_number: pan || null,
+        trade_license_number: tradeLicense || null,
+        address_line: address,
+        landmark: landmark || null,
+        city,
+        pincode,
+        latitude: latitude || null,
+        longitude: longitude || null,
+        upi_id: upiId || null,
+        bank_account_name: accountName || null,
+        bank_account_number: accountNumber || null,
+        bank_ifsc: ifsc || null,
+        delivery_type: deliveryType,
+      };
+
+      // Clean body – replace empty strings with null for backend patterns
+      Object.keys(body).forEach(key => {
+        if (body[key] === '') body[key] = null;
+      });
+
       const vendorRes = await fetch(`${API_BASE}/vendors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          shop_name: shopName,
-          owner_name: ownerName,
-          establishment_year: estYear,
-          email,
-          phone,
-          alt_contact_name: altName,
-          alt_phone: altPhone,
-          fssai_number: fssai,
-          gst_number: gst,
-          aadhar_number: aadhar,
-          pan_number: pan,
-          trade_license_number: tradeLicense,
-          address_line: address,
-          landmark: landmark,
-          city,
-          pincode,
-          latitude,            // ← from geocoder
-          longitude,           // ← from geocoder
-          upi_id: upiId,
-          bank_account_name: accountName,
-          bank_account_number: accountNumber,
-          bank_ifsc: ifsc,
-          delivery_type: deliveryType,
-        }),
+        body: JSON.stringify(body),
       });
 
       const vendorData = await vendorRes.json();
@@ -465,7 +474,11 @@ export default function VendorOnboardingScreen({ onComplete }) {
         });
       }
 
-      onComplete();
+      if (onComplete) {
+        onComplete();
+      } else {
+        navigation.navigate('Dashboard');
+      }
     } catch (err) {
       Alert.alert('Error', err.message);
     } finally {

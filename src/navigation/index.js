@@ -9,23 +9,24 @@ import { colors } from '../styles/colors';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 
-import LoginScreen        from '../apps/customer/LoginScreen';
-import CustomerTabs       from './CustomerTabs';
-import VendorTabs         from './VendorTabs';
-import DeliveryTabs       from './DeliveryTabs';
-import CheckoutScreen     from '../apps/customer/Checkout';
-import OrderPlaced        from '../apps/customer/OrderPlaced';
+import LoginScreen from '../apps/customer/LoginScreen';
+import CustomerTabs from './CustomerTabs';
+import VendorTabs from './VendorTabs';
+import DeliveryTabs from './DeliveryTabs';
+import CheckoutScreen from '../apps/customer/Checkout';
+import OrderPlaced from '../apps/customer/OrderPlaced';
 import VendorOnboardingScreen from '../apps/vendor/VendorOnboardingScreen';
+import DashboardScreen from '../apps/vendor/DashboardScreen';
 import DeliveryOnboardingScreen from '../apps/delivery/DeliveryOnboardingScreen';
 
 const Stack = createNativeStackNavigator();
 
 export default function Navigation() {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
-  const role            = useAuthStore(s => s.role);
-  const isLoading       = useAuthStore(s => s.isLoading);
-  const token           = useAuthStore(s => s.token);
-  const user            = useAuthStore(s => s.user);
+  const role = useAuthStore(s => s.role);
+  const isLoading = useAuthStore(s => s.isLoading);
+  const token = useAuthStore(s => s.token);
+  const user = useAuthStore(s => s.user);
 
   const [vendorOnboarded, setVendorOnboarded] = useState(null);
   const [deliveryOnboarded, setDeliveryOnboarded] = useState(null);
@@ -94,7 +95,7 @@ export default function Navigation() {
         {!isAuthenticated ? (
           // ── Unauthenticated screens ──────────────────────────────────
           <>
-            <Stack.Screen name="Login"  component={LoginScreen} />
+            <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Signup" component={SignupScreen} />
           </>
         ) : (
@@ -105,19 +106,24 @@ export default function Navigation() {
             {role?.toLowerCase() === 'vendor' ? (
               vendorOnboarded
                 ? <Stack.Screen name="VendorApp" component={VendorTabs} />
-                : <Stack.Screen name="VendorOnboarding">
-                    {() => <VendorOnboardingScreen onComplete={() => setVendorOnboarded(true)} />}
+                : <>
+                  <Stack.Screen name="Dashboard">
+                    {(props) => <DashboardScreen {...props} />}
                   </Stack.Screen>
+                  <Stack.Screen name="VendorOnboarding">
+                    {(props) => <VendorOnboardingScreen {...props} onComplete={() => setVendorOnboarded(true)} />}
+                  </Stack.Screen>
+                </>
             ) : role?.toLowerCase() === 'delivery' ? (
               deliveryOnboarded
                 ? <Stack.Screen name="DeliveryApp" component={DeliveryTabs} />
                 : <Stack.Screen name="DeliveryOnboarding">
-                    {() => <DeliveryOnboardingScreen onComplete={() => setDeliveryOnboarded(true)} />}
-                  </Stack.Screen>
+                  {() => <DeliveryOnboardingScreen onComplete={() => setDeliveryOnboarded(true)} />}
+                </Stack.Screen>
             ) : (
               <Stack.Screen name="CustomerApp" component={CustomerTabs} />
             )}
-            <Stack.Screen name="Checkout"    component={CheckoutScreen} />
+            <Stack.Screen name="Checkout" component={CheckoutScreen} />
             <Stack.Screen name="OrderPlaced" component={OrderPlaced} />
           </>
         )}
