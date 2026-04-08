@@ -23,24 +23,8 @@ const C = {
   gray600:    "#4B5563", gray900:    "#111827",
 };
 
-// ─── Countdown ring ───────────────────────────────────────────────────────────
-function CountdownRing({ seconds, total, color = C.green }) {
-  const pct = seconds / total;
-  return (
-    <View style={cr.wrap}>
-      <View style={[cr.track, { borderColor: color + '40' }]} />
-      <View style={cr.inner}>
-        <Text style={[cr.num, { color: color }]}>{seconds}</Text>
-      </View>
-    </View>
-  );
-}
-const cr = StyleSheet.create({
-  wrap:  { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  track: { position: "absolute", width: 44, height: 44, borderRadius: 22, borderWidth: 3 },
-  inner: { alignItems: "center", justifyContent: "center" },
-  num:   { fontSize: 13, fontWeight: "900" },
-});
+// Countdown ring component removed
+
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function OrderPlaced() {
@@ -53,8 +37,7 @@ export default function OrderPlaced() {
   const vendorName  = route.params?.vendorName  || "Store";
   const slot        = route.params?.slot        || null;
 
-  const [countdown, setCountdown] = useState(90);
-  const [status, setStatus] = useState("waiting"); // waiting, accepted, rejected, expired
+  const [status, setStatus] = useState("accepted"); // Default to accepted after payment flow
 
   // ── Animations ─────────────────────────────────────────────────────────────
   const scaleAnim    = useRef(new Animated.Value(0)).current;
@@ -101,22 +84,7 @@ export default function OrderPlaced() {
     return () => socket.disconnect();
   }, [token, orderId]);
 
-  // ── Timer ──────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (status !== "waiting") return;
-
-    const interval = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          setStatus("expired");
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [status]);
+  // Timer removed - order is confirmed after payment in this flow
 
   const goHome = () => navigation.navigate("CustomerApp", {
     screen: "CustomerTabNavigator",
@@ -200,13 +168,7 @@ export default function OrderPlaced() {
           </Text>
         </Animated.View>
 
-        {/* ── Negotiation Timer (only if waiting) ────────────────────────── */}
-        {status === "waiting" && (
-          <Animated.View style={[s.timerRow, { opacity: opacityAnim }]}>
-            <CountdownRing seconds={countdown} total={90} color={C.orange} />
-            <Text style={s.timerText}>Store response expected in {countdown}s</Text>
-          </Animated.View>
-        )}
+        {/* ── Negotiation Timer removed ── */}
 
         {/* ── Detail Card ───────────────────────────────────────────────── */}
         <Animated.View style={[s.infoCard, { opacity: opacityAnim, transform: [{ scale: cardScale }] }]}>

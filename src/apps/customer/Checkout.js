@@ -12,6 +12,7 @@ import {
   Modal,
   Pressable,
   Dimensions,
+  Linking,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -267,12 +268,12 @@ const cp = StyleSheet.create({
 function OrderSummaryCard({ items, subtotal, deliveryFee, total, onNegotiate, fs = 1 }) {
   return (
     <View style={osc.wrap}>
-      {items.slice(0, 3).map((item, i) => (
+      {items.map((item, i) => (
         <View
           key={i}
           style={[
             osc.itemRow,
-            i < Math.min(items.length, 3) - 1 && osc.itemBorder,
+            i < items.length - 1 && osc.itemBorder,
           ]}
         >
           <View style={osc.itemDot} />
@@ -290,9 +291,7 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, total, onNegotiate, fs
           </Text>
         </View>
       ))}
-      {items.length > 3 && (
-        <Text style={osc.moreText}>+{items.length - 3} more items</Text>
-      )}
+
       <View style={osc.divider} />
       <View style={osc.row}>
         <Text style={[osc.label, { fontSize: Math.round(13 * fs) }]}>
@@ -1403,8 +1402,20 @@ export default function CheckoutScreen() {
             {phoneStatus === "approved" ? (
               <View style={s.phoneBox}>
                 <Feather name="phone-call" size={18} color={C.green} />
-                <Text style={s.phoneValue}>{vendorPhone || "Shared"}</Text>
-                <Text style={s.phoneLabel}>Call vendor for any queries</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.phoneValue}>{vendorPhone || "Shared"}</Text>
+                  <Text style={s.phoneLabel}>Vendor contact approved</Text>
+                </View>
+                {vendorPhone && (
+                  <TouchableOpacity
+                    style={s.callBtn}
+                    onPress={() => Linking.openURL(`tel:${vendorPhone}`)}
+                    activeOpacity={0.85}
+                  >
+                    <Feather name="phone" size={14} color={C.white} />
+                    <Text style={s.callBtnText}>Call</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ) : phoneStatus === "pending" ? (
               <View style={s.phoneWait}>
@@ -2077,6 +2088,16 @@ const extraStyles = {
     borderColor: C.gray200,
   },
   phoneRequestText: { fontSize: 14, fontWeight: "700", color: C.gray700 },
+  callBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: C.green,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
+  callBtnText: { fontSize: 13, fontWeight: "800", color: C.white },
 };
 
 // ─── Local time parser (fallback) ───────────────────────────────────────────

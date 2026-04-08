@@ -72,6 +72,7 @@ const formatDateShort = (iso) => {
 
 // ─── Order Detail Modal ───────────────────────────────────────────────────────
 function OrderDetailModal({ order, onClose }) {
+  const navigation = useNavigation();
   if (!order) return null;
 
   const st         = getStatus(order.status);
@@ -256,6 +257,30 @@ function OrderDetailModal({ order, onClose }) {
                 </View>
               )}
 
+              {/* ── Track button — shown when order is active/out-for-delivery ── */}
+              {["accepted", "preparing", "ready", "picked_up"].includes(order.status) && (
+                <TouchableOpacity
+                  style={od.trackBtn}
+                  onPress={() => {
+                    onClose();
+                    navigation.navigate("TrackOrder", {
+                      orderId: order.id,
+                      orderNumber: order.order_number || `#${String(order.id).slice(-6).toUpperCase()}`,
+                    });
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient
+                    colors={["#0891B2", "#0E7490"]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    style={od.trackBtnGrad}
+                  >
+                    <Feather name="navigation" size={16} color="#fff" />
+                    <Text style={od.trackBtnText}>Track Delivery Partner</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+
               <View style={{ height: 24 }} />
             </View>
           </ScrollView>
@@ -325,6 +350,11 @@ const od = StyleSheet.create({
   // Payment
   paymentRow:   { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10 },
   paymentText:  { fontSize: 13, color: C.gray500, fontWeight: "500" },
+
+  // Track button
+  trackBtn:     { borderRadius: 14, overflow: "hidden", marginTop: 16 },
+  trackBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 15 },
+  trackBtnText: { fontSize: 15, fontWeight: "800", color: "#fff" },
 });
 
 // ─── Order Card ───────────────────────────────────────────────────────────────

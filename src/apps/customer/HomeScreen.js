@@ -56,6 +56,20 @@ const C = {
   gray900: "#111827",
 };
 
+// ─── Loose item helper ─────────────────────────────────────────────────────────
+function parseWeightOptions(p) {
+  if (!p) return null;
+  const wo = p.weight_options;
+  if (Array.isArray(wo) && wo.length > 0) return wo;
+  if (typeof wo === "string") {
+    try { const parsed = JSON.parse(wo); if (Array.isArray(parsed)) return parsed; } catch {}
+  }
+  return null;
+}
+function isLooseItem(p) {
+  return p?.item_type === "loose" || parseWeightOptions(p) !== null;
+}
+
 // ─── Gradient Text ─────────────────────────────────────────────────────────────
 function GradientText({ text, style }) {
   if (Platform.OS === "web") {
@@ -652,15 +666,21 @@ const VENDOR_TYPE_META = {
 };
 
 // ─── Item Card ─────────────────────────────────────────────────────────────────
-function ItemCard({ item, onAdd, onRemove, qty, cardWidth }) {
+function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker }) {
   const size = cardWidth || 130;
   const imgUri =
     item.img || CAT_FALLBACK_IMGS[item.category] || CAT_FALLBACK_IMGS._default;
   const hasMrp = item.orig && item.orig > item.price;
   const discPct = hasMrp ? Math.round((1 - item.price / item.orig) * 100) : 0;
+  const loose = isLooseItem(item);
 
   return (
     <View style={[ic.card, { width: size }]}>
+      {loose && (
+        <View style={[ic.badge, { backgroundColor: C.cyan, right: 5, left: "auto" }]}>
+          <Text style={ic.badgeText}>Loose</Text>
+        </View>
+      )}
       {hasMrp && (
         <View style={ic.badge}>
           <Text style={ic.badgeText}>{discPct}% off</Text>
@@ -682,12 +702,19 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth }) {
         </View>
         {qty === 0 ? (
           <TouchableOpacity
-            style={ic.addBtn}
-            onPress={() => onAdd(item)}
+            style={[ic.addBtn, loose && { backgroundColor: C.cyan }]}
+            onPress={() => {
+              if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
+              else onAdd(item);
+            }}
             activeOpacity={0.8}
           >
-            <Feather name="plus" size={12} color={C.white} />
-            <Text style={ic.addText}>ADD</Text>
+            {loose ? (
+              <Feather name="sliders" size={12} color={C.white} />
+            ) : (
+              <Feather name="plus" size={12} color={C.white} />
+            )}
+            <Text style={ic.addText}>{loose ? "SELECT" : "ADD"}</Text>
           </TouchableOpacity>
         ) : (
           <View style={ic.qtyRow}>
@@ -769,6 +796,97 @@ const ic = StyleSheet.create({
   qtyNum: { fontSize: 12, fontWeight: "800", color: C.white },
 });
 
+// ─── Weight Picker Modal ───────────────────────────────────────────────────
+function WeightPickerModal({ item, onClose, onAdd }) {
+  if (!item) return null;
+  const weightOptions = parseWeightOptions(item) || [item.unit || "1 pc"];
+  const [selected, setSelected] = useState(weightOptions[0]);
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={wp.backdrop} onPress={onClose}>
+        <Pressable style={wp.sheet} onPress={() => {}}>
+          <View style={wp.handle} />
+
+          {/* Header */}
+          <View style={wp.header}>
+            <Image
+              source={{ uri: item.img || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300" }}
+              style={wp.thumb} resizeMode="cover"
+            />
+            <View style={{ flex: 1 }}>
+              <View style={wp.looseBadge}>
+                <Feather name="droplet" size={10} color={C.cyan} />
+                <Text style={wp.looseBadgeText}>Loose item</Text>
+              </View>
+              <Text style={wp.productName} numberOfLines={2}>{item.name}</Text>
+              <Text style={wp.basePriceText}>
+                ₹{item.price}{" "}
+                <Text style={wp.perUnit}>per {item.unit || "unit"}</Text>
+              </Text>
+            </View>
+          </View>
+
+          {/* Weight chips */}
+          <Text style={wp.pickLabel}>Select quantity</Text>
+          <View style={wp.optionsGrid}>
+            {weightOptions.map(w => {
+              const isActive = selected === w;
+              return (
+                <TouchableOpacity
+                  key={w}
+                  style={[wp.chip, isActive && wp.chipActive]}
+                  onPress={() => setSelected(w)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[wp.chipText, isActive && wp.chipTextActive]}>{w}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Add button */}
+          <TouchableOpacity
+            style={wp.addBtn}
+            activeOpacity={0.88}
+            onPress={() => { onAdd(item, selected); onClose(); }}
+          >
+            <LinearGradient
+              colors={[C.green, C.greenDark]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={wp.addBtnGrad}
+            >
+              <Feather name="shopping-cart" size={16} color={C.white} />
+              <Text style={wp.addBtnText}>Add {selected} to Cart</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+const wp = StyleSheet.create({
+  backdrop:       { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  sheet:          { backgroundColor: C.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 36, zIndex: 9999 },
+  handle:         { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
+  header:         { flexDirection: "row", gap: 14, marginBottom: 24, alignItems: "center" },
+  thumb:          { width: 72, height: 72, borderRadius: 14, backgroundColor: C.gray100 },
+  looseBadge:     { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.cyanLight || "#ECFEFF", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, alignSelf: "flex-start", marginBottom: 6 },
+  looseBadgeText: { fontSize: 11, fontWeight: "700", color: C.cyan },
+  productName:    { fontSize: 16, fontWeight: "800", color: C.gray900, lineHeight: 21, marginBottom: 4 },
+  basePriceText:  { fontSize: 15, fontWeight: "700", color: C.green },
+  perUnit:        { fontSize: 12, fontWeight: "400", color: C.gray400 },
+  pickLabel:      { fontSize: 12, fontWeight: "700", color: C.gray500, marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
+  optionsGrid:    { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 },
+  chip:           { paddingHorizontal: 18, paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: C.gray200, backgroundColor: C.gray100 },
+  chipActive:     { borderColor: C.green, backgroundColor: C.greenLight },
+  chipText:       { fontSize: 14, fontWeight: "700", color: C.gray600 },
+  chipTextActive: { color: C.green },
+  addBtn:         { borderRadius: 16, overflow: "hidden", marginTop: 10 },
+  addBtnGrad:     { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16 },
+  addBtnText:     { fontSize: 16, fontWeight: "800", color: C.white },
+});
+
 // ═════════════════════════════════════════════════════════════════════════════
 export default function HomeScreen() {
   const { token, user } = useAuthStore();
@@ -804,6 +922,7 @@ export default function HomeScreen() {
   // Store picker
   const [pickerItem, setPickerItem] = useState(null);
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [loosePickerItem, setLoosePickerItem] = useState(null);
 
   // Address picker
   const [addrPickerVisible, setAddrPickerVisible] = useState(false);
@@ -910,6 +1029,8 @@ export default function HomeScreen() {
           orig: p.mrp != null && p.mrp > p.price ? p.mrp : null,
           img: p.image_url || null,
           category: p.category?.name || "Other",
+          item_type: p.item_type,
+          weight_options: p.weight_options,
         })),
       );
     } catch {
@@ -1091,6 +1212,8 @@ export default function HomeScreen() {
           orig: p.mrp != null && p.mrp > p.price ? p.mrp : null,
           img: p.image_url || null,
           category: catName,
+          item_type: p.item_type,
+          weight_options: p.weight_options,
         };
       }
     });
@@ -1129,14 +1252,18 @@ export default function HomeScreen() {
   // ── Cart helpers — reads from cartStore, no local qty state ───────────────
   // In handleAdd — check if THIS item is in cart, not just whether vendorId exists
   const handleAdd = useCallback(
-    (item) => {
-      const currentQty = getCartQty(item.id);
+    (item, selectedWeight = null) => {
+      if (isLooseItem(item) && !selectedWeight) {
+        setLoosePickerItem(item);
+        return;
+      }
+
       const itemInCart = cartItems.some((i) => i.id === item.id);
+      const unitToUse = selectedWeight || item.unit;
 
       if (!itemInCart) {
         // Item not in cart at all — always show store picker so user picks a vendor
-        // This correctly handles: first add AND re-add after removing all qty
-        setPickerItem(item);
+        setPickerItem({ ...item, selectedWeight: unitToUse });
         setPickerVisible(true);
         return;
       }
@@ -1148,12 +1275,12 @@ export default function HomeScreen() {
           name: item.name,
           price: item.price,
           img: item.img,
-          unit: item.unit,
+          unit: unitToUse,
         },
         cart?.vendorId,
       );
     },
-    [cart, cartItems, getCartQty],
+    [cart, cartItems],
   );
 
   const handleRemove = useCallback(
@@ -1172,7 +1299,7 @@ export default function HomeScreen() {
           name: item.name,
           price: item.price,
           img: item.img,
-          unit: item.unit,
+          unit: item.selectedWeight || item.unit,
         },
         vendor.id,
       );
@@ -1682,6 +1809,7 @@ export default function HomeScreen() {
                   onAdd={handleAdd}
                   onRemove={handleRemove}
                   cardWidth={cardW}
+                  onOpenWeightPicker={setLoosePickerItem}
                 />
               ))}
             </View>
@@ -1797,6 +1925,13 @@ export default function HomeScreen() {
           setAddrPickerVisible(false);
         }}
         onUseLocation={handleUseCurrentLocation}
+      />
+
+      {/* ══ WEIGHPICKER MODAL ═════════════════════════════════════════════ */}
+      <WeightPickerModal
+        item={loosePickerItem}
+        onClose={() => setLoosePickerItem(null)}
+        onAdd={handleAdd}
       />
 
       {/* ══ STORE PICKER MODAL ═════════════════════════════════════════════ */}

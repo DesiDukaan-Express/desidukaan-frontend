@@ -629,7 +629,7 @@ export default function ProfileScreen() {
         addr={detailAddr}
         isSelected={detailAddr?.id === addressStore.selectedId}
         onSelect={(a) => { addressStore.setSelectedId(a.id); setDetailAddr(null); }}
-        onRemove={(a) => { addressStore.removeAddress(a); setDetailAddr(null); }}
+        onRemove={(a) => { addressStore.removeAddress(a.id, token); setDetailAddr(null); }}
         onClose={() => setDetailAddr(null)}
       />
       <EditModal
