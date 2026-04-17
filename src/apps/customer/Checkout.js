@@ -633,12 +633,21 @@ export default function CheckoutScreen() {
   const [proposedFee,     setProposedFee]     = useState(null);
   const isAccepted = orderStatus === "accepted";
 
+  // ── Toast notification state ───────────────────────────────────────────────
+  const [toast, setToast] = useState({ visible: false, message: "", type: "info" }); // type: 'success' | 'error' | 'info'
+  const toastTimer = useRef(null);
+  const showToast = (message, type = "info") => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ visible: true, message, type });
+    toastTimer.current = setTimeout(() => setToast(t => ({ ...t, visible: false })), 3500);
+  };
+
   // ── Computed totals ────────────────────────────────────────────────────────
   const subtotal = items.reduce(
     (s, i) => s + i.price * (i.qty ?? i.quantity ?? 0),
     0,
   );
-  const baseFee = confirmedFee ?? (subtotal >= 299 ? 0 : 30);
+  const baseFee = confirmedFee ?? 30; // No free delivery threshold
   const activeFee = proposedFee !== null ? proposedFee : baseFee;
   const cartTotal = subtotal + activeFee;
   const total =
@@ -713,6 +722,7 @@ export default function CheckoutScreen() {
           delivery_fee: data.counter_offer.delivery_fee,
           total: data.counter_offer.total,
           note: data.counter_offer.note,
+          slot: data.counter_offer.slot || data.counter_offer.delivery_slot,
         });
         setOrderStatus("countered");
         setPlacing(false);
@@ -730,6 +740,7 @@ export default function CheckoutScreen() {
               delivery_fee: order.delivery_fee,
               total: order.total,
               note: order.vendor_note,
+              slot: order.delivery_slot,
             });
             setOrderStatus("countered");
             setPlacing(false);
@@ -744,8 +755,13 @@ export default function CheckoutScreen() {
       if (data.status === "approved" && data.phone) {
         setPhoneStatus("approved");
         setVendorPhone(data.phone);
+        showToast(`✅ Vendor shared their number: ${data.phone}`, "success");
+      } else if (data.status === "approved") {
+        setPhoneStatus("approved");
+        showToast("✅ Vendor approved your contact request!", "success");
       } else if (data.status === "rejected") {
         setPhoneStatus("rejected");
+        showToast("❌ Vendor declined the contact request.", "error");
       }
     });
 
@@ -947,6 +963,10 @@ export default function CheckoutScreen() {
           setOrderStatus("accepted");
         } else {
           setOrderStatus("rejected");
+          navigation.navigate("CustomerApp", {
+            screen: "CustomerTabNavigator",
+            params: { screen: "Home" },
+          });
         }
       } else {
         setErrorMsg(d.message || "Failed to respond. Please try again.");
@@ -1356,21 +1376,27 @@ export default function CheckoutScreen() {
               <View style={s.slotDisplay}>
                 <View style={s.slotInfo}>
                   <Text style={s.slotTimeText}>
-                    {new Date(confirmedSlot.start).toLocaleTimeString([], {
+                    {new Date(confirmedSlot.start).toLocaleTimeString("en-IN", {
                       hour: "2-digit",
                       minute: "2-digit",
+                      hour12: true,
                     })}{" "}
-                    -{" "}
-                    {new Date(confirmedSlot.end).toLocaleTimeString([], {
+                    –{" "}
+                    {new Date(confirmedSlot.end).toLocaleTimeString("en-IN", {
                       hour: "2-digit",
                       minute: "2-digit",
+                      hour12: true,
                     })}
                   </Text>
                   <Text style={s.slotDateText}>
                     {new Date(confirmedSlot.start).toDateString() ===
                     new Date().toDateString()
                       ? "Today"
-                      : "Tomorrow"}
+                      : "Tomorrow"} ·{" "}
+                    {new Date(confirmedSlot.start).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                    })}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -1923,6 +1949,20 @@ export default function CheckoutScreen() {
         onConfirm={handleRequestSlot}
         loading={requestingSlot}
       />
+
+      {/* ── In-app Toast Notification ─────────────────────────────── */}
+      {toast.visible && (
+        <View
+          style={[
+            toastStyle.wrap,
+            toast.type === "success" && toastStyle.success,
+            toast.type === "error" && toastStyle.error,
+          ]}
+          pointerEvents="none"
+        >
+          <Text style={toastStyle.text}>{toast.message}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -2134,8 +2174,8 @@ function parseSlotLocally(input) {
     });
   return {
     valid: true,
-    slot_start: start.toISOString(),
-    slot_end: end.toISOString(),
+    slot_start: new Date(start.getTime() - start.getTimezoneOffset() * 60000).toISOString().slice(0, -1),
+    slot_end: new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().slice(0, -1),
     start_label: fmt(start),
     end_label: fmt(end),
   };
@@ -2814,4 +2854,27 @@ const qr = StyleSheet.create({
     alignItems: "center",
   },
   doneBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
+});
+
+// ─── In-app Toast StyleSheet ─────────────────────────────────────────────────
+const toastStyle = StyleSheet.create({
+  wrap: {
+    position: "absolute",
+    bottom: 90,
+    left: 20,
+    right: 20,
+    backgroundColor: C.gray900,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    zIndex: 9999,
+    elevation: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  success: { backgroundColor: C.green },
+  error: { backgroundColor: "#DC2626" },
+  text: { color: C.white, fontSize: 14, fontWeight: "700", lineHeight: 20 },
 });

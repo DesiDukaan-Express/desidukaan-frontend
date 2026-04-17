@@ -62,7 +62,7 @@ function parseWeightOptions(p) {
   const wo = p.weight_options;
   if (Array.isArray(wo) && wo.length > 0) return wo;
   if (typeof wo === "string") {
-    try { const parsed = JSON.parse(wo); if (Array.isArray(parsed)) return parsed; } catch {}
+    try { const parsed = JSON.parse(wo); if (Array.isArray(parsed)) return parsed; } catch { }
   }
   return null;
 }
@@ -805,7 +805,7 @@ function WeightPickerModal({ item, onClose, onAdd }) {
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={wp.backdrop} onPress={onClose}>
-        <Pressable style={wp.sheet} onPress={() => {}}>
+        <Pressable style={wp.sheet} onPress={() => { }}>
           <View style={wp.handle} />
 
           {/* Header */}
@@ -866,25 +866,25 @@ function WeightPickerModal({ item, onClose, onAdd }) {
   );
 }
 const wp = StyleSheet.create({
-  backdrop:       { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  sheet:          { backgroundColor: C.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 36, zIndex: 9999 },
-  handle:         { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
-  header:         { flexDirection: "row", gap: 14, marginBottom: 24, alignItems: "center" },
-  thumb:          { width: 72, height: 72, borderRadius: 14, backgroundColor: C.gray100 },
-  looseBadge:     { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.cyanLight || "#ECFEFF", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, alignSelf: "flex-start", marginBottom: 6 },
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: C.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 36, zIndex: 9999 },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
+  header: { flexDirection: "row", gap: 14, marginBottom: 24, alignItems: "center" },
+  thumb: { width: 72, height: 72, borderRadius: 14, backgroundColor: C.gray100 },
+  looseBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.cyanLight || "#ECFEFF", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, alignSelf: "flex-start", marginBottom: 6 },
   looseBadgeText: { fontSize: 11, fontWeight: "700", color: C.cyan },
-  productName:    { fontSize: 16, fontWeight: "800", color: C.gray900, lineHeight: 21, marginBottom: 4 },
-  basePriceText:  { fontSize: 15, fontWeight: "700", color: C.green },
-  perUnit:        { fontSize: 12, fontWeight: "400", color: C.gray400 },
-  pickLabel:      { fontSize: 12, fontWeight: "700", color: C.gray500, marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
-  optionsGrid:    { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 },
-  chip:           { paddingHorizontal: 18, paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: C.gray200, backgroundColor: C.gray100 },
-  chipActive:     { borderColor: C.green, backgroundColor: C.greenLight },
-  chipText:       { fontSize: 14, fontWeight: "700", color: C.gray600 },
+  productName: { fontSize: 16, fontWeight: "800", color: C.gray900, lineHeight: 21, marginBottom: 4 },
+  basePriceText: { fontSize: 15, fontWeight: "700", color: C.green },
+  perUnit: { fontSize: 12, fontWeight: "400", color: C.gray400 },
+  pickLabel: { fontSize: 12, fontWeight: "700", color: C.gray500, marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
+  optionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 },
+  chip: { paddingHorizontal: 18, paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: C.gray200, backgroundColor: C.gray100 },
+  chipActive: { borderColor: C.green, backgroundColor: C.greenLight },
+  chipText: { fontSize: 14, fontWeight: "700", color: C.gray600 },
   chipTextActive: { color: C.green },
-  addBtn:         { borderRadius: 16, overflow: "hidden", marginTop: 10 },
-  addBtnGrad:     { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16 },
-  addBtnText:     { fontSize: 16, fontWeight: "800", color: C.white },
+  addBtn: { borderRadius: 16, overflow: "hidden", marginTop: 10 },
+  addBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16 },
+  addBtnText: { fontSize: 16, fontWeight: "800", color: C.white },
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -895,10 +895,27 @@ export default function HomeScreen() {
   const cart = useCartStore();
 
   const { currentLocation, fetchLocation: triggerRefetch } = addressStore;
-  const locationShort = currentLocation.displayName;
+
+  const [selectedAddrId, setSelectedAddrId] = useState(addressStore.selectedId || null);
+
+
+  // Derive locationShort label from selected address or GPS detecting
+  const locationShort = useMemo(() => {
+    if (selectedAddrId) {
+      const found = addressStore?.addresses?.find((a) => a.id === selectedAddrId);
+      if (found) {
+        const addrText = found.address_line || found.address || "";
+        const parts = addrText.split(",");
+        return (
+          [parts[0]?.trim(), parts[1]?.trim()].filter(Boolean).join(", ") ||
+          addrText
+        );
+      }
+    }
+    return currentLocation.displayName || "Set location";
+  }, [selectedAddrId, addressStore.addresses, currentLocation.displayName]);
 
   // Address picker state moved up to avoid ReferenceError in locationCoords
-  const [selectedAddrId, setSelectedAddrId] = useState(null);
 
   const locationCoords = useMemo(() => {
     // If a specific address is selected, use its coordinates
@@ -1913,11 +1930,6 @@ export default function HomeScreen() {
             setSelectedAddrId(newId);
             addressStore?.setSelectedId?.(newId);
           }
-          const parts = text.split(",");
-          setLocationShort(
-            [parts[0]?.trim(), parts[1]?.trim()].filter(Boolean).join(", ") ||
-            text,
-          );
           if (lat && lng) {
             fetchNearbyVendors(lat, lng);
             fetchPopularProducts(lat, lng);

@@ -258,7 +258,7 @@ function OrderDetailModal({ order, onClose }) {
               )}
 
               {/* ── Track button — shown when order is active/out-for-delivery ── */}
-              {["accepted", "preparing", "ready", "picked_up"].includes(order.status) && (
+              {["accepted", "preparing", "ready", "picked_up"].includes(order.status) && (order.delivery_partner_id || order.delivery_partner) && (
                 <TouchableOpacity
                   style={od.trackBtn}
                   onPress={() => {

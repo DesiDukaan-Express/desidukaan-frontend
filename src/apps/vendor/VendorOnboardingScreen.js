@@ -463,13 +463,23 @@ export default function VendorOnboardingScreen({ onComplete }) {
           body: JSON.stringify({
             name: product.name,
             mrp: parseFloat(product.mrp || 0),
-            price: parseFloat(product.price || product.base_price || 0),
+            price: parseFloat(product.price || product.base_price || product.sp || 0),
             unit: product.unit || 'kg',
-            category: product.category?.name || currentCategory?.name || '',
+            category: product.category?.name || product.cat || currentCategory?.name || '',
             category_id: product.category_id || currentCategory?.id,
-            stock_qty: parseInt(product.stock || 0),
-            type: product.item_type || 'packed',
-            weight_options: product.weight_options,
+            stock_qty: parseInt(product.stock || product.stock_qty || 0),
+            type: product.item_type || product.type || 'packed',
+            weight_options: (() => {
+              const opts = Array.isArray(product.weight_options) ? product.weight_options : [];
+              return opts.map(opt => {
+                if (typeof opt === 'string') {
+                  const m = opt.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Z]+)$/);
+                  if (m) return { weight: parseFloat(m[1]), unit: m[2] };
+                  return { weight: parseFloat(opt) || 0, unit: 'g' };
+                }
+                return opt;
+              });
+            })(),
           }),
         });
       }

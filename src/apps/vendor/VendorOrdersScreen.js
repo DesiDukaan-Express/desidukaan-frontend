@@ -49,6 +49,18 @@ export default function VendorOrdersScreen() {
   const [requests, setRequests] = useState({ phones: [], slots: [] });
   const [loadingRequests, setLoadingRequests] = useState(false);
 
+  // ── Toast notification ──────────────────────────────────────────────────────
+  const [vendorToast, setVendorToast] = useState({ visible: false, message: "", type: "info" });
+  const vendorToastTimer = React.useRef(null);
+  const showVendorToast = (message, type = "info") => {
+    if (vendorToastTimer.current) clearTimeout(vendorToastTimer.current);
+    setVendorToast({ visible: true, message, type });
+    vendorToastTimer.current = setTimeout(
+      () => setVendorToast(t => ({ ...t, visible: false })),
+      4000
+    );
+  };
+
   // Fetch nearby riders when modal opens and storeLocation is available
   useEffect(() => {
     if (isDeliveryModalVisible && (!selectedOrder?.delivery?.partner) && storeLocation) {
@@ -168,7 +180,9 @@ export default function VendorOrdersScreen() {
     const txt = input.trim().toLowerCase();
     const now = new Date();
     const baseDate = new Date(now);
-    if (txt.includes("tomorrow")) baseDate.setDate(baseDate.getDate() + 1);
+    let explicitTomorrow = txt.includes("tomorrow");
+    if (explicitTomorrow) baseDate.setDate(baseDate.getDate() + 1);
+    
     const timeRe = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/g;
     const times = [];
     let m;
@@ -182,10 +196,19 @@ export default function VendorOrdersScreen() {
     }
     if (times.length < 2) return null;
     const [s, e] = times;
-    const start = new Date(baseDate);
+    
+    let start = new Date(baseDate);
     start.setHours(s.h, s.min, 0, 0);
-    const end = new Date(baseDate);
+    
+    let end = new Date(baseDate);
     end.setHours(e.h, e.min, 0, 0);
+
+    // If both times are in the past for today and not explicitly tomorrow, assume tomorrow
+    if (!explicitTomorrow && start <= now) {
+      start.setDate(start.getDate() + 1);
+      end.setDate(end.getDate() + 1);
+    }
+    
     if (end <= start) return null;
     return { start: start.toISOString(), end: end.toISOString() };
   };
@@ -258,7 +281,10 @@ export default function VendorOrdersScreen() {
     // Slot & Fee Negotiation updates
     socket.on("slot:request", () => { fetchOrders(); fetchRequests(); });
     socket.on("fee:request", () => fetchOrders());
-    socket.on("phone:request", () => fetchRequests());
+    socket.on("phone:request", () => {
+      fetchRequests();
+      showVendorToast("📞 New phone number request from a customer!", "info");
+    });
 
     // Customer responses
     socket.on("slot:confirmed", () => fetchOrders());
@@ -285,10 +311,8 @@ export default function VendorOrdersScreen() {
   };
 
   const updateOrderStatus = async (id, status) => {
-
     try {
-
-      await fetch(`${API_BASE}/orders/${id}/status`, {
+      const res = await fetch(`${API_BASE}/orders/${id}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -296,13 +320,18 @@ export default function VendorOrdersScreen() {
         },
         body: JSON.stringify({ status })
       });
-
-      fetchOrders();
-
+      const result = await res.json();
+      if (res.ok && result.success) {
+        Alert.alert("Success", `Order marked as ${status}`);
+        fetchOrders();
+        setSelectedOrder(prev => prev && prev.id === id ? { ...prev, status } : prev);
+      } else {
+        Alert.alert("Error", result.msg || result.message || "Failed to update status");
+      }
     } catch (err) {
       console.log(err);
+      Alert.alert("Error", "Something went wrong while updating status.");
     }
-
   };
 
   useEffect(() => {
@@ -1035,6 +1064,19 @@ export default function VendorOrdersScreen() {
 
       </Modal>
 
+      {/* ── Vendor Toast Notification ──────────────────────────────────── */}
+      {vendorToast.visible && (
+        <View
+          style={[
+            vendorToastStyles.wrap,
+            vendorToast.type === "success" && vendorToastStyles.success,
+            vendorToast.type === "error" && vendorToastStyles.error,
+          ]}
+          pointerEvents="none"
+        >
+          <Text style={vendorToastStyles.text}>{vendorToast.message}</Text>
+        </View>
+      )}
 
     </View>
 
@@ -2033,3 +2075,27 @@ const silverMapStyle = [
     ]
   }
 ];
+
+// ─── Vendor Toast StyleSheet ──────────────────────────────────────────────────
+const vendorToastStyles = StyleSheet.create({
+  wrap: {
+    position: "absolute",
+    bottom: 90,
+    alignSelf: "center",
+    maxWidth: 400,
+    backgroundColor: "#1F2937",
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    zIndex: 9999,
+    elevation: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  success: { backgroundColor: "#16A34A" },
+  error: { backgroundColor: "#DC2626" },
+  info: { backgroundColor: "#1D4ED8" },
+  text: { color: "#fff", fontSize: 14, fontWeight: "700", lineHeight: 20 },
+});

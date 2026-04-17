@@ -198,10 +198,10 @@ export default function OrderPlaced() {
         {/* ── Actions ──────────────────────────────────────────────────── */}
         <Animated.View style={[s.actions, { opacity: opacityAnim }]}>
           {status === "accepted" && (
-            <TouchableOpacity style={s.trackBtn} onPress={handlePayment} activeOpacity={0.88}>
+            <TouchableOpacity style={s.trackBtn} onPress={goHome} activeOpacity={0.88}>
               <LinearGradient colors={[C.green, C.greenDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.trackGrad}>
-                <Feather name="credit-card" size={16} color={C.white} />
-                <Text style={s.trackText}>Proceed to Payment</Text>
+                <Feather name="home" size={16} color={C.white} />
+                <Text style={s.trackText}>Proceed to Home</Text>
               </LinearGradient>
             </TouchableOpacity>
           )}

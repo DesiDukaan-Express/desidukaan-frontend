@@ -65,8 +65,8 @@ function parseSlotLocally(input) {
   const fmt = (d) => d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
   return {
     valid:       true,
-    slot_start:  start.toISOString(),
-    slot_end:    end.toISOString(),
+    slot_start:  new Date(start.getTime() - start.getTimezoneOffset() * 60000).toISOString().slice(0, -1),
+    slot_end:    new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().slice(0, -1),
     start_label: fmt(start),
     end_label:   fmt(end),
   };
@@ -138,7 +138,7 @@ export default function CartScreen() {
   const [loadingInfo,      setLoadingInfo]      = useState(false);
 
   const subtotal   = items.reduce((s, i) => s + i.price * (i.qty || i.quantity || 0), 0);
-  const activeFee  = deliveryInfo?.delivery_fee ?? (subtotal >= 299 ? 0 : 30);
+  const activeFee  = deliveryInfo?.delivery_fee ?? 30;
   const grandTotal = subtotal + activeFee;
 
   // Qty helpers ────────────────────────────────────────────────────────────
@@ -393,12 +393,7 @@ function BillSummary({ subtotal, activeFee, grandTotal, fs = 1 }) {
           ? <Text style={[bs.value, { color: C.green, fontSize: Math.round(14 * fs) }]}>FREE</Text>
           : <Text style={[bs.value, { fontSize: Math.round(14 * fs) }]}>₹{activeFee}</Text>}
       </View>
-      {subtotal < 299 && (
-        <View style={bs.freeHint}>
-          <Feather name="info" size={11} color={C.green} />
-          <Text style={[bs.freeHintText, { fontSize: Math.round(11 * fs) }]}>Add ₹{299 - subtotal} more for free delivery</Text>
-        </View>
-      )}
+
       <View style={bs.divider} />
       <View style={bs.row}>
         <Text style={[bs.grandLabel, { fontSize: Math.round(16 * fs) }]}>Grand total</Text>
