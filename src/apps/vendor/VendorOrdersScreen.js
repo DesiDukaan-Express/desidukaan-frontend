@@ -40,6 +40,8 @@ export default function VendorOrdersScreen() {
   const [isDeliveryModalVisible, setIsDeliveryModalVisible] = useState(false);
 
   const [counterModalVisible, setCounterModalVisible] = useState(false);
+  const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
   const [liveRiderLocations, setLiveRiderLocations] = useState({});
   const [nearbyRiders, setNearbyRiders] = useState([]);
   const [autoAssigning, setAutoAssigning] = useState(false);
@@ -310,15 +312,18 @@ export default function VendorOrdersScreen() {
     fetchOrders();
   };
 
-  const updateOrderStatus = async (id, status) => {
+  const updateOrderStatus = async (id, status, reason = null) => {
     try {
+      const body = { status };
+      if (reason) body.reason = reason;
+
       const res = await fetch(`${API_BASE}/orders/${id}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ status })
+        body: JSON.stringify(body)
       });
       const result = await res.json();
       if (res.ok && result.success) {
@@ -896,8 +901,8 @@ export default function VendorOrdersScreen() {
                   <TouchableOpacity
                     style={styles.rejectBtn}
                     onPress={() => {
-                      updateOrderStatus(selectedOrder.id, "cancelled");
-                      setModalVisible(false);
+                      setRejectModalVisible(true);
+                      setRejectReason("");
                     }}
                   >
                     <Text style={styles.rejectText}>Decline</Text>
@@ -1062,6 +1067,46 @@ export default function VendorOrdersScreen() {
           </View>
         </View>
 
+      </Modal>
+
+      {/* REJECT MODAL */}
+      <Modal visible={rejectModalVisible} animationType="fade" transparent>
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent, { paddingBottom: 40 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Reject Order</Text>
+              <TouchableOpacity onPress={() => setRejectModalVisible(false)}>
+                <Text style={styles.closeBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={{ marginBottom: 12, color: '#4B5563', fontSize: 15 }}>
+              Please provide a reason for declining this order.
+            </Text>
+            <TextInput
+              style={styles.note}
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              multiline
+              placeholder="e.g. Items out of stock, shop closing soon..."
+              numberOfLines={4}
+            />
+            <TouchableOpacity
+              style={[styles.rejectBtn, { backgroundColor: '#EF4444', marginTop: 10 }]}
+              onPress={() => {
+                if (rejectReason.trim().length === 0) {
+                  Alert.alert("Reason Required", "Please provide a reason for rejecting.");
+                  return;
+                }
+                updateOrderStatus(selectedOrder.id, "cancelled", rejectReason.trim());
+                setRejectModalVisible(false);
+                setRejectReason("");
+                setModalVisible(false);
+              }}
+            >
+              <Text style={[styles.rejectText, { color: '#fff', fontSize: 16 }]}>Confirm Rejection</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       {/* ── Vendor Toast Notification ──────────────────────────────────── */}

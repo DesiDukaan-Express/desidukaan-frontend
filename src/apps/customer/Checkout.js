@@ -21,6 +21,7 @@ import { io } from "socket.io-client";
 import useCartStore from "../../store/cartStore";
 import useAuthStore from "../../store/authStore";
 import useAddressStore from "../../store/addressStore";
+import Slider from '@react-native-community/slider';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const SOCKET_URL =
@@ -1950,6 +1951,16 @@ export default function CheckoutScreen() {
         loading={requestingSlot}
       />
 
+      <FeeModal
+        visible={feeModalVisible}
+        currentFee={activeFee}
+        onClose={() => setFeeModalVisible(false)}
+        onPropose={(fee) => {
+          setProposedFee(fee);
+          setFeeModalVisible(false);
+        }}
+      />
+
       {/* ── In-app Toast Notification ─────────────────────────────── */}
       {toast.visible && (
         <View
@@ -1966,7 +1977,6 @@ export default function CheckoutScreen() {
     </View>
   );
 }
-
 // ─── Place Order Button (shared mobile + desktop) ─────────────────────────────
 function PlaceOrderBtn({ status, total, canPlace, placing, onPress, fs = 1 }) {
   const isAccepted = status === "accepted";
@@ -2228,64 +2238,28 @@ const fm = StyleSheet.create({
 
 // ─── Slot picker modal ────────────────────────────────────────────────────────
 function SlotModal({ visible, onClose, onConfirm, loading }) {
-  const [input, setInput] = useState("");
-  const [preview, setPreview] = useState(null);
-  const [checking, setChecking] = useState(false);
-  const debounceRef = useRef(null);
-
-  useEffect(() => {
-    if (!visible) {
-      setInput("");
-      setPreview(null);
-    }
-  }, [visible]);
-
-  useEffect(() => {
-    if (!input.trim()) {
-      setPreview(null);
-      return;
-    }
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
-      setChecking(true);
-      try {
-        const res = await fetch(`${BASE_URL}/slots/parse`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ input: input.trim() }),
-        });
-        const data = await res.json();
-        if (data.data?.valid !== undefined) {
-          setPreview(data.data);
-        } else {
-          const local = parseSlotLocally(input);
-          setPreview(
-            local || {
-              valid: false,
-              message: "Couldn't understand that. Try '3pm to 5pm'",
-            },
-          );
-        }
-      } catch {
-        const local = parseSlotLocally(input);
-        setPreview(
-          local || {
-            valid: false,
-            message: "Couldn't understand that. Try '3pm to 5pm'",
-          },
-        );
-      } finally {
-        setChecking(false);
-      }
-    }, 400);
-  }, [input]);
-
-  const handleConfirm = () => {
-    if (!preview?.valid) return;
-    onConfirm({ slot_start: preview.slot_start, slot_end: preview.slot_end });
+  const [day, setDay] = useState("today");
+  const [startHour, setStartHour] = useState(10);
+  const [duration, setDuration] = useState(2);
+  
+  const endHour = startHour + duration;
+  
+  const formatTime = (hour) => {
+    const ampm = hour >= 12 && hour < 24 ? "pm" : "am";
+    const h = (hour % 12) || 12;
+    return `${h}:00 ${ampm}`;
   };
 
-  const HINTS = ["3pm to 5pm", "today 6pm to 8pm", "tomorrow 10am to 11am"];
+  const getISODate = (hour) => {
+    const d = new Date();
+    if (day === "tomorrow") d.setDate(d.getDate() + 1);
+    d.setHours(hour, 0, 0, 0);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, -1);
+  };
+
+  const handleConfirm = () => {
+    onConfirm({ slot_start: getISODate(startHour), slot_end: getISODate(endHour) });
+  };
 
   return (
     <Modal
@@ -2298,107 +2272,75 @@ function SlotModal({ visible, onClose, onConfirm, loading }) {
         <Pressable style={sm.sheet} onPress={() => {}}>
           <View style={sm.handle} />
           <Text style={sm.title}>Choose delivery window</Text>
-          <Text style={sm.sub}>Type your preferred time window</Text>
+          <Text style={sm.sub}>Schedule your delivery using the sliders below</Text>
 
-          <View
-            style={[
-              sm.inputBox,
-              preview?.valid === false && sm.inputBoxError,
-              preview?.valid === true && sm.inputBoxValid,
-            ]}
-          >
-            <Feather
-              name="clock"
-              size={16}
-              color={
-                preview?.valid === true
-                  ? C.green
-                  : preview?.valid === false
-                  ? C.red
-                  : C.gray400
-              }
-              style={{ marginLeft: 14 }}
-            />
-            <TextInput
-              style={sm.input}
-              placeholder={`e.g. "3pm to 5pm" or "tomorrow 2pm to 3pm"`}
-              placeholderTextColor={C.gray400}
-              value={input}
-              onChangeText={setInput}
-              autoFocus
-              underlineColorAndroid="transparent"
-              selectionColor={C.green}
-            />
-            {checking ? (
-              <ActivityIndicator
-                size="small"
-                color={C.gray400}
-                style={{ marginRight: 14 }}
-              />
-            ) : input.length > 0 ? (
-              <TouchableOpacity
-                onPress={() => setInput("")}
-                style={{ marginRight: 14 }}
-              >
-                <Feather name="x" size={14} color={C.gray400} />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-
-          {!input.trim() && (
-            <View style={sm.hints}>
-              {HINTS.map((h) => (
+          <View style={{ marginBottom: 20 }}>
+            <Text style={{ fontWeight: '700', marginBottom: 10, color: C.gray700 }}>Select Day</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {['today', 'tomorrow'].map((d) => (
                 <TouchableOpacity
-                  key={h}
-                  style={sm.hintChip}
-                  onPress={() => setInput(h)}
-                  activeOpacity={0.7}
+                  key={d}
+                  style={[
+                    sm.hintChip,
+                    day === d && { borderColor: C.green, backgroundColor: C.greenLight }
+                  ]}
+                  onPress={() => setDay(d)}
                 >
-                  <Text style={sm.hintText}>{h}</Text>
+                  <Text style={[sm.hintText, day === d && { color: C.green }]}>{d.charAt(0).toUpperCase() + d.slice(1)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-          )}
+          </View>
 
-          {preview && (
-            <View
-              style={[
-                sm.preview,
-                preview.valid ? sm.previewValid : sm.previewInvalid,
-              ]}
-            >
-              <Feather
-                name={preview.valid ? "check-circle" : "alert-circle"}
-                size={15}
-                color={preview.valid ? C.green : C.red}
-              />
-              {preview.valid ? (
-                <Text style={sm.previewText}>
-                  <Text style={sm.previewBold}>{preview.start_label}</Text>
-                  {"  →  "}
-                  <Text style={sm.previewBold}>{preview.end_label}</Text>
-                </Text>
-              ) : (
-                <Text style={sm.previewTextErr}>{preview.message}</Text>
-              )}
-            </View>
-          )}
+          <View style={{ marginBottom: 20 }}>
+            <Text style={{ fontWeight: '700', marginBottom: 4, color: C.gray700 }}>Start Time: {formatTime(startHour)}</Text>
+            <Slider
+              style={{ width: '100%', height: 40 }}
+              minimumValue={8}
+              maximumValue={20}
+              step={1}
+              value={startHour}
+              onValueChange={setStartHour}
+              minimumTrackTintColor={C.green}
+              maximumTrackTintColor={C.gray200}
+              thumbTintColor={C.greenDark}
+            />
+          </View>
+
+          <View style={{ marginBottom: 20 }}>
+            <Text style={{ fontWeight: '700', marginBottom: 4, color: C.gray700 }}>Duration: {duration} hour{duration > 1 ? 's' : ''}</Text>
+            <Slider
+              style={{ width: '100%', height: 40 }}
+              minimumValue={1}
+              maximumValue={4}
+              step={1}
+              value={duration}
+              onValueChange={setDuration}
+              minimumTrackTintColor={C.green}
+              maximumTrackTintColor={C.gray200}
+              thumbTintColor={C.greenDark}
+            />
+          </View>
+
+          <View style={[sm.preview, sm.previewValid]}>
+            <Feather name="check-circle" size={15} color={C.green} />
+            <Text style={sm.previewText}>
+              <Text style={sm.previewBold}>{formatTime(startHour)}</Text>
+              {"  →  "}
+              <Text style={sm.previewBold}>{formatTime(endHour)}</Text>
+            </Text>
+          </View>
 
           <TouchableOpacity
-            style={[
-              sm.confirmBtn,
-              (!preview?.valid || loading) && sm.confirmBtnDisabled,
-            ]}
+            style={[sm.confirmBtn, loading && sm.confirmBtnDisabled]}
             onPress={handleConfirm}
-            disabled={!preview?.valid || loading}
+            disabled={loading}
             activeOpacity={0.85}
           >
             {loading ? (
               <ActivityIndicator size="small" color={C.white} />
             ) : (
-              <Text style={sm.confirmBtnText}>
-                {preview?.valid ? "Request this window →" : "Enter a window"}
-              </Text>
+              <Text style={sm.confirmBtnText}>Request this window →</Text>
             )}
           </TouchableOpacity>
         </Pressable>
@@ -2406,6 +2348,7 @@ function SlotModal({ visible, onClose, onConfirm, loading }) {
     </Modal>
   );
 }
+
 const sm = StyleSheet.create({
   backdrop: {
     flex: 1,

@@ -192,8 +192,36 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
                   }}
                   style={styles.addWeightBtn}
                 >
-                  <Text style={styles.addWeightBtnText}>+ Add</Text>
+                  <Text style={styles.addWeightBtnText}>+ Manual Entry</Text>
                 </TouchableOpacity>
+              </View>
+
+              <View style={styles.chipRow}>
+                {[{w: 50, u: 'g'}, {w: 100, u: 'g'}, {w: 250, u: 'g'}, {w: 500, u: 'g'}, {w: 1, u: 'kg'}].map((preset, i) => (
+                  <TouchableOpacity
+                    key={`preset-${i}`}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: T.primary,
+                      backgroundColor: T.primaryLight,
+                      borderRadius: 6,
+                      paddingVertical: 4,
+                      paddingHorizontal: 8,
+                    }}
+                    onPress={() => {
+                      const exists = form.weight_options.some(
+                        (o) => String(o.weight) === String(preset.w) && o.unit === preset.u
+                      );
+                      if (!exists) {
+                        set("weight_options", [...form.weight_options, { weight: String(preset.w), unit: preset.u }]);
+                      }
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, color: T.primary, fontWeight: "700" }}>
+                      + {preset.w}{preset.u}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
 
               {form.weight_options.map((opt, idx) => (
