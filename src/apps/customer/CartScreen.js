@@ -156,6 +156,16 @@ export default function CartScreen() {
     return new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
   };
   const fmtSlot = (slot) => slot ? `${fmtTime(slot.start)} – ${fmtTime(slot.end)}` : "";
+  const formatWeight = (w) => {
+    if (!w) return "";
+    if (typeof w === "string") return w;
+    if (typeof w === "object") {
+      if (w.weight !== undefined && w.unit) return `${w.weight}${w.unit}`;
+      if (w.weight !== undefined) return String(w.weight);
+      return w.unit || "";
+    }
+    return String(w);
+  };
 
   // ── Breakpoint (must be before any early return — Rules of Hooks) ───────────
   const { isDesktop, isTablet, isMobile } = useBreakpoint();
@@ -270,7 +280,7 @@ export default function CartScreen() {
                   />
                   <View style={s.itemMid}>
                     <Text style={[s.itemName, { fontSize: Math.round(14 * fs) }]} numberOfLines={1}>{item.name}</Text>
-                    {item.unit ? <Text style={[s.itemUnit, { fontSize: Math.round(12 * fs) }]}>{item.unit}</Text> : null}
+                    {item.unit ? <Text style={[s.itemUnit, { fontSize: Math.round(12 * fs) }]}>{formatWeight(item.unit)}</Text> : null}
                     <Text style={[s.itemPrice, { fontSize: Math.round(15 * fs) }]}>₹{item.price}</Text>
                   </View>
                   <View style={[s.qtyRow, { borderRadius: isDesktop ? 12 : 9 }]}>

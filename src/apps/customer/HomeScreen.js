@@ -69,6 +69,16 @@ function parseWeightOptions(p) {
 function isLooseItem(p) {
   return p?.item_type === "loose" || parseWeightOptions(p) !== null;
 }
+function formatWeight(w) {
+  if (!w) return "";
+  if (typeof w === "string") return w;
+  if (typeof w === "object") {
+    if (w.weight !== undefined && w.unit) return `${w.weight}${w.unit}`;
+    if (w.weight !== undefined) return String(w.weight);
+    return w.unit || "";
+  }
+  return String(w);
+}
 
 // ─── Gradient Text ─────────────────────────────────────────────────────────────
 function GradientText({ text, style }) {
@@ -537,7 +547,7 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
                         <Text style={sp.storeMetaText}>30 min</Text>
                       </View>
                       <Text style={sp.storePrice}>
-                        ₹{price} <Text style={sp.storeUnit}>· {item.unit}</Text>
+                        ₹{price} <Text style={sp.storeUnit}>· {formatWeight(item.selectedWeight || item.unit)}</Text>
                       </Text>
                     </View>
                     <View style={sp.addStoreBtn}>
@@ -831,15 +841,16 @@ function WeightPickerModal({ item, onClose, onAdd }) {
           <Text style={wp.pickLabel}>Select quantity</Text>
           <View style={wp.optionsGrid}>
             {weightOptions.map(w => {
+              const formatted = formatWeight(w);
               const isActive = selected === w;
               return (
                 <TouchableOpacity
-                  key={w}
+                  key={formatted}
                   style={[wp.chip, isActive && wp.chipActive]}
                   onPress={() => setSelected(w)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[wp.chipText, isActive && wp.chipTextActive]}>{w}</Text>
+                  <Text style={[wp.chipText, isActive && wp.chipTextActive]}>{formatted}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -857,7 +868,7 @@ function WeightPickerModal({ item, onClose, onAdd }) {
               style={wp.addBtnGrad}
             >
               <Feather name="shopping-cart" size={16} color={C.white} />
-              <Text style={wp.addBtnText}>Add {selected} to Cart</Text>
+              <Text style={wp.addBtnText}>Add {formatWeight(selected)} to Cart</Text>
             </LinearGradient>
           </TouchableOpacity>
         </Pressable>
@@ -1276,7 +1287,7 @@ export default function HomeScreen() {
       }
 
       const itemInCart = cartItems.some((i) => i.id === item.id);
-      const unitToUse = selectedWeight || item.unit;
+      const unitToUse = formatWeight(selectedWeight || item.unit);
 
       if (!itemInCart) {
         // Item not in cart at all — always show store picker so user picks a vendor

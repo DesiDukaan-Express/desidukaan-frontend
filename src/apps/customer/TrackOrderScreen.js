@@ -27,14 +27,18 @@ const C = {
 };
 
 const STATUS_STEPS = [
-  { key: "accepted",  label: "Order Accepted",       icon: "check-circle" },
-  { key: "preparing", label: "Getting Packed",        icon: "package"      },
-  { key: "ready",     label: "Ready for Pickup",      icon: "star"         },
-  { key: "picked_up", label: "Out for Delivery",      icon: "truck"        },
-  { key: "delivered", label: "Delivered!",             icon: "home"         },
+  { key: "pending",   label: "Order Placed",          icon: "clipboard"    },
+  { key: "accepted",  label: "Order Accepted",        icon: "check-circle" },
+  { key: "ready",     label: "Ready to Move",         icon: "package"      },
+  { key: "picked_up", label: "Out for Delivery",       icon: "truck"        },
+  { key: "delivered", label: "Delivered!",              icon: "home"         },
 ];
 
-const stepIndex = (status) => STATUS_STEPS.findIndex(s => s.key === status);
+const stepIndex = (status) => {
+  if (status === "preparing") return 1; // Merged with "Order Accepted"
+  if (status === "countered") return 0; // Stays at "Order Placed"
+  return STATUS_STEPS.findIndex(s => s.key === status);
+};
 
 // ─── Map component — Web: uses iframe with OpenStreetMap, Native: placeholder ──
 function DeliveryMap({ partnerLat, partnerLng, destLat, destLng }) {

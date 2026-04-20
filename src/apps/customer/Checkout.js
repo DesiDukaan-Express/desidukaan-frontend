@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -626,6 +626,7 @@ export default function CheckoutScreen() {
   const timerRef = useRef(null);
 
   // Slot management states
+  const [vendor, setVendor] = useState(null);
   const [slotModalVisible, setSlotModalVisible] = useState(false);
   const [requestingSlot, setRequestingSlot] = useState(false);
   const [requestingPhone, setRequestingPhone] = useState(false);
@@ -678,6 +679,21 @@ export default function CheckoutScreen() {
 
     return () => socket.disconnect();
   }, [token]);
+
+  // ── Fetch vendor details (for timings) ─────────────────────────────────────
+  useEffect(() => {
+    if (!vendorId) return;
+    (async () => {
+      try {
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await fetch(`${BASE_URL}/vendors/${vendorId}`, { headers });
+        const data = await res.json();
+        setVendor(data.data?.vendor || data.vendor || null);
+      } catch (e) {
+        console.error("Error fetching vendor timings:", e.message);
+      }
+    })();
+  }, [vendorId, token]);
   const [addrLine, setAddrLine] = useState("");
   const [addrCity, setAddrCity] = useState("");
   const [addrState, setAddrState] = useState("");
@@ -1949,6 +1965,7 @@ export default function CheckoutScreen() {
         onClose={() => setSlotModalVisible(false)}
         onConfirm={handleRequestSlot}
         loading={requestingSlot}
+        vendor={vendor}
       />
 
       <FeeModal
@@ -2237,27 +2254,64 @@ const fm = StyleSheet.create({
 });
 
 // ─── Slot picker modal ────────────────────────────────────────────────────────
-function SlotModal({ visible, onClose, onConfirm, loading }) {
+function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
   const [day, setDay] = useState("today");
-  const [startHour, setStartHour] = useState(10);
+  const [startHour, setStartHour] = useState(10); // decimal format (e.g. 10.75 = 10:45)
   const [duration, setDuration] = useState(2);
   
   const endHour = startHour + duration;
   
-  const formatTime = (hour) => {
-    const ampm = hour >= 12 && hour < 24 ? "pm" : "am";
-    const h = (hour % 12) || 12;
-    return `${h}:00 ${ampm}`;
+  // Helper: HH:MM string to decimal hour
+  const timeToDec = (timeStr) => {
+    if (!timeStr) return null;
+    const [h, m] = timeStr.split(":").map(Number);
+    return h + m / 60;
   };
 
-  const getISODate = (hour) => {
+  const formatTime = (decimalHour) => {
+    const h = Math.floor(decimalHour);
+    const m = Math.round((decimalHour - h) * 60);
+    const ampm = h >= 12 && h < 24 ? "pm" : "am";
+    const displayH = (h % 12) || 12;
+    const displayM = m.toString().padStart(2, "0");
+    return `${displayH}:${displayM} ${ampm}`;
+  };
+
+  const getISODate = (decimalHour) => {
     const d = new Date();
     if (day === "tomorrow") d.setDate(d.getDate() + 1);
-    d.setHours(hour, 0, 0, 0);
+    const h = Math.floor(decimalHour);
+    const m = Math.round((decimalHour - h) * 60);
+    d.setHours(h, m, 0, 0);
     return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, -1);
   };
 
+  // Validation Logic
+  const validation = useMemo(() => {
+    const now = new Date();
+    const nowDec = now.getHours() + (now.getMinutes() / 60);
+    const buffer = 0.5; // 30 min buffer
+
+    // 1. Past check
+    if (day === "today" && startHour < nowDec + buffer) {
+      return { valid: false, reason: "Store needs at least 30 mins to prepare." };
+    }
+
+    // 2. Store Hours check
+    if (vendor) {
+      const open = timeToDec(vendor.opening_time);
+      const close = timeToDec(vendor.closing_time);
+      if (open !== null && close !== null) {
+        if (startHour < open) return { valid: false, reason: `Store opens at ${formatTime(open)}.` };
+        if (endHour > close) return { valid: false, reason: `Store closes at ${formatTime(close)}.` };
+      }
+    }
+
+    return { valid: true };
+  }, [day, startHour, duration, vendor]);
+
   const handleConfirm = () => {
+    if (!validation.valid) return;
     onConfirm({ slot_start: getISODate(startHour), slot_end: getISODate(endHour) });
   };
 
@@ -2269,7 +2323,7 @@ function SlotModal({ visible, onClose, onConfirm, loading }) {
       onRequestClose={onClose}
     >
       <Pressable style={sm.backdrop} onPress={onClose}>
-        <Pressable style={sm.sheet} onPress={() => {}}>
+        <Pressable style={sm.sheet} onPress={(e) => e.stopPropagation()}>
           <View style={sm.handle} />
           <Text style={sm.title}>Choose delivery window</Text>
           <Text style={sm.sub}>Schedule your delivery using the sliders below</Text>
@@ -2286,19 +2340,24 @@ function SlotModal({ visible, onClose, onConfirm, loading }) {
                   ]}
                   onPress={() => setDay(d)}
                 >
-                  <Text style={[sm.hintText, day === d && { color: C.green }]}>{d.charAt(0).toUpperCase() + d.slice(1)}</Text>
+                  <Text style={[sm.hintText, day === d && { color: C.green }]}>
+                    {d.charAt(0).toUpperCase() + d.slice(1)}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
           <View style={{ marginBottom: 20 }}>
-            <Text style={{ fontWeight: '700', marginBottom: 4, color: C.gray700 }}>Start Time: {formatTime(startHour)}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text style={{ fontWeight: '700', color: C.gray700 }}>Start Time</Text>
+              <Text style={{ fontWeight: '800', color: C.greenDark }}>{formatTime(startHour)}</Text>
+            </View>
             <Slider
               style={{ width: '100%', height: 40 }}
               minimumValue={8}
-              maximumValue={20}
-              step={1}
+              maximumValue={22}
+              step={0.25}
               value={startHour}
               onValueChange={setStartHour}
               minimumTrackTintColor={C.green}
@@ -2308,12 +2367,15 @@ function SlotModal({ visible, onClose, onConfirm, loading }) {
           </View>
 
           <View style={{ marginBottom: 20 }}>
-            <Text style={{ fontWeight: '700', marginBottom: 4, color: C.gray700 }}>Duration: {duration} hour{duration > 1 ? 's' : ''}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text style={{ fontWeight: '700', color: C.gray700 }}>Duration</Text>
+              <Text style={{ fontWeight: '800', color: C.greenDark }}>{duration} hour{duration > 1 ? 's' : ''}</Text>
+            </View>
             <Slider
               style={{ width: '100%', height: 40 }}
               minimumValue={1}
               maximumValue={4}
-              step={1}
+              step={0.5}
               value={duration}
               onValueChange={setDuration}
               minimumTrackTintColor={C.green}
@@ -2322,25 +2384,33 @@ function SlotModal({ visible, onClose, onConfirm, loading }) {
             />
           </View>
 
-          <View style={[sm.preview, sm.previewValid]}>
-            <Feather name="check-circle" size={15} color={C.green} />
-            <Text style={sm.previewText}>
-              <Text style={sm.previewBold}>{formatTime(startHour)}</Text>
-              {"  →  "}
-              <Text style={sm.previewBold}>{formatTime(endHour)}</Text>
-            </Text>
+          <View style={[sm.preview, validation.valid ? sm.previewValid : sm.previewInvalid]}>
+            <Feather 
+              name={validation.valid ? "check-circle" : "alert-circle"} 
+              size={16} 
+              color={validation.valid ? C.green : C.red} 
+            />
+            {validation.valid ? (
+              <Text style={sm.previewText}>
+                Delivery between <Text style={sm.previewBold}>{formatTime(startHour)}</Text> and <Text style={sm.previewBold}>{formatTime(endHour)}</Text>
+              </Text>
+            ) : (
+              <Text style={sm.previewTextErr}>{validation.reason}</Text>
+            )}
           </View>
 
           <TouchableOpacity
-            style={[sm.confirmBtn, loading && sm.confirmBtnDisabled]}
+            style={[sm.confirmBtn, (!validation.valid || loading) && sm.confirmBtnDisabled]}
             onPress={handleConfirm}
-            disabled={loading}
+            disabled={!validation.valid || loading}
             activeOpacity={0.85}
           >
             {loading ? (
               <ActivityIndicator size="small" color={C.white} />
             ) : (
-              <Text style={sm.confirmBtnText}>Request this window →</Text>
+              <Text style={sm.confirmBtnText}>
+                {validation.valid ? "Request this window →" : "Invalid Selection"}
+              </Text>
             )}
           </TouchableOpacity>
         </Pressable>
