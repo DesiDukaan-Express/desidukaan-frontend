@@ -27,7 +27,7 @@ import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import { useNavigation } from "@react-navigation/native";
-import { vendorsAPI, ordersAPI } from "../../services/api";
+import { vendorsAPI, ordersAPI, categoriesAPI } from "../../services/api";
 
 // ── Use env var — works on device, emulator, and web ─────────────────────────
 // In your .env: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api
@@ -668,6 +668,378 @@ const CAT_FALLBACK_IMGS = {
     "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80",
 };
 
+// ─── Category accent colours (top-level) ──────────────────────────────────────
+const CAT_ACCENT = {
+  "Dairy, Bread & Eggs":      { bg: "#EFF6FF", accent: "#2563EB", icon: "🥛" },
+  "Fruits & Vegetables":     { bg: "#ECFDF5", accent: "#059669", icon: "🍎" },
+  "Cold Drinks & Juices":    { bg: "#F0FDF4", accent: "#16A34A", icon: "🧃" },
+  "Snacks & Munchies":       { bg: "#FFF7ED", accent: "#EA580C", icon: "🍿" },
+  "Breakfast & Instant Food": { bg: "#FEF9C3", accent: "#CA8A04", icon: "🥣" },
+  "Sweet Tooth":             { bg: "#FDF4FF", accent: "#9333EA", icon: "🍫" },
+  "Bakery & Biscuits":       { bg: "#FFF1F2", accent: "#E11D48", icon: "🍪" },
+  "Tea, Coffee & Milk Drinks": { bg: "#F5F5F4", accent: "#57534E", icon: "☕" },
+  "Atta, Rice & Dal":        { bg: "#FEFCE8", accent: "#A16207", icon: "🌾" },
+  "Masala, Oil & More":      { bg: "#FFF7ED", accent: "#C2410C", icon: "🌶️" },
+  "Sauces & Spreads":        { bg: "#F0FDFA", accent: "#0D9488", icon: "🥫" },
+  "Cleaning Essentials":     { bg: "#F0F9FF", accent: "#0284C7", icon: "🧼" },
+  "Personal Care":           { bg: "#FAF5FF", accent: "#7C3AED", icon: "🧴" },
+  "Home & Office":           { bg: "#F8FAFC", accent: "#475569", icon: "🖇️" },
+  _default:                  { bg: "#F3F4F6", accent: "#6B7280", icon: "📦" },
+};
+
+// ─── Build 3-level hierarchy from flat inventory ───────────────────────────────
+// Returns: { [topCatName]: { [subCatName]: inventoryItem[] } }
+// We use the category NAME only (no parent_id from API categories since inventory
+// only gives us product.category). The apiCategoryTree provides parent lookup.
+function buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCategories) {
+  // Build a parent lookup from API categories: catName → parentName
+  const parentOf = {};  // catName → parentCatName | null
+  const catById  = {};  // id → {name, parent_id}
+  if (apiCategories && apiCategories.length > 0) {
+    apiCategories.forEach(c => { catById[c.id] = c; });
+    apiCategories.forEach(c => {
+      if (c.parent_id && catById[c.parent_id]) {
+        parentOf[c.name] = catById[c.parent_id].name;
+      } else {
+        parentOf[c.name] = null; // top-level
+      }
+    });
+  }
+
+  const hierarchy = {};  // { topCat: { subCat: [inv, ...] } }
+
+  allInventoryItems.forEach(inv => {
+    const catName = getCategoryName(inv);
+    if (!catName) return;
+
+    let topCat, subCat;
+    if (parentOf.hasOwnProperty(catName)) {
+      // We have API hierarchy data
+      if (parentOf[catName] === null) {
+        // This IS a top-level category — put product under "All" sub-cat
+        topCat = catName;
+        subCat = "All";
+      } else {
+        // It's a sub-category
+        topCat = parentOf[catName];
+        subCat = catName;
+      }
+    } else {
+      // No API data — treat catName as top-level, sub-cat = product's unit as particulars group
+      topCat = catName;
+      const p = inv.product;
+      // Group by unit as a proxy for sub-category (e.g. "500 ml", "1 kg")
+      subCat = p?.unit || "General";
+    }
+
+    if (!hierarchy[topCat]) hierarchy[topCat] = {};
+    if (!hierarchy[topCat][subCat]) hierarchy[topCat][subCat] = [];
+    hierarchy[topCat][subCat].push(inv);
+  });
+
+  return hierarchy;
+}
+
+// ─── Category Browse Sheet ─────────────────────────────────────────────────────
+function CategoryBrowseSheet({
+  visible, category, hierarchy, onClose,
+  onAdd, onRemove, getCartQty, onOpenWeightPicker, vendors,
+  onStoreSelect,
+}) {
+  const [activeSubCat, setActiveSubCat] = React.useState(null);
+  const subCats = category && hierarchy[category] ? Object.keys(hierarchy[category]) : [];
+
+  React.useEffect(() => {
+    if (visible && subCats.length > 0) {
+      setActiveSubCat(subCats[0]);
+    }
+  }, [visible, category]);
+
+  if (!visible || !category) return null;
+
+  const subCatItems = (activeSubCat && hierarchy[category]?.[activeSubCat]) || [];
+  const catAccent = CAT_ACCENT[category] || CAT_ACCENT._default;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <Pressable style={cbs.backdrop} onPress={onClose}>
+        <Pressable style={cbs.sheet} onPress={() => {}}>
+          <View style={cbs.handle} />
+
+          {/* ── Header ── */}
+          <View style={[cbs.header, { borderBottomColor: catAccent.bg }]}>
+            <View style={[cbs.catIconWrap, { backgroundColor: catAccent.bg }]}>
+              <Text style={cbs.catIconEmoji}>{catAccent.icon}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={cbs.headerCat}>Category</Text>
+              <Text style={cbs.headerTitle}>{category}</Text>
+            </View>
+            <TouchableOpacity style={cbs.closeBtn} onPress={onClose}>
+              <Feather name="x" size={16} color={C.gray500} />
+            </TouchableOpacity>
+          </View>
+
+          {/* ── Sub-Category Pills ── */}
+          {subCats.length > 1 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={cbs.subCatRow}
+            >
+              {subCats.map(sc => {
+                const isActive = sc === activeSubCat;
+                const count = hierarchy[category]?.[sc]?.length || 0;
+                return (
+                  <TouchableOpacity
+                    key={sc}
+                    style={[
+                      cbs.subCatChip,
+                      isActive && { backgroundColor: catAccent.accent, borderColor: catAccent.accent },
+                    ]}
+                    onPress={() => setActiveSubCat(sc)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[cbs.subCatChipText, isActive && { color: C.white }]}>
+                      {sc}
+                    </Text>
+                    <View style={[cbs.subCatCount, isActive && { backgroundColor: "rgba(255,255,255,0.25)" }]}>
+                      <Text style={[cbs.subCatCountText, isActive && { color: C.white }]}>
+                        {count}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
+
+          {/* ── Column Headers ── */}
+          <View style={cbs.tableHeader}>
+            <Text style={[cbs.thCell, { flex: 2 }]}>PRODUCT</Text>
+            <Text style={[cbs.thCell, { flex: 1, textAlign: "center" }]}>BRAND</Text>
+            <Text style={[cbs.thCell, { flex: 1, textAlign: "center" }]}>QTY / UNIT</Text>
+            <Text style={[cbs.thCell, { width: 80, textAlign: "right" }]}>PRICE</Text>
+          </View>
+
+          {/* ── Product Rows ── */}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            style={{ flex: 1 }}
+          >
+            {subCatItems.length === 0 ? (
+              <View style={cbs.emptyWrap}>
+                <Feather name="package" size={32} color={C.gray300} />
+                <Text style={cbs.emptyText}>No items in this sub-category</Text>
+              </View>
+            ) : (
+              subCatItems.map((inv, idx) => {
+                const p = inv.product;
+                if (!p) return null;
+                const qty = getCartQty(p.id);
+                const loose = isLooseItem(p);
+                const hasMrp = p.mrp && p.mrp > p.price;
+                const discPct = hasMrp ? Math.round((1 - p.price / p.mrp) * 100) : 0;
+                const vendorName = inv._vendorName || "";
+
+                const item = {
+                  id:  p.id, name: p.name, price: p.price,
+                  img: p.image_url || null, unit: p.unit || "1 pc",
+                  orig: hasMrp ? p.mrp : null, category,
+                  item_type: p.item_type, weight_options: p.weight_options,
+                };
+
+                return (
+                  <View key={`${p.id}-${idx}`} style={[
+                    cbs.productRow,
+                    idx % 2 === 0 && cbs.productRowAlt,
+                  ]}>
+                    {/* Image + Name */}
+                    <View style={[cbs.productCell, { flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }]}>
+                      <View style={cbs.productImgWrap}>
+                        <Image
+                          source={{ uri: p.image_url || CAT_FALLBACK_IMGS[category] || CAT_FALLBACK_IMGS._default }}
+                          style={cbs.productImg}
+                          resizeMode="cover"
+                        />
+                        {hasMrp && (
+                          <View style={cbs.discPill}>
+                            <Text style={cbs.discPillText}>{discPct}%</Text>
+                          </View>
+                        )}
+                        {loose && (
+                          <View style={[cbs.discPill, { backgroundColor: "#0891B2" }]}>
+                            <Text style={cbs.discPillText}>Loose</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={cbs.productName} numberOfLines={2}>{p.name}</Text>
+                        {p.description ? (
+                          <Text style={cbs.productDesc} numberOfLines={1}>{p.description}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+
+                    {/* Brand (vendor) */}
+                    <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
+                      <Text style={cbs.brandText} numberOfLines={2}>{vendorName}</Text>
+                    </View>
+
+                    {/* Qty / Unit (Particulars) */}
+                    <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
+                      <Text style={cbs.unitText}>{p.unit || "1 pc"}</Text>
+                    </View>
+
+                    {/* Price + ADD */}
+                    <View style={[cbs.productCell, { width: 80, alignItems: "flex-end" }]}>
+                      <Text style={cbs.priceText}>₹{p.price}</Text>
+                      {hasMrp && <Text style={cbs.mrpText}>₹{p.mrp}</Text>}
+                      {qty === 0 ? (
+                        <TouchableOpacity
+                          style={[cbs.addBtn, loose && { backgroundColor: "#0891B2" }]}
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
+                            else onAdd(item);
+                          }}
+                        >
+                          <Text style={cbs.addBtnText}>{loose ? "SELECT" : "ADD"}</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={cbs.qtyRow}>
+                          <TouchableOpacity style={cbs.qtyBtn} onPress={() => onRemove(item)}>
+                            <Feather name="minus" size={10} color={C.white} />
+                          </TouchableOpacity>
+                          <Text style={cbs.qtyNum}>{qty}</Text>
+                          <TouchableOpacity style={cbs.qtyBtn} onPress={() => onAdd(item)}>
+                            <Feather name="plus" size={10} color={C.white} />
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                );
+              })
+            )}
+            <View style={{ height: 24 }} />
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const cbs = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  sheet: {
+    backgroundColor: C.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 12,
+    maxHeight: "88%",
+    flex: 1,
+  },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 2,
+    marginBottom: 0,
+  },
+  catIconWrap: {
+    width: 48, height: 48, borderRadius: 16,
+    alignItems: "center", justifyContent: "center",
+  },
+  catIconEmoji: { fontSize: 24 },
+  headerCat: { fontSize: 11, color: C.gray400, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
+  headerTitle: { fontSize: 20, fontWeight: "900", color: C.gray900 },
+  closeBtn: {
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: C.gray100, alignItems: "center", justifyContent: "center",
+  },
+
+  // Sub-category pills
+  subCatRow: { paddingHorizontal: 16, paddingVertical: 12, gap: 6, flexDirection: "row" },
+  subCatChip: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: 16, borderWidth: 1, borderColor: C.gray200,
+    backgroundColor: C.white,
+  },
+  subCatChipText: { fontSize: 11, fontWeight: "700", color: C.gray700 },
+  subCatCount: {
+    paddingHorizontal: 5, paddingVertical: 1,
+    borderRadius: 8, backgroundColor: C.gray100,
+  },
+  subCatCountText: { fontSize: 9, fontWeight: "800", color: C.gray500 },
+
+  // Table header
+  tableHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: C.gray100,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: C.gray200,
+  },
+  thCell: { fontSize: 10, fontWeight: "800", color: C.gray400, textTransform: "uppercase", letterSpacing: 0.4 },
+
+  // Product rows
+  productRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minHeight: 72,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+    gap: 8,
+  },
+  productRowAlt: { backgroundColor: "#FAFAFA" },
+  productCell: { justifyContent: "center" },
+  productImgWrap: { width: 52, height: 52, borderRadius: 10, overflow: "hidden", backgroundColor: C.gray100, flexShrink: 0, position: "relative" },
+  productImg: { width: "100%", height: "100%" },
+  discPill: {
+    position: "absolute", bottom: 0, left: 0, right: 0,
+    backgroundColor: C.orange,
+    paddingVertical: 1,
+    alignItems: "center",
+  },
+  discPillText: { fontSize: 8, color: C.white, fontWeight: "800" },
+  productName: { fontSize: 13, fontWeight: "700", color: C.gray900, lineHeight: 18 },
+  productDesc: { fontSize: 11, color: C.gray400, marginTop: 2 },
+  brandText: { fontSize: 12, fontWeight: "600", color: C.green, textAlign: "center" },
+  unitText: { fontSize: 13, fontWeight: "700", color: C.gray700, textAlign: "center" },
+  priceText: { fontSize: 14, fontWeight: "900", color: C.gray900 },
+  mrpText: { fontSize: 10, color: C.gray400, textDecorationLine: "line-through", marginTop: 1 },
+  addBtn: {
+    marginTop: 4,
+    backgroundColor: C.green, borderRadius: 7,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  addBtnText: { fontSize: 11, fontWeight: "800", color: C.white },
+  qtyRow: {
+    marginTop: 4,
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: C.green, borderRadius: 7, overflow: "hidden",
+  },
+  qtyBtn: { paddingHorizontal: 7, paddingVertical: 5 },
+  qtyNum: { fontSize: 11, fontWeight: "800", color: C.white, minWidth: 18, textAlign: "center" },
+  emptyWrap: { alignItems: "center", paddingVertical: 40, gap: 12 },
+  emptyText: { fontSize: 14, color: C.gray400 },
+});
+
 // ─── Vendor type display config ──────────────────────────────────────────────
 const VENDOR_TYPE_META = {
   ration: { label: "Ration Store", bg: "#FEF9C3", color: "#92400E" },
@@ -947,6 +1319,13 @@ export default function HomeScreen() {
   const [loadingVendors, setLoadingVendors] = useState(false);
   const [loadingInventory, setLoadingInventory] = useState(false);
 
+  // Category hierarchy from API
+  const [apiCategories, setApiCategories] = useState([]);
+
+  // Category browse sheet
+  const [catSheetVisible, setCatSheetVisible] = useState(false);
+  const [catSheetCategory, setCatSheetCategory] = useState(null);
+
   // Store picker
   const [pickerItem, setPickerItem] = useState(null);
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -1035,6 +1414,13 @@ export default function HomeScreen() {
   useEffect(() => {
     if (token) fetchRecentOrders();
   }, [token]);
+
+  // Fetch category hierarchy (public endpoint — no auth needed)
+  useEffect(() => {
+    categoriesAPI.getAll()
+      .then(res => setApiCategories(res.categories || []))
+      .catch(() => setApiCategories([]));
+  }, []);
 
   // ── Handled by addressStore ──────────────────────────────────────────────────
 
@@ -1143,36 +1529,7 @@ export default function HomeScreen() {
     return items;
   }, [vendors]);
 
-  const CAT_META = {
-    Groceries: {
-      img: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&q=80",
-      bg: "#FEF9C3",
-    },
-    Dairy: {
-      img: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&q=80",
-      bg: "#EFF6FF",
-    },
-    Snacks: {
-      img: "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=300&q=80",
-      bg: "#FFF7ED",
-    },
-    Beverages: {
-      img: "https://images.unsplash.com/photo-1527960471264-932f39eb5846?w=300&q=80",
-      bg: "#F0FDF4",
-    },
-    Bakery: {
-      img: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&q=80",
-      bg: "#FDF4FF",
-    },
-    Fruits: {
-      img: "https://images.unsplash.com/photo-1490474418585-ba9bad8fd0ea?w=300&q=80",
-      bg: "#ECFDF5",
-    },
-    Medicines: {
-      img: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&q=80",
-      bg: "#F0F9FF",
-    },
-  };
+  // ── Address Handlers ────────────────────────────────────────────────────────
 
   // In normalizeCatName — add Personal Care to the exclusion list
   const normalizeCatName = (name) => {
@@ -1202,19 +1559,57 @@ export default function HomeScreen() {
   const dynamicCategories = useMemo(() => {
     const seen = new Set();
     const cats = [];
+    
+    // Create a lookup for top-level resolution
+    const topLevelMap = {}; // catId -> topLevelCatName
+    if (apiCategories.length > 0) {
+      const catById = {};
+      apiCategories.forEach(c => { catById[c.id] = c; });
+      
+      apiCategories.forEach(c => {
+        let curr = c;
+        let safety = 0;
+        while (curr.parent_id && catById[curr.parent_id] && safety < 5) {
+          curr = catById[curr.parent_id];
+          safety++;
+        }
+        topLevelMap[c.id] = curr.name;
+        topLevelMap[c.name] = curr.name; // Map names too for robustness
+      });
+    }
+
     allInventoryItems.forEach((inv) => {
-      const catName = getCategoryName(inv);
+      const p = inv.product;
+      if (!p) return;
+      const catId = p.category_id || p.category?.id;
+      const rawName = getCategoryName(inv);
+      const catName = topLevelMap[catId] || topLevelMap[rawName] || rawName;
+      
       if (catName && !seen.has(catName)) {
         seen.add(catName);
-        const meta = CAT_META[catName] || {
-          img: "https://images.unsplash.com/photo-1585386959984-a4155224a1ad?w=300&q=80",
-          bg: "#F3F4F6",
-        };
-        cats.push({ label: catName, tag: catName, img: meta.img, bg: meta.bg });
+        
+        // Fetch image and accent from DB/Config
+        const apiCat = apiCategories.find(c => c.name === catName);
+        const accent = CAT_ACCENT[catName] || CAT_ACCENT._default;
+        
+        cats.push({ 
+          label: catName, 
+          tag: catName, 
+          img: apiCat?.image_url || "https://images.unsplash.com/photo-1585386959984-a4155224a1ad?w=300&q=80", 
+          bg: accent.bg, 
+          accent: accent.accent, 
+          icon: accent.icon 
+        });
       }
     });
     return cats.sort((a, b) => a.label.localeCompare(b.label));
-  }, [allInventoryItems, getCategoryName]);
+  }, [allInventoryItems, getCategoryName, apiCategories]);
+
+  // ── 3-level hierarchy for CategoryBrowseSheet ─────────────────────────────
+  const categoryHierarchy = useMemo(
+    () => buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCategories),
+    [allInventoryItems, getCategoryName, apiCategories],
+  );
 
   // ── Popular items — API-based with inventory fallback ─────────────────────
   const popularItems = useMemo(() => {
@@ -1764,41 +2159,50 @@ export default function HomeScreen() {
             >
               <View>
                 <Text style={s.sectionTitle}>Shop by Category</Text>
-                <Text style={s.sectionSub}>Available near you</Text>
+                <Text style={s.sectionSub}>Tap to browse items inside</Text>
               </View>
             </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingLeft: hPad,
-                paddingRight: 8,
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                paddingHorizontal: hPad,
                 paddingBottom: 8,
+                rowGap: 12,
+                columnGap: 4,
               }}
             >
-              {dynamicCategories.map((cat) => (
-                <TouchableOpacity
-                  key={cat.label}
-                  style={[s.catChip, wide && s.catChipWide]}
-                  onPress={() =>
-                    navigation.navigate("Search", {
-                      category: cat.label,
-                      filterByCategory: true,
-                    })
-                  }
-                  activeOpacity={0.8}
-                >
-                  <View style={[s.catImgWrap, { backgroundColor: cat.bg }]}>
-                    <Image
-                      source={{ uri: cat.img }}
-                      style={s.catImg}
-                      resizeMode="cover"
-                    />
-                  </View>
-                  <Text style={s.catLabel}>{cat.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+              {dynamicCategories.map((cat) => {
+                const subCats = categoryHierarchy[cat.label]
+                  ? Object.keys(categoryHierarchy[cat.label])
+                  : [];
+                const itemCount = subCats.reduce(
+                  (sum, sc) => sum + (categoryHierarchy[cat.label]?.[sc]?.length || 0), 0
+                );
+                
+                // Calculate width for 10 items per row, matching hPad and adding 4px gaps
+                const itemW = (winW - (hPad * 2) - (4 * 9)) / 10;
+                const bandSize = itemW;
+
+                return (
+                  <TouchableOpacity
+                    key={cat.label}
+                    style={[s.catCard, { width: itemW }]}
+                    onPress={() => {
+                      setCatSheetCategory(cat.label);
+                      setCatSheetVisible(true);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[s.catCardBand, { width: bandSize, height: bandSize, backgroundColor: cat.bg }]}>
+                      <Image source={{ uri: cat.img }} style={s.catImg} resizeMode="contain" />
+                      {cat.icon && <Text style={[s.catCardEmoji, { fontSize: bandSize * 0.3 }]}>{cat.icon}</Text>}
+                    </View>
+                    <Text style={s.catCardLabel} numberOfLines={2}>{cat.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </>
         )}
 
@@ -1964,6 +2368,20 @@ export default function HomeScreen() {
         vendors={vendors}
         onClose={() => setPickerVisible(false)}
         onSelectStore={handleStoreSelect}
+      />
+
+      {/* ══ CATEGORY BROWSE SHEET ══════════════════════════════════════════ */}
+      <CategoryBrowseSheet
+        visible={catSheetVisible}
+        category={catSheetCategory}
+        hierarchy={categoryHierarchy}
+        onClose={() => setCatSheetVisible(false)}
+        onAdd={handleAdd}
+        onRemove={handleRemove}
+        getCartQty={getCartQty}
+        onOpenWeightPicker={setLoosePickerItem}
+        vendors={vendors}
+        onStoreSelect={handleStoreSelect}
       />
 
       {/* ══ FLOATING CART — mobile ══════════════════════════════════════════ */}
@@ -2298,26 +2716,48 @@ const s = StyleSheet.create({
     elevation: 3,
   },
   storeCardWide: { width: 320 },
+  // ── Legacy catChip kept for SearchScreen compatibility ──
   catChip: { alignItems: "center", marginRight: 22, width: 124 },
   catChipWide: { width: 144 },
-  catImgWrap: {
-    width: 114,
-    height: 114,
-    borderRadius: 28,
-    overflow: "hidden",
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
-  },
   catImg: { width: "100%", height: "100%" },
-  catLabel: {
-    fontSize: 15,
-    color: C.gray900,
-    fontWeight: "800",
+  catLabel: { fontSize: 15, color: C.gray900, fontWeight: "800", textAlign: "center" },
+
+  // ── New category card (HomeScreen) ─────────────────────────────────────────
+  catCard: {
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  catCardBand: {
+    borderRadius: 8,
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    padding: 1,
+    marginBottom: 2,
+  },
+  catCardEmoji: {
+    position: "absolute",
+    top: 1,
+    right: 2,
+    zIndex: 2,
+  },
+  catCardImgWrap: {
+    width: "100%",
+    height: "100%",
+  },
+  catCardLabel: {
+    fontSize: 9,
+    fontWeight: "600",
+    color: C.gray800,
     textAlign: "center",
+    paddingHorizontal: 1,
+    lineHeight: 11,
+  },
+  // keep catImgWrap for compatibility
+  catImgWrap: {
+    width: 114, height: 114, borderRadius: 28, overflow: "hidden",
+    marginBottom: 10, elevation: 3,
   },
   itemsGrid: {
     flexDirection: "row",

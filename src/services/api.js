@@ -74,6 +74,12 @@ export const uploadAPI = {
   },
 };
 
+// ─── Categories ───
+export const categoriesAPI = {
+  /** Returns all active categories as flat list with parent_id for hierarchy */
+  getAll: () => request("GET", "/products/categories"),
+};
+
 // ─── Vendors ───
 export const vendorsAPI = {
   getNearby: (latitude, longitude, radius_km = 2) =>
