@@ -8,6 +8,7 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import useAuthStore from "../../store/authStore";
+import { downloadInvoice } from "../../utils/invoiceGenerator";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -73,7 +74,50 @@ const formatDateShort = (iso) => {
 // ─── Order Detail Modal ───────────────────────────────────────────────────────
 function OrderDetailModal({ order, onClose }) {
   const navigation = useNavigation();
+  const { token } = useAuthStore();
+  const [fullOrder, setFullOrder] = useState(null);
+  const [fetching, setFetching] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    if (order?.id) {
+      fetchFullOrder();
+    } else {
+      setFullOrder(null);
+    }
+  }, [order?.id]);
+
+  const fetchFullOrder = async () => {
+    setFetching(true);
+    try {
+      const res = await fetch(`${BASE_URL}/orders/${order.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setFullOrder(data.data?.order || data.order || data);
+    } catch (e) {
+      console.error("FetchFullOrder error:", e);
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const handleDownloadInvoice = async () => {
+    if (!order) return;
+    setGenerating(true);
+    try {
+      await downloadInvoice(order.id, order.order_number || order.id);
+    } catch (e) {
+      console.error("Invoice error:", e);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   if (!order) return null;
+  
+  // Use fullOrder if available for more details, otherwise fallback to order
+  const displayOrder = fullOrder || order;
 
   const st         = getStatus(order.status);
   const stepIdx    = stepIndex(order.status);
@@ -225,7 +269,34 @@ function OrderDetailModal({ order, onClose }) {
                   <Text style={od.billTotalLbl}>Total paid</Text>
                   <Text style={od.billTotalVal}>₹{total}</Text>
                 </View>
+
+                {/* GST Breakdown if available */}
+                {displayOrder.gst_amount > 0 && (
+                  <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: C.gray100, borderStyle: 'dashed' }}>
+                    <Text style={{ fontSize: 11, color: C.gray400, textAlign: 'right' }}>
+                      Includes ₹{displayOrder.gst_amount} GST (5%)
+                    </Text>
+                  </View>
+                )}
               </View>
+
+              {/* ── Invoice Button ── */}
+              {displayOrder.status !== 'pending' && (
+                <TouchableOpacity
+                  style={[od.invoiceBtn, generating && { opacity: 0.7 }]}
+                  onPress={handleDownloadInvoice}
+                  disabled={generating || fetching}
+                >
+                  {generating ? (
+                    <ActivityIndicator size="small" color={C.green} />
+                  ) : (
+                    <>
+                      <Feather name="file-text" size={16} color={C.green} />
+                      <Text style={od.invoiceBtnText}>Download Invoice</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
 
               {/* ── Delivery address ── */}
               {order.delivery_address && (
@@ -355,6 +426,25 @@ const od = StyleSheet.create({
   trackBtn:     { borderRadius: 14, overflow: "hidden", marginTop: 16 },
   trackBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 15 },
   trackBtnText: { fontSize: 15, fontWeight: "800", color: "#fff" },
+
+  // Invoice button
+  invoiceBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: C.green,
+    marginTop: 10,
+    backgroundColor: C.white,
+  },
+  invoiceBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: C.green,
+  },
 });
 
 // ─── Order Card ───────────────────────────────────────────────────────────────

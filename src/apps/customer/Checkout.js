@@ -303,6 +303,14 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, total, onNegotiate, fs
         </Text>
       </View>
       <View style={osc.row}>
+        <Text style={[osc.label, { fontSize: Math.round(13 * fs) }]}>
+          Taxes (GST 5%)
+        </Text>
+        <Text style={[osc.value, { fontSize: Math.round(13 * fs) }]}>
+          ₹{parseFloat((subtotal * 0.05).toFixed(2))}
+        </Text>
+      </View>
+      <View style={osc.row}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <Text style={[osc.label, { fontSize: Math.round(13 * fs) }]}>
             Delivery fee
@@ -651,7 +659,8 @@ export default function CheckoutScreen() {
   );
   const baseFee = confirmedFee ?? 30; // No free delivery threshold
   const activeFee = proposedFee !== null ? proposedFee : baseFee;
-  const cartTotal = subtotal + activeFee;
+  const gstAmount = parseFloat((subtotal * 0.05).toFixed(2));
+  const cartTotal = subtotal + activeFee + gstAmount;
   const total =
     orderStatus === "accepted" && counterData ? counterData.total : cartTotal;
 
