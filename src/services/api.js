@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 // ─── Core request helper ───
@@ -55,21 +57,45 @@ export const uploadAPI = {
       : mimeType === "image/webp"   ? ".webp"
       : ".jpg";
 
+    const fileName = `upload_${Date.now()}${ext}`;
     const formData = new FormData();
-    formData.append("file", {
-      uri:  localUri,
-      name: `upload_${Date.now()}${ext}`,
-      type: mimeType,
-    });
+
+    if (Platform.OS === 'web') {
+      // On web, we must fetch the blob and append it as a real File/Blob
+      try {
+        const response = await fetch(localUri);
+        const blob = await response.blob();
+        formData.append("file", blob, fileName);
+      } catch (err) {
+        console.error("Web upload blob conversion failed:", err);
+        throw new Error("Could not process file for upload");
+      }
+    } else {
+      // On native, use the special object format that React Native's FormData polyfill expects
+      formData.append("file", {
+        uri:  localUri,
+        name: fileName,
+        type: mimeType,
+      });
+    }
+
+    console.log("📤 Uploading file to:", `${BASE_URL}/upload`, "Platform:", Platform.OS);
 
     const response = await fetch(`${BASE_URL}/upload`, {
       method:  "POST",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { 
+        "Authorization": `Bearer ${token}`,
+        // DO NOT set Content-Type: multipart/form-data here, 
+        // the browser/native layer must set it with the boundary automatically.
+      },
       body:    formData,
     });
 
     const data = await response.json();
-    if (!response.ok) throw new Error(data.message || "Upload failed");
+    if (!response.ok) {
+      console.error("❌ Upload response error:", data);
+      throw new Error(data.message || "Upload failed");
+    }
     return data; // { success, url, mime }
   },
 };

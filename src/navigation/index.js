@@ -118,7 +118,7 @@ export default function Navigation() {
               deliveryOnboarded
                 ? <Stack.Screen name="DeliveryApp" component={DeliveryTabs} />
                 : <Stack.Screen name="DeliveryOnboarding">
-                  {() => <DeliveryOnboardingScreen onComplete={() => setDeliveryOnboarded(true)} />}
+                  {(props) => <DeliveryOnboardingScreen {...props} onComplete={() => setDeliveryOnboarded(true)} />}
                 </Stack.Screen>
             ) : (
               <Stack.Screen name="CustomerApp" component={CustomerTabs} />
