@@ -44,7 +44,6 @@ const getStatus = (s) => STATUS[s] || STATUS.pending;
 const TRACK_STEPS = [
   { key: "pending",   label: "Order Placed",    icon: "shopping-bag" },
   { key: "accepted",  label: "Accepted",         icon: "check-circle" },
-  { key: "packing", label: "Getting Packed",   icon: "package"      },
   { key: "ready",     label: "Ready to Move", icon: "star"         },
   { key: "picked_up", label: "Out for Delivery", icon: "truck"        },
   { key: "delivered", label: "Delivered",         icon: "home"         },
@@ -53,6 +52,7 @@ const TRACK_STEPS = [
 const stepIndex = (status) => {
   // rejected/cancelled don't fit the happy path
   if (status === "rejected" || status === "cancelled") return -1;
+  if (status === "preparing") return 1; // Merged with "Accepted"
   return TRACK_STEPS.findIndex(s => s.key === status);
 };
 
