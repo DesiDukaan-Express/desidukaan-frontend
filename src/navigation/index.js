@@ -1,42 +1,44 @@
-import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import SignupScreen from '../apps/customer/SignUpScreen';
-import useAuthStore from '../store/authStore';
-import { USER_ROLES } from '../constants';
-import { colors } from '../styles/colors';
+import React, { useState, useEffect } from "react";
+import { View, ActivityIndicator } from "react-native";
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import SignupScreen from "../apps/customer/SignUpScreen";
+import useAuthStore from "../store/authStore";
+import { USER_ROLES } from "../constants";
+import { colors } from "../styles/colors";
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
-import LoginScreen from '../apps/customer/LoginScreen';
-import CustomerTabs from './CustomerTabs';
-import VendorTabs from './VendorTabs';
-import DeliveryTabs from './DeliveryTabs';
-import CheckoutScreen from '../apps/customer/Checkout';
-import OrderPlaced from '../apps/customer/OrderPlaced';
-import VendorOnboardingScreen from '../apps/vendor/VendorOnboardingScreen';
-import DashboardScreen from '../apps/vendor/DashboardScreen';
-import DeliveryOnboardingScreen from '../apps/delivery/DeliveryOnboardingScreen';
+import LoginScreen from "../apps/customer/LoginScreen";
+import CustomerTabs from "./CustomerTabs";
+import VendorTabs from "./VendorTabs";
+import DeliveryTabs from "./DeliveryTabs";
+import CheckoutScreen from "../apps/customer/Checkout";
+import OrderPlaced from "../apps/customer/OrderPlaced";
+import VendorOnboardingScreen from "../apps/vendor/VendorOnboardingScreen";
+import DashboardScreen from "../apps/vendor/DashboardScreen";
+import DeliveryOnboardingScreen from "../apps/delivery/DeliveryOnboardingScreen";
 
 const Stack = createNativeStackNavigator();
 
 export default function Navigation() {
-  const isAuthenticated = useAuthStore(s => s.isAuthenticated);
-  const role = useAuthStore(s => s.role);
-  const isLoading = useAuthStore(s => s.isLoading);
-  const token = useAuthStore(s => s.token);
-  const user = useAuthStore(s => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const role = useAuthStore((s) => s.role);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
 
   const [vendorOnboarded, setVendorOnboarded] = useState(null);
   const [deliveryOnboarded, setDeliveryOnboarded] = useState(null);
   const [checkingOnboard, setCheckingOnboard] = useState(false);
+  const [vendorStatus, setVendorStatus] = useState(null);
+  const [vendorMissingDocs, setVendorMissingDocs] = useState([]);
 
   useEffect(() => {
     if (isAuthenticated) {
-      if (role?.toLowerCase() === 'vendor') {
+      if (role?.toLowerCase() === "vendor") {
         checkVendorProfile();
-      } else if (role?.toLowerCase() === 'delivery') {
+      } else if (role?.toLowerCase() === "delivery") {
         checkDeliveryProfile();
       }
     }
@@ -49,7 +51,13 @@ export default function Navigation() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      setVendorOnboarded(!!(data.data?.vendor?.shop_name));
+      const vendor = data.data?.vendor; // ← pehle variable banao
+
+      setVendorOnboarded(
+        !!(vendor?.shop_name && vendor?.onboarding_status === "approved"),
+      );
+      setVendorStatus(vendor?.onboarding_status || null);
+      setVendorMissingDocs(vendor?.missing_docs || []);
     } catch (err) {
       setVendorOnboarded(false);
     } finally {
@@ -65,7 +73,7 @@ export default function Navigation() {
       });
       const data = await res.json();
       // If profile exists and onboarding_submitted is true
-      setDeliveryOnboarded(!!(data.data?.profile?.onboarding_submitted));
+      setDeliveryOnboarded(!!data.data?.profile?.onboarding_submitted);
     } catch (err) {
       setDeliveryOnboarded(false);
     } finally {
@@ -75,15 +83,34 @@ export default function Navigation() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }}>
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.primary,
+        }}
+      >
         <ActivityIndicator size="large" color="white" />
       </View>
     );
   }
 
-  if (isAuthenticated && (checkingOnboard || (role?.toLowerCase() === 'vendor' && vendorOnboarded === null) || (role?.toLowerCase() === 'delivery' && deliveryOnboarded === null))) {
+  if (
+    isAuthenticated &&
+    (checkingOnboard ||
+      (role?.toLowerCase() === "vendor" && vendorOnboarded === null) ||
+      (role?.toLowerCase() === "delivery" && deliveryOnboarded === null))
+  ) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }}>
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.primary,
+        }}
+      >
         <ActivityIndicator size="large" color="white" />
       </View>
     );
@@ -103,23 +130,43 @@ export default function Navigation() {
           // Checkout and OrderPlaced are here so they unmount on logout,
           // preventing navigation to those screens after logging out
           <>
-            {role?.toLowerCase() === 'vendor' ? (
-              vendorOnboarded
-                ? <Stack.Screen name="VendorApp" component={VendorTabs} />
-                : <>
+            {role?.toLowerCase() === "vendor" ? (
+              vendorOnboarded ? (
+                <Stack.Screen name="VendorApp" component={VendorTabs} />
+              ) : (
+                <>
                   <Stack.Screen name="Dashboard">
-                    {(props) => <DashboardScreen {...props} />}
+                    {(props) => (
+                      <DashboardScreen
+                        {...props}
+                        vendorStatus={vendorStatus}
+                        missingDocs={vendorMissingDocs}
+                      />
+                    )}
                   </Stack.Screen>
                   <Stack.Screen name="VendorOnboarding">
-                    {(props) => <VendorOnboardingScreen {...props} onComplete={() => setVendorOnboarded(true)} />}
+                    {(props) => (
+                      <VendorOnboardingScreen
+                        {...props}
+                        onComplete={() => checkVendorProfile()}
+                      />
+                    )}
                   </Stack.Screen>
                 </>
-            ) : role?.toLowerCase() === 'delivery' ? (
-              deliveryOnboarded
-                ? <Stack.Screen name="DeliveryApp" component={DeliveryTabs} />
-                : <Stack.Screen name="DeliveryOnboarding">
-                  {(props) => <DeliveryOnboardingScreen {...props} onComplete={() => setDeliveryOnboarded(true)} />}
+              )
+            ) : role?.toLowerCase() === "delivery" ? (
+              deliveryOnboarded ? (
+                <Stack.Screen name="DeliveryApp" component={DeliveryTabs} />
+              ) : (
+                <Stack.Screen name="DeliveryOnboarding">
+                  {(props) => (
+                    <DeliveryOnboardingScreen
+                      {...props}
+                      onComplete={() => setDeliveryOnboarded(true)}
+                    />
+                  )}
                 </Stack.Screen>
+              )
             ) : (
               <Stack.Screen name="CustomerApp" component={CustomerTabs} />
             )}
