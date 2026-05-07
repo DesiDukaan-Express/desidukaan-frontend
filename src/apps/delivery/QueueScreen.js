@@ -125,7 +125,7 @@ function QueueCard({ order, onAccept, onDecline }) {
 }
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
-export default function QueueScreen() {
+export default function QueueScreen({ navigation }) {
   const { token } = useAuthStore();
   const [queue, setQueue] = useState([]);
   const [accepted, setAccepted] = useState(0);
@@ -176,7 +176,7 @@ export default function QueueScreen() {
       if (data.success) {
         setQueue(prev => prev.filter(o => o.orderId !== orderId));
         setAccepted(a => a + 1);
-        Alert.alert('✅ Order Accepted!', 'Head to the pickup location.');
+        navigation.navigate('Active');
       } else {
         Alert.alert('Error', data.message || 'Could not accept order');
         // Remove from queue if it's no longer available

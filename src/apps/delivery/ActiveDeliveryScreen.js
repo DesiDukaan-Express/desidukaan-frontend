@@ -96,7 +96,7 @@ function OrderCard({ order, onAccept, onDecline, onDeliver, onPickup }) {
   );
 }
 
-export default function ActiveDeliveryScreen() {
+export default function ActiveDeliveryScreen({ navigation }) {
   const { token, user } = useAuthStore();
 
   const [isOnline, setIsOnline] = useState(true);
@@ -234,8 +234,12 @@ export default function ActiveDeliveryScreen() {
     try {
       const res = await fetch(`${API_BASE}/delivery/accept/${orderId}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
-      if (data.success) fetchOrders();
-      else Alert.alert("Error", data.message);
+      if (data.success) {
+        fetchOrders();
+        navigation.navigate('Active');
+      } else {
+        Alert.alert("Error", data.message);
+      }
     } catch (e) { console.log(e); }
   };
 
@@ -247,6 +251,7 @@ export default function ActiveDeliveryScreen() {
       if (data.success) {
         setIncomingOrder(null);
         fetchOrders();
+        navigation.navigate('Active');
       } else {
         Alert.alert("Error", data.message || 'Could not accept order');
         setIncomingOrder(null);

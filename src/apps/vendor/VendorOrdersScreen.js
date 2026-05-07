@@ -174,7 +174,10 @@ export default function VendorOrdersScreen() {
   const [counterItems, setCounterItems] = useState([]);
   const [counterDeliveryFee, setCounterDeliveryFee] = useState("");
   const [counterNote, setCounterNote] = useState("");
-  const [counterSlotInput, setCounterSlotInput] = useState("");
+  const [counterSlotInput, setCounterSlotInput] = useState(""); // Keeping as fallback or for display
+  const [counterSlotDay, setCounterSlotDay] = useState("today"); // today | tomorrow
+  const [counterSlotStart, setCounterSlotStart] = useState("");
+  const [counterSlotEnd, setCounterSlotEnd] = useState("");
 
   // Helper to parse simple slot strings
   const parseSlotLocally = (input) => {
@@ -213,6 +216,35 @@ export default function VendorOrdersScreen() {
     
     if (end <= start) return null;
     return { start: start.toISOString(), end: end.toISOString() };
+  };
+
+  const constructSlotISO = (day, start, end) => {
+    if (!start || !end) return null;
+    try {
+      const now = new Date();
+      const base = new Date();
+      if (day === "tomorrow") base.setDate(base.getDate() + 1);
+      
+      const [sH, sM] = start.split(":").map(Number);
+      const [eH, eM] = end.split(":").map(Number);
+      
+      if (isNaN(sH) || isNaN(eH)) return null;
+
+      const startDate = new Date(base);
+      startDate.setHours(sH, sM || 0, 0, 0);
+      
+      const endDate = new Date(base);
+      endDate.setHours(eH, eM || 0, 0, 0);
+      
+      if (endDate <= startDate) {
+        endDate.setDate(endDate.getDate() + 1);
+      }
+      
+      return { start: startDate.toISOString(), end: endDate.toISOString() };
+    } catch (e) {
+      console.error("constructSlotISO error:", e);
+      return null;
+    }
   };
 
   const fetchOrders = async () => {
@@ -358,10 +390,22 @@ export default function VendorOrdersScreen() {
       );
 
       if (selectedOrder.delivery_slot && selectedOrder.delivery_slot.slot_start) {
-        const st = new Date(selectedOrder.delivery_slot.slot_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const ed = new Date(selectedOrder.delivery_slot.slot_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const start = new Date(selectedOrder.delivery_slot.slot_start);
+        const end = new Date(selectedOrder.delivery_slot.slot_end);
+        
+        const st = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`;
+        const ed = `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
+        
+        setCounterSlotStart(st);
+        setCounterSlotEnd(ed);
+        
+        const isToday = start.toDateString() === new Date().toDateString();
+        setCounterSlotDay(isToday ? "today" : "tomorrow");
         setCounterSlotInput(`${st} to ${ed}`);
       } else {
+        setCounterSlotStart("");
+        setCounterSlotEnd("");
+        setCounterSlotDay("today");
         setCounterSlotInput("");
       }
 
@@ -382,7 +426,12 @@ export default function VendorOrdersScreen() {
   const sendCounterOffer = async () => {
     try {
       let slot_start, slot_end;
-      if (counterSlotInput) {
+      
+      const structuredSlot = constructSlotISO(counterSlotDay, counterSlotStart, counterSlotEnd);
+      if (structuredSlot) {
+        slot_start = structuredSlot.start;
+        slot_end = structuredSlot.end;
+      } else if (counterSlotInput) {
         const parsed = parseSlotLocally(counterSlotInput);
         if (parsed) {
           slot_start = parsed.start;
@@ -575,12 +624,6 @@ export default function VendorOrdersScreen() {
             <Text style={styles.items}>
               {(item.items || []).map(i => `${i.quantity}x ${i.product_name}`).join(", ")}
             </Text>
-            {item.has_loose_items && (
-              <View style={styles.negotiationBadge}>
-                <MaterialIcons name="scale" size={12} color="#D97706" />
-                <Text style={styles.negotiationText}>WEIGHT NEGOTIATION NEEDED</Text>
-              </View>
-            )}
             <View style={styles.bottomRow}>
               <View style={styles.totalContainer}>
                 <Text style={styles.totalLabel}>Total</Text>
@@ -884,6 +927,7 @@ export default function VendorOrdersScreen() {
                     onPress={() => {
                       updateOrderStatus(selectedOrder.id, "accepted");
                       setModalVisible(false);
+                      setIsDeliveryModalVisible(true);
                     }}
                   >
                     <Text style={styles.btnText}>Accept</Text>
@@ -1035,7 +1079,84 @@ export default function VendorOrdersScreen() {
                 placeholder="Enter delivery fee"
               />
 
-              <Text style={styles.sectionTitle}>Delivery Window (Optional)</Text>
+              <Text style={styles.sectionTitle}>Delivery Slot</Text>
+              
+              <View style={styles.slotDayContainer}>
+                <TouchableOpacity 
+                  style={[styles.slotDayTab, counterSlotDay === "today" && styles.slotDayTabActive]} 
+                  onPress={() => setCounterSlotDay("today")}
+                >
+                  <Text style={[styles.slotDayTabText, counterSlotDay === "today" && styles.slotDayTabActiveText]}>Today</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.slotDayTab, counterSlotDay === "tomorrow" && styles.slotDayTabActive]} 
+                  onPress={() => setCounterSlotDay("tomorrow")}
+                >
+                  <Text style={[styles.slotDayTabText, counterSlotDay === "tomorrow" && styles.slotDayTabActiveText]}>Tomorrow</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.slotTimeContainer}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Start Time</Text>
+                  <TextInput
+                    style={styles.inputSmall}
+                    value={counterSlotStart}
+                    onChangeText={setCounterSlotStart}
+                    placeholder="HH:MM"
+                    keyboardType="default"
+                  />
+                </View>
+                <View style={{ width: 16 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>End Time</Text>
+                  <TextInput
+                    style={styles.inputSmall}
+                    value={counterSlotEnd}
+                    onChangeText={setCounterSlotEnd}
+                    placeholder="HH:MM"
+                    keyboardType="default"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.quickSlotsRow}>
+                {[
+                  { label: "+30m", value: 30 },
+                  { label: "+1h", value: 60 },
+                  { label: "+2h", value: 120 }
+                ].map((slot, idx) => (
+                  <TouchableOpacity 
+                    key={idx} 
+                    style={styles.quickSlotChip}
+                    onPress={() => {
+                      const now = new Date();
+                      const start = new Date(now.getTime() + 10 * 60000); // 10 mins from now
+                      const end = new Date(start.getTime() + slot.value * 60000);
+                      
+                      const st = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`;
+                      const ed = `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
+                      
+                      setCounterSlotStart(st);
+                      setCounterSlotEnd(ed);
+                      setCounterSlotDay("today");
+                    }}
+                  >
+                    <Text style={styles.quickSlotText}>{slot.label}</Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity 
+                   style={[styles.quickSlotChip, { backgroundColor: '#F3F4F6' }]}
+                   onPress={() => {
+                     setCounterSlotStart("");
+                     setCounterSlotEnd("");
+                   }}
+                >
+                   <Text style={[styles.quickSlotText, { color: '#6B7280' }]}>Clear</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.sectionTitle}>Manual Entry (Optional)</Text>
 
               <TextInput
                 style={styles.input}
@@ -1484,6 +1605,85 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     marginBottom: 10
+  },
+
+  inputSmall: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    padding: 10,
+    backgroundColor: "#F9FAFB",
+    fontSize: 15,
+    color: "#1F2937",
+  },
+
+  inputLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginBottom: 4,
+    fontWeight: "600"
+  },
+
+  slotDayContainer: {
+    flexDirection: "row",
+    backgroundColor: "#F3F4F6",
+    padding: 4,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+
+  slotDayTab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    borderRadius: 8,
+  },
+
+  slotDayTabActive: {
+    backgroundColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+
+  slotDayTabText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+
+  slotDayTabActiveText: {
+    color: "#111827",
+    fontWeight: "800",
+  },
+
+  slotTimeContainer: {
+    flexDirection: "row",
+    marginBottom: 12,
+  },
+
+  quickSlotsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 16,
+  },
+
+  quickSlotChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "#ECFDF5",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D1FAE5",
+  },
+
+  quickSlotText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#059669",
   },
 
   note: {

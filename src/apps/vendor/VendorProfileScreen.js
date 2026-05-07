@@ -204,7 +204,7 @@ export default function VendorProfileScreen() {
 
                 <View style={styles.statBox}>
                     <Text style={styles.statNumber}>
-                        {vendor.total_ratings || 0}
+                        {vendor.total_orders || 0}
                     </Text>
                     <Text style={styles.statLabel}>Orders</Text>
                 </View>
