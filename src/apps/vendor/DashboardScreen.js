@@ -16,7 +16,7 @@ import { useNavigation } from "@react-navigation/native";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
-export default function StoreDashboard() {
+export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
   const { token } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [currIndex, setCurrIndex] = useState(0); // 0 = Today, 1 = Weekly, 2 = Monthly
@@ -30,7 +30,7 @@ export default function StoreDashboard() {
     const fetchStats = async () => {
       try {
         const res = await fetch(`${API_BASE}/vendors/me/stats`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
 
@@ -46,7 +46,11 @@ export default function StoreDashboard() {
           // ...
           setStats({
             // ... (keep existing safe logic)
-            labels: s.weekly_chart_data?.map(d => new Date(d.date).toLocaleDateString("en-IN", { weekday: "short" })) || ["D-6", "D-5", "D-4", "D-3", "D-2", "D-1", "Today"],
+            labels: s.weekly_chart_data?.map((d) =>
+              new Date(d.date).toLocaleDateString("en-IN", {
+                weekday: "short",
+              }),
+            ) || ["D-6", "D-5", "D-4", "D-3", "D-2", "D-1", "Today"],
             today: {
               totalOrders: s.today_orders ?? 0,
               revenue: s.today_revenue ?? 0,
@@ -65,8 +69,10 @@ export default function StoreDashboard() {
               avgPrepTime: s.delivery_efficiency?.avg_prep_time ?? 0,
               deliveryTime: s.delivery_efficiency?.avg_delivery_time ?? 0,
             },
-            chartValues: s.weekly_chart_data?.map(d => d.revenue || 0) || [0,0,0,0,0,0,0],
-            topProducts: s.top_products || []
+            chartValues: s.weekly_chart_data?.map((d) => d.revenue || 0) || [
+              0, 0, 0, 0, 0, 0, 0,
+            ],
+            topProducts: s.top_products || [],
           });
         }
       } catch (err) {
@@ -81,7 +87,12 @@ export default function StoreDashboard() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+      <View
+        style={[
+          styles.container,
+          { alignItems: "center", justifyContent: "center" },
+        ]}
+      >
         <ActivityIndicator size="large" color="#0ff022" />
         <Text style={{ marginTop: 10 }}>Loading vendor stats...</Text>
       </View>
@@ -90,17 +101,47 @@ export default function StoreDashboard() {
 
   if (noProfile) {
     return (
-      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center', padding: 20 }]}>
+      <View
+        style={[
+          styles.container,
+          { alignItems: "center", justifyContent: "center", padding: 20 },
+        ]}
+      >
         <MaterialIcons name="store-mall-directory" size={80} color="#ccc" />
-        <Text style={{ fontSize: 20, fontWeight: '700', marginTop: 20, textAlign: 'center' }}>Welcome to DesiDukaan!</Text>
-        <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', marginTop: 10, marginBottom: 30 }}>
-          You haven't completed your shop registration yet. Complete it now to start selling!
-        </Text>
-        <TouchableOpacity 
-          style={{ backgroundColor: '#0ff022', paddingVertical: 15, paddingHorizontal: 40, borderRadius: 30 }}
-          onPress={() => navigation.navigate('VendorOnboarding')}
+        <Text
+          style={{
+            fontSize: 20,
+            fontWeight: "700",
+            marginTop: 20,
+            textAlign: "center",
+          }}
         >
-          <Text style={{ color: '#000', fontWeight: '700', fontSize: 16 }}>Complete Registration</Text>
+          Welcome to DesiDukaan!
+        </Text>
+        <Text
+          style={{
+            fontSize: 14,
+            color: "#666",
+            textAlign: "center",
+            marginTop: 10,
+            marginBottom: 30,
+          }}
+        >
+          You haven't completed your shop registration yet. Complete it now to
+          start selling!
+        </Text>
+        <TouchableOpacity
+          style={{
+            backgroundColor: "#0ff022",
+            paddingVertical: 15,
+            paddingHorizontal: 40,
+            borderRadius: 30,
+          }}
+          onPress={() => navigation.navigate("VendorOnboarding")}
+        >
+          <Text style={{ color: "#000", fontWeight: "700", fontSize: 16 }}>
+            Complete Registration
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -108,7 +149,12 @@ export default function StoreDashboard() {
 
   if (!stats) {
     return (
-      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+      <View
+        style={[
+          styles.container,
+          { alignItems: "center", justifyContent: "center" },
+        ]}
+      >
         <Text>Something went wrong loading your dashboard.</Text>
       </View>
     );
@@ -119,20 +165,101 @@ export default function StoreDashboard() {
 
   return (
     <View style={styles.container}>
+      {vendorStatus === "pending" && (
+        <View
+          style={{
+            backgroundColor: "#FFF8E1",
+            margin: 16,
+            marginBottom: 0,
+            padding: 14,
+            borderRadius: 12,
+            borderLeftWidth: 4,
+            borderLeftColor: "#F59E0B",
+          }}
+        >
+          <Text
+            style={{ fontWeight: "700", color: "#92400E", marginBottom: 4 }}
+          >
+            ⏳ Verification Pending
+          </Text>
+          <Text style={{ color: "#78350F", fontSize: 13, lineHeight: 18 }}>
+            Your shop is under admin review. You'll be notified once approved
+            (24-48 hrs).
+          </Text>
+          {missingDocs.length > 0 && (
+            <View style={{ marginTop: 10 }}>
+              <Text
+                style={{ fontWeight: "700", color: "#92400E", marginBottom: 4 }}
+              >
+                📄 Missing Documents:
+              </Text>
+              {missingDocs.map((doc) => (
+                <Text key={doc} style={{ color: "#B45309", fontSize: 12 }}>
+                  • {doc}
+                </Text>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
+      {vendorStatus === "rejected" && (
+        <View
+          style={{
+            backgroundColor: "#FEF2F2",
+            margin: 16,
+            marginBottom: 0,
+            padding: 14,
+            borderRadius: 12,
+            borderLeftWidth: 4,
+            borderLeftColor: "#EF4444",
+          }}
+        >
+          <Text
+            style={{ fontWeight: "700", color: "#991B1B", marginBottom: 4 }}
+          >
+            ❌ Application Rejected
+          </Text>
+          <Text style={{ color: "#7F1D1D", fontSize: 13, lineHeight: 18 }}>
+            Your application was rejected. Please re-submit with correct
+            documents.
+          </Text>
+          {missingDocs.length > 0 && (
+            <View style={{ marginTop: 10 }}>
+              <Text
+                style={{ fontWeight: "700", color: "#991B1B", marginBottom: 4 }}
+              >
+                📄 Missing Documents:
+              </Text>
+              {missingDocs.map((doc) => (
+                <Text key={doc} style={{ color: "#B91C1C", fontSize: 12 }}>
+                  • {doc}
+                </Text>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
 
       <ScrollView>
         {/* FILTER TABS */}
         <View style={styles.tabs}>
           <TouchableOpacity onPress={() => setCurrIndex(0)}>
-            <Text style={currIndex === 0 ? styles.tabActive : styles.tab}>Today</Text>
+            <Text style={currIndex === 0 ? styles.tabActive : styles.tab}>
+              Today
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => setCurrIndex(1)}>
-            <Text style={currIndex === 1 ? styles.tabActive : styles.tab}>Weekly</Text>
+            <Text style={currIndex === 1 ? styles.tabActive : styles.tab}>
+              Weekly
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => setCurrIndex(2)}>
-            <Text style={currIndex === 2 ? styles.tabActive : styles.tab}>Monthly</Text>
+            <Text style={currIndex === 2 ? styles.tabActive : styles.tab}>
+              Monthly
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -148,7 +275,9 @@ export default function StoreDashboard() {
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>REVENUE</Text>
             <View style={styles.metricRow}>
-              <Text style={styles.metricValue}>₹{Number(curr.revenue).toLocaleString('en-IN')}</Text>
+              <Text style={styles.metricValue}>
+                ₹{Number(curr.revenue).toLocaleString("en-IN")}
+              </Text>
             </View>
           </View>
         </View>
@@ -207,11 +336,18 @@ export default function StoreDashboard() {
                 sold={`${p.sold} units sold`}
                 price={`₹${Number(p.revenue).toLocaleString()}`}
                 tag={i === 0 ? "Best Seller" : i < 3 ? "Trending" : ""}
-                image={p.image || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&q=80"}
+                image={
+                  p.image ||
+                  "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&q=80"
+                }
               />
             ))
           ) : (
-            <Text style={{ color: "#888", textAlign: "center", marginVertical: 20 }}>No sales data yet</Text>
+            <Text
+              style={{ color: "#888", textAlign: "center", marginVertical: 20 }}
+            >
+              No sales data yet
+            </Text>
           )}
         </View>
 
@@ -240,7 +376,6 @@ export default function StoreDashboard() {
   );
 }
 
-
 function Product({ name, sold, price, tag, image }) {
   return (
     <View style={styles.productCard}>
@@ -259,9 +394,7 @@ function Product({ name, sold, price, tag, image }) {
   );
 }
 
-
 const styles = StyleSheet.create({
-
   container: {
     flex: 1,
     backgroundColor: "#f5f8f6",
@@ -505,5 +638,4 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#888",
   },
-
 });
