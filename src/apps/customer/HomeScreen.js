@@ -28,6 +28,7 @@ import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import { useNavigation } from "@react-navigation/native";
 import { vendorsAPI, ordersAPI, categoriesAPI } from "../../services/api";
+import { calculateProportionalPrice } from "../../utils/weightUtils";
 
 // ── Use env var — works on device, emulator, and web ─────────────────────────
 // In your .env: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api
@@ -1683,10 +1684,13 @@ export default function HomeScreen() {
 
       const itemInCart = cartItems.some((i) => i.id === item.id);
       const unitToUse = formatWeight(selectedWeight || item.unit);
+      const finalPrice = isLooseItem(item)
+        ? calculateProportionalPrice(item.price, unitToUse, item.unit || "1kg")
+        : item.price;
 
       if (!itemInCart) {
         // Item not in cart at all — always show store picker so user picks a vendor
-        setPickerItem({ ...item, selectedWeight: unitToUse });
+        setPickerItem({ ...item, selectedWeight: unitToUse, finalPrice });
         setPickerVisible(true);
         return;
       }
@@ -1696,7 +1700,7 @@ export default function HomeScreen() {
         {
           id: item.id,
           name: item.name,
-          price: item.price,
+          price: finalPrice,
           img: item.img,
           unit: unitToUse,
         },
@@ -1720,7 +1724,7 @@ export default function HomeScreen() {
         {
           id: item.id,
           name: item.name,
-          price: item.price,
+          price: item.finalPrice || item.price,
           img: item.img,
           unit: item.selectedWeight || item.unit,
         },

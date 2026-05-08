@@ -12,6 +12,7 @@ import { useNavigation } from "@react-navigation/native";
 import useAuthStore    from "../../store/authStore";
 import useCartStore    from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
+import AddressMapView from "../../components/AddressMapView";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -199,6 +200,24 @@ const mi = StyleSheet.create({
 
 // ─── Address Detail Modal ─────────────────────────────────────────────────
 function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
+  const [region, setRegion] = useState({
+    latitude: 28.6139,
+    longitude: 77.2090,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  });
+
+  useEffect(() => {
+    if (addr?.lat && addr?.lng) {
+      setRegion({
+        latitude: parseFloat(addr.lat),
+        longitude: parseFloat(addr.lng),
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      });
+    }
+  }, [addr]);
+
   if (!addr) return null;
   const text = typeof addr.address === "string" ? addr.address : addr.address_line || "Saved address";
   return (
@@ -207,6 +226,18 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
         <Pressable style={adm.sheet} onPress={() => {}}>
           <View style={adm.handle} />
           <Text style={adm.title}>Address details</Text>
+
+          {/* Map Preview */}
+          {addr.lat && addr.lng && (
+            <View style={adm.mapWrapper}>
+              <AddressMapView
+                region={region}
+                latitude={parseFloat(addr.lat)}
+                longitude={parseFloat(addr.lng)}
+                onRegionChangeComplete={setRegion}
+              />
+            </View>
+          )}
 
           {/* Address text */}
           <View style={adm.addrBox}>
@@ -264,6 +295,7 @@ const adm = StyleSheet.create({
   sheet:           { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
   handle:          { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
   title:           { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 20 },
+  mapWrapper:      { height: 160, borderRadius: 16, overflow: "hidden", marginBottom: 16, borderWidth: 1, borderColor: C.gray200 },
   addrBox:         { flexDirection: "row", alignItems: "flex-start", gap: 14, backgroundColor: C.gray100, borderRadius: 14, padding: 16, marginBottom: 12 },
   addrIcon:        { width: 38, height: 38, borderRadius: 11, backgroundColor: C.gray200, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   addrIconActive:  { backgroundColor: C.green },

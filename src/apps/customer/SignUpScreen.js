@@ -14,6 +14,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
+import AddressMapView from "../../components/AddressMapView";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import useAuthStore from "../../store/authStore";
@@ -107,6 +108,52 @@ export default function SignupScreen({ navigation, route }) {
   const stepAnim = useRef(new Animated.Value(0)).current;
   const timerRef = useRef(null);
 
+  const [latitude, setLatitude] = useState(null);
+  const [longitude, setLongitude] = useState(null);
+  const [region, setRegion] = useState({
+    latitude: 28.6139,
+    longitude: 77.2090,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  });
+
+  const geocodeAddress = async (addr) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1`,
+        { headers: { 'User-Agent': 'DesiDukaan/1.0' } }
+      );
+      const data = await response.json();
+      if (data && data.length > 0) {
+        console.log("Geocoded:", data[0].lat, data[0].lon);
+        return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+      }
+    } catch (error) {
+      console.error("Geocoding error:", error);
+    }
+    return { lat: null, lon: null };
+  };
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (address.trim().length >= 5) {
+        console.log("Triggering geocode for:", address.trim());
+        const coords = await geocodeAddress(address.trim());
+        if (coords.lat && coords.lon) {
+          setLatitude(coords.lat);
+          setLongitude(coords.lon);
+          setRegion((prev) => ({
+            ...prev,
+            latitude: coords.lat,
+            longitude: coords.lon,
+          }));
+        }
+      }
+    }, 800);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [address]);
+
   useEffect(() => {
     Animated.stagger(100, [
       Animated.spring(logoAnim, { toValue: 1, tension: 55, friction: 7, useNativeDriver: true }),
@@ -181,6 +228,11 @@ export default function SignupScreen({ navigation, route }) {
     if (!isFormValid) return;
     setLoading(true); setError("");
     try {
+      let coords = { lat: null, lon: null };
+      if (address.trim().length >= 5) {
+        coords = await geocodeAddress(address.trim());
+      }
+
       const res = await fetch(`${BASE_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -188,6 +240,8 @@ export default function SignupScreen({ navigation, route }) {
           name: name.trim(), phone: mobile,
           address: address.trim(), age: ageNum,
           gender, role: selectedRole,
+          latitude: coords.lat,
+          longitude: coords.lon,
         }),
       });
       const data = await res.json();
@@ -386,6 +440,16 @@ export default function SignupScreen({ navigation, route }) {
                                 underlineColorAndroid="transparent"
                               />
                             </View>
+                            {address.length > 0 && (
+                              <View style={s.mapWrapper}>
+                                <AddressMapView
+                                  region={region}
+                                  latitude={latitude}
+                                  longitude={longitude}
+                                  onRegionChangeComplete={setRegion}
+                                />
+                              </View>
+                            )}
                           </Field>
                         )
                       }
@@ -727,6 +791,18 @@ const s = StyleSheet.create({
   inputBoxError: { borderColor: C.errorBorder, backgroundColor: C.errorBg },
   inputBoxLocked: { backgroundColor: C.gray100, borderColor: C.gray200 },
   inputIconWrap: { width: 42, alignItems: "center", justifyContent: "center" },
+  mapWrapper: {
+    height: 180,
+    borderRadius: 15,
+    overflow: "hidden",
+    marginTop: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: C.greenBorder,
+  },
+  map: {
+    flex: 1,
+  },
   fieldInput: {
     flex: 1, fontSize: 14, color: C.gray900,
     paddingVertical: 13, paddingRight: 12, fontWeight: "500",

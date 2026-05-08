@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import useAuthStore from '../../store/authStore';
+import AddressMapView from "../../components/AddressMapView";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const PRIMARY = '#1ca049';
@@ -215,6 +216,32 @@ export default function VendorOnboardingScreen({ onComplete }) {
   // Geocoded coords — auto-set on submit
   const [resolvedLat, setResolvedLat] = useState(null);
   const [resolvedLng, setResolvedLng] = useState(null);
+  const [mapRegion, setMapRegion] = useState({
+    latitude: 28.6139,
+    longitude: 77.2090,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  });
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (city.length >= 3 && pincode.length === 6) {
+        setGeocoding(true);
+        const coords = await geocodeAddress(city, pincode);
+        if (coords.latitude && coords.longitude) {
+          setResolvedLat(coords.latitude);
+          setResolvedLng(coords.longitude);
+          setMapRegion(prev => ({
+            ...prev,
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+          }));
+        }
+        setGeocoding(false);
+      }
+    }, 1000);
+    return () => clearTimeout(delayDebounceFn);
+  }, [city, pincode]);
 
   // Step 2 — Compliance
   const [fssai, setFssai] = useState('');
@@ -629,6 +656,19 @@ export default function VendorOnboardingScreen({ onComplete }) {
                   <TextInput style={styles.input} placeholder="6-digit" keyboardType="numeric" maxLength={6} value={pincode} onChangeText={setPincode} />
                 </View>
               </View>
+
+              {/* Map Preview */}
+              {(city.length > 0 || pincode.length > 0) && (
+                <View style={styles.mapWrapper}>
+                  <AddressMapView
+                    region={mapRegion}
+                    latitude={resolvedLat}
+                    longitude={resolvedLng}
+                    onRegionChangeComplete={setMapRegion}
+                  />
+                </View>
+              )}
+
               {/* Geocoding note */}
               <View style={styles.geoNote}>
                 <Text style={styles.geoNoteIcon}>📍</Text>
@@ -1227,6 +1267,18 @@ const styles = StyleSheet.create({
 
   cantFindBtn: { borderWidth: 1, borderColor: PRIMARY, borderRadius: 10, padding: 13, alignItems: 'center', marginTop: 8, marginBottom: 4 },
   cantFindText: { color: PRIMARY, fontWeight: '600', fontSize: 13 },
+  mapWrapper: {
+    height: 180,
+    borderRadius: 12,
+    overflow: "hidden",
+    marginTop: 10,
+    marginBottom: 5,
+    borderWidth: 1,
+    borderColor: PRIMARY_LIGHT,
+  },
+  map: {
+    flex: 1,
+  },
 
   productCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#eaeaea' },
   productCardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },

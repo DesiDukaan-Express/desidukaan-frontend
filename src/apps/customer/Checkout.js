@@ -21,6 +21,7 @@ import { io } from "socket.io-client";
 import useCartStore from "../../store/cartStore";
 import useAuthStore from "../../store/authStore";
 import useAddressStore from "../../store/addressStore";
+import AddressMapView from "../../components/AddressMapView";
 import Slider from '@react-native-community/slider';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
@@ -709,6 +710,39 @@ export default function CheckoutScreen() {
   const [addrPin, setAddrPin] = useState("");
   const [addrLabel, setAddrLabel] = useState("Home");
 
+  // Geocoding for manual address
+  const [manualRegion, setManualRegion] = useState({
+    latitude: 28.6139,
+    longitude: 77.2090,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  });
+  const [manualCoords, setManualCoords] = useState({ lat: null, lng: null });
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      const full = [addrLine, addrCity, addrPin].filter(Boolean).join(", ");
+      if (full.length > 5) {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(full)}&format=json&limit=1`,
+            { headers: { "User-Agent": "DesiDukaan/1.0" } }
+          );
+          const data = await res.json();
+          if (data?.length > 0) {
+            const lat = parseFloat(data[0].lat);
+            const lon = parseFloat(data[0].lon);
+            setManualCoords({ lat, lng: lon });
+            setManualRegion(prev => ({ ...prev, latitude: lat, longitude: lon }));
+          }
+        } catch (e) {
+          console.error("Manual geocode fail:", e);
+        }
+      }
+    }, 1200);
+    return () => clearTimeout(delayDebounceFn);
+  }, [addrLine, addrCity, addrPin]);
+
   // ── Payment state ──────────────────────────────────────────────────────────
   const [selectedPay, setSelectedPay] = useState(null);
   const [selectedUPI, setSelectedUPI] = useState(null);
@@ -890,6 +924,7 @@ export default function CheckoutScreen() {
         items: items.map((i) => ({
           product_id: parseInt(i.id, 10),
           quantity: Math.max(1, i.qty ?? i.quantity ?? 1),
+          unit: i.unit, // Pass unit for loose item pricing ratio
           // price NOT sent — backend uses its own price from DB
         })),
         special_instructions: "",
@@ -1349,6 +1384,19 @@ export default function CheckoutScreen() {
                   underlineColorAndroid="transparent"
                   selectionColor={C.green}
                 />
+
+                {/* Map Preview for Manual Entry */}
+                {(addrLine.length > 3 || addrCity.length > 2) && (
+                  <View style={s.mapWrapper}>
+                    <AddressMapView
+                      region={manualRegion}
+                      latitude={manualCoords.lat}
+                      longitude={manualCoords.lng}
+                      onRegionChangeComplete={setManualRegion}
+                    />
+                  </View>
+                )}
+
                 <TouchableOpacity
                   style={s.useAddrBtn}
                   onPress={async () => {
@@ -1360,7 +1408,9 @@ export default function CheckoutScreen() {
                         city: addrCity, 
                         state: addrState, 
                         pincode: addrPin, 
-                        label: addrLabel 
+                        label: addrLabel,
+                        lat: manualCoords.lat,
+                        lng: manualCoords.lng
                       }, 
                       token
                     );
@@ -2821,6 +2871,15 @@ const s = StyleSheet.create({
   },
   upiDividerLine: { flex: 1, height: 1, backgroundColor: C.gray200 },
   upiDividerText: { fontSize: 11, color: C.gray400, fontWeight: "600" },
+  mapWrapper: {
+    height: 160,
+    borderRadius: 14,
+    overflow: "hidden",
+    marginTop: 10,
+    marginBottom: 5,
+    borderWidth: 1,
+    borderColor: C.gray200,
+  },
 });
 
 // ─── QR modal styles ──────────────────────────────────────────────────────────

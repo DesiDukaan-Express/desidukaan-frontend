@@ -11,6 +11,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import useAuthStore    from "../../store/authStore";
 import useCartStore    from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
+import { calculateProportionalPrice } from "../../utils/weightUtils";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const NEARBY_RADIUS = 10;   // km — stores within this are shown normally
@@ -82,8 +83,13 @@ function AddBtn({ product, vendorId, vendorName }) {
 
   const doAdd = () => {
     pop();
+    const isLoose = product.item_type === "loose";
+    const finalPrice = isLoose 
+      ? calculateProportionalPrice(product.price, product.unit || "1kg", product.unit || "1kg")
+      : product.price;
+
     cart?.addItem?.({
-      id: product.id, name: product.name, price: product.price,
+      id: product.id, name: product.name, price: finalPrice,
       image: product.image_url, unit: product.unit,
       quantity: 1, vendorId, vendorName,
     });
