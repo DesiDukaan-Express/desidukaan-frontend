@@ -432,11 +432,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                 await login(partner.user, token);
             }
 
-            // Trigger navigation to dashboard via state change in parent
-            if (onComplete) {
-                onComplete();
-            }
-
+            // Trigger success flow
             Alert.alert(
                 '🎉 Application Submitted!',
                 "We'll verify your documents within 24 hours. You'll receive an SMS once approved.",
@@ -444,7 +440,9 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     {
                         text: 'OK',
                         onPress: () => {
-                            if (!onComplete) {
+                            if (onComplete) {
+                                onComplete();
+                            } else {
                                 // Fallback if onComplete wasn't provided
                                 navigation?.navigate('DeliveryApp');
                             }
