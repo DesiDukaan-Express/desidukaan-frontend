@@ -16,7 +16,7 @@ import useAuthStore from '../../store/authStore';
 import DeliveryMapView from '../../components/DeliveryMapView';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
-const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || (API_BASE.includes('/api') ? API_BASE.split('/api')[0] : "http://localhost:3000");
 
 const C = {
   bg: '#F5F7F5',

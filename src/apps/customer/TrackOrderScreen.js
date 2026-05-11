@@ -10,7 +10,7 @@ import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
 
 const BASE_URL   = process.env.EXPO_PUBLIC_API_URL    || "http://localhost:3000/api";
-const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || (BASE_URL.includes('/api') ? BASE_URL.split('/api')[0] : "http://localhost:3000");
 
 const C = {
   orange:      "#F97316", orangeDark:  "#EA580C",
@@ -159,7 +159,10 @@ export default function TrackOrderScreen() {
   // ── Socket — listen for delivery partner location ──────────────────────────
   useEffect(() => {
     if (!token || !orderId) return;
-    const socket = io(SOCKET_URL, { auth: { token } });
+    const socket = io(SOCKET_URL, { 
+      auth: { token },
+      transports: ['websocket']
+    });
 
     socketRef.current = socket;
 
@@ -183,8 +186,45 @@ export default function TrackOrderScreen() {
 
     // Listen for order status changes
     socket.on("order:update", (data) => {
+      console.log("WebSocket order:update received:", data);
       if (String(data.order_id) !== String(orderId)) return;
       setOrder(prev => prev ? { ...prev, status: data.status } : prev);
+    });
+
+    // Listen for delivery status updates (more detailed)
+    socket.on("delivery_status_update", (data) => {
+      console.log("WebSocket delivery_status_update received:", data);
+      if (String(data.order_id) !== String(orderId)) return;
+      
+      // Update order status if it's included or map it
+      const orderStatusMap = {
+        picked_up: 'picked_up',
+        delivered: 'delivered',
+        failed: 'cancelled'
+      };
+      
+      const newStatus = orderStatusMap[data.status] || data.status;
+      setOrder(prev => prev ? { ...prev, status: newStatus } : prev);
+    });
+
+    // Listen for partner being assigned
+    socket.on("delivery_assigned", (data) => {
+      console.log("WebSocket delivery_assigned received:", data);
+      if (String(data.order_id) !== String(orderId)) return;
+      
+      // Force a refresh of order data to get partner details
+      (async () => {
+        try {
+          const res = await fetch(`${BASE_URL}/orders/${orderId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const d = await res.json();
+          const o = d.data?.order || d.order;
+          if (o) setOrder(o);
+        } catch (e) {
+          console.error("Refresh order error:", e);
+        }
+      })();
     });
 
     // Poll for location every 15s as a fallback
