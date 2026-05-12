@@ -575,7 +575,16 @@ export default function MyOrdersScreen() {
       const list = Array.isArray(data)
         ? data
         : data.data?.orders || data.data || data.orders || [];
+      
       setOrders(list);
+
+      // ── Sync detailOrder if it's open ──
+      setDetailOrder(prev => {
+        if (!prev) return null;
+        const updated = list.find(o => o.id === prev.id);
+        return updated ? { ...updated } : prev;
+      });
+
     } catch (e) { console.error("MyOrders:", e.message); }
     finally { setLoading(false); setRefreshing(false); }
   }, [token]);

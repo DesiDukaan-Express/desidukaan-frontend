@@ -267,6 +267,8 @@ export default function TrackOrderScreen() {
   const destLat        = order?.delivery_address?.latitude;
   const destLng        = order?.delivery_address?.longitude;
 
+  const [showDetails,   setShowDetails]   = useState(false);
+
   if (loading) {
     return (
       <View style={[s.root, { alignItems: "center", justifyContent: "center" }]}>
@@ -294,6 +296,16 @@ export default function TrackOrderScreen() {
           <Text style={s.headerTitle}>Track Delivery</Text>
           <Text style={s.headerSub}>{orderNumber || `Order #${orderId}`}</Text>
         </View>
+        
+        {/* Detail Button */}
+        <TouchableOpacity 
+          style={s.detailIconBtn} 
+          onPress={() => setShowDetails(true)}
+          activeOpacity={0.7}
+        >
+          <Feather name="file-text" size={20} color={C.white} />
+        </TouchableOpacity>
+
         {/* Live indicator */}
         {isActive && (
           <View style={s.livePill}>
@@ -302,6 +314,13 @@ export default function TrackOrderScreen() {
           </View>
         )}
       </LinearGradient>
+
+      {/* ── ORDER DETAIL MODAL (Inside Track Screen) ── */}
+      <OrderDetailModal 
+        visible={showDetails} 
+        order={order} 
+        onClose={() => setShowDetails(false)} 
+      />
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={s.body}>
 
@@ -437,6 +456,12 @@ const s = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center", justifyContent: "center",
   },
+  detailIconBtn: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center", justifyContent: "center",
+    marginRight: 8,
+  },
   headerTitle: { fontSize: 18, fontWeight: "900", color: C.white },
   headerSub:   { fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 2 },
   livePill: {
@@ -502,4 +527,86 @@ const s = StyleSheet.create({
   deliveredGrad: { flexDirection: "row", alignItems: "center", gap: 14, padding: 20 },
   deliveredTitle: { fontSize: 17, fontWeight: "900", color: C.white },
   deliveredSub:   { fontSize: 13, color: "rgba(255,255,255,0.85)", marginTop: 2 },
+});
+
+// ─── Order Detail Modal Helper ───────────────────────────────────────────────
+function OrderDetailModal({ visible, order, onClose }) {
+  if (!order) return null;
+  const items = order.items || order.order_items || [];
+  const subtotal = order.subtotal || items.reduce((s, i) => s + (i.product_price || i.price || 0) * (i.quantity || 1), 0);
+  const deliveryFee = order.delivery_fee ?? 20;
+  const total = order.total || (subtotal + deliveryFee);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={od.backdrop} onPress={onClose}>
+        <Pressable style={od.sheet} onPress={() => {}}>
+          <View style={od.handle} />
+          <View style={od.header}>
+            <Text style={od.title}>Order Summary</Text>
+            <TouchableOpacity onPress={onClose} style={od.closeBtn}>
+              <Feather name="x" size={20} color={C.gray400} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={od.content}>
+            <Text style={od.sectionTitle}>Items</Text>
+            {items.map((item, i) => (
+              <View key={i} style={od.itemRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={od.itemName}>{item.product_name || item.name || "Item"}</Text>
+                  <Text style={od.itemUnit}>{item.unit || "1 pc"}</Text>
+                </View>
+                <Text style={od.itemQty}>×{item.quantity || 1}</Text>
+                <Text style={od.itemPrice}>₹{(item.product_price || item.price || 0) * (item.quantity || 1)}</Text>
+              </View>
+            ))}
+
+            <View style={od.billBox}>
+              <View style={od.billRow}>
+                <Text style={od.billLabel}>Subtotal</Text>
+                <Text style={od.billValue}>₹{subtotal}</Text>
+              </View>
+              <View style={od.billRow}>
+                <Text style={od.billLabel}>Delivery Fee</Text>
+                <Text style={od.billValue}>₹{deliveryFee}</Text>
+              </View>
+              <View style={[od.billRow, { borderTopWidth: 1, borderTopColor: C.gray100, marginTop: 8, paddingTop: 8 }]}>
+                <Text style={[od.billLabel, { fontWeight: "800", color: C.gray900 }]}>Total Paid</Text>
+                <Text style={[od.billValue, { fontWeight: "900", color: C.gray900, fontSize: 16 }]}>₹{total}</Text>
+              </View>
+            </View>
+
+            <View style={od.statusBox}>
+              <Text style={od.statusLabel}>Current Status</Text>
+              <Text style={[od.statusValue, { color: C.green }]}>{(order.status || "").replace("_", " ").toUpperCase()}</Text>
+            </View>
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const od = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "80%" },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginTop: 10, marginBottom: 10 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  title: { fontSize: 18, fontWeight: "900", color: C.gray900 },
+  closeBtn: { padding: 4 },
+  content: { padding: 20 },
+  sectionTitle: { fontSize: 14, fontWeight: "800", color: C.gray500, textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 },
+  itemRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
+  itemName: { fontSize: 15, fontWeight: "700", color: C.gray900 },
+  itemUnit: { fontSize: 12, color: C.gray400, marginTop: 2 },
+  itemQty: { fontSize: 14, fontWeight: "600", color: C.gray500 },
+  itemPrice: { fontSize: 15, fontWeight: "800", color: C.gray900, minWidth: 60, textAlign: "right" },
+  billBox: { backgroundColor: C.gray100, borderRadius: 16, padding: 16, marginTop: 12 },
+  billRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
+  billLabel: { fontSize: 14, color: C.gray500 },
+  billValue: { fontSize: 14, fontWeight: "700", color: C.gray900 },
+  statusBox: { marginTop: 20, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: C.greenBorder, backgroundColor: C.greenLight, alignItems: "center" },
+  statusLabel: { fontSize: 11, fontWeight: "800", color: C.green, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 },
+  statusValue: { fontSize: 16, fontWeight: "900" },
 });
