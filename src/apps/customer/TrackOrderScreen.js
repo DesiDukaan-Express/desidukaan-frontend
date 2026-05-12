@@ -156,7 +156,7 @@ export default function TrackOrderScreen() {
     })();
   }, [orderId, token]);
 
-  // ── Socket — listen for delivery partner location ──────────────────────────
+  // ── Socket — listen for delivery partner location & status ──────────────────
   useEffect(() => {
     if (!token || !orderId) return;
     const socket = io(SOCKET_URL, { 
@@ -166,53 +166,54 @@ export default function TrackOrderScreen() {
 
     socketRef.current = socket;
 
-    socket.on("connect", () => setConnected(true));
+    socket.on("connect", () => {
+      setConnected(true);
+      // Re-join order room on reconnect
+      socket.emit("track:join", { order_id: orderId });
+    });
     socket.on("disconnect", () => setConnected(false));
 
-    // Join order tracking room
+    // Join order tracking room on first connect
     socket.emit("track:join", { order_id: orderId });
 
     // Listen for partner location updates
     socket.on("delivery_location_update", (data) => {
-      // The backend emits delivery_location_update to the user room
-      // Data contains: { partnerId, latitude, longitude, deliveryId, orderId }
-      // We check if it matches our order (orderId might be added to backend, 
-      // or we can match by deliveryId if we had it. For now, we update if it's there)
       if (data.orderId && String(data.orderId) !== String(orderId)) return;
-      
       setPartnerPos({ lat: data.latitude, lng: data.longitude });
       setLastUpdate(new Date());
     });
 
-    // Listen for order status changes
+    // Listen for order status changes (generic)
     socket.on("order:update", (data) => {
-      console.log("WebSocket order:update received:", data);
+      console.log("[WS] order:update", data);
       if (String(data.order_id) !== String(orderId)) return;
-      setOrder(prev => prev ? { ...prev, status: data.status } : prev);
+      if (data.status) {
+        setOrder(prev => prev ? { ...prev, status: data.status } : prev);
+        setLastUpdate(new Date());
+      }
     });
 
-    // Listen for delivery status updates (more detailed)
+    // Listen for delivery status updates (explicit delivery status change)
     socket.on("delivery_status_update", (data) => {
-      console.log("WebSocket delivery_status_update received:", data);
+      console.log("[WS] delivery_status_update", data);
       if (String(data.order_id) !== String(orderId)) return;
-      
-      // Update order status if it's included or map it
+
+      // Use order_status if provided by backend, otherwise fall back to mapping
       const orderStatusMap = {
         picked_up: 'picked_up',
-        delivered: 'delivered',
-        failed: 'cancelled'
+        delivered:  'delivered',
+        failed:     'cancelled',
       };
-      
-      const newStatus = orderStatusMap[data.status] || data.status;
+      const newStatus = data.order_status || orderStatusMap[data.status] || data.status;
       setOrder(prev => prev ? { ...prev, status: newStatus } : prev);
+      setLastUpdate(new Date());
     });
 
     // Listen for partner being assigned
     socket.on("delivery_assigned", (data) => {
-      console.log("WebSocket delivery_assigned received:", data);
-      if (String(data.order_id) !== String(orderId)) return;
-      
-      // Force a refresh of order data to get partner details
+      console.log("[WS] delivery_assigned", data);
+      if (data.order_id && String(data.order_id) !== String(orderId)) return;
+      // Refresh order data to get partner details
       (async () => {
         try {
           const res = await fetch(`${BASE_URL}/orders/${orderId}`, {
@@ -227,16 +228,14 @@ export default function TrackOrderScreen() {
       })();
     });
 
-    // Poll for location every 15s as a fallback
-    const poll = setInterval(async () => {
+    // Poll partner location every 15s as fallback
+    const locationPoll = setInterval(async () => {
       try {
-        // Fix: Use the correct delivery tracking endpoint
-        const res  = await fetch(`${BASE_URL}/delivery/track/${orderId}`, {
+        const res = await fetch(`${BASE_URL}/delivery/track/${orderId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
           const d = await res.json();
-          // Fix: Backend returns latitude/longitude in d.data
           if (d.data?.latitude) {
             setPartnerPos({ lat: d.data.latitude, lng: d.data.longitude });
             setLastUpdate(new Date());
@@ -245,11 +244,29 @@ export default function TrackOrderScreen() {
       } catch {}
     }, 15000);
 
+    // Poll order status every 20s as fallback for missed WebSocket events
+    const statusPoll = setInterval(async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/orders/${orderId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const d = await res.json();
+          const o = d.data?.order || d.order;
+          if (o?.status) {
+            setOrder(prev => prev ? { ...prev, status: o.status } : o);
+          }
+        }
+      } catch {}
+    }, 20000);
+
     return () => {
       socket.disconnect();
-      clearInterval(poll);
+      clearInterval(locationPoll);
+      clearInterval(statusPoll);
     };
   }, [orderId, token]);
+
 
   const currentStepIdx = order ? stepIndex(order.status) : -1;
   const isDelivered    = order?.status === "delivered";
