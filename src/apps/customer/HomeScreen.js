@@ -745,7 +745,7 @@ function buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCate
 function CategoryBrowseSheet({
   visible, category, hierarchy, onClose,
   onAdd, onRemove, getCartQty, onOpenWeightPicker, vendors,
-  onStoreSelect,
+  onStoreSelect, apiCategories,
 }) {
   const [activeSubCat, setActiveSubCat] = React.useState(null);
   const subCats = category && hierarchy[category] ? Object.keys(hierarchy[category]) : [];
@@ -760,6 +760,7 @@ function CategoryBrowseSheet({
 
   const subCatItems = (activeSubCat && hierarchy[category]?.[activeSubCat]) || [];
   const catAccent = CAT_ACCENT[category] || CAT_ACCENT._default;
+  const apiCat = apiCategories?.find(c => c.name === category);
 
   return (
     <Modal
@@ -775,7 +776,11 @@ function CategoryBrowseSheet({
           {/* ── Header ── */}
           <View style={[cbs.header, { borderBottomColor: catAccent.bg }]}>
             <View style={[cbs.catIconWrap, { backgroundColor: catAccent.bg }]}>
-              <Text style={cbs.catIconEmoji}>{catAccent.icon}</Text>
+              {apiCat?.image_url ? (
+                <Image source={{ uri: apiCat.image_url }} style={cbs.catHeaderImg} resizeMode="cover" />
+              ) : (
+                <Text style={cbs.catIconEmoji}>{catAccent.icon}</Text>
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={cbs.headerCat}>Category</Text>
@@ -957,9 +962,11 @@ const cbs = StyleSheet.create({
     marginBottom: 0,
   },
   catIconWrap: {
-    width: 48, height: 48, borderRadius: 16,
+    width: 48, height: 48, borderRadius: 12,
     alignItems: "center", justifyContent: "center",
+    overflow: "hidden",
   },
+  catHeaderImg: { width: "100%", height: "100%" },
   catIconEmoji: { fontSize: 24 },
   headerCat: { fontSize: 11, color: C.gray400, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
   headerTitle: { fontSize: 20, fontWeight: "900", color: C.gray900 },
@@ -1593,10 +1600,14 @@ export default function HomeScreen() {
         const apiCat = apiCategories.find(c => c.name === catName);
         const accent = CAT_ACCENT[catName] || CAT_ACCENT._default;
         
+        // Prioritize DB image -> Fallback Unsplash image based on name -> Global default
+        const dbImg = apiCat?.image_url;
+        const fallbackImg = CAT_FALLBACK_IMGS[catName] || CAT_FALLBACK_IMGS._default;
+        
         cats.push({ 
           label: catName, 
           tag: catName, 
-          img: apiCat?.image_url || "https://images.unsplash.com/photo-1585386959984-a4155224a1ad?w=300&q=80", 
+          img: dbImg || fallbackImg, 
           bg: accent.bg, 
           accent: accent.accent, 
           icon: accent.icon 
@@ -2172,8 +2183,8 @@ export default function HomeScreen() {
                 flexWrap: "wrap",
                 paddingHorizontal: hPad,
                 paddingBottom: 8,
-                rowGap: 12,
-                columnGap: 4,
+                rowGap: 16,
+                columnGap: 8,
               }}
             >
               {dynamicCategories.map((cat) => {
@@ -2184,14 +2195,16 @@ export default function HomeScreen() {
                   (sum, sc) => sum + (categoryHierarchy[cat.label]?.[sc]?.length || 0), 0
                 );
                 
-                // Calculate width for 10 items per row, matching hPad and adding 4px gaps
-                const itemW = (winW - (hPad * 2) - (4 * 9)) / 10;
-                const bandSize = itemW;
+                // Responsive columns
+                const catCols = winW >= 1024 ? 10 : winW >= 768 ? 6 : winW >= 480 ? 5 : 4;
+                const catGap = 8;
+                const catItemW = (winW - (hPad * 2) - (catGap * (catCols - 1))) / catCols;
+                const bandSize = catItemW;
 
                 return (
                   <TouchableOpacity
                     key={cat.label}
-                    style={[s.catCard, { width: itemW }]}
+                    style={[s.catCard, { width: catItemW }]}
                     onPress={() => {
                       setCatSheetCategory(cat.label);
                       setCatSheetVisible(true);
@@ -2199,8 +2212,16 @@ export default function HomeScreen() {
                     activeOpacity={0.8}
                   >
                     <View style={[s.catCardBand, { width: bandSize, height: bandSize, backgroundColor: cat.bg }]}>
-                      <Image source={{ uri: cat.img }} style={s.catImg} resizeMode="contain" />
-                      {cat.icon && <Text style={[s.catCardEmoji, { fontSize: bandSize * 0.3 }]}>{cat.icon}</Text>}
+                      <Image 
+                        source={{ uri: cat.img }} 
+                        style={s.catImg} 
+                        resizeMode="cover" 
+                      />
+                      {cat.icon && (
+                        <View style={[s.catCardEmojiWrap, { width: bandSize * 0.35, height: bandSize * 0.35 }]}>
+                          <Text style={[s.catCardEmoji, { fontSize: bandSize * 0.22 }]}>{cat.icon}</Text>
+                        </View>
+                      )}
                     </View>
                     <Text style={s.catCardLabel} numberOfLines={2}>{cat.label}</Text>
                   </TouchableOpacity>
@@ -2386,6 +2407,7 @@ export default function HomeScreen() {
         onOpenWeightPicker={setLoosePickerItem}
         vendors={vendors}
         onStoreSelect={handleStoreSelect}
+        apiCategories={apiCategories}
       />
 
       {/* ══ FLOATING CART — mobile ══════════════════════════════════════════ */}
@@ -2732,19 +2754,37 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
   catCardBand: {
-    borderRadius: 8,
+    borderRadius: 14,
     position: "relative",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
-    padding: 1,
-    marginBottom: 2,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.03)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  catCardEmojiWrap: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    zIndex: 3,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderRadius: 100,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   catCardEmoji: {
-    position: "absolute",
-    top: 1,
-    right: 2,
-    zIndex: 2,
+    textAlign: "center",
   },
   catCardImgWrap: {
     width: "100%",
