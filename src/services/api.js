@@ -104,6 +104,18 @@ export const uploadAPI = {
 export const categoriesAPI = {
   /** Returns all active categories as flat list with parent_id for hierarchy */
   getAll: () => request("GET", "/products/categories"),
+
+  /** Returns subcategories (children) of a parent category */
+  getSubcategories: (parentId) => request("GET", `/products/subcategories/${parentId}`),
+};
+
+// ─── Admin Categories ───
+const ADMIN_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+export const adminCategoriesAPI = {
+  getAll:   (token)               => request("GET",    "/admin/categories",      null,    token),
+  create:   (data, token)         => request("POST",   "/admin/categories",      data,    token),
+  update:   (id, data, token)     => request("PUT",    `/admin/categories/${id}`, data,   token),
+  remove:   (id, token)           => request("DELETE", `/admin/categories/${id}`, null,   token),
 };
 
 // ─── Vendors ───
