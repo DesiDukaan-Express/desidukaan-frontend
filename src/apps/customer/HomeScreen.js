@@ -873,7 +873,7 @@ function CategoryBrowseSheet({
                           source={{ 
                             uri: p.image_url || 
                                  CAT_FALLBACK_IMGS[category] || 
-                                 `https://loremflickr.com/200/200/${encodeURIComponent(p.name?.split(' ')[0] || category)}` 
+                                 CAT_FALLBACK_IMGS._default
                           }}
                           style={cbs.productImg}
                           resizeMode="cover"
@@ -1067,7 +1067,7 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
     item.img || 
     item.image_url || 
     CAT_FALLBACK_IMGS[item.category] || 
-    `https://loremflickr.com/400/400/${encodeURIComponent(item.name?.split(' ')[0] || item.category || 'grocery')}`;
+    CAT_FALLBACK_IMGS._default;
   const hasMrp = item.orig && item.orig > item.price;
   const discPct = hasMrp ? Math.round((1 - item.price / item.orig) * 100) : 0;
   const loose = isLooseItem(item);
@@ -1434,7 +1434,7 @@ export default function HomeScreen() {
   // Fetch category hierarchy (public endpoint — no auth needed)
   useEffect(() => {
     categoriesAPI.getAll()
-      .then(res => setApiCategories(res.categories || []))
+      .then(res => setApiCategories(res.data?.categories || []))
       .catch(() => setApiCategories([]));
   }, []);
 
@@ -1608,10 +1608,9 @@ export default function HomeScreen() {
         const apiCat = apiCategories.find(c => c.id === catId || c.name === catName);
         const accent = CAT_ACCENT[catName] || CAT_ACCENT[apiCat?.name] || CAT_ACCENT._default;
         
-        // Prioritize DB image -> Fallback Unsplash image based on name -> Keyword-based fallback
+        // Prioritize DB image -> Fallback Unsplash image based on name -> Global default
         const dbImg = apiCat?.image_url;
-        const fallbackImg = CAT_FALLBACK_IMGS[catName] || CAT_FALLBACK_IMGS[apiCat?.name] || 
-                           `https://loremflickr.com/200/200/${encodeURIComponent(catName)}`;
+        const fallbackImg = CAT_FALLBACK_IMGS[catName] || CAT_FALLBACK_IMGS[apiCat?.name] || CAT_FALLBACK_IMGS._default;
         
         cats.push({ 
           label: catName, 
@@ -2076,7 +2075,7 @@ export default function HomeScreen() {
                     source={{
                       uri:
                         vendor.shop_image_url ||
-                        `https://loremflickr.com/400/300/${encodeURIComponent(vendor.shop_name || 'shop')}`,
+                        `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${vendor.id}`,
                     }}
                     style={s.storeImg}
                   />
@@ -2307,7 +2306,7 @@ export default function HomeScreen() {
                   source={{
                     uri:
                       order.vendor?.shop_image_url ||
-                      `https://loremflickr.com/200/150/${encodeURIComponent(order.vendor?.shop_name || 'shop')}`,
+                      `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=200&sig=${order.vendor_id}`,
                   }}
                   style={s.orderImg}
                 />
