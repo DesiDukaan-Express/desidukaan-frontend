@@ -8,7 +8,11 @@ import {
   StyleSheet,
   Modal,
   ActivityIndicator,
+  Image,
 } from "react-native";
+import * as ImagePicker from 'expo-image-picker';
+import useAuthStore from "../../store/authStore";
+import { uploadAPI } from "../../services/api";
 import { T, UNITS } from "../common/tokens";
 import SelectChip from "../common/SelectChip";
 import Spinner from "../common/Spinner";
@@ -62,6 +66,7 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
         unit:          editing.unit  || "kg",
         type:          editing.type  || "packed",
         weight_options: editing.weight_options || [],
+        image_url:     editing.image_url || "",
       }
     : {
         name:          "",
@@ -75,10 +80,14 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
         price:         "",
         type:          "packed",
         weight_options: [],
+        image_url:     "",
       };
 
+  const { token } = useAuthStore();
   const [form, setForm]           = useState(init);
   const [err, setErr]             = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [urlInput, setUrlInput]   = useState(false);
 
   // ── Category/subcategory state ─────────────────────────────────────────────
   const [topCategories, setTopCategories]     = useState([]);
@@ -151,6 +160,32 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
     set("subcategoryName", sub.name);
   };
 
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled) {
+        setUploading(true);
+        const { url } = await uploadAPI.upload(
+          result.assets[0].uri,
+          result.assets[0].mimeType || 'image/jpeg',
+          token
+        );
+        set("image_url", url);
+        setUrlInput(false);
+      }
+    } catch (e) {
+      setErr("Image upload failed: " + e.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (
       !String(form.name).trim() ||
@@ -206,6 +241,49 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
           contentContainerStyle={styles.bodyContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* Product Image */}
+          <View>
+            <Text style={LBL_STYLE}>Product Image</Text>
+            {form.image_url ? (
+              <View style={styles.imagePreviewWrap}>
+                <Image source={{ uri: form.image_url }} style={styles.imagePreview} />
+                <TouchableOpacity 
+                  style={styles.changeImageBtn} 
+                  onPress={() => { set("image_url", ""); setUrlInput(false); }}
+                >
+                  <Text style={styles.changeImageText}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.imagePlaceholderWrap}>
+                {uploading ? (
+                  <ActivityIndicator color={T.primary} />
+                ) : (
+                  <>
+                    <TouchableOpacity style={styles.imageBtn} onPress={pickImage}>
+                      <Text style={styles.imageBtnText}>📷 Upload</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.imageBtn} 
+                      onPress={() => setUrlInput(!urlInput)}
+                    >
+                      <Text style={styles.imageBtnText}>🔗 Link</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            )}
+            {urlInput && !form.image_url && (
+              <TextInput
+                style={[styles.input, { marginTop: 8 }]}
+                value={form.image_url}
+                onChangeText={(v) => set("image_url", v)}
+                placeholder="Paste image URL here..."
+                placeholderTextColor={T.textXLight}
+              />
+            )}
+          </View>
+
           {/* Name & Description */}
           <View>
             <Text style={LBL_STYLE}>Product Name *</Text>
@@ -680,5 +758,61 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: T.textLight,
     fontStyle: "italic",
+  },
+  imagePreviewWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#F9FAFB",
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  imagePreview: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: "#eee",
+  },
+  changeImageBtn: {
+    backgroundColor: T.redLight,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  changeImageText: {
+    fontSize: 12,
+    color: T.red,
+    fontWeight: "700",
+  },
+  imagePlaceholderWrap: {
+    flexDirection: "row",
+    gap: 10,
+    backgroundColor: "#F9FAFB",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderStyle: "dashed",
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: 60,
+  },
+  imageBtn: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  imageBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: T.textMed,
   },
 });

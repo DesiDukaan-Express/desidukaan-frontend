@@ -50,6 +50,7 @@ export const inventoryService = {
           status:        stockStatus(qty),
           type:          p.item_type || "packed",
           weight_options: p.weight_options || [],
+          image_url:     p.image_url || null,
         };
       });
 
@@ -122,6 +123,7 @@ export const inventoryService = {
           stock_qty:      parseInt(payload.stock) || 0,
           type:           payload.type || "packed",
           weight_options: payload.weight_options || null,
+          image_url:      payload.image_url || null,
         }),
       });
       const data = await res.json();
@@ -152,6 +154,7 @@ export const inventoryService = {
           stock_qty:      parseInt(payload.stock) || 0,
           type:           payload.type || "packed",
           weight_options: payload.weight_options || null,
+          image_url:      payload.image_url || null,
         }),
       });
       const data = await res.json();
