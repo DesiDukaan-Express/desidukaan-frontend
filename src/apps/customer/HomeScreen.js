@@ -530,7 +530,7 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
                       source={{
                         uri:
                           v.shop_image_url ||
-                          "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400",
+                          `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${v.id}`,
                       }}
                       style={sp.storeImg}
                     />
@@ -1059,7 +1059,7 @@ const VENDOR_TYPE_META = {
 function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker }) {
   const size = cardWidth || 130;
   const imgUri =
-    item.img || CAT_FALLBACK_IMGS[item.category] || CAT_FALLBACK_IMGS._default;
+    item.img || item.image_url || CAT_FALLBACK_IMGS[item.category] || CAT_FALLBACK_IMGS._default;
   const hasMrp = item.orig && item.orig > item.price;
   const discPct = hasMrp ? Math.round((1 - item.price / item.orig) * 100) : 0;
   const loose = isLooseItem(item);
@@ -1201,7 +1201,7 @@ function WeightPickerModal({ item, onClose, onAdd }) {
           {/* Header */}
           <View style={wp.header}>
             <Image
-              source={{ uri: item.img || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300" }}
+              source={{ uri: item.img || item.image_url || CAT_FALLBACK_IMGS[item.category] || CAT_FALLBACK_IMGS._default }}
               style={wp.thumb} resizeMode="cover"
             />
             <View style={{ flex: 1 }}>
@@ -1597,12 +1597,12 @@ export default function HomeScreen() {
         seen.add(catName);
         
         // Fetch image and accent from DB/Config
-        const apiCat = apiCategories.find(c => c.name === catName);
-        const accent = CAT_ACCENT[catName] || CAT_ACCENT._default;
+        const apiCat = apiCategories.find(c => c.id === catId || c.name === catName);
+        const accent = CAT_ACCENT[catName] || CAT_ACCENT[apiCat?.name] || CAT_ACCENT._default;
         
         // Prioritize DB image -> Fallback Unsplash image based on name -> Global default
         const dbImg = apiCat?.image_url;
-        const fallbackImg = CAT_FALLBACK_IMGS[catName] || CAT_FALLBACK_IMGS._default;
+        const fallbackImg = CAT_FALLBACK_IMGS[catName] || CAT_FALLBACK_IMGS[apiCat?.name] || CAT_FALLBACK_IMGS._default;
         
         cats.push({ 
           label: catName, 
@@ -1967,7 +1967,7 @@ export default function HomeScreen() {
           <View style={[s.heroBanner, { height: wide ? 200 : 160 }]}>
             <Image
               source={{
-                uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&q=85",
+              uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&q=85&sig=banner",
               }}
               style={StyleSheet.absoluteFillObject}
               resizeMode="cover"
@@ -2067,7 +2067,7 @@ export default function HomeScreen() {
                     source={{
                       uri:
                         vendor.shop_image_url ||
-                        "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400",
+                        `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${vendor.id}`,
                     }}
                     style={s.storeImg}
                   />
@@ -2298,7 +2298,7 @@ export default function HomeScreen() {
                   source={{
                     uri:
                       order.vendor?.shop_image_url ||
-                      "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=200",
+                      `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=200&sig=${order.vendor_id}`,
                   }}
                   style={s.orderImg}
                 />
