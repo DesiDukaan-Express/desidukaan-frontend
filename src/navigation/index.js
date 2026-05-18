@@ -33,6 +33,8 @@ export default function Navigation() {
   const [checkingOnboard, setCheckingOnboard] = useState(false);
   const [vendorStatus, setVendorStatus] = useState(null);
   const [vendorMissingDocs, setVendorMissingDocs] = useState([]);
+  const [deliveryStatus, setDeliveryStatus] = useState(null);
+  const [deliveryMissingDocs, setDeliveryMissingDocs] = useState([]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -66,20 +68,27 @@ export default function Navigation() {
   };
 
   const checkDeliveryProfile = async () => {
-    setCheckingOnboard(true);
-    try {
-      const res = await fetch(`${API_BASE}/delivery/me/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      // If profile exists and onboarding_submitted is true
-      setDeliveryOnboarded(!!data.data?.profile?.onboarding_submitted);
-    } catch (err) {
-      setDeliveryOnboarded(false);
-    } finally {
-      setCheckingOnboard(false);
-    }
-  };
+  setCheckingOnboard(true);
+  try {
+    const res = await fetch(`${API_BASE}/delivery/me/profile`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    const profile = data.data?.profile;
+
+    // Approved check — onboarding_status OR is_certified (backward compat)
+    const isApproved = profile?.onboarding_status === 'approved' || profile?.is_certified === true;
+    const hasSubmitted = profile?.onboarding_submitted === true;
+
+    setDeliveryOnboarded(!!(hasSubmitted && isApproved));
+    setDeliveryStatus(hasSubmitted ? (profile?.onboarding_status || (profile?.is_certified ? 'approved' : 'pending')) : null);
+    setDeliveryMissingDocs(profile?.missing_docs || []);
+  } catch (err) {
+    setDeliveryOnboarded(false);
+  } finally {
+    setCheckingOnboard(false);
+  }
+};
 
   if (isLoading) {
     return (
@@ -162,7 +171,9 @@ export default function Navigation() {
                   {(props) => (
                     <DeliveryOnboardingScreen
                       {...props}
-                      onComplete={() => setDeliveryOnboarded(true)}
+                      deliveryStatus={deliveryStatus}
+                      missingDocs={deliveryMissingDocs}
+                      onComplete={() => checkDeliveryProfile()}
                     />
                   )}
                 </Stack.Screen>
