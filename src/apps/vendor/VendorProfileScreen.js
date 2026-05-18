@@ -18,6 +18,8 @@ import { spacing, radius } from "../../styles/spacing";
 import { shadows } from "../../styles/shadows";
 
 import useAuthStore from "../../store/authStore";
+import * as ImagePicker from 'expo-image-picker';
+import { uploadAPI } from "../../services/api";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -35,6 +37,9 @@ export default function VendorProfileScreen() {
     const [activeField, setActiveField] = useState("");
     const [customTime, setCustomTime] = useState("");
     const [deliveryModalVisible, setDeliveryModalVisible] = useState(false);
+    const [imageModalVisible, setImageModalVisible] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [urlInput, setUrlInput] = useState("");
 
     const pressIn = () => {
         Animated.spring(scaleAnim, {
@@ -117,6 +122,32 @@ export default function VendorProfileScreen() {
         }
     };
 
+    const pickImage = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+            });
+
+            if (!result.canceled) {
+                setUploading(true);
+                const { url } = await uploadAPI.upload(
+                    result.assets[0].uri,
+                    result.assets[0].mimeType || 'image/jpeg',
+                    token
+                );
+                await handleUpdateField("shop_image_url", url);
+                setImageModalVisible(false);
+            }
+        } catch (e) {
+            Alert.alert("Error", "Image upload failed: " + e.message);
+        } finally {
+            setUploading(false);
+        }
+    };
+
     const selectDeliveryType = () => {
         setDeliveryModalVisible(true);
     };
@@ -152,12 +183,22 @@ export default function VendorProfileScreen() {
 
             <View style={styles.profileCard}>
 
-                <Image
-                    source={{
-                        uri: vendor.shop_image_url || "https://lh3.googleusercontent.com/TW79DOPeTuw01SC4TNqtKXHNMjG1HGU7LT_-Ph2bY9COIgXwP0PBAQ_NxEyNu7cO4ofS5xu75SIF3t5WyXKjBF7Rng=w300-rw"
-                    }}
-                    style={styles.avatar}
-                />
+                <TouchableOpacity 
+                    style={styles.avatarContainer} 
+                    onPress={() => setImageModalVisible(true)}
+                    activeOpacity={0.8}
+                >
+                    <Image
+                        source={{
+                            uri: vendor.shop_image_url || "https://lh3.googleusercontent.com/TW79DOPeTuw01SC4TNqtKXHNMjG1HGU7LT_-Ph2bY9COIgXwP0PBAQ_NxEyNu7cO4ofS5xu75SIF3t5WyXKjBF7Rng=w300-rw"
+                        }}
+                        style={styles.avatar}
+                    />
+                    <View style={styles.cameraBadge}>
+                        <Text style={styles.cameraIcon}>📷</Text>
+                    </View>
+                </TouchableOpacity>
+
                 <Text style={styles.name}>{vendor.shop_name}</Text>
 
                 <Text style={styles.email}>
@@ -204,7 +245,7 @@ export default function VendorProfileScreen() {
 
                 <View style={styles.statBox}>
                     <Text style={styles.statNumber}>
-                        {vendor.total_ratings || 0}
+                        {vendor.total_orders || 0}
                     </Text>
                     <Text style={styles.statLabel}>Orders</Text>
                 </View>
@@ -336,6 +377,62 @@ export default function VendorProfileScreen() {
                     </View>
                 </View>
             </Modal>
+
+            {/* SHOP IMAGE MODAL */}
+            <Modal
+                transparent={true}
+                visible={imageModalVisible}
+                animationType="fade"
+                onRequestClose={() => setImageModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Change Shop Photo</Text>
+                        
+                        <TouchableOpacity 
+                            style={styles.modalOption} 
+                            onPress={pickImage}
+                            disabled={uploading}
+                        >
+                            {uploading ? (
+                                <ActivityIndicator color="#374151" />
+                            ) : (
+                                <Text style={styles.optionText}>📷 Upload from Gallery</Text>
+                            )}
+                        </TouchableOpacity>
+
+                        <View style={{ marginTop: 15 }}>
+                            <Text style={styles.label}>Or Paste Image URL:</Text>
+                            <TextInput
+                                style={[styles.input, { marginBottom: 10 }]}
+                                value={urlInput}
+                                onChangeText={setUrlInput}
+                                placeholder="https://..."
+                            />
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    if (urlInput.trim()) {
+                                        handleUpdateField("shop_image_url", urlInput);
+                                        setImageModalVisible(false);
+                                        setUrlInput("");
+                                    }
+                                }} 
+                                style={styles.saveBtn}
+                            >
+                                <Text style={{ color: "#fff", fontWeight: "700" }}>Save URL</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <TouchableOpacity 
+                            onPress={() => setImageModalVisible(false)} 
+                            style={styles.closeBtn}
+                        >
+                            <Text>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
 
             {/* DELIVERY TYPE MODAL */}
             <Modal
@@ -608,6 +705,27 @@ const styles = StyleSheet.create({
     closeBtn: {
         marginTop: 15,
         alignItems: "center"
-    }
+    },
+    avatarContainer: {
+        position: "relative",
+        marginBottom: 10,
+    },
+    cameraBadge: {
+        position: "absolute",
+        bottom: 0,
+        right: 0,
+        backgroundColor: "#fff",
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: "center",
+        alignItems: "center",
+        borderWidth: 1,
+        borderColor: "#ddd",
+        ...shadows.sm,
+    },
+    cameraIcon: {
+        fontSize: 16,
+    },
 
 });

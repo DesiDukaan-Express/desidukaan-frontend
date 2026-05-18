@@ -8,6 +8,7 @@ import {
   Switch,
   Alert,
   Modal,
+  Linking,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { io } from "socket.io-client";
@@ -15,7 +16,7 @@ import useAuthStore from '../../store/authStore';
 import DeliveryMapView from '../../components/DeliveryMapView';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
-const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || (API_BASE.includes('/api') ? API_BASE.split('/api')[0] : "http://localhost:3000");
 
 const C = {
   bg: '#F5F7F5',
@@ -70,7 +71,17 @@ function OrderCard({ order, onAccept, onDecline, onDeliver, onPickup }) {
       </View>
 
       <View style={styles.orderBottom}>
-        <Text style={styles.orderMeta}>{order.meta}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.orderMeta}>{order.meta}</Text>
+          {order.dropLoc && (
+            <TouchableOpacity 
+              onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${order.dropLoc.latitude},${order.dropLoc.longitude}`)}
+              style={{ marginTop: 4 }}
+            >
+              <Text style={{ fontSize: 11, color: C.blue, fontWeight: '600' }}>📍 View on Map</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {order.status === 'new' && (
           <View style={styles.btnRow}>
@@ -96,7 +107,7 @@ function OrderCard({ order, onAccept, onDecline, onDeliver, onPickup }) {
   );
 }
 
-export default function ActiveDeliveryScreen() {
+export default function ActiveDeliveryScreen({ navigation }) {
   const { token, user } = useAuthStore();
 
   const [isOnline, setIsOnline] = useState(true);
@@ -126,9 +137,10 @@ export default function ActiveDeliveryScreen() {
           displayId: d.order?.order_number,
           status: d.status === 'assigned' ? 'accepted' : d.status === 'picked_up' ? 'transit' : d.status,
           pickup: d.order?.vendor?.shop_name,
-          drop: d.order?.delivery_address?.city || 'Local',
+          drop: d.order?.delivery_address?.address_line || d.order?.delivery_address?.city || 'Local',
           meta: `₹${d.order?.total} · ${d.order?.items?.length || 0} items`,
-          vendorLoc: d.order?.vendor ? { latitude: d.order.vendor.latitude, longitude: d.order.vendor.longitude } : null
+          vendorLoc: d.order?.vendor ? { latitude: d.order.vendor.latitude, longitude: d.order.vendor.longitude } : null,
+          dropLoc: d.order?.delivery_address ? { latitude: d.order.delivery_address.latitude, longitude: d.order.delivery_address.longitude } : null
         });
       }
       if (avResult.success && avResult.data.orders) {
@@ -139,9 +151,10 @@ export default function ActiveDeliveryScreen() {
             displayId: o.order_number,
             status: 'new',
             pickup: o.vendor.shop_name,
-            drop: o.delivery_address?.city || 'Local',
+            drop: o.delivery_address?.address_line || o.delivery_address?.city || 'Local',
             meta: `₹${o.total} · ${o._count?.items || 0} items`,
-            vendorLoc: { latitude: o.vendor.latitude, longitude: o.vendor.longitude }
+            vendorLoc: { latitude: o.vendor.latitude, longitude: o.vendor.longitude },
+            dropLoc: o.delivery_address ? { latitude: o.delivery_address.latitude, longitude: o.delivery_address.longitude } : null
           });
         });
       }
@@ -234,8 +247,12 @@ export default function ActiveDeliveryScreen() {
     try {
       const res = await fetch(`${API_BASE}/delivery/accept/${orderId}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
-      if (data.success) fetchOrders();
-      else Alert.alert("Error", data.message);
+      if (data.success) {
+        fetchOrders();
+        navigation.navigate('Active');
+      } else {
+        Alert.alert("Error", data.message);
+      }
     } catch (e) { console.log(e); }
   };
 
@@ -247,6 +264,7 @@ export default function ActiveDeliveryScreen() {
       if (data.success) {
         setIncomingOrder(null);
         fetchOrders();
+        navigation.navigate('Active');
       } else {
         Alert.alert("Error", data.message || 'Could not accept order');
         setIncomingOrder(null);
@@ -308,7 +326,16 @@ export default function ActiveDeliveryScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.routeLabel}>Dropoff</Text>
                 <Text style={styles.routeAddr}>{incomingOrder?.dropoff?.address}</Text>
-                <Text style={styles.routeAddrSub}>{incomingOrder?.dropoff?.city}</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={styles.routeAddrSub}>{incomingOrder?.dropoff?.city}</Text>
+                  {incomingOrder?.dropoff?.latitude && (
+                    <TouchableOpacity 
+                      onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${incomingOrder.dropoff.latitude},${incomingOrder.dropoff.longitude}`)}
+                    >
+                      <Text style={{ fontSize: 11, color: C.blue, fontWeight: '600' }}>View on Map</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
             </View>
           </View>

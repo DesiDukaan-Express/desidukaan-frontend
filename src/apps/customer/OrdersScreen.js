@@ -7,7 +7,10 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
+import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
+
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || (process.env.EXPO_PUBLIC_API_URL?.includes('/api') ? process.env.EXPO_PUBLIC_API_URL.split('/api')[0] : "http://localhost:3000");
 import { downloadInvoice } from "../../utils/invoiceGenerator";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
@@ -85,7 +88,7 @@ function OrderDetailModal({ order, onClose }) {
     } else {
       setFullOrder(null);
     }
-  }, [order?.id]);
+  }, [order?.id, order?.status]);
 
   const fetchFullOrder = async () => {
     setFetching(true);
@@ -572,12 +575,45 @@ export default function MyOrdersScreen() {
       const list = Array.isArray(data)
         ? data
         : data.data?.orders || data.data || data.orders || [];
+      
       setOrders(list);
+
+      // ── Sync detailOrder if it's open ──
+      setDetailOrder(prev => {
+        if (!prev) return null;
+        const updated = list.find(o => o.id === prev.id);
+        return updated ? { ...updated } : prev;
+      });
+
     } catch (e) { console.error("MyOrders:", e.message); }
     finally { setLoading(false); setRefreshing(false); }
   }, [token]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+  useEffect(() => {
+    if (!token) return;
+    const socket = io(SOCKET_URL, { 
+      auth: { token },
+      transports: ['websocket']
+    });
+
+    socket.on("connect", () => console.log("[OrdersWS] Connected"));
+    
+    // Listen for any order updates for this user
+    socket.on("order:update", (data) => {
+      console.log("[OrdersWS] Order update received", data);
+      fetchOrders(true);
+      // If the detail modal is open for this order, it will refresh too because it uses the order object from the list
+    });
+
+    socket.on("delivery_status_update", (data) => {
+      console.log("[OrdersWS] Delivery update received", data);
+      fetchOrders(true);
+    });
+
+    return () => socket.disconnect();
+  }, [token, fetchOrders]);
 
   const onRefresh = () => { setRefreshing(true); fetchOrders(true); };
 

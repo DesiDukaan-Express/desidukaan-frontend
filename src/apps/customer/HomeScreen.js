@@ -28,6 +28,7 @@ import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import { useNavigation } from "@react-navigation/native";
 import { vendorsAPI, ordersAPI, categoriesAPI } from "../../services/api";
+import { calculateProportionalPrice } from "../../utils/weightUtils";
 
 // ── Use env var — works on device, emulator, and web ─────────────────────────
 // In your .env: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api
@@ -529,7 +530,7 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
                       source={{
                         uri:
                           v.shop_image_url ||
-                          "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400",
+                          `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${v.id}`,
                       }}
                       style={sp.storeImg}
                     />
@@ -647,25 +648,22 @@ const sp = StyleSheet.create({
   cancelText: { fontSize: 15, fontWeight: "700", color: C.gray600 },
 });
 
-// ─── Category fallback images ──────────────────────────────────────────────────
 const CAT_FALLBACK_IMGS = {
-  Groceries:
-    "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80",
-  Dairy: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80",
-  Snacks:
-    "https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=80",
-  Beverages:
-    "https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&q=80",
-  Bakery:
-    "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80",
-  Fruits:
-    "https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=400&q=80",
-  Medicines:
-    "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&q=80",
-  "Personal Care":
-    "https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&q=80",
-  _default:
-    "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80",
+  "Dairy, Bread & Eggs":      "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80",
+  "Fruits & Vegetables":     "https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=400&q=80",
+  "Cold Drinks & Juices":    "https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&q=80",
+  "Snacks & Munchies":       "https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=80",
+  "Breakfast & Instant Food":"https://images.unsplash.com/photo-1569058242252-62324e7d5567?w=400&q=80",
+  "Sweet Tooth":             "https://images.unsplash.com/photo-1582231229718-4c5931bc1184?w=400&q=80",
+  "Bakery & Biscuits":       "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80",
+  "Tea, Coffee & Milk Drinks":"https://images.unsplash.com/photo-1544787210-2211d7c309c7?w=400&q=80",
+  "Atta, Rice & Dal":        "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=80",
+  "Masala, Oil & More":      "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&q=80",
+  "Sauces & Spreads":        "https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=400&q=80",
+  "Cleaning Essentials":     "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&q=80",
+  "Personal Care":           "https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&q=80",
+  "Home & Office":           "https://images.unsplash.com/photo-1586075010633-2445c9ff093b?w=400&q=80",
+  _default:                  "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80",
 };
 
 // ─── Category accent colours (top-level) ──────────────────────────────────────
@@ -684,6 +682,10 @@ const CAT_ACCENT = {
   "Cleaning Essentials":     { bg: "#F0F9FF", accent: "#0284C7", icon: "🧼" },
   "Personal Care":           { bg: "#FAF5FF", accent: "#7C3AED", icon: "🧴" },
   "Home & Office":           { bg: "#F8FAFC", accent: "#475569", icon: "🖇️" },
+  "Bread":                   { bg: "#FFFBEB", accent: "#D97706", icon: "🍞" },
+  "Chips":                   { bg: "#FEF2F2", accent: "#EF4444", icon: "🍟" },
+  "Milk":                    { bg: "#F0F9FF", accent: "#0EA5E9", icon: "🥛" },
+  "Rice":                    { bg: "#FEFCE8", accent: "#EAB308", icon: "🌾" },
   _default:                  { bg: "#F3F4F6", accent: "#6B7280", icon: "📦" },
 };
 
@@ -744,7 +746,7 @@ function buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCate
 function CategoryBrowseSheet({
   visible, category, hierarchy, onClose,
   onAdd, onRemove, getCartQty, onOpenWeightPicker, vendors,
-  onStoreSelect,
+  onStoreSelect, apiCategories,
 }) {
   const [activeSubCat, setActiveSubCat] = React.useState(null);
   const subCats = category && hierarchy[category] ? Object.keys(hierarchy[category]) : [];
@@ -759,6 +761,7 @@ function CategoryBrowseSheet({
 
   const subCatItems = (activeSubCat && hierarchy[category]?.[activeSubCat]) || [];
   const catAccent = CAT_ACCENT[category] || CAT_ACCENT._default;
+  const apiCat = apiCategories?.find(c => c.name === category);
 
   return (
     <Modal
@@ -774,7 +777,11 @@ function CategoryBrowseSheet({
           {/* ── Header ── */}
           <View style={[cbs.header, { borderBottomColor: catAccent.bg }]}>
             <View style={[cbs.catIconWrap, { backgroundColor: catAccent.bg }]}>
-              <Text style={cbs.catIconEmoji}>{catAccent.icon}</Text>
+              {apiCat?.image_url ? (
+                <Image source={{ uri: apiCat.image_url }} style={cbs.catHeaderImg} resizeMode="cover" />
+              ) : (
+                <Text style={cbs.catIconEmoji}>{catAccent.icon}</Text>
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={cbs.headerCat}>Category</Text>
@@ -863,7 +870,11 @@ function CategoryBrowseSheet({
                     <View style={[cbs.productCell, { flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }]}>
                       <View style={cbs.productImgWrap}>
                         <Image
-                          source={{ uri: p.image_url || CAT_FALLBACK_IMGS[category] || CAT_FALLBACK_IMGS._default }}
+                          source={{ 
+                            uri: p.image_url || 
+                                 CAT_FALLBACK_IMGS[category] || 
+                                 CAT_FALLBACK_IMGS._default
+                          }}
                           style={cbs.productImg}
                           resizeMode="cover"
                         />
@@ -956,9 +967,11 @@ const cbs = StyleSheet.create({
     marginBottom: 0,
   },
   catIconWrap: {
-    width: 48, height: 48, borderRadius: 16,
+    width: 48, height: 48, borderRadius: 12,
     alignItems: "center", justifyContent: "center",
+    overflow: "hidden",
   },
+  catHeaderImg: { width: "100%", height: "100%" },
   catIconEmoji: { fontSize: 24 },
   headerCat: { fontSize: 11, color: C.gray400, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
   headerTitle: { fontSize: 20, fontWeight: "900", color: C.gray900 },
@@ -1051,7 +1064,10 @@ const VENDOR_TYPE_META = {
 function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker }) {
   const size = cardWidth || 130;
   const imgUri =
-    item.img || CAT_FALLBACK_IMGS[item.category] || CAT_FALLBACK_IMGS._default;
+    item.img || 
+    item.image_url || 
+    CAT_FALLBACK_IMGS[item.category] || 
+    CAT_FALLBACK_IMGS._default;
   const hasMrp = item.orig && item.orig > item.price;
   const discPct = hasMrp ? Math.round((1 - item.price / item.orig) * 100) : 0;
   const loose = isLooseItem(item);
@@ -1193,7 +1209,7 @@ function WeightPickerModal({ item, onClose, onAdd }) {
           {/* Header */}
           <View style={wp.header}>
             <Image
-              source={{ uri: item.img || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300" }}
+              source={{ uri: item.img || item.image_url || CAT_FALLBACK_IMGS[item.category] || CAT_FALLBACK_IMGS._default }}
               style={wp.thumb} resizeMode="cover"
             />
             <View style={{ flex: 1 }}>
@@ -1418,7 +1434,7 @@ export default function HomeScreen() {
   // Fetch category hierarchy (public endpoint — no auth needed)
   useEffect(() => {
     categoriesAPI.getAll()
-      .then(res => setApiCategories(res.categories || []))
+      .then(res => setApiCategories(res.data?.categories || []))
       .catch(() => setApiCategories([]));
   }, []);
 
@@ -1589,13 +1605,17 @@ export default function HomeScreen() {
         seen.add(catName);
         
         // Fetch image and accent from DB/Config
-        const apiCat = apiCategories.find(c => c.name === catName);
-        const accent = CAT_ACCENT[catName] || CAT_ACCENT._default;
+        const apiCat = apiCategories.find(c => c.id === catId || c.name === catName);
+        const accent = CAT_ACCENT[catName] || CAT_ACCENT[apiCat?.name] || CAT_ACCENT._default;
+        
+        // Prioritize DB image -> Fallback Unsplash image based on name -> Global default
+        const dbImg = apiCat?.image_url;
+        const fallbackImg = CAT_FALLBACK_IMGS[catName] || CAT_FALLBACK_IMGS[apiCat?.name] || CAT_FALLBACK_IMGS._default;
         
         cats.push({ 
           label: catName, 
           tag: catName, 
-          img: apiCat?.image_url || "https://images.unsplash.com/photo-1585386959984-a4155224a1ad?w=300&q=80", 
+          img: dbImg || fallbackImg, 
           bg: accent.bg, 
           accent: accent.accent, 
           icon: accent.icon 
@@ -1683,10 +1703,13 @@ export default function HomeScreen() {
 
       const itemInCart = cartItems.some((i) => i.id === item.id);
       const unitToUse = formatWeight(selectedWeight || item.unit);
+      const finalPrice = isLooseItem(item)
+        ? calculateProportionalPrice(item.price, unitToUse, item.unit || "1kg")
+        : item.price;
 
       if (!itemInCart) {
         // Item not in cart at all — always show store picker so user picks a vendor
-        setPickerItem({ ...item, selectedWeight: unitToUse });
+        setPickerItem({ ...item, selectedWeight: unitToUse, finalPrice });
         setPickerVisible(true);
         return;
       }
@@ -1696,7 +1719,7 @@ export default function HomeScreen() {
         {
           id: item.id,
           name: item.name,
-          price: item.price,
+          price: finalPrice,
           img: item.img,
           unit: unitToUse,
         },
@@ -1720,7 +1743,7 @@ export default function HomeScreen() {
         {
           id: item.id,
           name: item.name,
-          price: item.price,
+          price: item.finalPrice || item.price,
           img: item.img,
           unit: item.selectedWeight || item.unit,
         },
@@ -1952,7 +1975,7 @@ export default function HomeScreen() {
           <View style={[s.heroBanner, { height: wide ? 200 : 160 }]}>
             <Image
               source={{
-                uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&q=85",
+              uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&q=85&sig=banner",
               }}
               style={StyleSheet.absoluteFillObject}
               resizeMode="cover"
@@ -2052,7 +2075,7 @@ export default function HomeScreen() {
                     source={{
                       uri:
                         vendor.shop_image_url ||
-                        "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400",
+                        `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${vendor.id}`,
                     }}
                     style={s.storeImg}
                   />
@@ -2168,8 +2191,8 @@ export default function HomeScreen() {
                 flexWrap: "wrap",
                 paddingHorizontal: hPad,
                 paddingBottom: 8,
-                rowGap: 12,
-                columnGap: 4,
+                rowGap: 16,
+                columnGap: 8,
               }}
             >
               {dynamicCategories.map((cat) => {
@@ -2180,14 +2203,16 @@ export default function HomeScreen() {
                   (sum, sc) => sum + (categoryHierarchy[cat.label]?.[sc]?.length || 0), 0
                 );
                 
-                // Calculate width for 10 items per row, matching hPad and adding 4px gaps
-                const itemW = (winW - (hPad * 2) - (4 * 9)) / 10;
-                const bandSize = itemW;
+                // Responsive columns
+                const catCols = winW >= 1024 ? 10 : winW >= 768 ? 6 : winW >= 480 ? 5 : 4;
+                const catGap = 8;
+                const catItemW = (winW - (hPad * 2) - (catGap * (catCols - 1))) / catCols;
+                const bandSize = catItemW;
 
                 return (
                   <TouchableOpacity
                     key={cat.label}
-                    style={[s.catCard, { width: itemW }]}
+                    style={[s.catCard, { width: catItemW }]}
                     onPress={() => {
                       setCatSheetCategory(cat.label);
                       setCatSheetVisible(true);
@@ -2195,8 +2220,16 @@ export default function HomeScreen() {
                     activeOpacity={0.8}
                   >
                     <View style={[s.catCardBand, { width: bandSize, height: bandSize, backgroundColor: cat.bg }]}>
-                      <Image source={{ uri: cat.img }} style={s.catImg} resizeMode="contain" />
-                      {cat.icon && <Text style={[s.catCardEmoji, { fontSize: bandSize * 0.3 }]}>{cat.icon}</Text>}
+                      <Image 
+                        source={{ uri: cat.img }} 
+                        style={s.catImg} 
+                        resizeMode="cover" 
+                      />
+                      {cat.icon && (
+                        <View style={[s.catCardEmojiWrap, { width: bandSize * 0.35, height: bandSize * 0.35 }]}>
+                          <Text style={[s.catCardEmoji, { fontSize: bandSize * 0.22 }]}>{cat.icon}</Text>
+                        </View>
+                      )}
                     </View>
                     <Text style={s.catCardLabel} numberOfLines={2}>{cat.label}</Text>
                   </TouchableOpacity>
@@ -2273,7 +2306,7 @@ export default function HomeScreen() {
                   source={{
                     uri:
                       order.vendor?.shop_image_url ||
-                      "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=200",
+                      `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=200&sig=${order.vendor_id}`,
                   }}
                   style={s.orderImg}
                 />
@@ -2382,6 +2415,7 @@ export default function HomeScreen() {
         onOpenWeightPicker={setLoosePickerItem}
         vendors={vendors}
         onStoreSelect={handleStoreSelect}
+        apiCategories={apiCategories}
       />
 
       {/* ══ FLOATING CART — mobile ══════════════════════════════════════════ */}
@@ -2728,19 +2762,37 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
   catCardBand: {
-    borderRadius: 8,
+    borderRadius: 14,
     position: "relative",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
-    padding: 1,
-    marginBottom: 2,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.03)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  catCardEmojiWrap: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    zIndex: 3,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderRadius: 100,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   catCardEmoji: {
-    position: "absolute",
-    top: 1,
-    right: 2,
-    zIndex: 2,
+    textAlign: "center",
   },
   catCardImgWrap: {
     width: "100%",

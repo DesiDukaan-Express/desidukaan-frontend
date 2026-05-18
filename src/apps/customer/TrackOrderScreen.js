@@ -10,7 +10,7 @@ import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
 
 const BASE_URL   = process.env.EXPO_PUBLIC_API_URL    || "http://localhost:3000/api";
-const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || (BASE_URL.includes('/api') ? BASE_URL.split('/api')[0] : "http://localhost:3000");
 
 const C = {
   orange:      "#F97316", orangeDark:  "#EA580C",
@@ -156,47 +156,92 @@ export default function TrackOrderScreen() {
     })();
   }, [orderId, token]);
 
-  // ── Socket — listen for delivery partner location ──────────────────────────
+  const refreshOrder = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/orders/${orderId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json();
+      const o = d.data?.order || d.order;
+      if (o) {
+        setOrder(o);
+        setLastUpdate(new Date());
+      }
+    } catch (e) {
+      console.error("Refresh order error:", e);
+    }
+  };
+
+  // ── Socket — listen for delivery partner location & status ──────────────────
   useEffect(() => {
     if (!token || !orderId) return;
-    const socket = io(SOCKET_URL, { auth: { token } });
+    const socket = io(SOCKET_URL, { 
+      auth: { token },
+      transports: ['websocket']
+    });
 
     socketRef.current = socket;
 
-    socket.on("connect", () => setConnected(true));
-    socket.on("disconnect", () => setConnected(false));
+    socket.on("connect", () => {
+      setConnected(true);
+      console.log("[WS] Connected to server");
+      // Aggressively join order tracking room
+      socket.emit("track:join", { order_id: orderId });
+      socket.emit("track:join", { order_id: String(orderId) });
+    });
+    
+    socket.on("disconnect", () => {
+      setConnected(false);
+      console.log("[WS] Disconnected from server");
+    });
 
-    // Join order tracking room
+    // Join order tracking room immediately too
     socket.emit("track:join", { order_id: orderId });
 
     // Listen for partner location updates
     socket.on("delivery_location_update", (data) => {
-      // The backend emits delivery_location_update to the user room
-      // Data contains: { partnerId, latitude, longitude, deliveryId, orderId }
-      // We check if it matches our order (orderId might be added to backend, 
-      // or we can match by deliveryId if we had it. For now, we update if it's there)
-      if (data.orderId && String(data.orderId) !== String(orderId)) return;
+      const oid = data.order_id || data.orderId;
+      if (oid && String(oid) !== String(orderId)) return;
       
       setPartnerPos({ lat: data.latitude, lng: data.longitude });
       setLastUpdate(new Date());
     });
 
-    // Listen for order status changes
+    // Listen for order status changes (generic)
     socket.on("order:update", (data) => {
-      if (String(data.order_id) !== String(orderId)) return;
-      setOrder(prev => prev ? { ...prev, status: data.status } : prev);
+      console.log("[WS] order:update received", data);
+      const oid = data.order_id || data.orderId;
+      if (oid && String(oid) !== String(orderId)) return;
+      
+      refreshOrder();
     });
 
-    // Poll for location every 15s as a fallback
-    const poll = setInterval(async () => {
+    // Listen for delivery status updates (explicit delivery status change)
+    socket.on("delivery_status_update", (data) => {
+      console.log("[WS] delivery_status_update received", data);
+      const oid = data.order_id || data.orderId;
+      if (oid && String(oid) !== String(orderId)) return;
+
+      refreshOrder();
+    });
+
+    // Listen for partner being assigned
+    socket.on("delivery_assigned", (data) => {
+      console.log("[WS] delivery_assigned received", data);
+      const oid = data.order_id || data.orderId;
+      if (oid && String(oid) !== String(orderId)) return;
+      
+      refreshOrder();
+    });
+
+    // Poll partner location every 15s as fallback
+    const locationPoll = setInterval(async () => {
       try {
-        // Fix: Use the correct delivery tracking endpoint
-        const res  = await fetch(`${BASE_URL}/delivery/track/${orderId}`, {
+        const res = await fetch(`${BASE_URL}/delivery/track/${orderId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
           const d = await res.json();
-          // Fix: Backend returns latitude/longitude in d.data
           if (d.data?.latitude) {
             setPartnerPos({ lat: d.data.latitude, lng: d.data.longitude });
             setLastUpdate(new Date());
@@ -205,17 +250,24 @@ export default function TrackOrderScreen() {
       } catch {}
     }, 15000);
 
+    // Poll order status every 20s as fallback for missed WebSocket events
+    const statusPoll = setInterval(refreshOrder, 20000);
+
     return () => {
       socket.disconnect();
-      clearInterval(poll);
+      clearInterval(locationPoll);
+      clearInterval(statusPoll);
     };
   }, [orderId, token]);
+
 
   const currentStepIdx = order ? stepIndex(order.status) : -1;
   const isDelivered    = order?.status === "delivered";
   const isActive       = order && !["delivered", "cancelled", "rejected"].includes(order.status);
   const destLat        = order?.delivery_address?.latitude;
   const destLng        = order?.delivery_address?.longitude;
+
+  const [showDetails,   setShowDetails]   = useState(false);
 
   if (loading) {
     return (
@@ -244,6 +296,16 @@ export default function TrackOrderScreen() {
           <Text style={s.headerTitle}>Track Delivery</Text>
           <Text style={s.headerSub}>{orderNumber || `Order #${orderId}`}</Text>
         </View>
+        
+        {/* Detail Button */}
+        <TouchableOpacity 
+          style={s.detailIconBtn} 
+          onPress={() => setShowDetails(true)}
+          activeOpacity={0.7}
+        >
+          <Feather name="file-text" size={20} color={C.white} />
+        </TouchableOpacity>
+
         {/* Live indicator */}
         {isActive && (
           <View style={s.livePill}>
@@ -252,6 +314,13 @@ export default function TrackOrderScreen() {
           </View>
         )}
       </LinearGradient>
+
+      {/* ── ORDER DETAIL MODAL (Inside Track Screen) ── */}
+      <OrderDetailModal 
+        visible={showDetails} 
+        order={order} 
+        onClose={() => setShowDetails(false)} 
+      />
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={s.body}>
 
@@ -387,6 +456,12 @@ const s = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center", justifyContent: "center",
   },
+  detailIconBtn: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center", justifyContent: "center",
+    marginRight: 8,
+  },
   headerTitle: { fontSize: 18, fontWeight: "900", color: C.white },
   headerSub:   { fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 2 },
   livePill: {
@@ -452,4 +527,86 @@ const s = StyleSheet.create({
   deliveredGrad: { flexDirection: "row", alignItems: "center", gap: 14, padding: 20 },
   deliveredTitle: { fontSize: 17, fontWeight: "900", color: C.white },
   deliveredSub:   { fontSize: 13, color: "rgba(255,255,255,0.85)", marginTop: 2 },
+});
+
+// ─── Order Detail Modal Helper ───────────────────────────────────────────────
+function OrderDetailModal({ visible, order, onClose }) {
+  if (!order) return null;
+  const items = order.items || order.order_items || [];
+  const subtotal = order.subtotal || items.reduce((s, i) => s + (i.product_price || i.price || 0) * (i.quantity || 1), 0);
+  const deliveryFee = order.delivery_fee ?? 20;
+  const total = order.total || (subtotal + deliveryFee);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={od.backdrop} onPress={onClose}>
+        <Pressable style={od.sheet} onPress={() => {}}>
+          <View style={od.handle} />
+          <View style={od.header}>
+            <Text style={od.title}>Order Summary</Text>
+            <TouchableOpacity onPress={onClose} style={od.closeBtn}>
+              <Feather name="x" size={20} color={C.gray400} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={od.content}>
+            <Text style={od.sectionTitle}>Items</Text>
+            {items.map((item, i) => (
+              <View key={i} style={od.itemRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={od.itemName}>{item.product_name || item.name || "Item"}</Text>
+                  <Text style={od.itemUnit}>{item.unit || "1 pc"}</Text>
+                </View>
+                <Text style={od.itemQty}>×{item.quantity || 1}</Text>
+                <Text style={od.itemPrice}>₹{(item.product_price || item.price || 0) * (item.quantity || 1)}</Text>
+              </View>
+            ))}
+
+            <View style={od.billBox}>
+              <View style={od.billRow}>
+                <Text style={od.billLabel}>Subtotal</Text>
+                <Text style={od.billValue}>₹{subtotal}</Text>
+              </View>
+              <View style={od.billRow}>
+                <Text style={od.billLabel}>Delivery Fee</Text>
+                <Text style={od.billValue}>₹{deliveryFee}</Text>
+              </View>
+              <View style={[od.billRow, { borderTopWidth: 1, borderTopColor: C.gray100, marginTop: 8, paddingTop: 8 }]}>
+                <Text style={[od.billLabel, { fontWeight: "800", color: C.gray900 }]}>Total Paid</Text>
+                <Text style={[od.billValue, { fontWeight: "900", color: C.gray900, fontSize: 16 }]}>₹{total}</Text>
+              </View>
+            </View>
+
+            <View style={od.statusBox}>
+              <Text style={od.statusLabel}>Current Status</Text>
+              <Text style={[od.statusValue, { color: C.green }]}>{(order.status || "").replace("_", " ").toUpperCase()}</Text>
+            </View>
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const od = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "80%" },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginTop: 10, marginBottom: 10 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  title: { fontSize: 18, fontWeight: "900", color: C.gray900 },
+  closeBtn: { padding: 4 },
+  content: { padding: 20 },
+  sectionTitle: { fontSize: 14, fontWeight: "800", color: C.gray500, textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 },
+  itemRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
+  itemName: { fontSize: 15, fontWeight: "700", color: C.gray900 },
+  itemUnit: { fontSize: 12, color: C.gray400, marginTop: 2 },
+  itemQty: { fontSize: 14, fontWeight: "600", color: C.gray500 },
+  itemPrice: { fontSize: 15, fontWeight: "800", color: C.gray900, minWidth: 60, textAlign: "right" },
+  billBox: { backgroundColor: C.gray100, borderRadius: 16, padding: 16, marginTop: 12 },
+  billRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
+  billLabel: { fontSize: 14, color: C.gray500 },
+  billValue: { fontSize: 14, fontWeight: "700", color: C.gray900 },
+  statusBox: { marginTop: 20, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: C.greenBorder, backgroundColor: C.greenLight, alignItems: "center" },
+  statusLabel: { fontSize: 11, fontWeight: "800", color: C.green, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 },
+  statusValue: { fontSize: 16, fontWeight: "900" },
 });
