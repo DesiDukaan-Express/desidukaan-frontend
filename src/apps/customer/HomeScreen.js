@@ -28,6 +28,7 @@ import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import { useNavigation } from "@react-navigation/native";
 import { vendorsAPI, ordersAPI, categoriesAPI } from "../../services/api";
+import ChatWidget from "./ChatWidget";
 
 // ── Use env var — works on device, emulator, and web ─────────────────────────
 // In your .env: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api
@@ -2383,6 +2384,8 @@ export default function HomeScreen() {
         vendors={vendors}
         onStoreSelect={handleStoreSelect}
       />
+
+      <ChatWidget />
 
       {/* ══ FLOATING CART — mobile ══════════════════════════════════════════ */}
       {!wide && cartCount > 0 && (

@@ -185,4 +185,33 @@ export const inventoryService = {
       return { success: false };
     }
   },
+
+  async getLowStock(token, threshold = null) {
+    try {
+      const qs = threshold !== null ? `?threshold=${threshold}` : "";
+      const res = await fetch(`${API_BASE}/inventory/my/low-stock${qs}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return await res.json();
+    } catch (err) {
+      console.error("getLowStock error:", err);
+      return { success: false, data: { items: [] } };
+    }
+  },
+
+  async bulkImport(token, items) {
+    try {
+      const res = await fetch(`${API_BASE}/inventory/bulk-import`, {
+        method: "POST",
+        headers: authHeaders(token),
+        body: JSON.stringify({ items }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Bulk import failed");
+      return data;
+    } catch (err) {
+      console.error("bulkImport error:", err);
+      throw err;
+    }
+  },
 };
