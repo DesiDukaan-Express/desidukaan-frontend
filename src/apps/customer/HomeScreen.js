@@ -649,44 +649,44 @@ const sp = StyleSheet.create({
 });
 
 const CAT_FALLBACK_IMGS = {
-  "Dairy, Bread & Eggs":      "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80",
-  "Fruits & Vegetables":     "https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=400&q=80",
-  "Cold Drinks & Juices":    "https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&q=80",
-  "Snacks & Munchies":       "https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=80",
-  "Breakfast & Instant Food":"https://images.unsplash.com/photo-1569058242252-62324e7d5567?w=400&q=80",
-  "Sweet Tooth":             "https://images.unsplash.com/photo-1582231229718-4c5931bc1184?w=400&q=80",
-  "Bakery & Biscuits":       "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80",
-  "Tea, Coffee & Milk Drinks":"https://images.unsplash.com/photo-1544787210-2211d7c309c7?w=400&q=80",
-  "Atta, Rice & Dal":        "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=80",
-  "Masala, Oil & More":      "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&q=80",
-  "Sauces & Spreads":        "https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=400&q=80",
-  "Cleaning Essentials":     "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&q=80",
-  "Personal Care":           "https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&q=80",
-  "Home & Office":           "https://images.unsplash.com/photo-1586075010633-2445c9ff093b?w=400&q=80",
-  _default:                  "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80",
+  "Dairy, Bread & Eggs": "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80",
+  "Fruits & Vegetables": "https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=400&q=80",
+  "Cold Drinks & Juices": "https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&q=80",
+  "Snacks & Munchies": "https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=80",
+  "Breakfast & Instant Food": "https://images.unsplash.com/photo-1569058242252-62324e7d5567?w=400&q=80",
+  "Sweet Tooth": "https://images.unsplash.com/photo-1582231229718-4c5931bc1184?w=400&q=80",
+  "Bakery & Biscuits": "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80",
+  "Tea, Coffee & Milk Drinks": "https://images.unsplash.com/photo-1544787210-2211d7c309c7?w=400&q=80",
+  "Atta, Rice & Dal": "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=80",
+  "Masala, Oil & More": "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&q=80",
+  "Sauces & Spreads": "https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=400&q=80",
+  "Cleaning Essentials": "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&q=80",
+  "Personal Care": "https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&q=80",
+  "Home & Office": "https://images.unsplash.com/photo-1586075010633-2445c9ff093b?w=400&q=80",
+  _default: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80",
 };
 
 // ─── Category accent colours (top-level) ──────────────────────────────────────
 const CAT_ACCENT = {
-  "Dairy, Bread & Eggs":      { bg: "#EFF6FF", accent: "#2563EB", icon: "🥛" },
-  "Fruits & Vegetables":     { bg: "#ECFDF5", accent: "#059669", icon: "🍎" },
-  "Cold Drinks & Juices":    { bg: "#F0FDF4", accent: "#16A34A", icon: "🧃" },
-  "Snacks & Munchies":       { bg: "#FFF7ED", accent: "#EA580C", icon: "🍿" },
+  "Dairy, Bread & Eggs": { bg: "#EFF6FF", accent: "#2563EB", icon: "🥛" },
+  "Fruits & Vegetables": { bg: "#ECFDF5", accent: "#059669", icon: "🍎" },
+  "Cold Drinks & Juices": { bg: "#F0FDF4", accent: "#16A34A", icon: "🧃" },
+  "Snacks & Munchies": { bg: "#FFF7ED", accent: "#EA580C", icon: "🍿" },
   "Breakfast & Instant Food": { bg: "#FEF9C3", accent: "#CA8A04", icon: "🥣" },
-  "Sweet Tooth":             { bg: "#FDF4FF", accent: "#9333EA", icon: "🍫" },
-  "Bakery & Biscuits":       { bg: "#FFF1F2", accent: "#E11D48", icon: "🍪" },
+  "Sweet Tooth": { bg: "#FDF4FF", accent: "#9333EA", icon: "🍫" },
+  "Bakery & Biscuits": { bg: "#FFF1F2", accent: "#E11D48", icon: "🍪" },
   "Tea, Coffee & Milk Drinks": { bg: "#F5F5F4", accent: "#57534E", icon: "☕" },
-  "Atta, Rice & Dal":        { bg: "#FEFCE8", accent: "#A16207", icon: "🌾" },
-  "Masala, Oil & More":      { bg: "#FFF7ED", accent: "#C2410C", icon: "🌶️" },
-  "Sauces & Spreads":        { bg: "#F0FDFA", accent: "#0D9488", icon: "🥫" },
-  "Cleaning Essentials":     { bg: "#F0F9FF", accent: "#0284C7", icon: "🧼" },
-  "Personal Care":           { bg: "#FAF5FF", accent: "#7C3AED", icon: "🧴" },
-  "Home & Office":           { bg: "#F8FAFC", accent: "#475569", icon: "🖇️" },
-  "Bread":                   { bg: "#FFFBEB", accent: "#D97706", icon: "🍞" },
-  "Chips":                   { bg: "#FEF2F2", accent: "#EF4444", icon: "🍟" },
-  "Milk":                    { bg: "#F0F9FF", accent: "#0EA5E9", icon: "🥛" },
-  "Rice":                    { bg: "#FEFCE8", accent: "#EAB308", icon: "🌾" },
-  _default:                  { bg: "#F3F4F6", accent: "#6B7280", icon: "📦" },
+  "Atta, Rice & Dal": { bg: "#FEFCE8", accent: "#A16207", icon: "🌾" },
+  "Masala, Oil & More": { bg: "#FFF7ED", accent: "#C2410C", icon: "🌶️" },
+  "Sauces & Spreads": { bg: "#F0FDFA", accent: "#0D9488", icon: "🥫" },
+  "Cleaning Essentials": { bg: "#F0F9FF", accent: "#0284C7", icon: "🧼" },
+  "Personal Care": { bg: "#FAF5FF", accent: "#7C3AED", icon: "🧴" },
+  "Home & Office": { bg: "#F8FAFC", accent: "#475569", icon: "🖇️" },
+  "Bread": { bg: "#FFFBEB", accent: "#D97706", icon: "🍞" },
+  "Chips": { bg: "#FEF2F2", accent: "#EF4444", icon: "🍟" },
+  "Milk": { bg: "#F0F9FF", accent: "#0EA5E9", icon: "🥛" },
+  "Rice": { bg: "#FEFCE8", accent: "#EAB308", icon: "🌾" },
+  _default: { bg: "#F3F4F6", accent: "#6B7280", icon: "📦" },
 };
 
 // ─── Build 3-level hierarchy from flat inventory ───────────────────────────────
@@ -696,7 +696,7 @@ const CAT_ACCENT = {
 function buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCategories) {
   // Build a parent lookup from API categories: catName → parentName
   const parentOf = {};  // catName → parentCatName | null
-  const catById  = {};  // id → {name, parent_id}
+  const catById = {};  // id → {name, parent_id}
   if (apiCategories && apiCategories.length > 0) {
     apiCategories.forEach(c => { catById[c.id] = c; });
     apiCategories.forEach(c => {
@@ -771,7 +771,7 @@ function CategoryBrowseSheet({
       onRequestClose={onClose}
     >
       <Pressable style={cbs.backdrop} onPress={onClose}>
-        <Pressable style={cbs.sheet} onPress={() => {}}>
+        <Pressable style={cbs.sheet} onPress={() => { }}>
           <View style={cbs.handle} />
 
           {/* ── Header ── */}
@@ -855,7 +855,7 @@ function CategoryBrowseSheet({
                 const vendorName = inv._vendorName || "";
 
                 const item = {
-                  id:  p.id, name: p.name, price: p.price,
+                  id: p.id, name: p.name, price: p.price,
                   img: p.image_url || null, unit: p.unit || "1 pc",
                   orig: hasMrp ? p.mrp : null, category,
                   item_type: p.item_type, weight_options: p.weight_options,
@@ -870,10 +870,10 @@ function CategoryBrowseSheet({
                     <View style={[cbs.productCell, { flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }]}>
                       <View style={cbs.productImgWrap}>
                         <Image
-                          source={{ 
-                            uri: p.image_url || 
-                                 CAT_FALLBACK_IMGS[category] || 
-                                 CAT_FALLBACK_IMGS._default
+                          source={{
+                            uri: p.image_url ||
+                              CAT_FALLBACK_IMGS[category] ||
+                              CAT_FALLBACK_IMGS._default
                           }}
                           style={cbs.productImg}
                           resizeMode="cover"
@@ -1063,10 +1063,11 @@ const VENDOR_TYPE_META = {
 // ─── Item Card ─────────────────────────────────────────────────────────────────
 function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker }) {
   const size = cardWidth || 130;
+  console.log(item)
   const imgUri =
-    item.img || 
-    item.image_url || 
-    CAT_FALLBACK_IMGS[item.category] || 
+    item.img ||
+    item.image_url ||
+    CAT_FALLBACK_IMGS[item.category] ||
     CAT_FALLBACK_IMGS._default;
   const hasMrp = item.orig && item.orig > item.price;
   const discPct = hasMrp ? Math.round((1 - item.price / item.orig) * 100) : 0;
@@ -1575,13 +1576,13 @@ export default function HomeScreen() {
   const dynamicCategories = useMemo(() => {
     const seen = new Set();
     const cats = [];
-    
+
     // Create a lookup for top-level resolution
     const topLevelMap = {}; // catId -> topLevelCatName
     if (apiCategories.length > 0) {
       const catById = {};
       apiCategories.forEach(c => { catById[c.id] = c; });
-      
+
       apiCategories.forEach(c => {
         let curr = c;
         let safety = 0;
@@ -1600,25 +1601,25 @@ export default function HomeScreen() {
       const catId = p.category_id || p.category?.id;
       const rawName = getCategoryName(inv);
       const catName = topLevelMap[catId] || topLevelMap[rawName] || rawName;
-      
+
       if (catName && !seen.has(catName)) {
         seen.add(catName);
-        
+
         // Fetch image and accent from DB/Config
         const apiCat = apiCategories.find(c => c.id === catId || c.name === catName);
         const accent = CAT_ACCENT[catName] || CAT_ACCENT[apiCat?.name] || CAT_ACCENT._default;
-        
+
         // Prioritize DB image -> Fallback Unsplash image based on name -> Global default
         const dbImg = apiCat?.image_url;
         const fallbackImg = CAT_FALLBACK_IMGS[catName] || CAT_FALLBACK_IMGS[apiCat?.name] || CAT_FALLBACK_IMGS._default;
-        
-        cats.push({ 
-          label: catName, 
-          tag: catName, 
-          img: dbImg || fallbackImg, 
-          bg: accent.bg, 
-          accent: accent.accent, 
-          icon: accent.icon 
+
+        cats.push({
+          label: catName,
+          tag: catName,
+          img: dbImg || fallbackImg,
+          bg: accent.bg,
+          accent: accent.accent,
+          icon: accent.icon
         });
       }
     });
@@ -1975,7 +1976,7 @@ export default function HomeScreen() {
           <View style={[s.heroBanner, { height: wide ? 200 : 160 }]}>
             <Image
               source={{
-              uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&q=85&sig=banner",
+                uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&q=85&sig=banner",
               }}
               style={StyleSheet.absoluteFillObject}
               resizeMode="cover"
@@ -2202,7 +2203,7 @@ export default function HomeScreen() {
                 const itemCount = subCats.reduce(
                   (sum, sc) => sum + (categoryHierarchy[cat.label]?.[sc]?.length || 0), 0
                 );
-                
+
                 // Responsive columns
                 const catCols = winW >= 1024 ? 10 : winW >= 768 ? 6 : winW >= 480 ? 5 : 4;
                 const catGap = 8;
@@ -2220,10 +2221,10 @@ export default function HomeScreen() {
                     activeOpacity={0.8}
                   >
                     <View style={[s.catCardBand, { width: bandSize, height: bandSize, backgroundColor: cat.bg }]}>
-                      <Image 
-                        source={{ uri: cat.img }} 
-                        style={s.catImg} 
-                        resizeMode="cover" 
+                      <Image
+                        source={{ uri: cat.img }}
+                        style={s.catImg}
+                        resizeMode="cover"
                       />
                       {cat.icon && (
                         <View style={[s.catCardEmojiWrap, { width: bandSize * 0.35, height: bandSize * 0.35 }]}>
