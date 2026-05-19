@@ -118,7 +118,8 @@ export default function Navigation() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <VendorOnboardingScreen />
+      {/* <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
           // ── Unauthenticated screens ──────────────────────────────────
           <>
@@ -174,7 +175,7 @@ export default function Navigation() {
             <Stack.Screen name="OrderPlaced" component={OrderPlaced} />
           </>
         )}
-      </Stack.Navigator>
+      </Stack.Navigator> */}
     </NavigationContainer>
   );
 }

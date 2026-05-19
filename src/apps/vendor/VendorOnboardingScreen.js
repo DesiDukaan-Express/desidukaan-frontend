@@ -300,19 +300,36 @@ export default function VendorOnboardingScreen({ onComplete }) {
       });
       const data = await res.json();
 
-      if (data.children && data.children.length > 0) {
+      const hasChildren = data.children && data.children.length > 0;
+      const hasProducts = data.master_products && data.master_products.length > 0;
+
+      if (hasProducts) {
+        // ── Leaf node: show products ─────────────────────────────────────────
+        setCategoryStack(prev => [...prev, cat]);
+        setMasterCategories([]);
+        setCurrentCategory({ ...cat, products: data.master_products });
+      } else if (hasChildren) {
+        // ── Mid node: drill into sub-categories ──────────────────────────────
         setCategoryStack(prev => [...prev, cat]);
         setMasterCategories(data.children);
         setCurrentCategory(cat);
-      } else if (data.master_products && data.master_products.length > 0) {
-        setCategoryStack(prev => [...prev, cat]);
-        setMasterCategories([]); // clear categories
-        setSelectedProds(prev => {
-          // We keep existing selections
-          return prev;
+      } else {
+        // ── No children and no inline products — fetch via dedicated endpoint ─
+        const prodRes = await fetch(`${API_BASE}/master/products/${cat.id}`, {
+          headers: { Authorization: `Bearer ${token}` }
         });
-        // We'll handle product display in the UI based on whether categories or products are present
-        setCurrentCategory({ ...cat, products: data.master_products });
+        if (prodRes.ok) {
+          const prodData = await prodRes.json();
+          const products = Array.isArray(prodData) ? prodData : prodData.products || prodData.data || [];
+          setCategoryStack(prev => [...prev, cat]);
+          setMasterCategories([]);
+          setCurrentCategory({ ...cat, products });
+        } else {
+          // Nothing to show — just navigate in anyway so back works
+          setCategoryStack(prev => [...prev, cat]);
+          setMasterCategories([]);
+          setCurrentCategory({ ...cat, products: [] });
+        }
       }
     } catch (err) {
       console.error('Error fetching category details:', err);
