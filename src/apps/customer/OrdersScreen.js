@@ -105,7 +105,6 @@ function DriverLocationMap({ order, token }) {
   const destLat = order?.delivery_address?.latitude;
   const destLng = order?.delivery_address?.longitude;
 
-  const hasDriver  = !!(order?.delivery_partner_id || order?.delivery_partner);
   const isLocating = !partnerPos;
 
   return (
