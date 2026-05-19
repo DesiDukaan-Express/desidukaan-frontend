@@ -24,13 +24,20 @@ const ACTIVE_DELIVERY_STATUSES = ["accepted", "preparing", "ready", "picked_up"]
 
 const POLL_INTERVAL_MS = 15_000; // 15 seconds
 
-export default function useDriverLocation(orderId, token, orderStatus, hasDriver) {
-  const [partnerPos,  setPartnerPos]  = useState(null);   // { lat, lng }
+export default function useDriverLocation(orderId, token, orderStatus, hasDriver, initialLocation) {
+  const [partnerPos,  setPartnerPos]  = useState(initialLocation || null);   // { lat, lng }
   const [connected,   setConnected]   = useState(false);
   const [lastUpdate,  setLastUpdate]  = useState(null);   // Date
 
   const socketRef   = useRef(null);
   const pollTimerRef = useRef(null);
+
+  // Sync initial location if it arrives after mounting
+  useEffect(() => {
+    if (initialLocation && !partnerPos) {
+      setPartnerPos(initialLocation);
+    }
+  }, [initialLocation, partnerPos]);
 
   // ── Helper: fetch location from REST ──────────────────────────────────────
   const fetchLocation = useCallback(async () => {

@@ -81,12 +81,25 @@ const formatDateShort = (iso) => {
 const MAP_ACTIVE_STATUSES = ["accepted", "preparing", "ready", "picked_up"];
 
 function DriverLocationMap({ order, token }) {
-  const hasDriver = !!(order?.delivery_partner_id || order?.delivery_partner);
+  const hasDriver = !!(
+    order?.delivery_partner_id || 
+    order?.delivery_partner ||
+    order?.delivery?.partner_id ||
+    order?.delivery?.partner
+  );
+
+  const initialLocation = (order?.delivery?.partner?.current_lat && order?.delivery?.partner?.current_lng)
+    ? { lat: order.delivery.partner.current_lat, lng: order.delivery.partner.current_lng }
+    : (order?.delivery_partner?.current_lat && order?.delivery_partner?.current_lng)
+      ? { lat: order.delivery_partner.current_lat, lng: order.delivery_partner.current_lng }
+      : null;
+
   const { partnerPos, connected, lastUpdate } = useDriverLocation(
     order?.id,
     token,
     order?.status,
     hasDriver,
+    initialLocation,
   );
 
   // Pulsing "LIVE" badge animation
