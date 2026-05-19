@@ -81,10 +81,12 @@ const formatDateShort = (iso) => {
 const MAP_ACTIVE_STATUSES = ["accepted", "preparing", "ready", "picked_up"];
 
 function DriverLocationMap({ order, token }) {
+  const hasDriver = !!(order?.delivery_partner_id || order?.delivery_partner);
   const { partnerPos, connected, lastUpdate } = useDriverLocation(
     order?.id,
     token,
     order?.status,
+    hasDriver,
   );
 
   // Pulsing "LIVE" badge animation

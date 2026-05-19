@@ -24,7 +24,7 @@ const ACTIVE_DELIVERY_STATUSES = ["accepted", "preparing", "ready", "picked_up"]
 
 const POLL_INTERVAL_MS = 15_000; // 15 seconds
 
-export default function useDriverLocation(orderId, token, orderStatus) {
+export default function useDriverLocation(orderId, token, orderStatus, hasDriver) {
   const [partnerPos,  setPartnerPos]  = useState(null);   // { lat, lng }
   const [connected,   setConnected]   = useState(false);
   const [lastUpdate,  setLastUpdate]  = useState(null);   // Date
@@ -59,8 +59,13 @@ export default function useDriverLocation(orderId, token, orderStatus) {
       return;
     }
 
-    // 1. Initial REST fetch (before socket might fire)
-    fetchLocation();
+    // ── Socket always connects (to receive delivery_location_update when driver
+    //    is assigned during this session), but REST poll only fires if a driver
+    //    is already assigned (avoids 404 from orders without a delivery record).
+    const canPoll = !!hasDriver;
+
+    // 1. Initial REST fetch (only when driver assigned)
+    if (canPoll) fetchLocation();
 
     // 2. Start Socket.IO
     const socket = io(SOCKET_URL, {
@@ -93,8 +98,10 @@ export default function useDriverLocation(orderId, token, orderStatus) {
       }
     });
 
-    // 3. Start fallback poll
-    pollTimerRef.current = setInterval(fetchLocation, POLL_INTERVAL_MS);
+    // 3. Start fallback poll (only when driver assigned — avoids repeated 404s)
+    if (canPoll) {
+      pollTimerRef.current = setInterval(fetchLocation, POLL_INTERVAL_MS);
+    }
 
     // ── Cleanup ──
     return () => {
@@ -103,7 +110,7 @@ export default function useDriverLocation(orderId, token, orderStatus) {
       clearInterval(pollTimerRef.current);
       pollTimerRef.current = null;
     };
-  }, [orderId, token, orderStatus, fetchLocation]);
+  }, [orderId, token, orderStatus, hasDriver, fetchLocation]);
 
   return { partnerPos, connected, lastUpdate };
 }

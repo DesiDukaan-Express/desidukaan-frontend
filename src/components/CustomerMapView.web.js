@@ -17,21 +17,27 @@ import { View, StyleSheet, ActivityIndicator, Text } from "react-native";
 
 const DEFAULT_CENTER = [28.6139, 77.209]; // New Delhi fallback
 
-// Custom SVG icons (no external image dependency)
+// Custom SVG icons — pure ASCII, no emoji (btoa doesn't handle multi-byte Unicode)
 const DRIVER_ICON_SVG = `
-<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-  <circle cx="20" cy="20" r="18" fill="#16A34A" stroke="#fff" stroke-width="3"/>
-  <text x="20" y="26" text-anchor="middle" font-size="18" fill="white">🚚</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">
+  <circle cx="22" cy="22" r="20" fill="#16A34A" stroke="#fff" stroke-width="3"/>
+  <rect x="10" y="18" width="14" height="10" rx="2" fill="white"/>
+  <polygon points="24,18 36,18 36,28 24,28" fill="white" fill-opacity="0.9"/>
+  <circle cx="14" cy="30" r="2.5" fill="#15803D"/>
+  <circle cx="30" cy="30" r="2.5" fill="#15803D"/>
+  <rect x="10" y="15" width="8" height="5" rx="1" fill="white" fill-opacity="0.7"/>
 </svg>`;
 
 const DEST_ICON_SVG = `
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
   <path d="M16 0C7.163 0 0 7.163 0 16c0 10 16 24 16 24S32 26 32 16C32 7.163 24.837 0 16 0z" fill="#DC2626"/>
   <circle cx="16" cy="16" r="6" fill="#fff"/>
+  <circle cx="16" cy="16" r="3" fill="#DC2626"/>
 </svg>`;
 
+// encodeURIComponent handles full Unicode range (unlike btoa which is Latin1-only)
 function svgToDataUrl(svg) {
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 export default function CustomerMapView({ partnerPos, destLat, destLng }) {
