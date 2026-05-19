@@ -358,7 +358,7 @@ function OrderDetailModal({ order, onClose }) {
 
               {/* ── Live Driver Map — only for active delivery statuses ── */}
               {showMap && (
-                <DriverLocationMap order={order} token={token} />
+                <DriverLocationMap order={displayOrder} token={token} />
               )}
 
               {/* ── Order Tracking steps ── */}
