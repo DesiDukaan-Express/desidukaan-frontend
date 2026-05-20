@@ -5,8 +5,11 @@ import {
   KeyboardAvoidingView, Platform, Image
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import useAuthStore from '../../store/authStore';
 import AddressMapView from "../../components/AddressMapView";
+import { uploadAPI } from '../../services/api';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const PRIMARY = '#1ca049';
@@ -249,6 +252,11 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const [aadhar, setAadhar] = useState('');
   const [pan, setPan] = useState('');
   const [tradeLicense, setTradeLicense] = useState('');
+  // Step 2 — Document uploads (stores Cloudinary URLs)
+  const [docUrls, setDocUrls] = useState({ fssai: null, gst: null });
+  const [docUploading, setDocUploading] = useState({ fssai: false, gst: false });
+  // Step 4 — Product photo uploading per row index
+  const [prodImgUploading, setProdImgUploading] = useState({});
 
   // Step 3 — Bank
   const [upiId, setUpiId] = useState('');
@@ -375,6 +383,50 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const removeManualRow = (i) => setManualProds(prev => prev.filter((_, idx) => idx !== i));
   const updateManualProd = (i, field, value) =>
     setManualProds(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: value } : p));
+
+  // ── Document upload (Step 2) ──────────────────────────────────────────────────
+  const pickAndUploadDoc = async (docKey) => {
+    try {
+      setDocUploading(prev => ({ ...prev, [docKey]: true }));
+      // Try document picker first (supports PDF + images)
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+      const mimeType = asset.mimeType || (asset.name?.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+      const data = await uploadAPI.upload(asset.uri, mimeType, token);
+      setDocUrls(prev => ({ ...prev, [docKey]: data.url }));
+      Alert.alert('✅ Uploaded', 'Document uploaded successfully!');
+    } catch (e) {
+      Alert.alert('Upload Failed', e.message || 'Could not upload document');
+    } finally {
+      setDocUploading(prev => ({ ...prev, [docKey]: false }));
+    }
+  };
+
+  // ── Product photo upload (Step 4 manual) ─────────────────────────────────────
+  const pickAndUploadProductPhoto = async (index) => {
+    try {
+      setProdImgUploading(prev => ({ ...prev, [index]: true }));
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+      const mimeType = asset.mimeType || 'image/jpeg';
+      const data = await uploadAPI.upload(asset.uri, mimeType, token);
+      updateManualProd(index, 'image_url', data.url);
+    } catch (e) {
+      Alert.alert('Upload Failed', e.message || 'Could not upload image');
+    } finally {
+      setProdImgUploading(prev => ({ ...prev, [index]: false }));
+    }
+  };
 
   const parseCSV = () => {
     try {
@@ -742,14 +794,37 @@ export default function VendorOnboardingScreen({ onComplete }) {
               </View>
 
               <Text style={styles.sectionSep}>📄 Document Upload (optional — speeds up approval)</Text>
-              {['FSSAI Certificate', 'GST Registration Certificate'].map(doc => (
-                <View key={doc}>
-                  <Text style={styles.label}>{doc}</Text>
-                  <TouchableOpacity style={styles.uploadBox}>
-                    <Text style={styles.uploadIcon}>📁</Text>
-                    <Text style={styles.uploadText}>Tap to upload PDF or image</Text>
-                    <Text style={styles.uploadHint}>Max 5MB</Text>
-                  </TouchableOpacity>
+              {[
+                { label: 'FSSAI Certificate', key: 'fssai' },
+                { label: 'GST Registration Certificate', key: 'gst' },
+              ].map(doc => (
+                <View key={doc.key}>
+                  <Text style={styles.label}>{doc.label}</Text>
+                  {docUrls[doc.key] ? (
+                    <View style={styles.uploadedBox}>
+                      <Text style={styles.uploadedIcon}>✅</Text>
+                      <Text style={styles.uploadedText} numberOfLines={1}>Document uploaded successfully</Text>
+                      <TouchableOpacity onPress={() => setDocUrls(prev => ({ ...prev, [doc.key]: null }))}>
+                        <Text style={styles.uploadRemove}>✕ Remove</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.uploadBox}
+                      onPress={() => pickAndUploadDoc(doc.key)}
+                      disabled={docUploading[doc.key]}
+                    >
+                      {docUploading[doc.key] ? (
+                        <ActivityIndicator color={PRIMARY} size="small" />
+                      ) : (
+                        <Text style={styles.uploadIcon}>📁</Text>
+                      )}
+                      <Text style={styles.uploadText}>
+                        {docUploading[doc.key] ? 'Uploading…' : 'Tap to upload PDF or photo'}
+                      </Text>
+                      <Text style={styles.uploadHint}>Max 10MB</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               ))}
             </View>
@@ -914,11 +989,33 @@ export default function VendorOnboardingScreen({ onComplete }) {
                       </View>
 
                       <View style={styles.photoRow}>
-                        <TouchableOpacity style={styles.photoBox}>
-                          <Text style={styles.photoIcon}>📷</Text>
-                        </TouchableOpacity>
+                        {product.image_url ? (
+                          <View style={styles.photoPreviewWrap}>
+                            <Image source={{ uri: product.image_url }} style={styles.photoPreview} />
+                            <TouchableOpacity
+                              style={styles.photoRemoveBtn}
+                              onPress={() => updateManualProd(index, 'image_url', null)}
+                            >
+                              <Text style={styles.photoRemoveText}>✕</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            style={styles.photoBox}
+                            onPress={() => pickAndUploadProductPhoto(index)}
+                            disabled={!!prodImgUploading[index]}
+                          >
+                            {prodImgUploading[index] ? (
+                              <ActivityIndicator color={PRIMARY} size="small" />
+                            ) : (
+                              <Text style={styles.photoIcon}>📷</Text>
+                            )}
+                          </TouchableOpacity>
+                        )}
                         <Text style={styles.photoHint}>
-                          Add a photo for better visibility.{'\n'}Customers trust shops with product photos.
+                          {product.image_url
+                            ? 'Photo uploaded! Tap ✕ to remove.'
+                            : `Add a photo for better visibility.\nCustomers trust shops with product photos.`}
                         </Text>
                       </View>
 
@@ -1244,6 +1341,10 @@ const styles = StyleSheet.create({
   uploadIcon: { fontSize: 24, marginBottom: 6 },
   uploadText: { fontSize: 13, color: '#888' },
   uploadHint: { fontSize: 11, color: '#bbb', marginTop: 3 },
+  uploadedBox: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#c8e6c9', borderRadius: 10, padding: 12, marginBottom: 6, backgroundColor: '#f1fff5' },
+  uploadedIcon: { fontSize: 18 },
+  uploadedText: { fontSize: 13, color: '#2e7d32', flex: 1, fontWeight: '600' },
+  uploadRemove: { fontSize: 12, color: '#e53935', fontWeight: '700' },
 
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 16, gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#e0e0e0' },
@@ -1306,6 +1407,10 @@ const styles = StyleSheet.create({
   photoBox: { width: 56, height: 56, borderRadius: 10, borderWidth: 1, borderColor: '#ddd', backgroundColor: '#fafafa', alignItems: 'center', justifyContent: 'center' },
   photoIcon: { fontSize: 24 },
   photoHint: { fontSize: 12, color: '#888', flex: 1, lineHeight: 18 },
+  photoPreviewWrap: { position: 'relative', width: 56, height: 56 },
+  photoPreview: { width: 56, height: 56, borderRadius: 10, backgroundColor: '#eee' },
+  photoRemoveBtn: { position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: '#e53935', alignItems: 'center', justifyContent: 'center' },
+  photoRemoveText: { color: '#fff', fontSize: 10, fontWeight: '900' },
 
   segmentRow: { flexDirection: 'row', backgroundColor: '#f0f0f0', borderRadius: 8, padding: 3 },
   segBtn: { flex: 1, paddingVertical: 7, borderRadius: 6, alignItems: 'center' },
