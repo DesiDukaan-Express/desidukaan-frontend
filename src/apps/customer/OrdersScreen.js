@@ -1,14 +1,19 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Image,
   TouchableOpacity, ActivityIndicator, RefreshControl,
-  Platform, StatusBar, Modal, Pressable,
+  Platform, StatusBar, Modal, Pressable, Animated,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
+import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
+
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || (process.env.EXPO_PUBLIC_API_URL?.includes('/api') ? process.env.EXPO_PUBLIC_API_URL.split('/api')[0] : "http://localhost:3000");
 import { downloadInvoice } from "../../utils/invoiceGenerator";
+import useDriverLocation from "../../hooks/useDriverLocation";
+import CustomerMapView from "../../components/CustomerMapView";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -71,6 +76,214 @@ const formatDateShort = (iso) => {
   });
 };
 
+// ─── Live Driver Location Map ────────────────────────────────────────────────
+// Shown inside the OrderDetailModal for active delivery statuses.
+const MAP_ACTIVE_STATUSES = ["accepted", "preparing", "ready", "picked_up"];
+
+function DriverLocationMap({ order, token }) {
+  const hasDriver = !!(
+    order?.delivery_partner_id || 
+    order?.delivery_partner ||
+    order?.delivery?.partner_id ||
+    order?.delivery?.partner
+  );
+
+  const initialLocation = (order?.delivery?.partner?.current_lat && order?.delivery?.partner?.current_lng)
+    ? { lat: order.delivery.partner.current_lat, lng: order.delivery.partner.current_lng }
+    : (order?.delivery_partner?.current_lat && order?.delivery_partner?.current_lng)
+      ? { lat: order.delivery_partner.current_lat, lng: order.delivery_partner.current_lng }
+      : null;
+
+  const { partnerPos, connected, lastUpdate } = useDriverLocation(
+    order?.id,
+    token,
+    order?.status,
+    hasDriver,
+    initialLocation,
+  );
+
+  // Pulsing "LIVE" badge animation
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.35, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 800, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim]);
+
+  const destLat = order?.delivery_address?.latitude;
+  const destLng = order?.delivery_address?.longitude;
+
+  const isLocating = !partnerPos;
+
+  return (
+    <View style={dlm.card}>
+      {/* Card header */}
+      <View style={dlm.header}>
+        <View style={dlm.headerLeft}>
+          <View style={dlm.mapIconBg}>
+            <Feather name="map" size={14} color={C.green} />
+          </View>
+          <Text style={dlm.headerTitle}>Driver Location</Text>
+        </View>
+        <View style={dlm.liveBadge}>
+          <Animated.View style={[dlm.liveDot, { opacity: pulseAnim }]} />
+          <Text style={dlm.liveText}>LIVE</Text>
+        </View>
+      </View>
+
+      {/* Map */}
+      <View style={dlm.mapWrap}>
+        <CustomerMapView
+          partnerPos={partnerPos}
+          destLat={destLat}
+          destLng={destLng}
+        />
+
+        {/* Locating overlay — shown until first position arrives */}
+        {isLocating && (
+          <View style={dlm.locatingOverlay}>
+            <ActivityIndicator size="small" color={C.green} />
+            <Text style={dlm.locatingText}>
+              {hasDriver
+                ? "Locating driver…"
+                : "Waiting for driver assignment…"}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Status row */}
+      <View style={dlm.statusRow}>
+        <View style={[dlm.connDot, { backgroundColor: connected ? C.green : C.gray300 }]} />
+        <Text style={dlm.connText}>
+          {connected ? "Connected — live updates" : "Reconnecting…"}
+        </Text>
+        {lastUpdate && (
+          <Text style={dlm.lastUpdate}>
+            {lastUpdate.toLocaleTimeString("en-IN", {
+              hour: "2-digit", minute: "2-digit", second: "2-digit",
+            })}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const dlm = StyleSheet.create({
+  card: {
+    backgroundColor: C.white,
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: C.greenBorder,
+    marginBottom: 20,
+    shadowColor: C.green,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+    backgroundColor: C.greenLight,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  mapIconBg: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: C.greenMid,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: C.gray900,
+  },
+  liveBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: C.green,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#FFFFFF",
+  },
+  liveText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    letterSpacing: 1,
+  },
+  mapWrap: {
+    position: "relative",
+  },
+  locatingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(248,250,252,0.88)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    zIndex: 10,
+    minHeight: 220,
+  },
+  locatingText: {
+    fontSize: 13,
+    color: C.gray500,
+    fontWeight: "600",
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderTopWidth: 1,
+    borderTopColor: C.gray100,
+    backgroundColor: C.white,
+  },
+  connDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  connText: {
+    flex: 1,
+    fontSize: 11,
+    color: C.gray500,
+    fontWeight: "500",
+  },
+  lastUpdate: {
+    fontSize: 10,
+    color: C.gray400,
+    fontWeight: "500",
+  },
+});
+
 // ─── Order Detail Modal ───────────────────────────────────────────────────────
 function OrderDetailModal({ order, onClose }) {
   const navigation = useNavigation();
@@ -78,6 +291,7 @@ function OrderDetailModal({ order, onClose }) {
   const [fullOrder, setFullOrder] = useState(null);
   const [fetching, setFetching] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const showMap = MAP_ACTIVE_STATUSES.includes(order?.status);
 
   useEffect(() => {
     if (order?.id) {
@@ -85,7 +299,7 @@ function OrderDetailModal({ order, onClose }) {
     } else {
       setFullOrder(null);
     }
-  }, [order?.id]);
+  }, [order?.id, order?.status]);
 
   const fetchFullOrder = async () => {
     setFetching(true);
@@ -154,6 +368,11 @@ function OrderDetailModal({ order, onClose }) {
             </LinearGradient>
 
             <View style={od.body}>
+
+              {/* ── Live Driver Map — only for active delivery statuses ── */}
+              {showMap && (
+                <DriverLocationMap order={displayOrder} token={token} />
+              )}
 
               {/* ── Order Tracking steps ── */}
               {!isFailed ? (
@@ -572,12 +791,45 @@ export default function MyOrdersScreen() {
       const list = Array.isArray(data)
         ? data
         : data.data?.orders || data.data || data.orders || [];
+      
       setOrders(list);
+
+      // ── Sync detailOrder if it's open ──
+      setDetailOrder(prev => {
+        if (!prev) return null;
+        const updated = list.find(o => o.id === prev.id);
+        return updated ? { ...updated } : prev;
+      });
+
     } catch (e) { console.error("MyOrders:", e.message); }
     finally { setLoading(false); setRefreshing(false); }
   }, [token]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+  useEffect(() => {
+    if (!token) return;
+    const socket = io(SOCKET_URL, { 
+      auth: { token },
+      transports: ['websocket']
+    });
+
+    socket.on("connect", () => console.log("[OrdersWS] Connected"));
+    
+    // Listen for any order updates for this user
+    socket.on("order:update", (data) => {
+      console.log("[OrdersWS] Order update received", data);
+      fetchOrders(true);
+      // If the detail modal is open for this order, it will refresh too because it uses the order object from the list
+    });
+
+    socket.on("delivery_status_update", (data) => {
+      console.log("[OrdersWS] Delivery update received", data);
+      fetchOrders(true);
+    });
+
+    return () => socket.disconnect();
+  }, [token, fetchOrders]);
 
   const onRefresh = () => { setRefreshing(true); fetchOrders(true); };
 

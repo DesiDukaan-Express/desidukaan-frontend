@@ -9,6 +9,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import useCartStore from "../../store/cartStore";
 import useAuthStore from "../../store/authStore";
+import { calculateProportionalPrice } from "../../utils/weightUtils";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -635,13 +636,18 @@ export default function VendorStoreScreen() {
       return;
     }
 
+    const unitStr = formatWeight(selectedWeight || p.unit);
+    const finalPrice = loose 
+      ? calculateProportionalPrice(p.price, unitStr, p.unit || "1kg")
+      : p.price;
+
     cart?.addItem?.({
       id: item.product_id,
       name: p.name,
-      price: p.price,
+      price: finalPrice,
       qty: 1,
       image: p.image_url || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400",
-      unit: formatWeight(selectedWeight || p.unit), // e.g. "500g" for loose
+      unit: unitStr, // e.g. "500g" for loose
       vendorId,
       vendorName: vendor?.shop_name || vendorName,
     });

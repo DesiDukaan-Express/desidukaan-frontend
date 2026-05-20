@@ -31,20 +31,26 @@ export const inventoryService = {
       const result = await res.json();
       let data = (result.data?.products || []).map((p) => {
         const qty = p.inventory?.[0]?.stock_qty ?? 0;
+        // category is the top-level name, subcategory is the child name
+        const categoryName    = typeof p.category === "string" ? p.category : (p.category?.name || "Other");
+        const subcategoryName = p.subcategory || null; // returned by updated controller
         return {
-          id: p.id.toString(),
-          name: p.name,
-          description: p.description || "",
-          category: typeof p.category === "string" ? p.category : (p.category?.name || "Other"),
-          unit: p.unit || "kg",
-          stock: `${qty} ${p.unit || "kg"}`,
-          rawStock: qty,
-          price: p.price,
-          priceDisplay: `₹${p.price}`,
-          updatedAt: new Date(p.updated_at ?? p.created_at).toLocaleDateString("en-IN"),
-          status: stockStatus(qty),
-          type: p.item_type || "packed",
+          id:            p.id.toString(),
+          name:          p.name,
+          description:   p.description || "",
+          category:      categoryName,
+          subcategory:   subcategoryName,
+          category_id:   p.category_id || null,
+          unit:          p.unit || "kg",
+          stock:         `${qty} ${p.unit || "kg"}`,
+          rawStock:      qty,
+          price:         p.price,
+          priceDisplay:  `₹${p.price}`,
+          updatedAt:     new Date(p.updated_at ?? p.created_at).toLocaleDateString("en-IN"),
+          status:        stockStatus(qty),
+          type:          p.item_type || "packed",
           weight_options: p.weight_options || [],
+          image_url:     p.image_url || null,
         };
       });
 
@@ -106,14 +112,18 @@ export const inventoryService = {
         method: "POST",
         headers: authHeaders(token),
         body: JSON.stringify({
-          name:        payload.name,
-          description: payload.description || "",
-          category:    payload.category || "Other",
-          unit:        payload.unit || "kg",
-          price:       parseFloat(String(payload.price).replace(/[^0-9.]/g, "")) || 0,
-          stock_qty:   parseInt(payload.stock) || 0,
-          type:        payload.type || "packed",
+          name:           payload.name,
+          description:    payload.description || "",
+          category:       payload.category || "Other",
+          // Send subcategory_id if available; backend will use it as category_id
+          subcategory_id: payload.subcategory_id || null,
+          category_id:    payload.category_id    || null,
+          unit:           payload.unit || "kg",
+          price:          parseFloat(String(payload.price).replace(/[^0-9.]/g, "")) || 0,
+          stock_qty:      parseInt(payload.stock) || 0,
+          type:           payload.type || "packed",
           weight_options: payload.weight_options || null,
+          image_url:      payload.image_url || null,
         }),
       });
       const data = await res.json();
@@ -134,14 +144,17 @@ export const inventoryService = {
         method: "PUT",
         headers: authHeaders(token),
         body: JSON.stringify({
-          name:        payload.name,
-          description: payload.description || "",
-          category:    payload.category || "Other",
-          unit:        payload.unit || "kg",
-          price:       parseFloat(String(payload.price).replace(/[^0-9.]/g, "")) || 0,
-          stock_qty:   parseInt(payload.stock) || 0,
-          type:        payload.type || "packed",
+          name:           payload.name,
+          description:    payload.description || "",
+          category:       payload.category || "Other",
+          subcategory_id: payload.subcategory_id || null,
+          category_id:    payload.category_id    || null,
+          unit:           payload.unit || "kg",
+          price:          parseFloat(String(payload.price).replace(/[^0-9.]/g, "")) || 0,
+          stock_qty:      parseInt(payload.stock) || 0,
+          type:           payload.type || "packed",
           weight_options: payload.weight_options || null,
+          image_url:      payload.image_url || null,
         }),
       });
       const data = await res.json();

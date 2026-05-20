@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, Alert,
   KeyboardAvoidingView, Platform, Image
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import useAuthStore from '../../store/authStore';
+import AddressMapView from "../../components/AddressMapView";
+import { uploadAPI } from '../../services/api';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const PRIMARY = '#1ca049';
@@ -199,6 +203,17 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const [loading, setLoading] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
 
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      const timer = setTimeout(() => {
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStep]);
+
   // Step 1 — Shop Info
   const [shopName, setShopName] = useState('');
   const [ownerName, setOwnerName] = useState('');
@@ -215,6 +230,32 @@ export default function VendorOnboardingScreen({ onComplete }) {
   // Geocoded coords — auto-set on submit
   const [resolvedLat, setResolvedLat] = useState(null);
   const [resolvedLng, setResolvedLng] = useState(null);
+  const [mapRegion, setMapRegion] = useState({
+    latitude: 28.6139,
+    longitude: 77.2090,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  });
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (city.length >= 3 && pincode.length === 6) {
+        setGeocoding(true);
+        const coords = await geocodeAddress(city, pincode);
+        if (coords.latitude && coords.longitude) {
+          setResolvedLat(coords.latitude);
+          setResolvedLng(coords.longitude);
+          setMapRegion(prev => ({
+            ...prev,
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+          }));
+        }
+        setGeocoding(false);
+      }
+    }, 1000);
+    return () => clearTimeout(delayDebounceFn);
+  }, [city, pincode]);
 
   // Step 2 — Compliance
   const [fssai, setFssai] = useState('');
@@ -222,6 +263,11 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const [aadhar, setAadhar] = useState('');
   const [pan, setPan] = useState('');
   const [tradeLicense, setTradeLicense] = useState('');
+  // Step 2 — Document uploads (stores Cloudinary URLs)
+  const [docUrls, setDocUrls] = useState({ fssai: null, gst: null });
+  const [docUploading, setDocUploading] = useState({ fssai: false, gst: false });
+  // Step 4 — Product photo uploading per row index
+  const [prodImgUploading, setProdImgUploading] = useState({});
 
   // Step 3 — Bank
   const [upiId, setUpiId] = useState('');
@@ -273,19 +319,36 @@ export default function VendorOnboardingScreen({ onComplete }) {
       });
       const data = await res.json();
 
-      if (data.children && data.children.length > 0) {
+      const hasChildren = data.children && data.children.length > 0;
+      const hasProducts = data.master_products && data.master_products.length > 0;
+
+      if (hasProducts) {
+        // ── Leaf node: show products ─────────────────────────────────────────
+        setCategoryStack(prev => [...prev, cat]);
+        setMasterCategories([]);
+        setCurrentCategory({ ...cat, products: data.master_products });
+      } else if (hasChildren) {
+        // ── Mid node: drill into sub-categories ──────────────────────────────
         setCategoryStack(prev => [...prev, cat]);
         setMasterCategories(data.children);
         setCurrentCategory(cat);
-      } else if (data.master_products && data.master_products.length > 0) {
-        setCategoryStack(prev => [...prev, cat]);
-        setMasterCategories([]); // clear categories
-        setSelectedProds(prev => {
-          // We keep existing selections
-          return prev;
+      } else {
+        // ── No children and no inline products — fetch via dedicated endpoint ─
+        const prodRes = await fetch(`${API_BASE}/master/products/${cat.id}`, {
+          headers: { Authorization: `Bearer ${token}` }
         });
-        // We'll handle product display in the UI based on whether categories or products are present
-        setCurrentCategory({ ...cat, products: data.master_products });
+        if (prodRes.ok) {
+          const prodData = await prodRes.json();
+          const products = Array.isArray(prodData) ? prodData : prodData.products || prodData.data || [];
+          setCategoryStack(prev => [...prev, cat]);
+          setMasterCategories([]);
+          setCurrentCategory({ ...cat, products });
+        } else {
+          // Nothing to show — just navigate in anyway so back works
+          setCategoryStack(prev => [...prev, cat]);
+          setMasterCategories([]);
+          setCurrentCategory({ ...cat, products: [] });
+        }
       }
     } catch (err) {
       console.error('Error fetching category details:', err);
@@ -331,6 +394,50 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const removeManualRow = (i) => setManualProds(prev => prev.filter((_, idx) => idx !== i));
   const updateManualProd = (i, field, value) =>
     setManualProds(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: value } : p));
+
+  // ── Document upload (Step 2) ──────────────────────────────────────────────────
+  const pickAndUploadDoc = async (docKey) => {
+    try {
+      setDocUploading(prev => ({ ...prev, [docKey]: true }));
+      // Try document picker first (supports PDF + images)
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+      const mimeType = asset.mimeType || (asset.name?.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+      const data = await uploadAPI.upload(asset.uri, mimeType, token);
+      setDocUrls(prev => ({ ...prev, [docKey]: data.url }));
+      Alert.alert('✅ Uploaded', 'Document uploaded successfully!');
+    } catch (e) {
+      Alert.alert('Upload Failed', e.message || 'Could not upload document');
+    } finally {
+      setDocUploading(prev => ({ ...prev, [docKey]: false }));
+    }
+  };
+
+  // ── Product photo upload (Step 4 manual) ─────────────────────────────────────
+  const pickAndUploadProductPhoto = async (index) => {
+    try {
+      setProdImgUploading(prev => ({ ...prev, [index]: true }));
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+      const mimeType = asset.mimeType || 'image/jpeg';
+      const data = await uploadAPI.upload(asset.uri, mimeType, token);
+      updateManualProd(index, 'image_url', data.url);
+    } catch (e) {
+      Alert.alert('Upload Failed', e.message || 'Could not upload image');
+    } finally {
+      setProdImgUploading(prev => ({ ...prev, [index]: false }));
+    }
+  };
 
   const parseCSV = () => {
     try {
@@ -426,6 +533,8 @@ export default function VendorOnboardingScreen({ onComplete }) {
         aadhar_number: aadhar || null,
         pan_number: pan || null,
         trade_license_number: tradeLicense || null,
+        fssai_license_url: docUrls.fssai || null,
+        gst_certificate_url: docUrls.gst || null,
         address_line: address,
         landmark: landmark || null,
         city,
@@ -469,6 +578,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
             category_id: product.category_id || currentCategory?.id,
             stock_qty: parseInt(product.stock || product.stock_qty || 0),
             type: product.item_type || product.type || 'packed',
+            image_url: product.image_url || product.image || null,
             weight_options: (() => {
               const opts = Array.isArray(product.weight_options) ? product.weight_options : [];
               return opts.map(opt => {
@@ -557,7 +667,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
       </ScrollView>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={scrollRef} style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
           {/* Step header */}
           <View style={styles.stepHeader}>
@@ -629,6 +739,19 @@ export default function VendorOnboardingScreen({ onComplete }) {
                   <TextInput style={styles.input} placeholder="6-digit" keyboardType="numeric" maxLength={6} value={pincode} onChangeText={setPincode} />
                 </View>
               </View>
+
+              {/* Map Preview */}
+              {(city.length > 0 || pincode.length > 0) && (
+                <View style={styles.mapWrapper}>
+                  <AddressMapView
+                    region={mapRegion}
+                    latitude={resolvedLat}
+                    longitude={resolvedLng}
+                    onRegionChangeComplete={setMapRegion}
+                  />
+                </View>
+              )}
+
               {/* Geocoding note */}
               <View style={styles.geoNote}>
                 <Text style={styles.geoNoteIcon}>📍</Text>
@@ -685,14 +808,37 @@ export default function VendorOnboardingScreen({ onComplete }) {
               </View>
 
               <Text style={styles.sectionSep}>📄 Document Upload (optional — speeds up approval)</Text>
-              {['FSSAI Certificate', 'GST Registration Certificate'].map(doc => (
-                <View key={doc}>
-                  <Text style={styles.label}>{doc}</Text>
-                  <TouchableOpacity style={styles.uploadBox}>
-                    <Text style={styles.uploadIcon}>📁</Text>
-                    <Text style={styles.uploadText}>Tap to upload PDF or image</Text>
-                    <Text style={styles.uploadHint}>Max 5MB</Text>
-                  </TouchableOpacity>
+              {[
+                { label: 'FSSAI Certificate', key: 'fssai' },
+                { label: 'GST Registration Certificate', key: 'gst' },
+              ].map(doc => (
+                <View key={doc.key}>
+                  <Text style={styles.label}>{doc.label}</Text>
+                  {docUrls[doc.key] ? (
+                    <View style={styles.uploadedBox}>
+                      <Text style={styles.uploadedIcon}>✅</Text>
+                      <Text style={styles.uploadedText} numberOfLines={1}>Document uploaded successfully</Text>
+                      <TouchableOpacity onPress={() => setDocUrls(prev => ({ ...prev, [doc.key]: null }))}>
+                        <Text style={styles.uploadRemove}>✕ Remove</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.uploadBox}
+                      onPress={() => pickAndUploadDoc(doc.key)}
+                      disabled={docUploading[doc.key]}
+                    >
+                      {docUploading[doc.key] ? (
+                        <ActivityIndicator color={PRIMARY} size="small" />
+                      ) : (
+                        <Text style={styles.uploadIcon}>📁</Text>
+                      )}
+                      <Text style={styles.uploadText}>
+                        {docUploading[doc.key] ? 'Uploading…' : 'Tap to upload PDF or photo'}
+                      </Text>
+                      <Text style={styles.uploadHint}>Max 10MB</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               ))}
             </View>
@@ -857,11 +1003,33 @@ export default function VendorOnboardingScreen({ onComplete }) {
                       </View>
 
                       <View style={styles.photoRow}>
-                        <TouchableOpacity style={styles.photoBox}>
-                          <Text style={styles.photoIcon}>📷</Text>
-                        </TouchableOpacity>
+                        {product.image_url ? (
+                          <View style={styles.photoPreviewWrap}>
+                            <Image source={{ uri: product.image_url }} style={styles.photoPreview} />
+                            <TouchableOpacity
+                              style={styles.photoRemoveBtn}
+                              onPress={() => updateManualProd(index, 'image_url', null)}
+                            >
+                              <Text style={styles.photoRemoveText}>✕</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            style={styles.photoBox}
+                            onPress={() => pickAndUploadProductPhoto(index)}
+                            disabled={!!prodImgUploading[index]}
+                          >
+                            {prodImgUploading[index] ? (
+                              <ActivityIndicator color={PRIMARY} size="small" />
+                            ) : (
+                              <Text style={styles.photoIcon}>📷</Text>
+                            )}
+                          </TouchableOpacity>
+                        )}
                         <Text style={styles.photoHint}>
-                          Add a photo for better visibility.{'\n'}Customers trust shops with product photos.
+                          {product.image_url
+                            ? 'Photo uploaded! Tap ✕ to remove.'
+                            : `Add a photo for better visibility.\nCustomers trust shops with product photos.`}
                         </Text>
                       </View>
 
@@ -1187,6 +1355,10 @@ const styles = StyleSheet.create({
   uploadIcon: { fontSize: 24, marginBottom: 6 },
   uploadText: { fontSize: 13, color: '#888' },
   uploadHint: { fontSize: 11, color: '#bbb', marginTop: 3 },
+  uploadedBox: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#c8e6c9', borderRadius: 10, padding: 12, marginBottom: 6, backgroundColor: '#f1fff5' },
+  uploadedIcon: { fontSize: 18 },
+  uploadedText: { fontSize: 13, color: '#2e7d32', flex: 1, fontWeight: '600' },
+  uploadRemove: { fontSize: 12, color: '#e53935', fontWeight: '700' },
 
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 16, gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#e0e0e0' },
@@ -1227,6 +1399,18 @@ const styles = StyleSheet.create({
 
   cantFindBtn: { borderWidth: 1, borderColor: PRIMARY, borderRadius: 10, padding: 13, alignItems: 'center', marginTop: 8, marginBottom: 4 },
   cantFindText: { color: PRIMARY, fontWeight: '600', fontSize: 13 },
+  mapWrapper: {
+    height: 180,
+    borderRadius: 12,
+    overflow: "hidden",
+    marginTop: 10,
+    marginBottom: 5,
+    borderWidth: 1,
+    borderColor: PRIMARY_LIGHT,
+  },
+  map: {
+    flex: 1,
+  },
 
   productCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#eaeaea' },
   productCardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
@@ -1237,6 +1421,10 @@ const styles = StyleSheet.create({
   photoBox: { width: 56, height: 56, borderRadius: 10, borderWidth: 1, borderColor: '#ddd', backgroundColor: '#fafafa', alignItems: 'center', justifyContent: 'center' },
   photoIcon: { fontSize: 24 },
   photoHint: { fontSize: 12, color: '#888', flex: 1, lineHeight: 18 },
+  photoPreviewWrap: { position: 'relative', width: 56, height: 56 },
+  photoPreview: { width: 56, height: 56, borderRadius: 10, backgroundColor: '#eee' },
+  photoRemoveBtn: { position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: '#e53935', alignItems: 'center', justifyContent: 'center' },
+  photoRemoveText: { color: '#fff', fontSize: 10, fontWeight: '900' },
 
   segmentRow: { flexDirection: 'row', backgroundColor: '#f0f0f0', borderRadius: 8, padding: 3 },
   segBtn: { flex: 1, paddingVertical: 7, borderRadius: 6, alignItems: 'center' },
