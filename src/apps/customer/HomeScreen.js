@@ -28,6 +28,7 @@ import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import { useNavigation } from "@react-navigation/native";
 import { vendorsAPI, ordersAPI, categoriesAPI } from "../../services/api";
+import ChatWidget from "./ChatWidget";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 
 // ── Use env var — works on device, emulator, and web ─────────────────────────
@@ -2418,6 +2419,8 @@ export default function HomeScreen() {
         onStoreSelect={handleStoreSelect}
         apiCategories={apiCategories}
       />
+
+      <ChatWidget />
 
       {/* ══ FLOATING CART — mobile ══════════════════════════════════════════ */}
       {!wide && cartCount > 0 && (

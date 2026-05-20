@@ -129,5 +129,7 @@ export default function useInventory() {
       withSave(async () => {
         for (const id of ids) await inventoryService.deleteProduct(token, id);
       }),
+    bulkImport: (items) =>
+      withSave(() => inventoryService.bulkImport(token, items)),
   };
 }
