@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, Alert,
@@ -202,6 +202,17 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
+
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      const timer = setTimeout(() => {
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStep]);
 
   // Step 1 — Shop Info
   const [shopName, setShopName] = useState('');
@@ -522,6 +533,8 @@ export default function VendorOnboardingScreen({ onComplete }) {
         aadhar_number: aadhar || null,
         pan_number: pan || null,
         trade_license_number: tradeLicense || null,
+        fssai_license_url: docUrls.fssai || null,
+        gst_certificate_url: docUrls.gst || null,
         address_line: address,
         landmark: landmark || null,
         city,
@@ -565,6 +578,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
             category_id: product.category_id || currentCategory?.id,
             stock_qty: parseInt(product.stock || product.stock_qty || 0),
             type: product.item_type || product.type || 'packed',
+            image_url: product.image_url || product.image || null,
             weight_options: (() => {
               const opts = Array.isArray(product.weight_options) ? product.weight_options : [];
               return opts.map(opt => {
@@ -653,7 +667,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
       </ScrollView>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={scrollRef} style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
           {/* Step header */}
           <View style={styles.stepHeader}>
