@@ -69,7 +69,7 @@ function useBreakpoint() {
 }
 
 // ─── Add/Qty button (uses real cartStore) ─────────────────────────────────────
-function AddBtn({ product, vendorId, vendorName }) {
+function AddBtn({ product, vendorId, vendorName, outOfStock }) {
   const cart     = useCartStore();
   const items    = cart?.items || [];
   const cartItem = items.find(i => i.id === product.id);
@@ -99,6 +99,14 @@ function AddBtn({ product, vendorId, vendorName }) {
     cart?.removeItem?.(product.id);
   };
 
+  if (outOfStock) {
+    return (
+      <View style={ab.oosBtn}>
+        <Text style={ab.oosTxt}>Out of Stock</Text>
+      </View>
+    );
+  }
+
   return (
     <Animated.View style={{ transform: [{ scale: sc }] }}>
       {qty === 0 ? (
@@ -125,31 +133,39 @@ const ab = StyleSheet.create({
   qtyRow: { flexDirection: "row", alignItems: "center", backgroundColor: C.green, borderRadius: 9, overflow: "hidden" },
   qtyBtn: { paddingHorizontal: 9, paddingVertical: 7 },
   qtyNum: { fontSize: 13, fontWeight: "800", color: C.white, paddingHorizontal: 8, minWidth: 24, textAlign: "center" },
+  oosBtn: { backgroundColor: C.gray100, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: C.gray200 },
+  oosTxt: { fontSize: 11, fontWeight: "700", color: C.gray400 },
 });
 
 // ─── Product card (items tab) ─────────────────────────────────────────────────
 function ProductCard({ product, vendorId, vendorName, onSeeStores }) {
   const disc = product.mrp && product.mrp > product.price
     ? Math.round((1 - product.price / product.mrp) * 100) : null;
+  const outOfStock = (product.stock_qty != null && product.stock_qty <= 0);
 
   return (
-    <View style={pc.card}>
+    <View style={[pc.card, outOfStock && pc.cardOos]}>
       <View style={pc.imgWrap}>
         <Image
           source={{ uri: product.image_url || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300" }}
           style={pc.img} resizeMode="cover"
         />
-        {disc && <View style={pc.discBadge}><Text style={pc.discText}>{disc}% off</Text></View>}
+        {disc && !outOfStock && <View style={pc.discBadge}><Text style={pc.discText}>{disc}% off</Text></View>}
+        {outOfStock && (
+          <View style={pc.oosOverlay}>
+            <Text style={pc.oosOverlayText}>Out of{"\n"}Stock</Text>
+          </View>
+        )}
       </View>
       <View style={pc.info}>
         <Text style={pc.brand}>{product.vendor?.shop_name || vendorName || ""}</Text>
         <Text style={pc.name} numberOfLines={2}>{product.name}</Text>
         <Text style={pc.unit}>{product.unit || "1 pc"}</Text>
         <View style={pc.priceRow}>
-          <Text style={pc.price}>₹{product.price}</Text>
+          <Text style={[pc.price, outOfStock && { color: C.gray400 }]}>₹{product.price}</Text>
           {product.mrp > product.price && <Text style={pc.mrp}>₹{product.mrp}</Text>}
         </View>
-        {onSeeStores && (
+        {!outOfStock && onSeeStores && (
           <TouchableOpacity style={pc.storeBtn} onPress={onSeeStores} activeOpacity={0.7}>
             <Feather name="shopping-bag" size={10} color={C.green} />
             <Text style={pc.storeBtnText}>
@@ -162,17 +178,20 @@ function ProductCard({ product, vendorId, vendorName, onSeeStores }) {
         )}
       </View>
       <View style={pc.ctaWrap}>
-        <AddBtn product={product} vendorId={vendorId} vendorName={vendorName} />
+        <AddBtn product={product} vendorId={vendorId} vendorName={vendorName} outOfStock={outOfStock} />
       </View>
     </View>
   );
 }
 const pc = StyleSheet.create({
   card:      { flexDirection: "row", alignItems: "flex-start", paddingVertical: 14, paddingHorizontal: 16, gap: 12, backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  cardOos:   { opacity: 0.55 },
   imgWrap:   { width: 88, height: 88, borderRadius: 12, overflow: "hidden", backgroundColor: C.gray100, position: "relative" },
   img:       { width: "100%", height: "100%" },
   discBadge: { position: "absolute", top: 5, left: 0, backgroundColor: C.orange, paddingHorizontal: 6, paddingVertical: 2, borderTopRightRadius: 6, borderBottomRightRadius: 6 },
   discText:  { fontSize: 9, color: C.white, fontWeight: "800" },
+  oosOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.48)", alignItems: "center", justifyContent: "center" },
+  oosOverlayText: { fontSize: 10, fontWeight: "800", color: C.white, textAlign: "center", lineHeight: 14 },
   info:      { flex: 1, gap: 2 },
   brand:     { fontSize: 10, color: C.green, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
   name:      { fontSize: 14, fontWeight: "700", color: C.gray900, lineHeight: 19 },
@@ -524,7 +543,7 @@ export default function SearchScreen() {
         )
       );
 
-      // Step 3: Build products list (unique by product name, keeping cheapest)
+      // Step 3: Build products list (unique by product name, keeping cheapest in-stock first)
       const productMap = new Map(); // key = product name, value = best product
       const vendorMatchMap = new Map(); // vendorId -> matchCount
 
@@ -535,27 +554,58 @@ export default function SearchScreen() {
             const p   = inv.product;
             if (!p) continue;
             const key = p.name?.toLowerCase() || p.id;
-            if (!productMap.has(key) || (p.price < productMap.get(key).price)) {
+            const inStock = inv.stock_qty > 0;
+            const existing = productMap.get(key);
+            // Prefer in-stock over OOS; among same stock status, prefer cheapest
+            if (
+              !existing ||
+              (!existing._inStock && inStock) ||
+              (existing._inStock === inStock && p.price < existing.price)
+            ) {
               productMap.set(key, {
                 ...p,
                 vendor_id:    vendor.id,
                 vendor:       vendor,
                 stock_qty:    inv.stock_qty,
-                _allVendorIds: [],
+                _inStock:     inStock,
+                _allVendorIds: existing?._allVendorIds || [],
               });
             }
             // Track all vendors that carry this product
-            const existing = productMap.get(key);
-            if (!existing._allVendorIds.includes(vendor.id)) {
-              existing._allVendorIds.push(vendor.id);
+            const cur = productMap.get(key);
+            if (!cur._allVendorIds.includes(vendor.id)) {
+              cur._allVendorIds.push(vendor.id);
             }
+          }
+        }
+      }
+
+      // Also collect OOS-only products (not already in map as in-stock)
+      for (const { vendor, matched } of inventoryResults) {
+        for (const inv of matched) {
+          const p = inv.product;
+          if (!p) continue;
+          const key = p.name?.toLowerCase() || p.id;
+          if (!productMap.has(key) && inv.stock_qty <= 0) {
+            productMap.set(key, {
+              ...p,
+              vendor_id: vendor.id,
+              vendor,
+              stock_qty: inv.stock_qty,
+              _inStock:  false,
+              _allVendorIds: [vendor.id],
+            });
           }
         }
       }
 
       const prodList = Array.from(productMap.values())
         .map(p => ({ ...p, _storeCount: p._allVendorIds?.length || 1 }))
-        .sort((a, b) => a.name.localeCompare(b.name));
+        // In-stock first, then OOS; within each group sort by name
+        .sort((a, b) => {
+          if (a._inStock !== b._inStock) return a._inStock ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        });
 
       setProducts(prodList);
 
@@ -646,6 +696,19 @@ export default function SearchScreen() {
          ...CATEGORIES.map(c => c.label).filter(l => l.toLowerCase().includes(trimmed.toLowerCase()))]
       )].slice(0, 6)
     : [];
+
+  // ── Floating cart ─────────────────────────────────────────────────────────
+  const cart = useCartStore();
+  const cartItems = cart?.items || [];
+  const cartCount = cartItems.reduce((s, i) => s + (i.qty || i.quantity || 0), 0);
+  const cartTotal = cartItems.reduce((s, i) => s + i.price * (i.qty || i.quantity || 0), 0);
+  const floatingY = useRef(new Animated.Value(120)).current;
+  useEffect(() => {
+    Animated.spring(floatingY, {
+      toValue: cartCount > 0 ? 0 : 120,
+      tension: 70, friction: 12, useNativeDriver: true,
+    }).start();
+  }, [cartCount]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -920,6 +983,31 @@ export default function SearchScreen() {
           }}
         />
       )}
+
+      {/* ── FLOATING CART (mirrors VendorStoreScreen) ─────────────────── */}
+      {cartCount > 0 && (
+        <Animated.View style={[s.floatingCart, { transform: [{ translateY: floatingY }] }]}>
+          <TouchableOpacity
+            style={s.floatingInner}
+            onPress={() => navigation.navigate("CustomerTabNavigator", { screen: "Cart" })}
+            activeOpacity={0.88}
+          >
+            <View style={s.floatingLeft}>
+              <View style={s.floatingBadge}>
+                <Text style={s.floatingBadgeText}>{cartCount}</Text>
+              </View>
+              <View>
+                <Text style={s.floatingItems}>{cartCount} item{cartCount > 1 ? "s" : ""} added</Text>
+                <Text style={s.floatingTotal}>₹{cartTotal.toFixed(0)} total</Text>
+              </View>
+            </View>
+            <View style={s.floatingCTA}>
+              <Text style={s.floatingCTAText}>View Cart</Text>
+              <Feather name="arrow-right" size={14} color={C.white} />
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -927,6 +1015,17 @@ export default function SearchScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   root:    { flex: 1, paddingTop: Platform.OS === "ios" ? 52 : 32 },
+
+  // Floating cart
+  floatingCart:      { position: "absolute", bottom: 20, left: 16, right: 16, backgroundColor: C.green, borderRadius: 18, shadowColor: C.green, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 14, zIndex: 100 },
+  floatingInner:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14, paddingHorizontal: 18, borderRadius: 18 },
+  floatingLeft:      { flexDirection: "row", alignItems: "center", gap: 12 },
+  floatingBadge:     { width: 34, height: 34, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
+  floatingBadgeText: { fontSize: 15, fontWeight: "900", color: C.white },
+  floatingItems:     { fontSize: 14, fontWeight: "700", color: C.white },
+  floatingTotal:     { fontSize: 12, color: "rgba(255,255,255,0.82)", marginTop: 1 },
+  floatingCTA:       { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 16, paddingVertical: 9, borderRadius: 12 },
+  floatingCTAText:   { fontSize: 14, fontWeight: "800", color: C.white },
 
   // Header
   topBar:         { flexDirection: "row", alignItems: "center", gap: 10, paddingBottom: 12 },

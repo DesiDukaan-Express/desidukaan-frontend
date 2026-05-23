@@ -357,7 +357,7 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
 
   return (
     <TouchableOpacity
-      style={[pc.card, { width: cardW }]}
+      style={[pc.card, { width: cardW }, !inStock && { opacity: 0.5 }]}
       onPress={onPress}
       activeOpacity={0.88}
     >
