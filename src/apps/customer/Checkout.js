@@ -195,75 +195,88 @@ const slb = StyleSheet.create({
 });
 
 // ─── Cancellation policy ──────────────────────────────────────────────────────
+const POLICY_ITEMS = [
+  { icon: "check-circle", color: C.green,  text: "Free cancellation before payment is confirmed." },
+  { icon: "check-circle", color: C.green,  text: "Return request allowed before payment is processed." },
+  { icon: "alert-circle", color: C.amber,  text: "Once payment is confirmed, cancellation may not be possible." },
+  { icon: "alert-circle", color: C.amber,  text: "Perishable items (dairy, fresh produce) cannot be returned after delivery." },
+  { icon: "info",         color: C.gray400, text: "Contact the vendor directly for disputes via the phone request feature." },
+];
+
 function CancellationPolicy() {
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
   return (
-    <View style={cp.wrap}>
+    <>
+      {/* Trigger row — never expands inline */}
       <TouchableOpacity
-        style={cp.header}
-        onPress={() => setExpanded((v) => !v)}
+        style={cp.trigger}
+        onPress={() => setOpen(true)}
         activeOpacity={0.8}
       >
         <Feather name="shield" size={15} color={C.amber} />
-        <Text style={cp.title}>Cancellation & Return Policy</Text>
-        <Feather
-          name={expanded ? "chevron-up" : "chevron-down"}
-          size={16}
-          color={C.gray400}
-        />
+        <Text style={cp.triggerTitle}>Cancellation & Return Policy</Text>
+        <Feather name="chevron-right" size={15} color={C.gray400} />
       </TouchableOpacity>
-      {expanded && (
-        <View style={cp.body}>
-          {[
-            {
-              icon: "check-circle",
-              color: C.green,
-              text: "Free cancellation before payment is confirmed.",
-            },
-            {
-              icon: "check-circle",
-              color: C.green,
-              text: "Return request allowed before payment is processed.",
-            },
-            {
-              icon: "alert-circle",
-              color: C.amber,
-              text: "Once payment is confirmed, cancellation may not be possible.",
-            },
-            {
-              icon: "alert-circle",
-              color: C.amber,
-              text: "Perishable items (dairy, fresh produce) cannot be returned after delivery.",
-            },
-            {
-              icon: "info",
-              color: C.gray400,
-              text: "Contact the vendor directly for disputes via the phone request feature.",
-            },
-          ].map((item, i) => (
-            <View key={i} style={cp.row}>
-              <Feather name={item.icon} size={13} color={item.color} />
-              <Text style={cp.text}>{item.text}</Text>
+
+      {/* Bottom-sheet Modal */}
+      <Modal
+        visible={open}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setOpen(false)}
+      >
+        <Pressable style={cp.backdrop} onPress={() => setOpen(false)}>
+          <Pressable style={cp.sheet} onPress={() => {}}>
+            <View style={cp.handle} />
+            <View style={cp.sheetHeader}>
+              <View style={cp.sheetIconWrap}>
+                <Feather name="shield" size={20} color={C.amber} />
+              </View>
+              <Text style={cp.sheetTitle}>Cancellation & Return Policy</Text>
+              <TouchableOpacity style={cp.closeBtn} onPress={() => setOpen(false)}>
+                <Feather name="x" size={15} color={C.gray600} />
+              </TouchableOpacity>
             </View>
-          ))}
-        </View>
-      )}
-    </View>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 36, paddingHorizontal: 20, gap: 14 }}
+            >
+              {POLICY_ITEMS.map((item, i) => (
+                <View key={i} style={cp.row}>
+                  <View style={[cp.iconCircle, { backgroundColor: item.color + "18" }]}>
+                    <Feather name={item.icon} size={15} color={item.color} />
+                  </View>
+                  <Text style={cp.text}>{item.text}</Text>
+                </View>
+              ))}
+              <View style={cp.footerNote}>
+                <Feather name="info" size={12} color={C.gray400} />
+                <Text style={cp.footerText}>
+                  Policies apply per order and may vary by vendor.
+                </Text>
+              </View>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 const cp = StyleSheet.create({
-  wrap: {
-    backgroundColor: C.white,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: C.gray200,
-    overflow: "hidden",
-  },
-  header: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14 },
-  title: { flex: 1, fontSize: 14, fontWeight: "700", color: C.gray700 },
-  body: { paddingHorizontal: 14, paddingBottom: 14, gap: 10 },
-  row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  text: { flex: 1, fontSize: 13, color: C.gray600, lineHeight: 18 },
+  trigger:       { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.white, borderRadius: 14, borderWidth: 1, borderColor: C.gray200, padding: 14 },
+  triggerTitle:  { flex: 1, fontSize: 14, fontWeight: "700", color: C.gray700 },
+  backdrop:      { flex: 1, backgroundColor: "rgba(0,0,0,0.48)", justifyContent: "flex-end" },
+  sheet:         { backgroundColor: C.white, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingTop: 10, maxHeight: "80%" },
+  handle:        { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
+  sheetHeader:   { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.gray100, marginBottom: 14 },
+  sheetIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.amberLight, alignItems: "center", justifyContent: "center" },
+  sheetTitle:    { flex: 1, fontSize: 16, fontWeight: "900", color: C.gray900 },
+  closeBtn:      { width: 30, height: 30, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
+  row:           { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  iconCircle:    { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 },
+  text:          { flex: 1, fontSize: 13, color: C.gray600, lineHeight: 19 },
+  footerNote:    { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.gray100, borderRadius: 10, padding: 12, marginTop: 4 },
+  footerText:    { flex: 1, fontSize: 11, color: C.gray500, lineHeight: 16 },
 });
 
 // ─── Order Summary card ───────────────────────────────────────────────────────

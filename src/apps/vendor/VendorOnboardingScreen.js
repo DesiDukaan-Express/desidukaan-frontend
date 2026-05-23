@@ -202,6 +202,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const scrollRef = useRef(null);
 
@@ -597,7 +598,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
       if (onComplete) {
         onComplete();
       } else {
-        navigation.navigate('Dashboard');
+        setShowSuccess(true);
       }
     } catch (err) {
       Alert.alert('Error', err.message);
@@ -613,6 +614,53 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
   return (
     <View style={styles.container}>
+
+      {/* ── SUCCESS POPUP ── */}
+      <Modal visible={showSuccess} transparent animationType="fade">
+        <View style={styles.successOverlay}>
+          <View style={styles.successCard}>
+            {/* Green circle icon */}
+            <View style={styles.successIconWrap}>
+              <View style={styles.successIconInner}>
+                <Text style={{ fontSize: 48 }}>🚀</Text>
+              </View>
+            </View>
+
+            <Text style={styles.successTitle}>You're Submitted!</Text>
+            <Text style={styles.successSub}>
+              <Text style={{ fontWeight: '800', color: '#16A34A' }}>{shopName || 'Your shop'}</Text> is under review.
+            </Text>
+            <Text style={styles.successDesc}>
+              Our team will verify your FSSAI & GST details within{' '}
+              <Text style={{ fontWeight: '700' }}>24–48 hours</Text>. You'll get an
+              email notification once approved and live.
+            </Text>
+
+            {/* Timeline */}
+            {[
+              { icon: '📋', label: 'Application submitted', done: true },
+              { icon: '🔍', label: 'Admin verification (24–48 hrs)', done: false },
+              { icon: '✅', label: 'Shop goes live!', done: false },
+            ].map((step, i) => (
+              <View key={i} style={styles.successStep}>
+                <Text style={styles.successStepIcon}>{step.icon}</Text>
+                <Text style={[styles.successStepText, step.done && { color: '#16A34A', fontWeight: '700' }]}>
+                  {step.label}
+                </Text>
+                {step.done && <Text style={{ color: '#16A34A', fontSize: 14 }}>✓</Text>}
+              </View>
+            ))}
+
+            <TouchableOpacity
+              style={styles.successBtn}
+              onPress={() => { setShowSuccess(false); navigation.navigate('Dashboard'); }}
+              activeOpacity={0.88}
+            >
+              <Text style={styles.successBtnText}>Go to Dashboard →</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Top bar */}
       <View style={styles.topBar}>
@@ -1472,4 +1520,43 @@ const styles = StyleSheet.create({
   backText: { fontSize: 14, fontWeight: '600', color: '#555' },
   nextBtn: { flex: 1, backgroundColor: PRIMARY, paddingVertical: 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   nextText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+
+  // ── Success popup ──────────────────────────────────────────────────────────
+  successOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center', justifyContent: 'center',
+    padding: 24,
+  },
+  successCard: {
+    backgroundColor: '#fff', borderRadius: 28,
+    padding: 28, width: '100%', maxWidth: 420,
+    alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.2, shadowRadius: 30, elevation: 20,
+  },
+  successIconWrap: {
+    width: 100, height: 100, borderRadius: 50,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 20,
+  },
+  successIconInner: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: '#F0FDF4',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  successTitle: { fontSize: 26, fontWeight: '900', color: '#111827', marginBottom: 8, textAlign: 'center' },
+  successSub:   { fontSize: 15, color: '#374151', marginBottom: 6, textAlign: 'center' },
+  successDesc:  { fontSize: 13, color: '#6B7280', lineHeight: 20, textAlign: 'center', marginBottom: 22 },
+  successStep:  { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%', paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  successStepIcon: { fontSize: 18, width: 28, textAlign: 'center' },
+  successStepText: { flex: 1, fontSize: 13, color: '#374151' },
+  successBtn: {
+    marginTop: 24, width: '100%',
+    backgroundColor: '#16A34A', paddingVertical: 16,
+    borderRadius: 14, alignItems: 'center',
+    shadowColor: '#16A34A', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
+  },
+  successBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
 });
