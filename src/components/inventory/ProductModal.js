@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,15 +9,31 @@ import {
   Modal,
   ActivityIndicator,
   Image,
+  Animated,
+  Platform,
+  KeyboardAvoidingView,
 } from "react-native";
-import * as ImagePicker from 'expo-image-picker';
+import * as ImagePicker from "expo-image-picker";
 import useAuthStore from "../../store/authStore";
 import { uploadAPI } from "../../services/api";
 import { T, UNITS } from "../common/tokens";
 import SelectChip from "../common/SelectChip";
 import Spinner from "../common/Spinner";
 
-// ─── Fallback hardcoded categories (used if API is unavailable) ───────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const PRIMARY   = "#147538";
+const PRIMARY_L = "#E8F5EC";
+const PRIMARY_D = "#0E5229";
+const BORDER    = "#E4E4E7";
+const BG        = "#FAFAFA";
+const TEXT      = "#18181B";
+const TEXT_MED  = "#52525B";
+const TEXT_LITE = "#A1A1AA";
+const RED       = "#EF4444";
+const RED_L     = "#FEF2F2";
+const ORANGE    = "#F97316";
+
 const FALLBACK_CATEGORIES = [
   "Dairy, Bread & Eggs",
   "Fruits & Vegetables",
@@ -31,28 +47,530 @@ const FALLBACK_CATEGORIES = [
   "Other",
 ];
 
-const LBL_STYLE = {
-  fontSize: 11,
-  fontWeight: "700",
-  color: T.textXLight,
-  textTransform: "uppercase",
-  letterSpacing: 0.5,
-  marginBottom: 6,
-};
-
 const TYPE_OPTS = [
-  { label: "Packed", value: "packed" },
-  { label: "Loose",  value: "loose"  },
+  { label: "Packed", value: "packed", icon: "📦" },
+  { label: "Loose",  value: "loose",  icon: "⚖️" },
+];
+
+const WEIGHT_PRESETS = [
+  { w: 50,  u: "g"  },
+  { w: 100, u: "g"  },
+  { w: 250, u: "g"  },
+  { w: 500, u: "g"  },
+  { w: 1,   u: "kg" },
 ];
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
-/**
- * ProductModal — Add or Edit product form, shown as a bottom-sheet style Modal.
- * Features a dynamic 2-step category → subcategory picker loaded from the API.
- */
+// ─── Step indicator ───────────────────────────────────────────────────────────
+
+function StepDots({ total, current }) {
+  return (
+    <View style={dot.row}>
+      {Array.from({ length: total }).map((_, i) => (
+        <View
+          key={i}
+          style={[
+            dot.dot,
+            i === current && dot.dotActive,
+            i < current && dot.dotDone,
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+const dot = StyleSheet.create({
+  row:       { flexDirection: "row", gap: 5, alignItems: "center" },
+  dot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: BORDER },
+  dotActive: { width: 18, backgroundColor: PRIMARY },
+  dotDone:   { backgroundColor: PRIMARY + "60" },
+});
+
+// ─── Section label ────────────────────────────────────────────────────────────
+
+function Label({ children, required }) {
+  return (
+    <Text style={lbl.text}>
+      {children}
+      {required && <Text style={lbl.req}> *</Text>}
+    </Text>
+  );
+}
+const lbl = StyleSheet.create({
+  text: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: TEXT_LITE,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  req: { color: RED },
+});
+
+// ─── Styled TextInput ─────────────────────────────────────────────────────────
+
+function Field({ label, required, style, inputStyle, ...props }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <View style={style}>
+      {label && <Label required={required}>{label}</Label>}
+      <TextInput
+        style={[
+          fi.input,
+          focused && fi.focused,
+          inputStyle,
+        ]}
+        placeholderTextColor={TEXT_LITE}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        {...props}
+      />
+    </View>
+  );
+}
+const fi = StyleSheet.create({
+  input: {
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: TEXT,
+    backgroundColor: "#fff",
+  },
+  focused: {
+    borderColor: PRIMARY,
+    backgroundColor: "#fff",
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+});
+
+// ─── Type Card ────────────────────────────────────────────────────────────────
+
+function TypeCard({ option, active, onPress }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.75}
+      style={[tc.card, active && tc.cardActive]}
+    >
+      <Text style={tc.icon}>{option.icon}</Text>
+      <Text style={[tc.label, active && tc.labelActive]}>{option.label}</Text>
+      {active && <View style={tc.check}><Text style={tc.checkText}>✓</Text></View>}
+    </TouchableOpacity>
+  );
+}
+const tc = StyleSheet.create({
+  card: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    backgroundColor: "#fff",
+  },
+  cardActive: {
+    borderColor: PRIMARY,
+    backgroundColor: PRIMARY_L,
+  },
+  icon:  { fontSize: 18 },
+  label: { fontSize: 14, fontWeight: "600", color: TEXT_MED, flex: 1 },
+  labelActive: { color: PRIMARY_D, fontWeight: "700" },
+  check: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: PRIMARY,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkText: { color: "#fff", fontSize: 11, fontWeight: "800" },
+});
+
+// ─── Image Uploader ───────────────────────────────────────────────────────────
+
+function ImageUploader({ imageUrl, uploading, onUpload, onRemove, onUrlInput }) {
+  if (imageUrl) {
+    return (
+      <View style={img.previewWrap}>
+        <Image source={{ uri: imageUrl }} style={img.preview} resizeMode="cover" />
+        <View style={img.previewMeta}>
+          <Text style={img.previewLabel}>Product Image</Text>
+          <Text style={img.previewSub} numberOfLines={1}>{imageUrl.split("/").pop()}</Text>
+        </View>
+        <TouchableOpacity onPress={onRemove} style={img.removeBtn}>
+          <Text style={img.removeBtnText}>Remove</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+  return (
+    <View style={img.dropzone}>
+      {uploading ? (
+        <View style={img.uploadingWrap}>
+          <ActivityIndicator color={PRIMARY} size="small" />
+          <Text style={img.uploadingText}>Uploading…</Text>
+        </View>
+      ) : (
+        <>
+          <Text style={img.dropzoneIcon}>🖼️</Text>
+          <Text style={img.dropzoneTitle}>Add Product Image</Text>
+          <Text style={img.dropzoneSub}>Optional but recommended</Text>
+          <View style={img.btnRow}>
+            <TouchableOpacity onPress={onUpload} style={img.uploadBtn}>
+              <Text style={img.uploadBtnText}>📷  Upload Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onUrlInput} style={img.urlBtn}>
+              <Text style={img.urlBtnText}>🔗  Use URL</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+const img = StyleSheet.create({
+  dropzone: {
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    borderStyle: "dashed",
+    borderRadius: 14,
+    padding: 20,
+    alignItems: "center",
+    backgroundColor: BG,
+    gap: 6,
+  },
+  dropzoneIcon:  { fontSize: 28 },
+  dropzoneTitle: { fontSize: 14, fontWeight: "700", color: TEXT },
+  dropzoneSub:   { fontSize: 12, color: TEXT_LITE },
+  btnRow:        { flexDirection: "row", gap: 10, marginTop: 6 },
+  uploadBtn: {
+    backgroundColor: PRIMARY,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+  },
+  uploadBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  urlBtn: {
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    backgroundColor: "#fff",
+  },
+  urlBtnText: { fontSize: 13, fontWeight: "600", color: TEXT_MED },
+  uploadingWrap: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12 },
+  uploadingText: { fontSize: 13, color: TEXT_MED },
+  previewWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1.5,
+    borderColor: PRIMARY + "50",
+    borderRadius: 14,
+    padding: 10,
+    backgroundColor: PRIMARY_L,
+  },
+  preview: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    backgroundColor: BORDER,
+  },
+  previewMeta: { flex: 1 },
+  previewLabel: { fontSize: 13, fontWeight: "700", color: PRIMARY_D },
+  previewSub:   { fontSize: 11, color: TEXT_LITE, marginTop: 2 },
+  removeBtn: {
+    backgroundColor: RED_L,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  removeBtnText: { fontSize: 12, fontWeight: "700", color: RED },
+});
+
+// ─── Weight Options ───────────────────────────────────────────────────────────
+
+function WeightOptions({ options, onChange }) {
+  const add = (w, u) => {
+    const exists = options.some((o) => String(o.weight) === String(w) && o.unit === u);
+    if (!exists) onChange([...options, { weight: String(w), unit: u }]);
+  };
+  const remove = (idx) => onChange(options.filter((_, i) => i !== idx));
+  const update = (idx, key, val) => {
+    const next = [...options];
+    next[idx] = { ...next[idx], [key]: val };
+    onChange(next);
+  };
+
+  return (
+    <View style={wo.wrap}>
+      <View style={wo.header}>
+        <Text style={wo.title}>Weight Options</Text>
+        <Text style={wo.sub}>Customers choose when ordering</Text>
+      </View>
+
+      {/* Presets */}
+      <View style={wo.presetsRow}>
+        {WEIGHT_PRESETS.map((p, i) => {
+          const active = options.some(
+            (o) => String(o.weight) === String(p.w) && o.unit === p.u
+          );
+          return (
+            <TouchableOpacity
+              key={i}
+              onPress={() => add(p.w, p.u)}
+              style={[wo.preset, active && wo.presetActive]}
+            >
+              <Text style={[wo.presetText, active && wo.presetTextActive]}>
+                {active ? "✓ " : "+ "}{p.w}{p.u}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Manual entries */}
+      {options.map((opt, idx) => (
+        <View key={idx} style={wo.row}>
+          <TextInput
+            style={[fi.input, { flex: 1, paddingVertical: 9 }]}
+            value={String(opt.weight)}
+            onChangeText={(v) => update(idx, "weight", v)}
+            placeholder="e.g. 250"
+            placeholderTextColor={TEXT_LITE}
+            keyboardType="numeric"
+          />
+          <View style={wo.unitRow}>
+            {["g", "kg"].map((u) => (
+              <TouchableOpacity
+                key={u}
+                onPress={() => update(idx, "unit", u)}
+                style={[wo.unitBtn, opt.unit === u && wo.unitBtnActive]}
+              >
+                <Text style={[wo.unitText, opt.unit === u && wo.unitTextActive]}>{u}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TouchableOpacity onPress={() => remove(idx)} style={wo.removeBtn}>
+            <Text style={{ color: RED, fontWeight: "800", fontSize: 16 }}>×</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+
+      <TouchableOpacity
+        onPress={() => onChange([...options, { weight: "", unit: "g" }])}
+        style={wo.addManual}
+      >
+        <Text style={wo.addManualText}>+ Custom Weight</Text>
+      </TouchableOpacity>
+
+      {options.length === 0 && (
+        <Text style={wo.hint}>Select presets or add custom weights above.</Text>
+      )}
+    </View>
+  );
+}
+const wo = StyleSheet.create({
+  wrap: {
+    backgroundColor: BG,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    padding: 14,
+    gap: 10,
+  },
+  header:   { gap: 2 },
+  title:    { fontSize: 13, fontWeight: "700", color: TEXT },
+  sub:      { fontSize: 11, color: TEXT_LITE },
+  presetsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  preset: {
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#fff",
+  },
+  presetActive: { borderColor: PRIMARY, backgroundColor: PRIMARY_L },
+  presetText:   { fontSize: 12, fontWeight: "600", color: TEXT_MED },
+  presetTextActive: { color: PRIMARY_D },
+  row: { flexDirection: "row", alignItems: "center", gap: 8 },
+  unitRow: { flexDirection: "row", gap: 4 },
+  unitBtn: {
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: "#fff",
+  },
+  unitBtnActive: { borderColor: PRIMARY, backgroundColor: PRIMARY_L },
+  unitText:      { fontSize: 13, fontWeight: "600", color: TEXT_MED },
+  unitTextActive: { color: PRIMARY_D },
+  removeBtn: { padding: 6 },
+  addManual: {
+    alignSelf: "flex-start",
+    borderWidth: 1.5,
+    borderColor: PRIMARY + "60",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: PRIMARY_L,
+  },
+  addManualText: { fontSize: 12, fontWeight: "700", color: PRIMARY },
+  hint: { fontSize: 11, color: TEXT_LITE, fontStyle: "italic", textAlign: "center", paddingVertical: 4 },
+});
+
+// ─── Category Picker ──────────────────────────────────────────────────────────
+
+function CategoryPicker({
+  topCategories, subcategories, selectedTopCat, selectedSubId, selectedSubName,
+  catLoading, subLoading,
+  onSelectTop, onSelectSub,
+  categoryName,
+}) {
+  return (
+    <View style={cp.wrap}>
+      <Label>Category</Label>
+      {catLoading ? (
+        <View style={cp.loadingRow}>
+          <ActivityIndicator size="small" color={PRIMARY} />
+          <Text style={cp.loadingText}>Loading…</Text>
+        </View>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={cp.chipRow}>
+            {topCategories.map((cat) => (
+              <TouchableOpacity
+                key={cat.id}
+                onPress={() => onSelectTop(cat)}
+                style={[cp.chip, selectedTopCat?.id === cat.id && cp.chipActive]}
+              >
+                <Text style={[cp.chipText, selectedTopCat?.id === cat.id && cp.chipTextActive]}>
+                  {cat.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+      )}
+
+      {selectedTopCat && (
+        <View style={cp.subSection}>
+          <View style={cp.subHeader}>
+            <Text style={cp.subLabel}>Subcategory</Text>
+            {selectedSubName ? (
+              <View style={cp.badge}>
+                <Text style={cp.badgeText}>✓ {selectedSubName}</Text>
+              </View>
+            ) : null}
+          </View>
+          {subLoading ? (
+            <View style={cp.loadingRow}>
+              <ActivityIndicator size="small" color={PRIMARY} />
+              <Text style={cp.loadingText}>Loading…</Text>
+            </View>
+          ) : subcategories.length === 0 ? (
+            <View style={cp.noSub}>
+              <Text style={cp.noSubText}>
+                No subcategories — product will file directly under "{selectedTopCat.name}".
+              </Text>
+            </View>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={cp.chipRow}>
+                {subcategories.map((sub) => (
+                  <TouchableOpacity
+                    key={sub.id}
+                    onPress={() => onSelectSub(sub)}
+                    style={[cp.chip, selectedSubId === sub.id && cp.chipActive]}
+                  >
+                    <Text style={[cp.chipText, selectedSubId === sub.id && cp.chipTextActive]}>
+                      {sub.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          )}
+        </View>
+      )}
+
+      {/* Breadcrumb */}
+      {categoryName && (
+        <View style={cp.breadcrumb}>
+          <Text style={cp.breadcrumbText}>
+            📁 {categoryName}
+            {selectedSubName ? ` › ${selectedSubName}` : ""}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+const cp = StyleSheet.create({
+  wrap:      { gap: 6 },
+  loadingRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6 },
+  loadingText: { fontSize: 12, color: TEXT_MED },
+  chipRow:   { flexDirection: "row", gap: 7 },
+  chip: {
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    borderRadius: 20,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    backgroundColor: "#fff",
+  },
+  chipActive:     { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  chipText:       { fontSize: 12, fontWeight: "600", color: TEXT_MED },
+  chipTextActive: { color: "#fff" },
+  subSection: { marginTop: 4, gap: 6 },
+  subHeader:  { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  subLabel:   { fontSize: 11, fontWeight: "700", color: TEXT_LITE, textTransform: "uppercase", letterSpacing: 0.8 },
+  badge: {
+    backgroundColor: PRIMARY_L,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  badgeText: { fontSize: 11, fontWeight: "700", color: PRIMARY_D },
+  noSub: {
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderStyle: "dashed",
+    borderRadius: 10,
+    padding: 10,
+    backgroundColor: BG,
+  },
+  noSubText: { fontSize: 12, color: TEXT_LITE },
+  breadcrumb: {
+    backgroundColor: "#F0FDF4",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 4,
+  },
+  breadcrumbText: { fontSize: 12, fontWeight: "600", color: "#15803D" },
+});
+
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+
 export default function ProductModal({ editing, onClose, onSave, saving }) {
-  // ── Form initial state ─────────────────────────────────────────────────────
   const init = editing
     ? {
         name:          editing.name,
@@ -69,94 +587,83 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
         image_url:     editing.image_url || "",
       }
     : {
-        name:          "",
-        description:   "",
-        categoryName:  "",
-        subcategoryId: null,
-        subcategoryName: "",
-        barcode:       "",
-        unit:          "kg",
-        stock:         "",
-        price:         "",
-        type:          "packed",
-        weight_options: [],
-        image_url:     "",
+        name: "", description: "", categoryName: "", subcategoryId: null,
+        subcategoryName: "", barcode: "", unit: "kg", stock: "", price: "",
+        type: "packed", weight_options: [], image_url: "",
       };
 
   const { token } = useAuthStore();
-  const [form, setForm]           = useState(init);
-  const [err, setErr]             = useState("");
+  const [form, setForm]         = useState(init);
+  const [err, setErr]           = useState("");
   const [uploading, setUploading] = useState(false);
-  const [urlInput, setUrlInput]   = useState(false);
+  const [urlInput, setUrlInput] = useState(false);
 
-  // ── Category/subcategory state ─────────────────────────────────────────────
-  const [topCategories, setTopCategories]     = useState([]);
-  const [subcategories, setSubcategories]     = useState([]);
-  const [selectedTopCat, setSelectedTopCat]   = useState(null); // { id, name }
-  const [catLoading, setCatLoading]           = useState(false);
-  const [subLoading, setSubLoading]           = useState(false);
+  const [topCategories, setTopCategories]   = useState([]);
+  const [subcategories, setSubcategories]   = useState([]);
+  const [selectedTopCat, setSelectedTopCat] = useState(null);
+  const [catLoading, setCatLoading]         = useState(false);
+  const [subLoading, setSubLoading]         = useState(false);
 
-  // ── Fetch top-level categories on mount ────────────────────────────────────
+  // Slide-up animation
+  const slideAnim = useRef(new Animated.Value(80)).current;
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     setCatLoading(true);
     fetch(`${BASE_URL}/products/categories`)
-      .then(r => r.json())
-      .then(data => {
+      .then((r) => r.json())
+      .then((data) => {
         if (cancelled) return;
-        const cats = (data.data?.categories || []).filter(c => c.parent_id === null);
-        setTopCategories(cats.length > 0 ? cats : FALLBACK_CATEGORIES.map((n, i) => ({ id: -(i + 1), name: n, parent_id: null })));
-
-        // If editing, pre-select the parent category
+        const cats = (data.data?.categories || []).filter((c) => c.parent_id === null);
+        setTopCategories(
+          cats.length > 0
+            ? cats
+            : FALLBACK_CATEGORIES.map((n, i) => ({ id: -(i + 1), name: n, parent_id: null }))
+        );
         if (editing?.category) {
-          const match = cats.find(c => c.name === editing.category);
+          const match = cats.find((c) => c.name === editing.category);
           if (match) setSelectedTopCat(match);
         }
       })
       .catch(() => {
-        if (!cancelled) {
+        if (!cancelled)
           setTopCategories(FALLBACK_CATEGORIES.map((n, i) => ({ id: -(i + 1), name: n, parent_id: null })));
-        }
       })
       .finally(() => { if (!cancelled) setCatLoading(false); });
-
     return () => { cancelled = true; };
   }, []);
 
-  // ── Fetch subcategories when a top-level cat is selected ──────────────────
   useEffect(() => {
-    if (!selectedTopCat || selectedTopCat.id < 0) {
-      setSubcategories([]);
-      return;
-    }
+    if (!selectedTopCat || selectedTopCat.id < 0) { setSubcategories([]); return; }
     let cancelled = false;
     setSubLoading(true);
     fetch(`${BASE_URL}/products/subcategories/${selectedTopCat.id}`)
-      .then(r => r.json())
-      .then(data => {
-        if (cancelled) return;
-        setSubcategories(data.data?.subcategories || []);
-      })
+      .then((r) => r.json())
+      .then((data) => { if (!cancelled) setSubcategories(data.data?.subcategories || []); })
       .catch(() => { if (!cancelled) setSubcategories([]); })
       .finally(() => { if (!cancelled) setSubLoading(false); });
     return () => { cancelled = true; };
   }, [selectedTopCat]);
 
-  const set = (k, v) => {
-    setErr("");
-    setForm(f => ({ ...f, [k]: v }));
-  };
+  const set = (k, v) => { setErr(""); setForm((f) => ({ ...f, [k]: v })); };
 
-  const handleSelectTopCat = (cat) => {
+  const handleSelectTop = (cat) => {
     setSelectedTopCat(cat);
-    set("categoryName",    cat.name);
-    set("subcategoryId",   null);
+    set("categoryName", cat.name);
+    set("subcategoryId", null);
     set("subcategoryName", "");
     setSubcategories([]);
   };
 
-  const handleSelectSubCat = (sub) => {
-    set("subcategoryId",   sub.id);
+  const handleSelectSub = (sub) => {
+    set("subcategoryId", sub.id);
     set("subcategoryName", sub.name);
   };
 
@@ -168,12 +675,11 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
         aspect: [1, 1],
         quality: 0.8,
       });
-
       if (!result.canceled) {
         setUploading(true);
         const { url } = await uploadAPI.upload(
           result.assets[0].uri,
-          result.assets[0].mimeType || 'image/jpeg',
+          result.assets[0].mimeType || "image/jpeg",
           token
         );
         set("image_url", url);
@@ -187,632 +693,365 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
   };
 
   const handleSubmit = async () => {
-    if (
-      !String(form.name).trim() ||
-      !String(form.stock).trim() ||
-      !String(form.price).trim()
-    ) {
+    if (!form.name.trim() || !form.stock.trim() || !form.price.trim()) {
       setErr("Name, Stock and Price are required.");
       return;
     }
-
     if (form.type === "loose" && form.weight_options.length === 0) {
-      setErr("Loose items must have at least one weight option.");
+      setErr("Loose items need at least one weight option.");
       return;
     }
-
     const cleanedOptions = form.weight_options
-      .filter(opt => opt.weight && !isNaN(parseFloat(opt.weight)))
-      .map(opt => ({ weight: parseFloat(opt.weight), unit: opt.unit }));
-
+      .filter((o) => o.weight && !isNaN(parseFloat(o.weight)))
+      .map((o) => ({ weight: parseFloat(o.weight), unit: o.unit }));
     if (form.type === "loose" && cleanedOptions.length === 0) {
       setErr("Please enter valid numeric weights.");
       return;
     }
-
     await onSave({
       ...form,
-      weight_options: cleanedOptions,
-      // Pass subcategory_id so backend uses it as category_id
-      subcategory_id: form.subcategoryId || null,
-      category_id:    form.subcategoryId || null,
-      category:       form.categoryName  || "Other",
+      weight_options:  cleanedOptions,
+      subcategory_id:  form.subcategoryId || null,
+      category_id:     form.subcategoryId || null,
+      category:        form.categoryName  || "Other",
     });
   };
 
   return (
-    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <TouchableOpacity
-        style={styles.overlay}
-        activeOpacity={1}
-        onPress={onClose}
-      />
-      <View style={styles.sheet}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>{editing ? "Edit Product" : "Add New Product"}</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-            <Text style={styles.closeBtnText}>✕</Text>
-          </TouchableOpacity>
-        </View>
+    <Modal visible animationType="none" transparent onRequestClose={onClose}>
+      <Animated.View style={[s.overlay, { opacity: fadeAnim }]}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+      </Animated.View>
 
-        <ScrollView
-          style={styles.body}
-          contentContainerStyle={styles.bodyContent}
-          showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={s.kavWrap}
+        pointerEvents="box-none"
+      >
+        <Animated.View
+          style={[s.sheet, { transform: [{ translateY: slideAnim }] }]}
         >
-          {/* Product Image */}
-          <View>
-            <Text style={LBL_STYLE}>Product Image</Text>
-            {form.image_url ? (
-              <View style={styles.imagePreviewWrap}>
-                <Image source={{ uri: form.image_url }} style={styles.imagePreview} />
-                <TouchableOpacity 
-                  style={styles.changeImageBtn} 
-                  onPress={() => { set("image_url", ""); setUrlInput(false); }}
-                >
-                  <Text style={styles.changeImageText}>Remove</Text>
-                </TouchableOpacity>
+          {/* ── Handle ── */}
+          <View style={s.handle} />
+
+          {/* ── Header ── */}
+          <View style={s.header}>
+            <View style={s.headerLeft}>
+              <View style={s.headerIconBox}>
+                <Text style={{ fontSize: 18 }}>{editing ? "✎" : "＋"}</Text>
               </View>
-            ) : (
-              <View style={styles.imagePlaceholderWrap}>
-                {uploading ? (
-                  <ActivityIndicator color={T.primary} />
-                ) : (
-                  <>
-                    <TouchableOpacity style={styles.imageBtn} onPress={pickImage}>
-                      <Text style={styles.imageBtnText}>📷 Upload</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.imageBtn} 
-                      onPress={() => setUrlInput(!urlInput)}
-                    >
-                      <Text style={styles.imageBtnText}>🔗 Link</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
+              <View>
+                <Text style={s.title}>{editing ? "Edit Product" : "Add New Product"}</Text>
+                <Text style={s.subtitle}>{editing ? "Update product details" : "Fill in the details below"}</Text>
               </View>
-            )}
-            {urlInput && !form.image_url && (
-              <TextInput
-                style={[styles.input, { marginTop: 8 }]}
-                value={form.image_url}
-                onChangeText={(v) => set("image_url", v)}
-                placeholder="Paste image URL here..."
-                placeholderTextColor={T.textXLight}
+            </View>
+            <TouchableOpacity onPress={onClose} style={s.closeBtn}>
+              <Text style={s.closeBtnText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ── Body ── */}
+          <ScrollView
+            style={s.scroll}
+            contentContainerStyle={s.body}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Image */}
+            <View style={s.section}>
+              <ImageUploader
+                imageUrl={form.image_url}
+                uploading={uploading}
+                onUpload={pickImage}
+                onRemove={() => { set("image_url", ""); setUrlInput(false); }}
+                onUrlInput={() => setUrlInput((v) => !v)}
               />
-            )}
-          </View>
+              {urlInput && !form.image_url && (
+                <Field
+                  style={{ marginTop: 10 }}
+                  value={form.image_url}
+                  onChangeText={(v) => set("image_url", v)}
+                  placeholder="Paste image URL…"
+                />
+              )}
+            </View>
 
-          {/* Name & Description */}
-          <View>
-            <Text style={LBL_STYLE}>Product Name *</Text>
-            <TextInput
-              style={styles.input}
-              value={form.name}
-              onChangeText={(v) => set("name", v)}
-              placeholder="e.g. Amul Full Cream Milk"
-              placeholderTextColor={T.textXLight}
-            />
-          </View>
+            <View style={s.divider} />
 
-          <View>
-            <Text style={LBL_STYLE}>Description</Text>
-            <TextInput
-              style={[styles.input, { minHeight: 60, textAlignVertical: "top" }]}
-              value={form.description}
-              onChangeText={(v) => set("description", v)}
-              placeholder="Enter product details..."
-              placeholderTextColor={T.textXLight}
-              multiline
-            />
-          </View>
+            {/* Name & Description */}
+            <View style={s.section}>
+              <Field
+                label="Product Name"
+                required
+                value={form.name}
+                onChangeText={(v) => set("name", v)}
+                placeholder="e.g. Amul Full Cream Milk 500ml"
+              />
+              <Field
+                label="Description"
+                style={{ marginTop: 14 }}
+                inputStyle={{ minHeight: 72, textAlignVertical: "top" }}
+                value={form.description}
+                onChangeText={(v) => set("description", v)}
+                placeholder="Optional product details…"
+                multiline
+              />
+            </View>
 
-          {/* ── Step 1: Top-level Category ── */}
-          <View>
-            <Text style={LBL_STYLE}>Category</Text>
-            {catLoading ? (
-              <View style={styles.loadingRow}>
-                <ActivityIndicator size="small" color={T.primary} />
-                <Text style={styles.loadingText}>Loading categories…</Text>
-              </View>
-            ) : (
+            <View style={s.divider} />
+
+            {/* Category */}
+            <View style={s.section}>
+              <CategoryPicker
+                topCategories={topCategories}
+                subcategories={subcategories}
+                selectedTopCat={selectedTopCat}
+                selectedSubId={form.subcategoryId}
+                selectedSubName={form.subcategoryName}
+                catLoading={catLoading}
+                subLoading={subLoading}
+                onSelectTop={handleSelectTop}
+                onSelectSub={handleSelectSub}
+                categoryName={form.categoryName}
+              />
+            </View>
+
+            <View style={s.divider} />
+
+            {/* Unit */}
+            <View style={s.section}>
+              <Label>Unit</Label>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.chipRow}>
-                  {topCategories.map((cat) => (
-                    <SelectChip
-                      key={cat.id}
-                      label={cat.name}
-                      active={selectedTopCat?.id === cat.id}
-                      onClick={() => handleSelectTopCat(cat)}
-                    />
+                <View style={s.chipRow}>
+                  {UNITS.map((u) => (
+                    <TouchableOpacity
+                      key={u}
+                      onPress={() => set("unit", u)}
+                      style={[s.chip, form.unit === u && s.chipActive]}
+                    >
+                      <Text style={[s.chipText, form.unit === u && s.chipTextActive]}>{u}</Text>
+                    </TouchableOpacity>
                   ))}
                 </View>
               </ScrollView>
-            )}
-          </View>
-
-          {/* ── Step 2: Subcategory (shown once a top cat is selected) ── */}
-          {selectedTopCat && (
-            <View>
-              <View style={styles.subCatHeader}>
-                <Text style={LBL_STYLE}>Subcategory</Text>
-                {form.subcategoryName ? (
-                  <View style={styles.selectedBadge}>
-                    <Text style={styles.selectedBadgeText}>✓ {form.subcategoryName}</Text>
-                  </View>
-                ) : null}
-              </View>
-
-              {subLoading ? (
-                <View style={styles.loadingRow}>
-                  <ActivityIndicator size="small" color={T.primary} />
-                  <Text style={styles.loadingText}>Loading subcategories…</Text>
-                </View>
-              ) : subcategories.length === 0 ? (
-                <View style={styles.noSubCatWrap}>
-                  <Text style={styles.noSubCatText}>
-                    No subcategories for "{selectedTopCat.name}".{"\n"}
-                    Product will be filed directly under this category.
-                  </Text>
-                </View>
-              ) : (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.chipRow}>
-                    {subcategories.map((sub) => (
-                      <SelectChip
-                        key={sub.id}
-                        label={sub.name}
-                        active={form.subcategoryId === sub.id}
-                        onClick={() => handleSelectSubCat(sub)}
-                      />
-                    ))}
-                  </View>
-                </ScrollView>
-              )}
-
-              {/* Breadcrumb preview */}
-              {(form.categoryName || form.subcategoryName) && (
-                <View style={styles.breadcrumb}>
-                  <Text style={styles.breadcrumbText}>
-                    📁 {form.categoryName}
-                    {form.subcategoryName ? ` → ${form.subcategoryName}` : ""}
-                  </Text>
-                </View>
-              )}
             </View>
-          )}
 
-          {/* Unit */}
-          <View>
-            <Text style={LBL_STYLE}>Unit</Text>
-            <View style={styles.chipRow}>
-              {UNITS.map((u) => (
-                <SelectChip
-                  key={u}
-                  label={u}
-                  active={form.unit === u}
-                  onClick={() => set("unit", u)}
-                />
-              ))}
-            </View>
-          </View>
-
-          {/* Type */}
-          <View>
-            <Text style={LBL_STYLE}>Type</Text>
-            <View style={styles.chipRow}>
-              {TYPE_OPTS.map((opt) => (
-                <SelectChip
-                  key={opt.value}
-                  label={opt.label}
-                  active={form.type === opt.value}
-                  onClick={() => set("type", opt.value)}
-                />
-              ))}
-            </View>
-          </View>
-
-          {/* Weight Options (Only for Loose) */}
-          {form.type === "loose" && (
-            <View style={styles.weightSection}>
-              <View style={styles.weightHeader}>
-                <Text style={LBL_STYLE}>Weight Options (Customer Picks)</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    const next = [...form.weight_options, { weight: "", unit: "g" }];
-                    set("weight_options", next);
-                  }}
-                  style={styles.addWeightBtn}
-                >
-                  <Text style={styles.addWeightBtnText}>+ Manual Entry</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.chipRow}>
-                {[{w: 50, u: "g"}, {w: 100, u: "g"}, {w: 250, u: "g"}, {w: 500, u: "g"}, {w: 1, u: "kg"}].map((preset, i) => (
-                  <TouchableOpacity
-                    key={`preset-${i}`}
-                    style={{
-                      borderWidth: 1,
-                      borderColor: T.primary,
-                      backgroundColor: T.primaryLight,
-                      borderRadius: 6,
-                      paddingVertical: 4,
-                      paddingHorizontal: 8,
-                    }}
-                    onPress={() => {
-                      const exists = form.weight_options.some(
-                        (o) => String(o.weight) === String(preset.w) && o.unit === preset.u
-                      );
-                      if (!exists) {
-                        set("weight_options", [...form.weight_options, { weight: String(preset.w), unit: preset.u }]);
-                      }
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, color: T.primary, fontWeight: "700" }}>
-                      + {preset.w}{preset.u}
-                    </Text>
-                  </TouchableOpacity>
+            {/* Type */}
+            <View style={[s.section, { marginTop: 0 }]}>
+              <Label>Product Type</Label>
+              <View style={s.typeRow}>
+                {TYPE_OPTS.map((opt) => (
+                  <TypeCard
+                    key={opt.value}
+                    option={opt}
+                    active={form.type === opt.value}
+                    onPress={() => set("type", opt.value)}
+                  />
                 ))}
               </View>
+            </View>
 
-              {form.weight_options.map((opt, idx) => (
-                <View key={idx} style={styles.weightRow}>
-                  <TextInput
-                    style={[styles.input, { flex: 2, paddingVertical: 6 }]}
-                    value={String(opt.weight)}
-                    onChangeText={(v) => {
-                      const next = [...form.weight_options];
-                      next[idx].weight = v;
-                      set("weight_options", next);
-                    }}
-                    placeholder="Value (e.g. 500)"
-                    keyboardType="numeric"
-                  />
-                  <View style={[styles.chipRow, { flex: 3, marginTop: 0 }]}>
-                    {["g", "kg"].map((u) => (
-                      <SelectChip
-                        key={u}
-                        label={u}
-                        active={opt.unit === u}
-                        onClick={() => {
-                          const next = [...form.weight_options];
-                          next[idx].unit = u;
-                          set("weight_options", next);
-                        }}
-                      />
-                    ))}
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => {
-                      const next = form.weight_options.filter((_, i) => i !== idx);
-                      set("weight_options", next);
-                    }}
-                    style={styles.removeWeightBtn}
-                  >
-                    <Text style={{ color: T.red, fontWeight: "800" }}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-              {form.weight_options.length === 0 && (
-                <Text style={styles.hintText}>
-                  Add fixed weights (e.g. 250g, 500g) for customers to choose from.
-                </Text>
+            {/* Weight Options */}
+            {form.type === "loose" && (
+              <View style={s.section}>
+                <WeightOptions
+                  options={form.weight_options}
+                  onChange={(v) => set("weight_options", v)}
+                />
+              </View>
+            )}
+
+            <View style={s.divider} />
+
+            {/* Stock & Price */}
+            <View style={s.section}>
+              <View style={s.row}>
+                <Field
+                  label="Stock"
+                  required
+                  style={{ flex: 1 }}
+                  value={form.stock}
+                  onChangeText={(v) => set("stock", v)}
+                  placeholder="e.g. 45"
+                  keyboardType="numeric"
+                />
+                <Field
+                  label="Price (₹)"
+                  required
+                  style={{ flex: 1 }}
+                  value={form.price}
+                  onChangeText={(v) => set("price", v)}
+                  placeholder="e.g. 40"
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+
+            {/* Barcode */}
+            <View style={[s.section, { marginTop: 0 }]}>
+              <Field
+                label="Barcode (Optional)"
+                value={form.barcode}
+                onChangeText={(v) => set("barcode", v)}
+                placeholder="Scan or enter barcode"
+              />
+            </View>
+
+            {/* Error */}
+            {!!err && (
+              <View style={s.errBox}>
+                <Text style={s.errText}>⚠️  {err}</Text>
+              </View>
+            )}
+
+            {/* Submit */}
+            <TouchableOpacity
+              onPress={handleSubmit}
+              disabled={saving}
+              style={[s.submitBtn, saving && s.submitBtnDisabled]}
+              activeOpacity={0.85}
+            >
+              {saving ? (
+                <Spinner size={18} color="#fff" />
+              ) : (
+                <Text style={s.submitBtnIcon}>{editing ? "💾" : "＋"}</Text>
               )}
-            </View>
-          )}
+              <Text style={s.submitBtnText}>
+                {saving ? "Saving…" : editing ? "Save Changes" : "Add Product"}
+              </Text>
+            </TouchableOpacity>
 
-          {/* Stock & Price */}
-          <View style={styles.row}>
-            <View style={styles.rowHalf}>
-              <Text style={LBL_STYLE}>Stock *</Text>
-              <TextInput
-                style={styles.input}
-                value={form.stock}
-                onChangeText={(v) => set("stock", v)}
-                placeholder="e.g. 45"
-                placeholderTextColor={T.textXLight}
-                keyboardType="numeric"
-              />
-            </View>
-            <View style={styles.rowHalf}>
-              <Text style={LBL_STYLE}>Price *</Text>
-              <TextInput
-                style={styles.input}
-                value={form.price}
-                onChangeText={(v) => set("price", v)}
-                placeholder="e.g. 40"
-                placeholderTextColor={T.textXLight}
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
-
-          {/* Barcode */}
-          <View>
-            <Text style={LBL_STYLE}>Barcode (Optional)</Text>
-            <TextInput
-              style={styles.input}
-              value={form.barcode}
-              onChangeText={(v) => set("barcode", v)}
-              placeholder="Scan or enter barcode"
-              placeholderTextColor={T.textXLight}
-            />
-          </View>
-
-          {err ? <Text style={styles.err}>{err}</Text> : null}
-
-          <TouchableOpacity
-            onPress={handleSubmit}
-            disabled={saving}
-            style={[styles.submitBtn, saving && styles.submitBtnDisabled]}
-            activeOpacity={0.8}
-          >
-            {saving && <Spinner size={16} color="#fff" />}
-            <Text style={styles.submitBtnText}>
-              {saving ? "Saving…" : editing ? "Save Changes" : "+ Add Product"}
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
+            <View style={{ height: 20 }} />
+          </ScrollView>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
   overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.42)",
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.48)",
+  },
+  kavWrap: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    justifyContent: "flex-end",
   },
   sheet: {
     backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: "88%",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "92%",
     shadowColor: "#000",
-    shadowOpacity: 0.22,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: -6 },
-    elevation: 12,
+    shadowOpacity: 0.2,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: -8 },
+    elevation: 16,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: BORDER,
+    alignSelf: "center",
+    marginTop: 10,
+    marginBottom: 4,
   },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 16,
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: T.border,
+    borderBottomColor: "#F4F4F5",
   },
-  title: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: T.text,
-  },
-  closeBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  closeBtnText: {
-    color: T.textLight,
-    fontWeight: "700",
-    fontSize: 13,
-  },
-  body: {
-    flexGrow: 0,
-  },
-  bodyContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 36,
-    paddingTop: 16,
-    gap: 18,
-  },
-  input: {
-    borderWidth: 1.5,
-    borderColor: T.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: T.text,
-    backgroundColor: "#FAFAFA",
-  },
-  chipRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 7,
-    marginTop: 4,
-  },
-  loadingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 8,
-  },
-  loadingText: {
-    fontSize: 13,
-    color: T.textLight,
-  },
-  subCatHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 2,
-  },
-  selectedBadge: {
-    backgroundColor: T.primaryLight,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  selectedBadgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: T.primaryDark,
-  },
-  noSubCatWrap: {
-    backgroundColor: "#F9FAFB",
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: T.border,
-    borderStyle: "dashed",
-  },
-  noSubCatText: {
-    fontSize: 12,
-    color: T.textLight,
-    lineHeight: 18,
-  },
-  breadcrumb: {
-    marginTop: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "#F0FDF4",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#BBF7D0",
-  },
-  breadcrumbText: {
-    fontSize: 12,
-    color: "#15803D",
-    fontWeight: "600",
-  },
-  row: {
-    flexDirection: "row",
-    gap: 14,
-  },
-  rowHalf: {
-    flex: 1,
-  },
-  err: {
-    fontSize: 12,
-    color: T.red,
-    fontWeight: "600",
-  },
-  submitBtn: {
-    backgroundColor: T.primary,
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
-    shadowColor: T.primary,
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  submitBtnDisabled: {
-    opacity: 0.7,
-  },
-  submitBtnText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  weightSection: {
-    backgroundColor: "#F9FAFB",
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: T.border,
-    gap: 10,
-  },
-  weightHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  addWeightBtn: {
-    backgroundColor: T.primaryLight,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  addWeightBtnText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: T.primary,
-  },
-  weightRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#fff",
-    padding: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: T.border,
-  },
-  removeWeightBtn: {
-    padding: 6,
-  },
-  hintText: {
-    fontSize: 11,
-    color: T.textLight,
-    fontStyle: "italic",
-  },
-  imagePreviewWrap: {
+  headerLeft: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: "#F9FAFB",
-    padding: 8,
+  },
+  headerIconBox: {
+    width: 42,
+    height: 42,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: T.border,
-  },
-  imagePreview: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: "#eee",
-  },
-  changeImageBtn: {
-    backgroundColor: T.redLight,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  changeImageText: {
-    fontSize: 12,
-    color: T.red,
-    fontWeight: "700",
-  },
-  imagePlaceholderWrap: {
-    flexDirection: "row",
-    gap: 10,
-    backgroundColor: "#F9FAFB",
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: T.border,
-    borderStyle: "dashed",
+    backgroundColor: PRIMARY_L,
+    alignItems: "center",
     justifyContent: "center",
-    alignItems: "center",
-    minHeight: 60,
-  },
-  imageBtn: {
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: T.border,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    borderColor: PRIMARY + "30",
+  },
+  title:    { fontSize: 17, fontWeight: "800", color: TEXT },
+  subtitle: { fontSize: 12, color: TEXT_LITE, marginTop: 1 },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#F4F4F5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeBtnText: { color: TEXT_MED, fontWeight: "700", fontSize: 14 },
+
+  scroll: { flexGrow: 0 },
+  body:   { paddingTop: 6, paddingBottom: 24 },
+
+  section: { paddingHorizontal: 20, paddingVertical: 14, gap: 0 },
+  divider: { height: 1, backgroundColor: "#F4F4F5", marginVertical: 2 },
+
+  row: { flexDirection: "row", gap: 12 },
+
+  chipRow: { flexDirection: "row", gap: 7 },
+  chip: {
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    backgroundColor: "#fff",
+  },
+  chipActive:     { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  chipText:       { fontSize: 13, fontWeight: "600", color: TEXT_MED },
+  chipTextActive: { color: "#fff" },
+
+  typeRow: { flexDirection: "row", gap: 10, marginTop: 4 },
+
+  errBox: {
+    marginHorizontal: 20,
+    marginBottom: 10,
+    backgroundColor: RED_L,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: RED + "40",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  errText: { fontSize: 13, color: RED, fontWeight: "600" },
+
+  submitBtn: {
+    marginHorizontal: 20,
+    marginTop: 6,
+    backgroundColor: PRIMARY,
+    borderRadius: 14,
+    paddingVertical: 15,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    justifyContent: "center",
+    gap: 8,
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
   },
-  imageBtnText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: T.textMed,
-  },
+  submitBtnDisabled: { opacity: 0.65 },
+  submitBtnIcon:     { fontSize: 16, color: "#fff" },
+  submitBtnText:     { fontSize: 15, fontWeight: "800", color: "#fff" },
 });
