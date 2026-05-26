@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -6,28 +6,143 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  ActivityIndicator,
+  Modal,
+  FlatList,
+  Animated,
+  Platform,
+  useWindowDimensions,
+  StatusBar,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import useAuthStore from "../../store/authStore";
-
 import { LineChart } from "react-native-chart-kit";
-import { Dimensions, ActivityIndicator } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { TextInput } from "react-native";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
+// ─── Color Tokens ───────────────────────────────────────────────
+const C = {
+  bg: "#F0F4F8",
+  surface: "#FFFFFF",
+  primary: "#0EE627",
+  primaryDim: "#0EE62718",
+  primaryMid: "#0EE62740",
+  primaryDark: "#09a81c",
+  accent: "#0F172A",
+  accentMid: "#1E293B",
+  text: "#0F172A",
+  textSub: "#64748B",
+  textLight: "#94A3B8",
+  border: "#E2E8F0",
+  warn: "#FFFBEB",
+  warnBorder: "#F59E0B",
+  warnText: "#92400E",
+  danger: "#FFF1F2",
+  dangerBorder: "#F43F5E",
+  dangerText: "#9F1239",
+  purple: "#7C3AED",
+  purpleDim: "#7C3AED15",
+  blue: "#3B82F6",
+  blueDim: "#3B82F615",
+  orange: "#F97316",
+  orangeDim: "#F9731615",
+};
+
+// ─── Greeting config ────────────────────────────────────────────
+const getGreetingConfig = () => {
+  const h = new Date().getHours();
+  if (h < 12)
+    return {
+      text: "Good Morning",
+      emoji: "☀️",
+      gradient: ["#FEF3C7", "#FDE68A"],
+      iconBg: "#F59E0B",
+      sub: "Your store is ready to serve!",
+      badge: "Morning Boost",
+    };
+  if (h < 17)
+    return {
+      text: "Good Afternoon",
+      emoji: "⛅",
+      gradient: ["#DBEAFE", "#BFDBFE"],
+      iconBg: "#3B82F6",
+      sub: "Keep the momentum going!",
+      badge: "Peak Hours",
+    };
+  return {
+    text: "Good Evening",
+    emoji: "🌙",
+    gradient: ["#EDE9FE", "#DDD6FE"],
+    iconBg: "#7C3AED",
+    sub: "Wrapping up strong today!",
+    badge: "Wind Down",
+  };
+};
+
 export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
+  const navigation = useNavigation();
+  const { width: SCREEN_W } = useWindowDimensions();
+
+  // Responsive helpers (recalculate on every render)
+  const isSmall = SCREEN_W < 360;
+  const isMedium = SCREEN_W >= 360 && SCREEN_W < 420;
+  const rs = (sm, md, lg) => (isSmall ? sm : isMedium ? md : lg);
+
+  // ─── State ──────────────────────────────────────────────────
   const [loading, setLoading] = useState(true);
-  const [currIndex, setCurrIndex] = useState(0); // 0 = Today, 1 = Weekly, 2 = Monthly
+  const [currIndex, setCurrIndex] = useState(0);
   const [stats, setStats] = useState(null);
   const [noProfile, setNoProfile] = useState(false);
-  const navigation = useNavigation();
+  const [notifications, setNotifications] = useState([]);
+  const [notifVisible, setNotifVisible] = useState(false);
+  const [reviewsModal, setReviewsModal] = useState(false);
+  const [allReviews, setAllReviews] = useState([]);
+  const [partnersModal, setPartnersModal] = useState(false);
+  const [allPartners, setAllPartners] = useState([]);
+  const [vendorLocation, setVendorLocation] = useState(null);
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [locModalVisible, setLocModalVisible] = useState(false);
+  const [locInput, setLocInput] = useState("");
 
-  const screenWidth = Dimensions.get("window").width;
+  // Animations
+  const greetFadeAnim = useRef(new Animated.Value(0)).current;
+  const greetSlideAnim = useRef(new Animated.Value(20)).current;
+  const heroScaleAnim = useRef(new Animated.Value(0.95)).current;
 
+  const vendorName = user?.name || "Vendor";
+  const greeting = getGreetingConfig();
+
+  // ─── Animations start ───────────────────────────────────────
   useEffect(() => {
-    const fetchStats = async () => {
+    Animated.parallel([
+      Animated.timing(greetFadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(greetSlideAnim, {
+        toValue: 0,
+        duration: 700,
+        useNativeDriver: true,
+      }),
+      Animated.spring(heroScaleAnim, {
+        toValue: 1,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  // ─── Fetch Stats ─────────────────────────────────────────────
+  useEffect(() => {
+    const fetchAll = async () => {
       try {
         const res = await fetch(`${API_BASE}/vendors/me/stats`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -41,11 +156,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         }
 
         if (data.success) {
-          // ... (existing stats logic)
           const s = data.data.stats;
-          // ...
           setStats({
-            // ... (keep existing safe logic)
+            pendingOrders: s.pending_orders ?? 0,
             labels: s.weekly_chart_data?.map((d) =>
               new Date(d.date).toLocaleDateString("en-IN", {
                 weekday: "short",
@@ -73,75 +186,72 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               0, 0, 0, 0, 0, 0, 0,
             ],
             topProducts: s.top_products || [],
+            recentReviews: s.recent_reviews || [],
+            allReviews: s.all_reviews || [],
+            deliveryPartners: s.delivery_partners || [],
+            allDeliveryPartners: s.all_delivery_partners || [],
           });
+          setAllReviews(s.all_reviews || s.recent_reviews || []);
+          setAllPartners(s.all_delivery_partners || s.delivery_partners || []);
         }
+
+        const profileRes = await fetch(`${API_BASE}/vendors/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const profileData = await profileRes.json();
+        if (profileData.success && profileData.data) {
+          const addr =
+            profileData.data.address || profileData.data.store_address;
+          if (addr) setVendorLocation(addr.city || addr.area || addr);
+        }
+
+        const notifRes = await fetch(`${API_BASE}/vendors/me/notifications`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const notifData = await notifRes.json();
+        if (notifData.success) setNotifications(notifData.data || []);
       } catch (err) {
-        console.error("Dashboard Stats Fetch Error:", err);
+        console.error("Dashboard Fetch Error:", err);
       } finally {
         setLoading(false);
       }
     };
-
-    fetchStats();
+    fetchAll();
   }, [token]);
 
+  // ─── Loading ─────────────────────────────────────────────────
   if (loading) {
     return (
-      <View
-        style={[
-          styles.container,
-          { alignItems: "center", justifyContent: "center" },
-        ]}
-      >
-        <ActivityIndicator size="large" color="#0ff022" />
-        <Text style={{ marginTop: 10 }}>Loading vendor stats...</Text>
+      <View style={[styles.centered, { backgroundColor: C.bg }]}>
+        <View style={styles.loadingCard}>
+          <ActivityIndicator size="large" color={C.primary} />
+          <Text style={styles.loadingText}>Loading your dashboard…</Text>
+        </View>
       </View>
     );
   }
 
   if (noProfile) {
     return (
-      <View
-        style={[
-          styles.container,
-          { alignItems: "center", justifyContent: "center", padding: 20 },
-        ]}
-      >
-        <MaterialIcons name="store-mall-directory" size={80} color="#ccc" />
-        <Text
-          style={{
-            fontSize: 20,
-            fontWeight: "700",
-            marginTop: 20,
-            textAlign: "center",
-          }}
-        >
-          Welcome to DesiDukaan!
-        </Text>
-        <Text
-          style={{
-            fontSize: 14,
-            color: "#666",
-            textAlign: "center",
-            marginTop: 10,
-            marginBottom: 30,
-          }}
-        >
+      <View style={[styles.centered, { backgroundColor: C.bg, padding: 24 }]}>
+        <View style={styles.emptyIconWrap}>
+          <MaterialIcons
+            name="store-mall-directory"
+            size={52}
+            color={C.primary}
+          />
+        </View>
+        <Text style={styles.emptyTitle}>Welcome to KwikPik!</Text>
+        <Text style={styles.emptySubtitle}>
           You haven't completed your shop registration yet. Complete it now to
           start selling!
         </Text>
         <TouchableOpacity
-          style={{
-            backgroundColor: "#0ff022",
-            paddingVertical: 15,
-            paddingHorizontal: 40,
-            borderRadius: 30,
-          }}
+          style={styles.ctaBtn}
           onPress={() => navigation.navigate("VendorOnboarding")}
         >
-          <Text style={{ color: "#000", fontWeight: "700", fontSize: 16 }}>
-            Complete Registration
-          </Text>
+          <Text style={styles.ctaBtnText}>Complete Registration</Text>
+          <MaterialIcons name="arrow-forward" size={16} color="#000" />
         </TouchableOpacity>
       </View>
     );
@@ -149,493 +259,2580 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
 
   if (!stats) {
     return (
-      <View
-        style={[
-          styles.container,
-          { alignItems: "center", justifyContent: "center" },
-        ]}
-      >
-        <Text>Something went wrong loading your dashboard.</Text>
+      <View style={[styles.centered, { backgroundColor: C.bg }]}>
+        <Text style={{ color: C.textSub }}>
+          Something went wrong loading your dashboard.
+        </Text>
       </View>
     );
   }
 
-  const views = [stats.today, stats.weekly, stats.monthly];
-  const curr = views[currIndex];
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  const currStats = [stats.today, stats.weekly, stats.monthly][currIndex];
+  const chartW = SCREEN_W - 64;
+
+  const displayReviews = stats.recentReviews?.length ? stats.recentReviews : [];
+  const displayPartners = stats.deliveryPartners?.length
+    ? stats.deliveryPartners
+    : [];
+
+  const goalPct =
+    stats.monthly.totalOrders > 0
+      ? Math.min(
+          Math.round(
+            (stats.today.totalOrders / stats.monthly.totalOrders) * 100,
+          ),
+          100,
+        )
+      : 0;
+
+  const STAT_TABS = ["Today", "Week", "Month"];
+
+  const handleSearch = async (query) => {
+    setSearchQuery(query);
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    setSearchLoading(true);
+    try {
+      const q = query.toLowerCase().trim();
+      let results = [];
+
+      // ── 1. Search Inventory (with stock levels) ──────────────────
+      try {
+        const invRes = await fetch(
+          `${API_BASE}/vendors/me/inventory?search=${encodeURIComponent(query)}&limit=50`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        const invData = await invRes.json();
+        if (invData.success && Array.isArray(invData.data)) {
+          const inventoryItems = invData.data.map((item) => ({
+            _type: "inventory",
+            id: item.id,
+            name: item.product?.name || item.name || "Unknown Item",
+            stock_qty: item.stock_qty ?? 0,
+            low_stock_threshold: item.low_stock_threshold ?? 5,
+            price: item.product?.price ?? item.price ?? 0,
+            unit: item.product?.unit || item.unit || "",
+            category: item.product?.category?.name || "",
+            stockStatus:
+              item.stock_qty <= 0
+                ? "out"
+                : item.stock_qty <= (item.low_stock_threshold ?? 5)
+                  ? "low"
+                  : "ok",
+          }));
+          results = [...results, ...inventoryItems];
+        }
+      } catch (e) {
+        console.warn("Inventory search failed:", e);
+      }
+
+      // ── 2. Search Products (if inventory search returns nothing) ──
+      if (results.length === 0) {
+        try {
+          const prodRes = await fetch(
+            `${API_BASE}/vendors/me/products?search=${encodeURIComponent(query)}&limit=50`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          const prodData = await prodRes.json();
+          if (prodData.success && Array.isArray(prodData.data)) {
+            const productItems = prodData.data.map((p) => ({
+              _type: "product",
+              id: p.id,
+              name: p.name || "Product",
+              price: p.price ?? 0,
+              unit: p.unit || "",
+              category: p.category?.name || "",
+              stock_qty: p.inventory?.stock_qty ?? null,
+            }));
+            results = [...results, ...productItems];
+          }
+        } catch (e) {
+          console.warn("Product search failed:", e);
+        }
+      }
+
+      // ── 3. Search Delivery Partners (from loaded stats) ───────────
+      if (stats?.deliveryPartners?.length) {
+        const partnerHits = stats.deliveryPartners.filter((p) =>
+          (p.name || "").toLowerCase().includes(q),
+        );
+        results = [
+          ...results,
+          ...partnerHits.map((p) => ({
+            _type: "partner",
+            name: p.name,
+            status: p.status || "Offline",
+            orders_count: p.orders_count ?? 0,
+            rating: p.rating ?? 0,
+          })),
+        ];
+      }
+
+      // ── 4. Search Top Products (from loaded stats) ────────────────
+      if (stats?.topProducts?.length) {
+        const topHits = stats.topProducts.filter((p) =>
+          (p.name || "").toLowerCase().includes(q),
+        );
+        results = [
+          ...results,
+          ...topHits.map((p) => ({
+            _type: "top_product",
+            name: p.name,
+            sold: p.sold ?? 0,
+            revenue: p.revenue ?? 0,
+          })),
+        ];
+      }
+
+      // ── 5. Earnings / Revenue keywords ───────────────────────────
+      const earningsKeywords = [
+        "earn",
+        "revenue",
+        "income",
+        "profit",
+        "money",
+        "sales",
+        "today",
+        "weekly",
+        "monthly",
+        "₹",
+      ];
+      if (earningsKeywords.some((k) => q.includes(k))) {
+        results = [
+          ...results,
+          {
+            _type: "earnings",
+            name: "Today's Revenue",
+            detail: `₹${Number(stats?.today?.revenue || 0).toLocaleString("en-IN")}`,
+            sub: `${stats?.today?.totalOrders ?? 0} orders today`,
+          },
+          {
+            _type: "earnings",
+            name: "Weekly Revenue",
+            detail: `₹${Number(stats?.weekly?.revenue || 0).toLocaleString("en-IN")}`,
+            sub: `${stats?.weekly?.totalOrders ?? 0} orders this week`,
+          },
+          {
+            _type: "earnings",
+            name: "Monthly Revenue",
+            detail: `₹${Number(stats?.monthly?.revenue || 0).toLocaleString("en-IN")}`,
+            sub: `${stats?.monthly?.totalOrders ?? 0} orders this month`,
+          },
+        ];
+      }
+
+      // ── 6. Order count keywords ───────────────────────────────────
+      const orderKeywords = ["order", "pending", "preparing", "delivered"];
+      if (orderKeywords.some((k) => q.includes(k))) {
+        results = [
+          ...results,
+          {
+            _type: "orders",
+            name: "Pending Orders",
+            detail: String(stats?.pendingOrders ?? 0),
+            sub: "Awaiting your action",
+          },
+          {
+            _type: "orders",
+            name: "Today's Orders",
+            detail: String(stats?.today?.totalOrders ?? 0),
+            sub: "Orders placed today",
+          },
+        ];
+      }
+
+      setSearchResults(results);
+    } catch (e) {
+      console.error("Search error:", e);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.root, { backgroundColor: C.bg }]}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
+
+      {/* ── NAVBAR ──────────────────────────────────────────── */}
+      <View
+        style={{
+          paddingTop: Platform.OS === "ios" ? 52 : 40,
+          paddingHorizontal: rs(12, 16, 20),
+          backgroundColor: "#147538",
+          paddingBottom: 10,
+          borderBottomWidth: 1,
+          borderBottomColor: "rgba(255,255,255,0.1)",
+        }}
+      >
+        {/* Row 1: Logo + Icons */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 10,
+          }}
+        >
+          {/* Logo */}
+          <View style={styles.logoWrap}>
+            <View
+              style={[
+                styles.logoIconBox,
+                {
+                  width: rs(32, 36, 40),
+                  height: rs(32, 36, 40),
+                  borderRadius: rs(9, 10, 11),
+                },
+              ]}
+            >
+              <MaterialIcons
+                name="shopping-cart"
+                size={rs(17, 19, 21)}
+                color="#147538"
+              />
+            </View>
+            <Text
+              style={[
+                styles.logoText,
+                { fontSize: rs(17, 20, 23), color: "#FFFFFF" },
+              ]}
+            >
+              Kwik<Text style={{ color: C.primary }}>Pik</Text>
+            </Text>
+          </View>
+
+          {/* Right icons */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: rs(6, 8, 10),
+            }}
+          >
+            {/* Notification bell */}
+            <TouchableOpacity
+              style={[
+                styles.iconBtn,
+                {
+                  width: rs(36, 40, 44),
+                  height: rs(36, 40, 44),
+                  borderRadius: rs(10, 11, 12),
+                  backgroundColor: "rgba(255,255,255,0.15)",
+                  borderColor: "rgba(255,255,255,0.2)",
+                },
+              ]}
+              onPress={() => setNotifVisible(true)}
+            >
+              <MaterialIcons
+                name="notifications-none"
+                size={rs(20, 22, 24)}
+                color="#FFFFFF"
+              />
+              {unreadCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Avatar → Profile */}
+            <TouchableOpacity
+              style={[
+                styles.avatarBtn,
+                {
+                  width: rs(36, 40, 44),
+                  height: rs(36, 40, 44),
+                  borderRadius: rs(18, 20, 22),
+                  backgroundColor: C.primary,
+                },
+              ]}
+              onPress={() => navigation.navigate("Profile")}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.avatarInitials,
+                  { fontSize: rs(11, 12, 13), color: "#000000" },
+                ]}
+              >
+                {vendorName
+                  .split(" ")
+                  .map((w) => w[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Row 2: Full-width Search Bar */}
+        <TouchableOpacity
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            backgroundColor: "rgba(255,255,255,0.15)",
+            borderColor: "rgba(255,255,255,0.25)",
+            borderWidth: 1,
+            borderRadius: 999,
+            paddingHorizontal: 14,
+            paddingVertical: 9,
+            width: "100%",
+          }}
+          activeOpacity={0.7}
+          onPress={() => setSearchVisible(true)}
+        >
+          <MaterialIcons
+            name="search"
+            size={rs(15, 16, 17)}
+            color="rgba(255,255,255,0.7)"
+          />
+          <Text
+            style={{
+              fontSize: rs(12, 13, 14),
+              color: "rgba(255,255,255,0.6)",
+              flex: 1,
+            }}
+          >
+            Search inventory, partners, earnings…
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── STATUS BANNERS ──────────────────────────────────── */}
       {vendorStatus === "pending" && (
-        <View
-          style={{
-            backgroundColor: "#FFF8E1",
-            margin: 16,
-            marginBottom: 0,
-            padding: 14,
-            borderRadius: 12,
-            borderLeftWidth: 4,
-            borderLeftColor: "#F59E0B",
-          }}
-        >
-          <Text
-            style={{ fontWeight: "700", color: "#92400E", marginBottom: 4 }}
-          >
-            ⏳ Verification Pending
-          </Text>
-          <Text style={{ color: "#78350F", fontSize: 13, lineHeight: 18 }}>
-            Your shop is under admin review. You'll be notified once approved
-            (24-48 hrs).
-          </Text>
-          {missingDocs.length > 0 && (
-            <View style={{ marginTop: 10 }}>
-              <Text
-                style={{ fontWeight: "700", color: "#92400E", marginBottom: 4 }}
-              >
-                📄 Missing Documents:
-              </Text>
-              {missingDocs.map((doc) => (
-                <Text key={doc} style={{ color: "#B45309", fontSize: 12 }}>
-                  • {doc}
-                </Text>
-              ))}
-            </View>
-          )}
-        </View>
+        <StatusBanner
+          title="⏳ Verification Pending"
+          message="Your shop is under admin review. You'll be notified once approved (24–48 hrs)."
+          bg={C.warn}
+          border={C.warnBorder}
+          textColor={C.warnText}
+          missingDocs={missingDocs}
+        />
       )}
-
       {vendorStatus === "rejected" && (
-        <View
-          style={{
-            backgroundColor: "#FEF2F2",
-            margin: 16,
-            marginBottom: 0,
-            padding: 14,
-            borderRadius: 12,
-            borderLeftWidth: 4,
-            borderLeftColor: "#EF4444",
-          }}
-        >
-          <Text
-            style={{ fontWeight: "700", color: "#991B1B", marginBottom: 4 }}
-          >
-            ❌ Application Rejected
-          </Text>
-          <Text style={{ color: "#7F1D1D", fontSize: 13, lineHeight: 18 }}>
-            Your application was rejected. Please re-submit with correct
-            documents.
-          </Text>
-          {missingDocs.length > 0 && (
-            <View style={{ marginTop: 10 }}>
-              <Text
-                style={{ fontWeight: "700", color: "#991B1B", marginBottom: 4 }}
-              >
-                📄 Missing Documents:
-              </Text>
-              {missingDocs.map((doc) => (
-                <Text key={doc} style={{ color: "#B91C1C", fontSize: 12 }}>
-                  • {doc}
-                </Text>
-              ))}
-            </View>
-          )}
-        </View>
+        <StatusBanner
+          title="❌ Application Rejected"
+          message="Your application was rejected. Please re-submit with correct documents."
+          bg={C.danger}
+          border={C.dangerBorder}
+          textColor={C.dangerText}
+          missingDocs={missingDocs}
+        />
       )}
 
-      <ScrollView>
-        {/* FILTER TABS */}
-        <View style={styles.tabs}>
-          <TouchableOpacity onPress={() => setCurrIndex(0)}>
-            <Text style={currIndex === 0 ? styles.tabActive : styles.tab}>
-              Today
-            </Text>
-          </TouchableOpacity>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120, paddingTop: 4 }}
+      >
+        {/* ── GREETING ──────────────────────────────────────── */}
+        <Animated.View
+          style={{
+            opacity: greetFadeAnim,
+            transform: [{ translateY: greetSlideAnim }],
+            marginHorizontal: rs(12, 14, 16),
+            marginTop: rs(12, 14, 16),
+          }}
+        >
+          <View
+            style={[
+              styles.greetingCard,
+              {
+                paddingHorizontal: rs(16, 18, 20),
+                paddingVertical: rs(16, 18, 20),
+              },
+            ]}
+          >
+            {/* Background accent blobs */}
+            <View style={styles.greetingBlobTop} />
+            <View style={styles.greetingBlobBot} />
 
-          <TouchableOpacity onPress={() => setCurrIndex(1)}>
-            <Text style={currIndex === 1 ? styles.tabActive : styles.tab}>
-              Weekly
-            </Text>
-          </TouchableOpacity>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: rs(12, 14, 16),
+              }}
+            >
+              {/* Emoji bubble */}
+              <View
+                style={[
+                  styles.greetingEmojiBubble,
+                  {
+                    width: rs(52, 58, 64),
+                    height: rs(52, 58, 64),
+                    borderRadius: rs(16, 18, 20),
+                    backgroundColor: greeting.iconBg + "20",
+                  },
+                ]}
+              >
+                <Text style={{ fontSize: rs(26, 28, 32) }}>
+                  {greeting.emoji}
+                </Text>
+              </View>
 
-          <TouchableOpacity onPress={() => setCurrIndex(2)}>
-            <Text style={currIndex === 2 ? styles.tabActive : styles.tab}>
-              Monthly
-            </Text>
-          </TouchableOpacity>
-        </View>
+              <View style={{ flex: 1 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 2,
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.greetingTimeText,
+                      { fontSize: rs(12, 13, 13), color: C.textSub },
+                    ]}
+                  >
+                    {greeting.text}
+                  </Text>
+                  <View
+                    style={[
+                      styles.greetingBadge,
+                      { backgroundColor: greeting.iconBg + "18" },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.greetingBadgeText,
+                        { color: greeting.iconBg, fontSize: rs(9, 10, 10) },
+                      ]}
+                    >
+                      {greeting.badge}
+                    </Text>
+                  </View>
+                </View>
+                <Text
+                  style={[styles.greetingName, { fontSize: rs(19, 22, 24) }]}
+                >
+                  {vendorName.split(" ")[0]} 👋
+                </Text>
+                <Text
+                  style={[
+                    styles.greetingSub,
+                    { fontSize: rs(11, 12, 12), color: greeting.iconBg },
+                  ]}
+                >
+                  {greeting.sub}
+                </Text>
+              </View>
+            </View>
 
-        {/* METRICS */}
-        <View style={styles.metricsRow}>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>TOTAL ORDERS</Text>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricValue}>{curr.totalOrders}</Text>
+            {/* Mini stat strip */}
+            <View style={styles.greetingStrip}>
+              <View style={styles.greetingStripItem}>
+                <Text style={[styles.greetingStripVal, { color: C.primary }]}>
+                  {stats.today.totalOrders}
+                </Text>
+                <Text style={styles.greetingStripLabel}>Today's Orders</Text>
+              </View>
+              <View style={styles.greetingStripDivider} />
+              <View style={styles.greetingStripItem}>
+                <Text style={[styles.greetingStripVal, { color: C.blue }]}>
+                  ₹{Number(stats.today.revenue).toLocaleString("en-IN")}
+                </Text>
+                <Text style={styles.greetingStripLabel}>Today's Revenue</Text>
+              </View>
+              <View style={styles.greetingStripDivider} />
+              <View style={styles.greetingStripItem}>
+                <Text style={[styles.greetingStripVal, { color: C.orange }]}>
+                  {stats.today.avgPrepTime}m
+                </Text>
+                <Text style={styles.greetingStripLabel}>Avg. Prep</Text>
+              </View>
             </View>
           </View>
+        </Animated.View>
 
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>REVENUE</Text>
-            <View style={styles.metricRow}>
-              <Text style={styles.metricValue}>
-                ₹{Number(curr.revenue).toLocaleString("en-IN")}
+        {/* ── HERO STAT ROW ─────────────────────────────────── */}
+        <Animated.View
+          style={{
+            transform: [{ scale: heroScaleAnim }],
+            paddingHorizontal: rs(12, 14, 16),
+            marginTop: rs(10, 12, 14),
+            flexDirection: "row",
+            gap: rs(8, 10, 12),
+          }}
+        >
+          {/* Big dark card */}
+          <View
+            style={[
+              styles.heroCard,
+              {
+                flex: 1.5,
+                padding: rs(14, 16, 18),
+                borderRadius: rs(16, 18, 20),
+              },
+            ]}
+          >
+            <View style={styles.heroGlowDot} />
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                marginBottom: 8,
+              }}
+            >
+              <View style={styles.heroPulse} />
+              <Text style={[styles.heroTopLabel, { fontSize: rs(10, 11, 11) }]}>
+                MONTHLY ORDERS
               </Text>
             </View>
+            <Text style={[styles.heroValue, { fontSize: rs(28, 32, 36) }]}>
+              {stats.monthly.totalOrders.toLocaleString()}
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                marginTop: 4,
+              }}
+            >
+              <View style={styles.heroChangeBadge}>
+                <MaterialIcons name="trending-up" size={10} color={C.primary} />
+                <Text
+                  style={[styles.heroChangeTxt, { fontSize: rs(9, 10, 10) }]}
+                >
+                  +24%
+                </Text>
+              </View>
+              <Text style={[styles.heroSubTxt, { fontSize: rs(10, 10, 11) }]}>
+                vs last month
+              </Text>
+            </View>
+            <View style={styles.heroDivider} />
+            <View style={{ flexDirection: "row", gap: rs(12, 14, 16) }}>
+              <View>
+                <Text
+                  style={[styles.heroSmallLabel, { fontSize: rs(9, 10, 10) }]}
+                >
+                  Revenue
+                </Text>
+                <Text
+                  style={[styles.heroSmallVal, { fontSize: rs(13, 14, 15) }]}
+                >
+                  ₹
+                  {Number(stats.monthly.revenue).toLocaleString("en-IN", {
+                    notation: "compact",
+                  })}
+                </Text>
+              </View>
+              <View>
+                <Text
+                  style={[styles.heroSmallLabel, { fontSize: rs(9, 10, 10) }]}
+                >
+                  Prep Avg
+                </Text>
+                <Text
+                  style={[styles.heroSmallVal, { fontSize: rs(13, 14, 15) }]}
+                >
+                  {stats.monthly.avgPrepTime}m
+                </Text>
+              </View>
+            </View>
           </View>
-        </View>
 
-        {/* SALES TREND */}
+          {/* Right mini cards */}
+          <View style={{ flex: 1, gap: rs(8, 10, 12) }}>
+            <MiniMetricCard
+              label="Weekly Orders"
+              value={stats.weekly.totalOrders.toString()}
+              icon="receipt-long"
+              iconColor={C.blue}
+              iconBg={C.blueDim}
+              rs={rs}
+            />
+            <MiniMetricCard
+              label="Weekly Revenue"
+              value={`₹${Number(stats.weekly.revenue).toLocaleString("en-IN", { notation: "compact" })}`}
+              icon="payments"
+              iconColor={C.orange}
+              iconBg={C.orangeDim}
+              rs={rs}
+            />
+            <MiniMetricCard
+              label="Delivery Time"
+              value={`${stats.monthly.deliveryTime}m`}
+              icon="moped"
+              iconColor={C.purple}
+              iconBg={C.purpleDim}
+              rs={rs}
+            />
+          </View>
+        </Animated.View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Sales Trend</Text>
-            <Text style={styles.sectionHint}>Last 7 Days</Text>
+        {/* ── SALES CHART ───────────────────────────────────── */}
+        <View
+          style={[
+            styles.card,
+            { marginHorizontal: rs(12, 14, 16), marginTop: rs(10, 12, 14) },
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <View>
+              <Text style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}>
+                SALES OVERVIEW
+              </Text>
+              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 16) }]}>
+                Revenue Chart
+              </Text>
+            </View>
+            <View style={styles.tabRow}>
+              {STAT_TABS.map((t, i) => (
+                <TouchableOpacity
+                  key={t}
+                  onPress={() => setCurrIndex(i)}
+                  style={[
+                    styles.tabPill,
+                    currIndex === i && styles.tabPillActive,
+                    {
+                      paddingHorizontal: rs(8, 10, 12),
+                      paddingVertical: rs(4, 5, 6),
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.tabText,
+                      { fontSize: rs(9, 10, 11) },
+                      currIndex === i && styles.tabTextActive,
+                    ]}
+                  >
+                    {t}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Active period stats */}
+          <View style={styles.chartStatRow}>
+            <View style={styles.chartStatItem}>
+              <Text
+                style={[
+                  styles.chartStatVal,
+                  { fontSize: rs(16, 18, 20), color: C.primary },
+                ]}
+              >
+                {currStats.totalOrders}
+              </Text>
+              <Text
+                style={[styles.chartStatLabel, { fontSize: rs(10, 11, 11) }]}
+              >
+                Orders
+              </Text>
+            </View>
+            <View style={styles.chartStatItem}>
+              <Text
+                style={[
+                  styles.chartStatVal,
+                  { fontSize: rs(16, 18, 20), color: C.blue },
+                ]}
+              >
+                ₹{Number(currStats.revenue).toLocaleString("en-IN")}
+              </Text>
+              <Text
+                style={[styles.chartStatLabel, { fontSize: rs(10, 11, 11) }]}
+              >
+                Revenue
+              </Text>
+            </View>
+            <View style={styles.chartStatItem}>
+              <Text
+                style={[
+                  styles.chartStatVal,
+                  { fontSize: rs(16, 18, 20), color: C.orange },
+                ]}
+              >
+                {currStats.avgPrepTime}m
+              </Text>
+              <Text
+                style={[styles.chartStatLabel, { fontSize: rs(10, 11, 11) }]}
+              >
+                Avg. Prep
+              </Text>
+            </View>
           </View>
 
           <LineChart
             data={{
               labels: stats.labels,
-              datasets: [{ data: stats.chartValues }],
+              datasets: [
+                { data: stats.chartValues.length ? stats.chartValues : [0] },
+              ],
             }}
-            width={screenWidth - 32}
-            height={200}
+            width={chartW}
+            height={rs(150, 170, 185)}
             yAxisSuffix="₹"
             chartConfig={{
-              backgroundGradientFrom: "#ffffff",
-              backgroundGradientTo: "#ffffff",
+              backgroundGradientFrom: C.surface,
+              backgroundGradientTo: C.surface,
               decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(15, 240, 34, ${opacity})`,
-              labelColor: () => "#888",
+              color: (opacity = 1) => `rgba(14, 230, 39, ${opacity})`,
+              labelColor: () => C.textLight,
               propsForDots: {
-                r: "4",
+                r: "5",
                 strokeWidth: "2",
-                stroke: "#0ff022",
+                stroke: C.primary,
+                fill: C.surface,
               },
               propsForBackgroundLines: {
-                stroke: "#eee",
+                stroke: C.border,
+                strokeDasharray: "4",
               },
             }}
             bezier
-            style={{
-              borderRadius: 16,
-              marginTop: 10,
-            }}
+            style={{ borderRadius: 12, marginTop: 10, marginLeft: -8 }}
           />
         </View>
 
-        {/* TOP PRODUCTS */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Top Products</Text>
-            <Text style={styles.link}>View All</Text>
+        {/* ── GOAL + EFFICIENCY ─────────────────────────────── */}
+        <View
+          style={[
+            styles.twoCol,
+            {
+              marginHorizontal: rs(12, 14, 16),
+              marginTop: rs(10, 12, 14),
+              gap: rs(8, 10, 12),
+            },
+          ]}
+        >
+          {/* Goal */}
+          <View
+            style={[
+              styles.card,
+              { flex: 1, marginHorizontal: 0, marginTop: 0 },
+            ]}
+          >
+            <Text
+              style={[
+                styles.cardTitle,
+                { fontSize: rs(13, 14, 15), marginBottom: 12 },
+              ]}
+            >
+              Goal Overview
+            </Text>
+            <View style={styles.goalRingWrap}>
+              <View
+                style={[
+                  styles.goalRing,
+                  {
+                    width: rs(76, 86, 96),
+                    height: rs(76, 86, 96),
+                    borderRadius: rs(38, 43, 48),
+                    borderWidth: rs(7, 8, 10),
+                  },
+                ]}
+              >
+                <Text style={[styles.goalPct, { fontSize: rs(15, 17, 19) }]}>
+                  {goalPct}%
+                </Text>
+              </View>
+            </View>
+            <View style={{ gap: 8, marginTop: 12 }}>
+              <View style={styles.goalRow}>
+                <View
+                  style={[styles.goalDot, { backgroundColor: C.primary }]}
+                />
+                <Text style={[styles.goalLabel, { fontSize: rs(10, 11, 11) }]}>
+                  Monthly Total
+                </Text>
+                <Text style={[styles.goalNum, { fontSize: rs(11, 12, 12) }]}>
+                  {stats.monthly.totalOrders}
+                </Text>
+              </View>
+              <View style={styles.goalRow}>
+                <View style={[styles.goalDot, { backgroundColor: C.blue }]} />
+                <Text style={[styles.goalLabel, { fontSize: rs(10, 11, 11) }]}>
+                  Today
+                </Text>
+                <Text style={[styles.goalNum, { fontSize: rs(11, 12, 12) }]}>
+                  {stats.today.totalOrders}
+                </Text>
+              </View>
+            </View>
           </View>
 
+          {/* Efficiency */}
+          <View
+            style={[
+              styles.card,
+              { flex: 1, marginHorizontal: 0, marginTop: 0 },
+            ]}
+          >
+            <Text
+              style={[
+                styles.cardTitle,
+                { fontSize: rs(13, 14, 15), marginBottom: 12 },
+              ]}
+            >
+              Efficiency
+            </Text>
+            <View style={styles.effBlock}>
+              <View
+                style={[
+                  styles.effIcon,
+                  {
+                    backgroundColor: C.primaryDim,
+                    width: rs(38, 42, 46),
+                    height: rs(38, 42, 46),
+                    borderRadius: rs(11, 12, 13),
+                  },
+                ]}
+              >
+                <MaterialIcons
+                  name="schedule"
+                  size={rs(18, 20, 22)}
+                  color={C.primaryDark}
+                />
+              </View>
+              <Text style={[styles.effLabel, { fontSize: rs(10, 10, 11) }]}>
+                Avg. Prep Time
+              </Text>
+              <Text
+                style={[
+                  styles.effVal,
+                  { fontSize: rs(18, 20, 22), color: C.primaryDark },
+                ]}
+              >
+                {stats.monthly.avgPrepTime}
+                <Text style={{ fontSize: rs(11, 12, 13) }}> min</Text>
+              </Text>
+            </View>
+            <View style={styles.effDivider} />
+            <View style={styles.effBlock}>
+              <View
+                style={[
+                  styles.effIcon,
+                  {
+                    backgroundColor: C.purpleDim,
+                    width: rs(38, 42, 46),
+                    height: rs(38, 42, 46),
+                    borderRadius: rs(11, 12, 13),
+                  },
+                ]}
+              >
+                <MaterialIcons
+                  name="moped"
+                  size={rs(18, 20, 22)}
+                  color={C.purple}
+                />
+              </View>
+              <Text style={[styles.effLabel, { fontSize: rs(10, 10, 11) }]}>
+                Avg. Delivery
+              </Text>
+              <Text
+                style={[
+                  styles.effVal,
+                  { fontSize: rs(18, 20, 22), color: C.purple },
+                ]}
+              >
+                {stats.monthly.deliveryTime}
+                <Text style={{ fontSize: rs(11, 12, 13) }}> min</Text>
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── TOP PRODUCTS ──────────────────────────────────── */}
+        <View
+          style={[
+            styles.card,
+            { marginHorizontal: rs(12, 14, 16), marginTop: rs(10, 12, 14) },
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <View>
+              <Text style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}>
+                PERFORMANCE
+              </Text>
+              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 16) }]}>
+                Top Selling Products
+              </Text>
+            </View>
+            <View style={[styles.badgePill, { backgroundColor: C.primaryDim }]}>
+              <MaterialIcons
+                name="trending-up"
+                size={12}
+                color={C.primaryDark}
+              />
+              <Text
+                style={[
+                  styles.badgePillText,
+                  { color: C.primaryDark, fontSize: rs(9, 10, 10) },
+                ]}
+              >
+                Live
+              </Text>
+            </View>
+          </View>
           {stats.topProducts && stats.topProducts.length > 0 ? (
             stats.topProducts.map((p, i) => (
-              <Product
+              <ProductRow
                 key={i}
+                rank={i + 1}
                 name={p.name}
-                sold={`${p.sold} units sold`}
-                price={`₹${Number(p.revenue).toLocaleString()}`}
-                tag={i === 0 ? "Best Seller" : i < 3 ? "Trending" : ""}
+                sold={p.sold}
+                revenue={p.revenue}
+                tag={i === 0 ? "Best Seller" : i < 3 ? "Trending" : null}
                 image={
                   p.image ||
                   "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&q=80"
                 }
+                rs={rs}
               />
             ))
           ) : (
-            <Text
-              style={{ color: "#888", textAlign: "center", marginVertical: 20 }}
-            >
-              No sales data yet
-            </Text>
+            <EmptyState icon="bar-chart" message="No sales data yet" />
           )}
         </View>
 
-        {/* DELIVERY EFFICIENCY */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Delivery Efficiency</Text>
-
-          <View style={styles.deliveryRow}>
-            <View style={styles.deliveryCard}>
-              <MaterialIcons name="schedule" size={20} color="#0ff022" />
-              <Text style={styles.deliveryLabel}>Avg. Prep Time</Text>
-              <Text style={styles.deliveryValue}>{curr.avgPrepTime} min</Text>
+        {/* ── LATEST REVIEWS ────────────────────────────────── */}
+        <View
+          style={[
+            styles.card,
+            { marginHorizontal: rs(12, 14, 16), marginTop: rs(10, 12, 14) },
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <View>
+              <Text style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}>
+                FEEDBACK
+              </Text>
+              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 16) }]}>
+                Latest Reviews
+              </Text>
             </View>
-
-            <View style={styles.deliveryCard}>
-              <MaterialIcons name="moped" size={20} color="#0ff022" />
-              <Text style={styles.deliveryLabel}>Delivery Time</Text>
-              <Text style={styles.deliveryValue}>{curr.deliveryTime} min</Text>
-            </View>
+            <TouchableOpacity
+              style={[styles.viewMoreBtn]}
+              onPress={() => setReviewsModal(true)}
+            >
+              <Text style={[styles.viewMoreText, { fontSize: rs(11, 12, 12) }]}>
+                View all
+              </Text>
+              <MaterialIcons
+                name="arrow-forward-ios"
+                size={10}
+                color={C.primary}
+              />
+            </TouchableOpacity>
           </View>
+          {displayReviews.length > 0
+            ? displayReviews
+                .slice(0, 3)
+                .map((r, i) => <ReviewRow key={i} review={r} rs={rs} />)
+            : null}
         </View>
 
-        <View style={{ height: 100 }} />
+        {/* ── DELIVERY PARTNERS ─────────────────────────────── */}
+        <View
+          style={[
+            styles.card,
+            { marginHorizontal: rs(12, 14, 16), marginTop: rs(10, 12, 14) },
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <View>
+              <Text style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}>
+                NETWORK
+              </Text>
+              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 16) }]}>
+                Delivery Partners
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.viewMoreBtn}
+              onPress={() => setPartnersModal(true)}
+            >
+              <Text style={[styles.viewMoreText, { fontSize: rs(11, 12, 12) }]}>
+                See all
+              </Text>
+              <MaterialIcons
+                name="arrow-forward-ios"
+                size={10}
+                color={C.primary}
+              />
+            </TouchableOpacity>
+          </View>
+          {displayPartners.length > 0
+            ? displayPartners
+                .slice(0, 3)
+                .map((d, i) => (
+                  <DeliveryRow key={i} index={i} partner={d} rs={rs} />
+                ))
+            : null}
+        </View>
       </ScrollView>
+
+      {/* ── NOTIFICATIONS MODAL ─────────────────────────────── */}
+      <Modal
+        visible={notifVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setNotifVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={() => setNotifVisible(false)}
+        />
+        <View
+          style={[
+            styles.sheet,
+            { paddingBottom: Platform.OS === "ios" ? 34 : 20 },
+          ]}
+        >
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <View>
+              <Text style={styles.sheetTitle}>Notifications</Text>
+              {unreadCount > 0 && (
+                <Text style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>
+                  {unreadCount} unread
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity
+              onPress={() => setNotifVisible(false)}
+              style={styles.closeIconBtn}
+            >
+              <MaterialIcons name="close" size={20} color={C.text} />
+            </TouchableOpacity>
+          </View>
+          {notifications.length > 0 ? (
+            <FlatList
+              data={notifications}
+              keyExtractor={(_, i) => i.toString()}
+              renderItem={({ item }) => <NotifItem item={item} />}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            />
+          ) : (
+            <EmptyState
+              icon="notifications-none"
+              message="You're all caught up!"
+            />
+          )}
+        </View>
+      </Modal>
+
+      {/* ── ALL REVIEWS MODAL ───────────────────────────────── */}
+      <Modal
+        visible={reviewsModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setReviewsModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={() => setReviewsModal(false)}
+        />
+        <View
+          style={[
+            styles.sheet,
+            {
+              maxHeight: "80%",
+              paddingBottom: Platform.OS === "ios" ? 34 : 20,
+            },
+          ]}
+        >
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>All Reviews</Text>
+            <TouchableOpacity
+              onPress={() => setReviewsModal(false)}
+              style={styles.closeIconBtn}
+            >
+              <MaterialIcons name="close" size={20} color={C.text} />
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={allReviews}
+            keyExtractor={(_, i) => i.toString()}
+            renderItem={({ item }) => (
+              <View style={{ paddingHorizontal: 18 }}>
+                <ReviewRow review={item} rs={(sm, md, lg) => md} />
+              </View>
+            )}
+            ListEmptyComponent={
+              <EmptyState icon="star-border" message="No reviews yet" />
+            }
+            contentContainerStyle={{ paddingBottom: 40 }}
+          />
+        </View>
+      </Modal>
+
+      {/* ── ALL PARTNERS MODAL ──────────────────────────────── */}
+      <Modal
+        visible={partnersModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPartnersModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={() => setPartnersModal(false)}
+        />
+        <View
+          style={[
+            styles.sheet,
+            {
+              maxHeight: "80%",
+              paddingBottom: Platform.OS === "ios" ? 34 : 20,
+            },
+          ]}
+        >
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>All Delivery Partners</Text>
+            <TouchableOpacity
+              onPress={() => setPartnersModal(false)}
+              style={styles.closeIconBtn}
+            >
+              <MaterialIcons name="close" size={20} color={C.text} />
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={allPartners}
+            keyExtractor={(_, i) => i.toString()}
+            renderItem={({ item, index }) => (
+              <View style={{ paddingHorizontal: 18 }}>
+                <DeliveryRow
+                  index={index}
+                  partner={item}
+                  rs={(sm, md, lg) => md}
+                />
+              </View>
+            )}
+            ListEmptyComponent={
+              <EmptyState icon="moped" message="No partners yet" />
+            }
+            contentContainerStyle={{ paddingBottom: 40 }}
+          />
+        </View>
+      </Modal>
+
+      {/* ── SEARCH MODAL ────────────────────────────────────── */}
+      <Modal
+        visible={searchVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setSearchVisible(false);
+          setSearchQuery("");
+          setSearchResults([]);
+        }}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)" }}>
+          <View style={styles.searchModal}>
+            <View style={styles.searchModalHeader}>
+              <View style={styles.searchInputRow}>
+                <MaterialIcons name="search" size={18} color={C.textLight} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search inventory, products, earnings…"
+                  placeholderTextColor={C.textLight}
+                  autoFocus
+                  value={searchQuery}
+                  onChangeText={handleSearch}
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSearchQuery("");
+                      setSearchResults([]);
+                    }}
+                  >
+                    <MaterialIcons name="close" size={18} color={C.textLight} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <TouchableOpacity
+                style={styles.searchCancelBtn}
+                onPress={() => {
+                  setSearchVisible(false);
+                  setSearchQuery("");
+                  setSearchResults([]);
+                }}
+              >
+                <Text
+                  style={{ color: C.primary, fontWeight: "700", fontSize: 14 }}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {searchLoading ? (
+              <ActivityIndicator color={C.primary} style={{ marginTop: 40 }} />
+            ) : searchResults.length > 0 ? (
+              <FlatList
+                data={searchResults}
+                keyExtractor={(_, i) => i.toString()}
+                renderItem={({ item }) => {
+                  // ── Config map ──────────────────────────────────────────────
+                  const stockColor =
+                    item.stockStatus === "out"
+                      ? "#EF4444"
+                      : item.stockStatus === "low"
+                        ? C.orange
+                        : "#16A34A";
+
+                  const stockLabel =
+                    item.stockStatus === "out"
+                      ? "Out of Stock"
+                      : item.stockStatus === "low"
+                        ? "Low Stock"
+                        : "In Stock";
+
+                  const stockBg =
+                    item.stockStatus === "out"
+                      ? "#FEF2F2"
+                      : item.stockStatus === "low"
+                        ? C.orangeDim
+                        : C.primaryDim;
+
+                  const typeMap = {
+                    inventory: {
+                      icon: "inventory",
+                      iconColor: C.primaryDark,
+                      iconBg: C.primaryDim,
+                      badgeLabel: "Inventory",
+                      badgeColor: C.primaryDark,
+                      badgeBg: C.primaryDim,
+                      mainText: item.name,
+                      subText: `${item.unit || ""}${item.category ? " · " + item.category : ""}`,
+                      rightTop: `${item.stock_qty ?? 0} units`,
+                      rightTopColor: stockColor,
+                      rightBottom: stockLabel,
+                      rightBottomBg: stockBg,
+                      rightBottomColor: stockColor,
+                    },
+                    product: {
+                      icon: "shopping-bag",
+                      iconColor: C.blue,
+                      iconBg: C.blueDim,
+                      badgeLabel: "Product",
+                      badgeColor: C.blue,
+                      badgeBg: C.blueDim,
+                      mainText: item.name,
+                      subText: `${item.unit || ""}${item.category ? " · " + item.category : ""}`,
+                      rightTop: `₹${item.price}`,
+                      rightTopColor: C.blue,
+                      rightBottom:
+                        item.stock_qty != null
+                          ? `Stock: ${item.stock_qty}`
+                          : "",
+                      rightBottomBg: C.blueDim,
+                      rightBottomColor: C.blue,
+                    },
+                    partner: {
+                      icon: "moped",
+                      iconColor: C.purple,
+                      iconBg: C.purpleDim,
+                      badgeLabel: "Partner",
+                      badgeColor: C.purple,
+                      badgeBg: C.purpleDim,
+                      mainText: item.name,
+                      subText: `${item.orders_count ?? 0} orders delivered`,
+                      rightTop: `⭐ ${item.rating ?? 0}`,
+                      rightTopColor: C.orange,
+                      rightBottom: item.status,
+                      rightBottomBg:
+                        item.status === "Online" ? C.primaryDim : "#F1F5F9",
+                      rightBottomColor:
+                        item.status === "Online" ? C.primaryDark : C.textSub,
+                    },
+                    top_product: {
+                      icon: "trending-up",
+                      iconColor: C.orange,
+                      iconBg: C.orangeDim,
+                      badgeLabel: "Top Seller",
+                      badgeColor: C.orange,
+                      badgeBg: C.orangeDim,
+                      mainText: item.name,
+                      subText: `${item.sold ?? 0} units sold`,
+                      rightTop: `₹${Number(item.revenue ?? 0).toLocaleString("en-IN")}`,
+                      rightTopColor: C.orange,
+                      rightBottom: "Revenue",
+                      rightBottomBg: C.orangeDim,
+                      rightBottomColor: C.orange,
+                    },
+                    earnings: {
+                      icon: "payments",
+                      iconColor: "#16A34A",
+                      iconBg: "#ECFDF5",
+                      badgeLabel: "Earnings",
+                      badgeColor: "#16A34A",
+                      badgeBg: "#ECFDF5",
+                      mainText: item.name,
+                      subText: item.sub || "",
+                      rightTop: item.detail,
+                      rightTopColor: "#16A34A",
+                      rightBottom: "",
+                      rightBottomBg: "transparent",
+                      rightBottomColor: "transparent",
+                    },
+                    orders: {
+                      icon: "receipt-long",
+                      iconColor: C.blue,
+                      iconBg: C.blueDim,
+                      badgeLabel: "Orders",
+                      badgeColor: C.blue,
+                      badgeBg: C.blueDim,
+                      mainText: item.name,
+                      subText: item.sub || "",
+                      rightTop: item.detail,
+                      rightTopColor: C.blue,
+                      rightBottom: "",
+                      rightBottomBg: "transparent",
+                      rightBottomColor: "transparent",
+                    },
+                  };
+
+                  const cfg = typeMap[item._type] || typeMap.product;
+
+                  return (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 12,
+                        paddingHorizontal: 18,
+                        paddingVertical: 13,
+                        borderBottomWidth: 1,
+                        borderBottomColor: C.border,
+                      }}
+                    >
+                      {/* Icon */}
+                      <View
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 12,
+                          backgroundColor: cfg.iconBg,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <MaterialIcons
+                          name={cfg.icon}
+                          size={20}
+                          color={cfg.iconColor}
+                        />
+                      </View>
+
+                      {/* Middle: name + sub + badge */}
+                      <View style={{ flex: 1 }}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 6,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 14,
+                              fontWeight: "700",
+                              color: C.text,
+                              flexShrink: 1,
+                            }}
+                            numberOfLines={1}
+                          >
+                            {cfg.mainText}
+                          </Text>
+                          <View
+                            style={{
+                              paddingHorizontal: 7,
+                              paddingVertical: 2,
+                              borderRadius: 999,
+                              backgroundColor: cfg.badgeBg,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 9,
+                                fontWeight: "800",
+                                color: cfg.badgeColor,
+                              }}
+                            >
+                              {cfg.badgeLabel}
+                            </Text>
+                          </View>
+                        </View>
+                        {cfg.subText ? (
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              color: C.textSub,
+                              marginTop: 2,
+                            }}
+                            numberOfLines={1}
+                          >
+                            {cfg.subText}
+                          </Text>
+                        ) : null}
+                      </View>
+
+                      {/* Right: value + status pill */}
+                      <View
+                        style={{
+                          alignItems: "flex-end",
+                          gap: 4,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            fontWeight: "800",
+                            color: cfg.rightTopColor,
+                          }}
+                        >
+                          {cfg.rightTop}
+                        </Text>
+                        {cfg.rightBottom ? (
+                          <View
+                            style={{
+                              paddingHorizontal: 7,
+                              paddingVertical: 2,
+                              borderRadius: 999,
+                              backgroundColor: cfg.rightBottomBg,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 9,
+                                fontWeight: "700",
+                                color: cfg.rightBottomColor,
+                              }}
+                            >
+                              {cfg.rightBottom}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                  );
+                }}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              />
+            ) : searchQuery.length > 0 ? (
+              <View style={styles.empty}>
+                <MaterialIcons name="search-off" size={40} color={C.border} />
+                <Text style={styles.emptyText}>
+                  No results for "{searchQuery}"
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.empty}>
+                <MaterialIcons
+                  name="manage-search"
+                  size={40}
+                  color={C.border}
+                />
+                <Text style={styles.emptyText}>
+                  Search your inventory or products
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── LOCATION MODAL ──────────────────────────────────── */}
+      <Modal
+        visible={locModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setLocModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={() => setLocModalVisible(false)}
+        />
+        <View style={styles.locModal}>
+          <Text style={styles.sheetTitle}>Store Location</Text>
+          <Text style={{ color: C.textSub, fontSize: 13, marginBottom: 14 }}>
+            This is pulled from your store profile. To change it permanently,
+            update your store address in Settings.
+          </Text>
+          <View style={styles.locCurrentRow}>
+            <MaterialIcons name="location-on" size={18} color={C.primary} />
+            <Text
+              style={{
+                fontSize: 15,
+                fontWeight: "700",
+                color: C.text,
+                flex: 1,
+              }}
+            >
+              {vendorLocation || "Not set"}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.ctaBtn,
+              { marginTop: 16, alignSelf: "stretch", justifyContent: "center" },
+            ]}
+            onPress={() => {
+              setLocModalVisible(false);
+              navigation.navigate("VendorOnboarding");
+            }}
+          >
+            <MaterialIcons name="edit" size={16} color="#000" />
+            <Text style={styles.ctaBtnText}>Edit in Store Settings</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ marginTop: 12, alignSelf: "center" }}
+            onPress={() => setLocModalVisible(false)}
+          >
+            <Text style={{ color: C.textSub, fontSize: 14 }}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 }
 
-function Product({ name, sold, price, tag, image }) {
+// ─── Sub-components ────────────────────────────────────────────
+
+function StatusBanner({ title, message, bg, border, textColor, missingDocs }) {
   return (
-    <View style={styles.productCard}>
-      <Image source={{ uri: image }} style={styles.productImage} />
+    <View
+      style={[styles.banner, { backgroundColor: bg, borderLeftColor: border }]}
+    >
+      <Text style={[styles.bannerTitle, { color: textColor }]}>{title}</Text>
+      <Text style={[styles.bannerMsg, { color: textColor }]}>{message}</Text>
+      {missingDocs.length > 0 && (
+        <View style={{ marginTop: 8 }}>
+          <Text
+            style={[styles.bannerTitle, { color: textColor, marginBottom: 4 }]}
+          >
+            📄 Missing Documents:
+          </Text>
+          {missingDocs.map((doc) => (
+            <Text key={doc} style={[styles.bannerDoc, { color: textColor }]}>
+              • {doc}
+            </Text>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
 
-      <View style={{ flex: 1 }}>
-        <Text style={styles.productName}>{name}</Text>
-        <Text style={styles.productSold}>{sold}</Text>
-      </View>
-
-      <View style={{ alignItems: "flex-end" }}>
-        <Text style={styles.productPrice}>{price}</Text>
-        <Text style={styles.productTag}>{tag}</Text>
+function MiniMetricCard({ label, value, icon, iconColor, iconBg, rs }) {
+  return (
+    <View
+      style={[
+        styles.miniCard,
+        { padding: rs(10, 11, 12), borderRadius: rs(12, 13, 14) },
+      ]}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <View
+          style={[
+            styles.miniIcon,
+            {
+              width: rs(28, 30, 32),
+              height: rs(28, 30, 32),
+              borderRadius: rs(8, 9, 10),
+              backgroundColor: iconBg,
+            },
+          ]}
+        >
+          <MaterialIcons name={icon} size={rs(14, 15, 16)} color={iconColor} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.miniLabel, { fontSize: rs(9, 10, 10) }]}>
+            {label}
+          </Text>
+          <Text
+            style={[
+              styles.miniValue,
+              { fontSize: rs(13, 14, 15), color: iconColor },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {value}
+          </Text>
+        </View>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f8f6",
-    paddingTop: 40,
-  },
+function ProductRow({ rank, name, sold, revenue, tag, image, rs }) {
+  return (
+    <View style={styles.productRow}>
+      <Text style={[styles.productRank, { fontSize: rs(11, 12, 12) }]}>
+        #{rank}
+      </Text>
+      <Image
+        source={{ uri: image }}
+        style={[
+          styles.productImg,
+          {
+            width: rs(38, 42, 46),
+            height: rs(38, 42, 46),
+            borderRadius: rs(10, 11, 12),
+          },
+        ]}
+      />
+      <View style={{ flex: 1 }}>
+        <Text
+          style={[styles.productName, { fontSize: rs(12, 13, 14) }]}
+          numberOfLines={1}
+        >
+          {name}
+        </Text>
+        <Text style={[styles.productSold, { fontSize: rs(10, 11, 11) }]}>
+          {sold} units sold
+        </Text>
+      </View>
+      <View style={{ alignItems: "flex-end", gap: 4 }}>
+        <Text style={[styles.productRevenue, { fontSize: rs(12, 13, 14) }]}>
+          ₹{Number(revenue).toLocaleString()}
+        </Text>
+        {tag && (
+          <View
+            style={[
+              styles.tagPill,
+              {
+                backgroundColor:
+                  tag === "Best Seller" ? C.primaryDim : C.orangeDim,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.tagText,
+                {
+                  color: tag === "Best Seller" ? C.primaryDark : C.orange,
+                  fontSize: rs(8, 9, 9),
+                },
+              ]}
+            >
+              {tag}
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
 
+function ReviewRow({ review, rs }) {
+  const name = review.customer_name || review.name || "Customer";
+  const rating = review.rating || 0;
+  const comment = review.comment || review.quote || "";
+  const positive = rating >= 3;
+  const initials = name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return (
+    <View style={styles.reviewRow}>
+      <View
+        style={[
+          styles.reviewAvatar,
+          {
+            width: rs(34, 36, 40),
+            height: rs(34, 36, 40),
+            borderRadius: rs(17, 18, 20),
+            backgroundColor: positive ? C.primaryDim : "#FEF2F2",
+          },
+        ]}
+      >
+        <Text
+          style={[
+            styles.reviewInitials,
+            {
+              fontSize: rs(11, 12, 13),
+              color: positive ? C.primaryDark : "#EF4444",
+            },
+          ]}
+        >
+          {initials}
+        </Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.reviewName, { fontSize: rs(12, 13, 14) }]}>
+          {name}
+        </Text>
+        <Text
+          style={[styles.reviewQuote, { fontSize: rs(10, 11, 11) }]}
+          numberOfLines={1}
+        >
+          {comment}
+        </Text>
+      </View>
+      <View
+        style={[
+          styles.ratingBadge,
+          { backgroundColor: positive ? C.primaryDim : "#FEF2F2" },
+        ]}
+      >
+        <Text style={{ fontSize: 10 }}>⭐</Text>
+        <Text
+          style={[
+            styles.ratingText,
+            {
+              color: positive ? C.primaryDark : "#EF4444",
+              fontSize: rs(11, 12, 12),
+            },
+          ]}
+        >
+          {Number(rating).toFixed(1)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function StaticReviewRow({ data, rs }) {
+  return (
+    <View style={styles.reviewRow}>
+      <View
+        style={[
+          styles.reviewAvatar,
+          {
+            width: rs(34, 36, 40),
+            height: rs(34, 36, 40),
+            borderRadius: rs(17, 18, 20),
+            backgroundColor: data.positive ? C.primaryDim : "#FEF2F2",
+          },
+        ]}
+      >
+        <Text
+          style={[
+            styles.reviewInitials,
+            {
+              fontSize: rs(11, 12, 13),
+              color: data.positive ? C.primaryDark : "#EF4444",
+            },
+          ]}
+        >
+          {data.initials}
+        </Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.reviewName, { fontSize: rs(12, 13, 14) }]}>
+          {data.name}
+        </Text>
+        <Text
+          style={[styles.reviewQuote, { fontSize: rs(10, 11, 11) }]}
+          numberOfLines={1}
+        >
+          {data.quote}
+        </Text>
+      </View>
+      <View
+        style={[
+          styles.ratingBadge,
+          { backgroundColor: data.positive ? C.primaryDim : "#FEF2F2" },
+        ]}
+      >
+        <Text style={{ fontSize: 10 }}>⭐</Text>
+        <Text
+          style={[
+            styles.ratingText,
+            {
+              color: data.positive ? C.primaryDark : "#EF4444",
+              fontSize: rs(11, 12, 12),
+            },
+          ]}
+        >
+          {data.rating.toFixed(1)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function DeliveryRow({ index, partner, rs }) {
+  const name = partner.name || partner.driver_name || "Driver";
+  const status = partner.status || (partner.is_online ? "Online" : "Offline");
+  const orders = partner.orders_count ?? partner.deliveries_today ?? 0;
+  const score = partner.rating ?? partner.score ?? 0;
+  const scoreColor =
+    score >= 4 ? "#059669" : score >= 3 ? "#F59E0B" : "#EF4444";
+  const scoreBg = score >= 4 ? "#ECFDF5" : score >= 3 ? "#FFFBEB" : "#FEF2F2";
+  const initials = name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return (
+    <View style={styles.deliveryRow}>
+      <Text style={[styles.deliveryRank, { fontSize: rs(10, 11, 12) }]}>
+        {index + 1}
+      </Text>
+      <View
+        style={[
+          styles.deliveryAvatar,
+          {
+            width: rs(34, 36, 40),
+            height: rs(34, 36, 40),
+            borderRadius: rs(17, 18, 20),
+          },
+        ]}
+      >
+        <Text style={[styles.deliveryInitials, { fontSize: rs(11, 12, 13) }]}>
+          {initials}
+        </Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.deliveryName, { fontSize: rs(12, 13, 14) }]}>
+          {name}
+        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: status === "Online" ? "#22c55e" : "#94a3b8" },
+            ]}
+          />
+          <Text style={[styles.deliverySub, { fontSize: rs(10, 11, 11) }]}>
+            {status} · {orders} orders
+          </Text>
+        </View>
+      </View>
+      <View style={[styles.scoreBadge, { backgroundColor: scoreBg }]}>
+        <Text style={{ fontSize: 10 }}>⭐</Text>
+        <Text
+          style={[
+            styles.scoreText,
+            { color: scoreColor, fontSize: rs(11, 11, 12) },
+          ]}
+        >
+          {score}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function StaticDeliveryRow({ index, data, rs }) {
+  return (
+    <View style={styles.deliveryRow}>
+      <Text style={[styles.deliveryRank, { fontSize: rs(10, 11, 12) }]}>
+        {index + 1}
+      </Text>
+      <View
+        style={[
+          styles.deliveryAvatar,
+          {
+            width: rs(34, 36, 40),
+            height: rs(34, 36, 40),
+            borderRadius: rs(17, 18, 20),
+          },
+        ]}
+      >
+        <Text style={[styles.deliveryInitials, { fontSize: rs(11, 12, 13) }]}>
+          {data.initials}
+        </Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.deliveryName, { fontSize: rs(12, 13, 14) }]}>
+          {data.name}
+        </Text>
+        <Text style={[styles.deliverySub, { fontSize: rs(10, 11, 11) }]}>
+          {data.sub}
+        </Text>
+      </View>
+      <View style={[styles.scoreBadge, { backgroundColor: data.color + "18" }]}>
+        <Text style={{ fontSize: 10 }}>⭐</Text>
+        <Text
+          style={[
+            styles.scoreText,
+            { color: data.color, fontSize: rs(11, 11, 12) },
+          ]}
+        >
+          {data.score}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function NotifItem({ item }) {
+  const typeMap = {
+    order: { icon: "receipt", color: "#059669", bg: "#ECFDF5" },
+    delivery: { icon: "moped", color: "#6366F1", bg: "#EEF2FF" },
+    review: { icon: "star", color: "#F59E0B", bg: "#FFFBEB" },
+    system: { icon: "info-outline", color: "#3B82F6", bg: "#EFF6FF" },
+  };
+  const t = typeMap[item.type] || typeMap.system;
+  return (
+    <View
+      style={[
+        styles.notifItem,
+        !item.read && { backgroundColor: C.primaryDim },
+      ]}
+    >
+      <View style={[styles.notifIcon, { backgroundColor: t.bg }]}>
+        <MaterialIcons name={t.icon} size={18} color={t.color} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.notifTitle}>{item.title || item.message}</Text>
+        {item.body && <Text style={styles.notifBody}>{item.body}</Text>}
+        <Text style={styles.notifTime}>
+          {item.time || item.created_at || ""}
+        </Text>
+      </View>
+      {!item.read && <View style={styles.unreadDot} />}
+    </View>
+  );
+}
+
+function EmptyState({ icon, message }) {
+  return (
+    <View style={styles.empty}>
+      <MaterialIcons name={icon} size={40} color={C.border} />
+      <Text style={styles.emptyText}>{message}</Text>
+    </View>
+  );
+}
+
+// ─── Styles ────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  centered: { flex: 1, alignItems: "center", justifyContent: "center" },
+
+  loadingCard: {
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: C.surface,
+    padding: 32,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  loadingText: { color: C.textSub, fontSize: 14, fontWeight: "500" },
+
+  // ── Header ──
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    padding: 16,
-  },
-
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-  },
-
-  calendarBtn: {
-    backgroundColor: "#eee",
-    padding: 8,
-    borderRadius: 8,
-  },
-
-  tabs: {
-    flexDirection: "row",
-    justifyContent: "space-around",
+    gap: 8,
+    backgroundColor: C.surface,
+    paddingBottom: 12,
     borderBottomWidth: 1,
-    borderColor: "#eee",
+    borderBottomColor: C.border,
   },
-
-  tab: {
-    padding: 12,
-    color: "#888",
-    fontWeight: "600",
+  logoWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
+  logoIconBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: C.primary,
   },
+  logoImg: { width: "100%", height: "100%" },
+  logoText: { fontWeight: "900", color: C.text, letterSpacing: -0.5 },
 
-  tabActive: {
-    padding: 12,
-    color: "#000",
-    borderBottomWidth: 3,
-    borderColor: "#0ff022",
-    fontWeight: "700",
-  },
-
-  metricsRow: {
+  locationChip: {
     flexDirection: "row",
-    padding: 16,
-    gap: 10,
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: C.primaryDim,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    maxWidth: 120,
   },
+  locationChipText: { color: C.text, fontWeight: "600", flexShrink: 1 },
 
-  metricCard: {
-    flex: 1,
-    backgroundColor: "#0ff02210",
-    borderRadius: 12,
-    padding: 14,
-  },
-
-  metricLabel: {
-    fontSize: 10,
-    color: "#666",
-  },
-
-  metricRow: {
+  searchBar: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    backgroundColor: C.bg,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minWidth: 80,
   },
+  searchText: { color: C.textLight, flex: 1 },
 
-  metricValue: {
-    fontSize: 22,
-    fontWeight: "700",
+  iconBtn: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.border,
+    position: "relative",
   },
-
-  metricUp: {
-    fontSize: 12,
-    color: "green",
-    fontWeight: "700",
+  notifBadge: {
+    position: "absolute",
+    top: 5,
+    right: 5,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#F43F5E",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 2,
   },
+  notifBadgeText: { fontSize: 9, fontWeight: "800", color: "#fff" },
 
-  section: {
-    paddingHorizontal: 16,
-    marginTop: 20,
+  avatarBtn: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: C.primaryDim,
   },
+  avatarInitials: { fontWeight: "800", color: C.primaryDark },
 
-  sectionHeader: {
+  // ── Banner ──
+  banner: {
+    marginHorizontal: 14,
+    marginTop: 10,
+    padding: 14,
+    borderRadius: 14,
+    borderLeftWidth: 4,
+  },
+  bannerTitle: { fontWeight: "700", fontSize: 13, marginBottom: 4 },
+  bannerMsg: { fontSize: 12, lineHeight: 18 },
+  bannerDoc: { fontSize: 12, marginTop: 2 },
+
+  // ── Greeting ──
+  greetingCard: {
+    backgroundColor: C.surface,
+    borderRadius: 20,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  greetingBlobTop: {
+    position: "absolute",
+    top: -30,
+    right: -30,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: C.primaryDim,
+  },
+  greetingBlobBot: {
+    position: "absolute",
+    bottom: -20,
+    left: -20,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#3B82F608",
+  },
+  greetingEmojiBubble: { alignItems: "center", justifyContent: "center" },
+  greetingTimeText: { fontWeight: "500" },
+  greetingBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  greetingBadgeText: { fontWeight: "700", letterSpacing: 0.3 },
+  greetingName: { fontWeight: "800", color: C.text, letterSpacing: -0.5 },
+  greetingSub: { fontWeight: "600", marginTop: 2 },
+
+  greetingStrip: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 10,
+    backgroundColor: C.bg,
+    borderRadius: 14,
+    marginTop: 14,
+    padding: 12,
   },
-
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
+  greetingStripItem: { flex: 1, alignItems: "center" },
+  greetingStripDivider: {
+    width: 1,
+    backgroundColor: C.border,
+    marginHorizontal: 8,
   },
-
-  sectionHint: {
-    fontSize: 12,
-    color: "#777",
-  },
-
-  chart: {
-    height: 160,
-    backgroundColor: "#f2f2f2",
-    borderRadius: 12,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    padding: 10,
-  },
-
-  bar: {
-    width: 12,
-    backgroundColor: "#0ff022",
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
-  },
-
-  chartLabels: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 6,
+  greetingStripVal: { fontSize: 16, fontWeight: "800", letterSpacing: -0.3 },
+  greetingStripLabel: {
     fontSize: 10,
+    color: C.textSub,
+    marginTop: 2,
+    fontWeight: "500",
   },
 
-  productCard: {
+  // ── Hero ──
+  heroCard: {
+    backgroundColor: C.accent,
+    shadowColor: C.accent,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
+    overflow: "hidden",
+  },
+  heroGlowDot: {
+    position: "absolute",
+    top: -40,
+    right: -40,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: "rgba(14,230,39,0.07)",
+  },
+  heroPulse: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: C.primary,
+  },
+  heroTopLabel: {
+    color: "rgba(255,255,255,0.5)",
+    fontWeight: "700",
+    letterSpacing: 0.8,
+  },
+  heroValue: { fontWeight: "900", color: "#fff", letterSpacing: -1 },
+  heroChangeBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f7f7f7",
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 10,
+    gap: 3,
+    backgroundColor: C.primaryDim,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
   },
-
-  productImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    marginRight: 10,
+  heroChangeTxt: { color: C.primary, fontWeight: "700" },
+  heroSubTxt: { color: "rgba(255,255,255,0.4)", fontWeight: "500" },
+  heroDivider: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    marginVertical: 10,
   },
-
-  productName: {
-    fontWeight: "700",
+  heroSmallLabel: {
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "600",
+    marginBottom: 2,
   },
+  heroSmallVal: { color: "#fff", fontWeight: "700" },
 
-  productSold: {
-    fontSize: 12,
-    color: "#777",
+  miniCard: {
+    backgroundColor: C.surface,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 1,
   },
+  miniIcon: { alignItems: "center", justifyContent: "center" },
+  miniLabel: { color: C.textSub, fontWeight: "500", marginBottom: 1 },
+  miniValue: { fontWeight: "800" },
 
-  productPrice: {
-    fontWeight: "700",
-  },
-
-  productTag: {
-    fontSize: 10,
-    color: "green",
-  },
-
-  deliveryRow: {
+  // ── Chart ──
+  chartStatRow: {
     flexDirection: "row",
-    gap: 10,
-    marginTop: 10,
-  },
-
-  deliveryCard: {
-    flex: 1,
-    backgroundColor: "#fff",
-    padding: 14,
+    marginTop: 14,
+    backgroundColor: C.bg,
     borderRadius: 12,
+    padding: 12,
   },
+  chartStatItem: { flex: 1, alignItems: "center" },
+  chartStatVal: { fontWeight: "800", letterSpacing: -0.3 },
+  chartStatLabel: { color: C.textSub, marginTop: 2, fontWeight: "500" },
 
-  deliveryLabel: {
-    fontSize: 12,
-    color: "#777",
+  tabRow: { flexDirection: "row", gap: 4 },
+  tabPill: {
+    borderRadius: 999,
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.border,
   },
+  tabPillActive: { backgroundColor: C.accent, borderColor: C.accent },
+  tabText: { fontWeight: "600", color: C.textSub },
+  tabTextActive: { color: "#fff" },
 
-  deliveryValue: {
-    fontSize: 20,
-    fontWeight: "700",
+  // ── Two Col ──
+  twoCol: { flexDirection: "row" },
+
+  // ── Card ──
+  card: {
+    backgroundColor: C.surface,
+    borderRadius: 18,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
   },
-
-  partnerBox: {
-    backgroundColor: "#111",
-    borderRadius: 12,
-    padding: 14,
-    marginTop: 20,
-  },
-
-  partnerTitle: {
-    color: "#fff",
-    fontWeight: "700",
-    marginBottom: 10,
-  },
-
-  partnerRow: {
+  cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 4,
   },
-
-  partnerName: {
-    color: "#ccc",
-  },
-
-  partnerRating: {
-    color: "#fff",
+  cardOverline: {
+    color: C.textLight,
     fontWeight: "700",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+  cardTitle: { fontWeight: "800", color: C.text, letterSpacing: -0.3 },
+
+  badgePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  badgePillText: { fontWeight: "700" },
+
+  viewMoreBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: C.primaryDim,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  viewMoreText: { color: C.primaryDark, fontWeight: "700" },
+
+  // ── Goal ──
+  goalRingWrap: { alignItems: "center", marginTop: 8 },
+  goalRing: {
+    borderColor: C.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  goalPct: { fontWeight: "900", color: C.text },
+  goalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 2,
+  },
+  goalDot: { width: 8, height: 8, borderRadius: 4 },
+  goalLabel: { flex: 1, color: C.textSub, fontWeight: "500" },
+  goalNum: { fontWeight: "700", color: C.text },
+
+  // ── Efficiency ──
+  effBlock: { alignItems: "center", gap: 4 },
+  effIcon: { alignItems: "center", justifyContent: "center" },
+  effLabel: { color: C.textSub, fontWeight: "500" },
+  effVal: { fontWeight: "800" },
+  effDivider: {
+    width: "80%",
+    alignSelf: "center",
+    height: 1,
+    backgroundColor: C.border,
+    marginVertical: 10,
   },
 
-  progressBg: {
-    height: 4,
-    backgroundColor: "#444",
+  // ── Products ──
+  productRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+  },
+  productRank: { fontWeight: "700", color: C.textLight, width: 20 },
+  productImg: { resizeMode: "cover" },
+  productName: { fontWeight: "700", color: C.text },
+  productSold: { color: C.textSub, marginTop: 2 },
+  productRevenue: { fontWeight: "800", color: C.text },
+  tagPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  tagText: { fontWeight: "700" },
+
+  // ── Reviews ──
+  reviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+  },
+  reviewAvatar: { alignItems: "center", justifyContent: "center" },
+  reviewInitials: { fontWeight: "800" },
+  reviewName: { fontWeight: "700", color: C.text },
+  reviewQuote: { color: C.textSub, marginTop: 2 },
+  ratingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  ratingText: { fontWeight: "700" },
+
+  // ── Delivery ──
+  deliveryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+  },
+  deliveryRank: { fontWeight: "700", color: C.textLight, width: 14 },
+  deliveryAvatar: {
+    backgroundColor: C.purpleDim,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deliveryInitials: { fontWeight: "800", color: C.purple },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  deliveryName: { fontWeight: "700", color: C.text },
+  deliverySub: { color: C.textSub, marginTop: 2 },
+  scoreBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  scoreText: { fontWeight: "700" },
+
+  // ── Notification item ──
+  notifItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  notifIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notifTitle: { fontSize: 14, fontWeight: "700", color: C.text },
+  notifBody: { fontSize: 12, color: C.textSub, marginTop: 2, lineHeight: 17 },
+  notifTime: { fontSize: 11, color: C.textLight, marginTop: 4 },
+  unreadDot: {
+    width: 8,
+    height: 8,
     borderRadius: 4,
-    marginTop: 4,
+    backgroundColor: C.primary,
+    marginTop: 6,
   },
 
-  progressFill: {
-    height: 4,
-    backgroundColor: "#0ff022",
-    borderRadius: 4,
-  },
-
-  bottomNav: {
+  // ── Sheet / Modal ──
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)" },
+  sheet: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderColor: "#eee",
+    backgroundColor: C.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    minHeight: 300,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: C.border,
+    borderRadius: 999,
+    alignSelf: "center",
+    marginTop: 14,
+    marginBottom: 2,
+  },
+  sheetHeader: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  sheetTitle: { fontSize: 18, fontWeight: "800", color: C.text },
+  closeIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: C.bg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // ── Empty ──
+  empty: { alignItems: "center", paddingVertical: 36, gap: 10 },
+  emptyText: { color: C.textLight, fontSize: 13, fontWeight: "500" },
+
+  // ── No Profile ──
+  emptyIconWrap: {
+    width: 100,
+    height: 100,
+    borderRadius: 28,
+    backgroundColor: C.primaryDim,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: C.text,
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: C.textSub,
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 28,
+    paddingHorizontal: 12,
+  },
+  ctaBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: C.primary,
+    paddingVertical: 15,
+    paddingHorizontal: 32,
+    borderRadius: 999,
+  },
+  ctaBtnText: { color: "#000", fontWeight: "800", fontSize: 15 },
+  headerRow1: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    width: "100%",
+    marginBottom: 10,
+  },
+  searchBarFull: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: C.bg,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    width: "100%",
+  },
+  searchModal: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: C.surface,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    paddingTop: Platform.OS === "ios" ? 56 : 44,
+    paddingBottom: 20,
+    minHeight: 300,
+    maxHeight: "70%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  searchModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  searchInputRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: C.bg,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingHorizontal: 14,
     paddingVertical: 10,
   },
-
-  navItem: {
-    alignItems: "center",
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: C.text,
   },
-
-  navText: {
-    fontSize: 10,
-    color: "#888",
+  searchCancelBtn: { paddingHorizontal: 4 },
+  searchResultItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  searchResultIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  searchResultName: { fontSize: 14, fontWeight: "700", color: C.text },
+  searchResultSub: { fontSize: 12, color: C.textSub, marginTop: 2 },
+  searchResultTypeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  locModal: {
+    position: "absolute",
+    top: "30%",
+    left: 20,
+    right: 20,
+    backgroundColor: C.surface,
+    borderRadius: 20,
+    padding: 22,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  locCurrentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: C.primaryDim,
+    borderRadius: 12,
+    padding: 12,
   },
 });
