@@ -1486,6 +1486,7 @@ export default function HomeScreen() {
           delivery_type: list[0].delivery_type,
         }, null, 2));
       }
+      console.log(list);
       setVendors(list);
       // Pass list directly — state update is async, list is synchronous
       await fetchInventoryForVendors(list);
@@ -1578,46 +1579,20 @@ export default function HomeScreen() {
     const seen = new Set();
     const cats = [];
 
-    // Create a lookup for top-level resolution
-    const topLevelMap = {}; // catId -> topLevelCatName
-    if (apiCategories.length > 0) {
-      const catById = {};
-      apiCategories.forEach(c => { catById[c.id] = c; });
+    // Find all top-level categories (those without parent_id)
+    const topLevelCats = apiCategories.filter(c => !c.parent_id);
 
-      apiCategories.forEach(c => {
-        let curr = c;
-        let safety = 0;
-        while (curr.parent_id && catById[curr.parent_id] && safety < 5) {
-          curr = catById[curr.parent_id];
-          safety++;
-        }
-        topLevelMap[c.id] = curr.name;
-        topLevelMap[c.name] = curr.name; // Map names too for robustness
-      });
-    }
+    topLevelCats.forEach(c => {
+      if (c.name && !seen.has(c.name)) {
+        seen.add(c.name);
 
-    allInventoryItems.forEach((inv) => {
-      const p = inv.product;
-      if (!p) return;
-      const catId = p.category_id || p.category?.id;
-      const rawName = getCategoryName(inv);
-      const catName = topLevelMap[catId] || topLevelMap[rawName] || rawName;
-
-      if (catName && !seen.has(catName)) {
-        seen.add(catName);
-
-        // Fetch image and accent from DB/Config
-        const apiCat = apiCategories.find(c => c.id === catId || c.name === catName);
-        const accent = CAT_ACCENT[catName] || CAT_ACCENT[apiCat?.name] || CAT_ACCENT._default;
-
-        // Prioritize DB image -> Fallback Unsplash image based on name -> Global default
-        const dbImg = apiCat?.image_url;
-        const fallbackImg = CAT_FALLBACK_IMGS[catName] || CAT_FALLBACK_IMGS[apiCat?.name] || CAT_FALLBACK_IMGS._default;
+        const accent = CAT_ACCENT[c.name] || CAT_ACCENT._default;
+        const fallbackImg = CAT_FALLBACK_IMGS[c.name] || CAT_FALLBACK_IMGS._default;
 
         cats.push({
-          label: catName,
-          tag: catName,
-          img: dbImg || fallbackImg,
+          label: c.name,
+          tag: c.name,
+          img: c.image_url || fallbackImg,
           bg: accent.bg,
           accent: accent.accent,
           icon: accent.icon
@@ -1625,7 +1600,7 @@ export default function HomeScreen() {
       }
     });
     return cats.sort((a, b) => a.label.localeCompare(b.label));
-  }, [allInventoryItems, getCategoryName, apiCategories]);
+  }, [apiCategories]);
 
   // ── 3-level hierarchy for CategoryBrowseSheet ─────────────────────────────
   const categoryHierarchy = useMemo(

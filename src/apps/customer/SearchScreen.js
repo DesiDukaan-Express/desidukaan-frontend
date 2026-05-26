@@ -12,6 +12,7 @@ import useAuthStore    from "../../store/authStore";
 import useCartStore    from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
+import { categoriesAPI } from "../../services/api";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const NEARBY_RADIUS = 10;   // km — stores within this are shown normally
@@ -33,15 +34,46 @@ const C = {
   red:         "#DC2626", redLight:    "#FEF2F2",
 };
 
-// ─── Category config — matches HomeScreen exactly ────────────────────────────
-const CATEGORIES = [
-  { label: "Grocery",   emoji: "🥦", img: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&q=80",  bg: "#FEF9C3", accent: "#CA8A04" },
-  { label: "Dairy",     emoji: "🥛", img: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&q=80",  bg: "#EFF6FF", accent: "#2563EB" },
-  { label: "Snacks",    emoji: "🍿", img: "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=300&q=80", bg: "#FFF7ED", accent: "#EA580C" },
-  { label: "Beverages", emoji: "🧃", img: "https://images.unsplash.com/photo-1527960471264-932f39eb5846?w=300&q=80", bg: "#F0FDF4", accent: "#16A34A" },
-  { label: "Bakery",    emoji: "🍞", img: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&q=80", bg: "#FDF4FF", accent: "#9333EA" },
-  { label: "Fruits",    emoji: "🍎", img: "https://images.unsplash.com/photo-1490474418585-ba9bad8fd0ea?w=300&q=80", bg: "#ECFDF5", accent: "#059669" },
-];
+const CAT_FALLBACK_IMGS = {
+  "Dairy, Bread & Eggs": "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80",
+  "Fruits & Vegetables": "https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=400&q=80",
+  "Cold Drinks & Juices": "https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&q=80",
+  "Snacks & Munchies": "https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=80",
+  "Breakfast & Instant Food": "https://images.unsplash.com/photo-1569058242252-62324e7d5567?w=400&q=80",
+  "Sweet Tooth": "https://images.unsplash.com/photo-1582231229718-4c5931bc1184?w=400&q=80",
+  "Bakery & Biscuits": "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80",
+  "Tea, Coffee & Milk Drinks": "https://images.unsplash.com/photo-1544787210-2211d7c309c7?w=400&q=80",
+  "Atta, Rice & Dal": "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=80",
+  "Masala, Oil & More": "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&q=80",
+  "Sauces & Spreads": "https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=400&q=80",
+  "Cleaning Essentials": "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&q=80",
+  "Personal Care": "https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&q=80",
+  "Home & Office": "https://images.unsplash.com/photo-1586075010633-2445c9ff093b?w=400&q=80",
+  _default: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80",
+};
+
+// ─── Category accent colours (top-level) ──────────────────────────────────────
+const CAT_ACCENT = {
+  "Dairy, Bread & Eggs": { bg: "#EFF6FF", accent: "#2563EB", icon: "🥛" },
+  "Fruits & Vegetables": { bg: "#ECFDF5", accent: "#059669", icon: "🍎" },
+  "Cold Drinks & Juices": { bg: "#F0FDF4", accent: "#16A34A", icon: "🧃" },
+  "Snacks & Munchies": { bg: "#FFF7ED", accent: "#EA580C", icon: "🍿" },
+  "Breakfast & Instant Food": { bg: "#FEF9C3", accent: "#CA8A04", icon: "🥣" },
+  "Sweet Tooth": { bg: "#FDF4FF", accent: "#9333EA", icon: "🍫" },
+  "Bakery & Biscuits": { bg: "#FFF1F2", accent: "#E11D48", icon: "🍪" },
+  "Tea, Coffee & Milk Drinks": { bg: "#F5F5F4", accent: "#57534E", icon: "☕" },
+  "Atta, Rice & Dal": { bg: "#FEFCE8", accent: "#A16207", icon: "🌾" },
+  "Masala, Oil & More": { bg: "#FFF7ED", accent: "#C2410C", icon: "🌶️" },
+  "Sauces & Spreads": { bg: "#F0FDFA", accent: "#0D9488", icon: "🥫" },
+  "Cleaning Essentials": { bg: "#F0F9FF", accent: "#0284C7", icon: "🧼" },
+  "Personal Care": { bg: "#FAF5FF", accent: "#7C3AED", icon: "🧴" },
+  "Home & Office": { bg: "#F8FAFC", accent: "#475569", icon: "🖇️" },
+  "Bread": { bg: "#FFFBEB", accent: "#D97706", icon: "🍞" },
+  "Chips": { bg: "#FEF2F2", accent: "#EF4444", icon: "🍟" },
+  "Milk": { bg: "#F0F9FF", accent: "#0EA5E9", icon: "🥛" },
+  "Rice": { bg: "#FEFCE8", accent: "#EAB308", icon: "🌾" },
+  _default: { bg: "#F3F4F6", accent: "#6B7280", icon: "📦" },
+};
 
 // ─── Haversine distance ───────────────────────────────────────────────────────
 function distKm(lat1, lng1, lat2, lng2) {
@@ -402,6 +434,38 @@ export default function SearchScreen() {
   // Item stores sheet
   const [sheetProduct, setSheetProduct] = useState(null);
   const [sheetStores,  setSheetStores]  = useState([]);
+
+  // Database-fetched categories
+  const [apiCategories, setApiCategories] = useState([]);
+
+  useEffect(() => {
+    categoriesAPI.getAll()
+      .then(res => setApiCategories(res.data?.categories || []))
+      .catch(() => setApiCategories([]));
+  }, []);
+
+  const dbCategories = useMemo(() => {
+    const seen = new Set();
+    const cats = [];
+    const topLevelCats = apiCategories.filter(c => !c.parent_id);
+
+    topLevelCats.forEach(c => {
+      if (c.name && !seen.has(c.name)) {
+        seen.add(c.name);
+        const accent = CAT_ACCENT[c.name] || CAT_ACCENT._default;
+        const fallbackImg = CAT_FALLBACK_IMGS[c.name] || CAT_FALLBACK_IMGS._default;
+        cats.push({
+          label: c.name,
+          tag: c.name,
+          img: c.image_url || fallbackImg,
+          bg: accent.bg,
+          accent: accent.accent,
+          icon: accent.icon,
+        });
+      }
+    });
+    return cats.sort((a, b) => a.label.localeCompare(b.label));
+  }, [apiCategories]);
 
   const inputRef = useRef(null);
   const px = isDesktop ? 40 : isTablet ? 24 : 16;
@@ -819,7 +883,7 @@ export default function SearchScreen() {
                   horizontal showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ paddingRight: 8, paddingBottom: 8, gap: 20 }}
                 >
-                  {CATEGORIES.map(cat => (
+                  {dbCategories.map(cat => (
                     <TouchableOpacity
                       key={cat.label}
                       style={s.catChip}
