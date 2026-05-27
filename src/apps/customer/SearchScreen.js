@@ -757,7 +757,7 @@ export default function SearchScreen() {
   const suggestions = isTyping
     ? [...new Set(
         [...history.filter(h => h.toLowerCase().includes(trimmed.toLowerCase())),
-         ...CATEGORIES.map(c => c.label).filter(l => l.toLowerCase().includes(trimmed.toLowerCase()))]
+         ...dbCategories.map(c => c.label).filter(l => l.toLowerCase().includes(trimmed.toLowerCase()))]
       )].slice(0, 6)
     : [];
 

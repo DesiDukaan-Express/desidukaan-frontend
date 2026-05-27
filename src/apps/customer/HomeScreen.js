@@ -21,7 +21,7 @@ import {
   StatusBar,
   Pressable,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
@@ -39,6 +39,7 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const C = {
   orange: "#F97316",
   orangeDark: "#EA580C",
+  orangeLight: "#FFF7ED",
   green: "#16A34A",
   greenDark: "#15803D",
   greenDeep: "#14532D",
@@ -56,6 +57,10 @@ const C = {
   gray700: "#374151",
   gray800: "#1F2937",
   gray900: "#111827",
+  cyan: "#0891B2",
+  cyanLight: "#ECFEFF",
+  red: "#DC2626",
+  redLight: "#FEF2F2",
 };
 
 // ─── Loose item helper ─────────────────────────────────────────────────────────
@@ -162,8 +167,8 @@ function AddressPicker({
               onPress={() => (showForm ? setShowForm(false) : onClose())}
               style={ap.closeBtn}
             >
-              <Feather
-                name={showForm ? "arrow-left" : "x"}
+              <MaterialIcons
+                name={showForm ? "arrow-back" : "close"}
                 size={16}
                 color={C.gray500}
               />
@@ -174,8 +179,8 @@ function AddressPicker({
             <View style={ap.formWrap}>
               <Text style={ap.formLabel}>Full address</Text>
               <View style={[ap.inputBox, inputErr ? ap.inputBoxError : null]}>
-                <Feather
-                  name="map-pin"
+                <MaterialIcons
+                  name="location-on"
                   size={15}
                   color={inputErr ? "#DC2626" : C.green}
                   style={{ marginLeft: 14 }}
@@ -205,7 +210,7 @@ function AddressPicker({
                 activeOpacity={0.85}
                 disabled={inputText.trim().length < 5}
               >
-                <Feather name="check" size={16} color={C.white} />
+                <MaterialIcons name="check" size={16} color={C.white} />
                 <Text style={ap.saveBtnText}>Save address</Text>
               </TouchableOpacity>
             </View>
@@ -217,7 +222,7 @@ function AddressPicker({
                 activeOpacity={0.8}
               >
                 <View style={ap.locationIconWrap}>
-                  <Feather name="crosshair" size={18} color={C.green} />
+                  <MaterialIcons name="my-location" size={18} color={C.orange} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={ap.locationRowTitle}>Use current location</Text>
@@ -225,7 +230,7 @@ function AddressPicker({
                     Detect my location automatically
                   </Text>
                 </View>
-                <Feather name="chevron-right" size={16} color={C.gray400} />
+                <MaterialIcons name="chevron-right" size={16} color={C.gray400} />
               </TouchableOpacity>
               <View style={ap.divider} />
               <ScrollView
@@ -234,7 +239,7 @@ function AddressPicker({
               >
                 {addresses.length === 0 ? (
                   <View style={ap.emptyWrap}>
-                    <Feather name="map-pin" size={28} color={C.gray300} />
+                    <MaterialIcons name="location-on" size={28} color={C.gray300} />
                     <Text style={ap.emptyText}>No saved addresses yet</Text>
                   </View>
                 ) : (
@@ -254,8 +259,8 @@ function AddressPicker({
                               isActive && { backgroundColor: C.green },
                             ]}
                           >
-                            <Feather
-                              name="map-pin"
+                            <MaterialIcons
+                              name="location-on"
                               size={15}
                               color={isActive ? C.white : C.gray500}
                             />
@@ -275,7 +280,7 @@ function AddressPicker({
                           </View>
                           {isActive && (
                             <View style={ap.activeTick}>
-                              <Feather name="check" size={12} color={C.white} />
+                              <MaterialIcons name="check" size={12} color={C.white} />
                             </View>
                           )}
                         </TouchableOpacity>
@@ -286,7 +291,7 @@ function AddressPicker({
                             onPress={() => onDelete && onDelete(addr.id)}
                             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                           >
-                            <Feather name="trash-2" size={16} color={C.red} />
+                            <MaterialIcons name="delete" size={16} color={C.red} />
                           </TouchableOpacity>
                         )}
                       </View>
@@ -299,7 +304,7 @@ function AddressPicker({
                 onPress={() => setShowForm(true)}
                 activeOpacity={0.85}
               >
-                <Feather name="plus" size={16} color={C.green} />
+                <MaterialIcons name="add" size={16} color={C.green} />
                 <Text style={ap.addNewText}>Add new address</Text>
               </TouchableOpacity>
             </>
@@ -509,7 +514,7 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
           >
             {vendorsWithItem.length === 0 ? (
               <View style={sp.emptyWrap}>
-                <Feather name="alert-circle" size={32} color={C.gray300} />
+                <MaterialIcons name="error-outline" size={32} color={C.gray300} />
                 <Text style={sp.emptyText}>
                   No stores nearby carry this item right now.
                 </Text>
@@ -538,14 +543,14 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
                     <View style={sp.storeInfo}>
                       <Text style={sp.storeName}>{v.shop_name}</Text>
                       <View style={sp.storeMeta}>
-                        <Feather name="map-pin" size={11} color={C.green} />
+                        <MaterialIcons name="location-on" size={11} color={C.green} />
                         <Text style={sp.storeMetaText}>
                           {v.distance_km
                             ? `${parseFloat(v.distance_km).toFixed(1)} km`
                             : "Nearby"}
                         </Text>
                         <View style={sp.dot} />
-                        <Feather name="clock" size={11} color={C.gray400} />
+                        <MaterialIcons name="access-time" size={11} color={C.gray400} />
                         <Text style={sp.storeMetaText}>30 min</Text>
                       </View>
                       <Text style={sp.storePrice}>
@@ -554,7 +559,7 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
                     </View>
                     <View style={sp.addStoreBtn}>
                       <Text style={sp.addStoreBtnText}>Add</Text>
-                      <Feather name="arrow-right" size={13} color={C.white} />
+                      <MaterialIcons name="arrow-forward" size={13} color={C.white} />
                     </View>
                   </TouchableOpacity>
                 );
@@ -789,7 +794,7 @@ function CategoryBrowseSheet({
               <Text style={cbs.headerTitle}>{category}</Text>
             </View>
             <TouchableOpacity style={cbs.closeBtn} onPress={onClose}>
-              <Feather name="x" size={16} color={C.gray500} />
+              <MaterialIcons name="close" size={16} color={C.gray500} />
             </TouchableOpacity>
           </View>
 
@@ -842,7 +847,7 @@ function CategoryBrowseSheet({
           >
             {subCatItems.length === 0 ? (
               <View style={cbs.emptyWrap}>
-                <Feather name="package" size={32} color={C.gray300} />
+                <MaterialIcons name="inventory" size={32} color={C.gray300} />
                 <Text style={cbs.emptyText}>No items in this sub-category</Text>
               </View>
             ) : (
@@ -926,11 +931,11 @@ function CategoryBrowseSheet({
                       ) : (
                         <View style={cbs.qtyRow}>
                           <TouchableOpacity style={cbs.qtyBtn} onPress={() => onRemove(item)}>
-                            <Feather name="minus" size={10} color={C.white} />
+                            <MaterialIcons name="remove" size={10} color={C.white} />
                           </TouchableOpacity>
                           <Text style={cbs.qtyNum}>{qty}</Text>
                           <TouchableOpacity style={cbs.qtyBtn} onPress={() => onAdd(item)}>
-                            <Feather name="plus" size={10} color={C.white} />
+                            <MaterialIcons name="add" size={10} color={C.white} />
                           </TouchableOpacity>
                         </View>
                       )}
@@ -1076,21 +1081,23 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
 
   return (
     <View style={[ic.card, { width: size }]}>
-      {loose && (
-        <View style={[ic.badge, { backgroundColor: C.cyan, right: 5, left: "auto" }]}>
-          <Text style={ic.badgeText}>Loose</Text>
-        </View>
-      )}
-      {hasMrp && (
-        <View style={ic.badge}>
-          <Text style={ic.badgeText}>{discPct}% off</Text>
-        </View>
-      )}
-      <Image
-        source={{ uri: imgUri }}
-        style={[ic.img, { height: size }]}
-        resizeMode="cover"
-      />
+      <View style={ic.imgWrap}>
+        {loose && (
+          <View style={[ic.badge, { backgroundColor: C.cyan, right: 6, left: "auto", top: 6 }]}>
+            <Text style={ic.badgeText}>Loose</Text>
+          </View>
+        )}
+        {hasMrp && (
+          <View style={[ic.badge, { top: 6, left: 6 }]}>
+            <Text style={ic.badgeText}>{discPct}% off</Text>
+          </View>
+        )}
+        <Image
+          source={{ uri: imgUri }}
+          style={[ic.img, { width: size - 16, height: size - 16 }]}
+          resizeMode="cover"
+        />
+      </View>
       <View style={ic.info}>
         <Text style={ic.name} numberOfLines={2}>
           {item.name}
@@ -1110,20 +1117,20 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
             activeOpacity={0.8}
           >
             {loose ? (
-              <Feather name="sliders" size={12} color={C.white} />
+              <MaterialIcons name="tune" size={12} color={C.white} />
             ) : (
-              <Feather name="plus" size={12} color={C.white} />
+              <MaterialIcons name="add" size={12} color={C.white} />
             )}
             <Text style={ic.addText}>{loose ? "SELECT" : "ADD"}</Text>
           </TouchableOpacity>
         ) : (
           <View style={ic.qtyRow}>
             <TouchableOpacity style={ic.qtyBtn} onPress={() => onRemove(item)}>
-              <Feather name="minus" size={10} color={C.white} />
+              <MaterialIcons name="remove" size={10} color={C.white} />
             </TouchableOpacity>
             <Text style={ic.qtyNum}>{qty}</Text>
             <TouchableOpacity style={ic.qtyBtn} onPress={() => onAdd(item)}>
-              <Feather name="plus" size={10} color={C.white} />
+              <MaterialIcons name="add" size={10} color={C.white} />
             </TouchableOpacity>
           </View>
         )}
@@ -1135,64 +1142,74 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
 const ic = StyleSheet.create({
   card: {
     backgroundColor: C.white,
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: C.gray200,
+    borderColor: "rgba(0,0,0,0.05)",
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  imgWrap: {
+    padding: 8,
+    paddingBottom: 0,
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
   },
   badge: {
     position: "absolute",
-    top: 5,
-    left: 5,
     zIndex: 2,
     backgroundColor: C.orange,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  badgeText: { fontSize: 8, color: C.white, fontWeight: "800" },
-  img: { width: "100%" },
-  info: { padding: 8 },
+  badgeText: { fontSize: 9, color: C.white, fontWeight: "800" },
+  img: {
+    borderRadius: 14,
+    backgroundColor: C.gray100,
+  },
+  info: { padding: 10, paddingTop: 6 },
   name: {
     fontSize: 13,
     fontWeight: "700",
     color: C.gray900,
     lineHeight: 17,
-    marginBottom: 2,
+    marginBottom: 3,
   },
-  unit: { fontSize: 11, color: C.gray400, marginBottom: 5 },
+  unit: { fontSize: 11, color: C.gray400, marginBottom: 6, fontWeight: "500" },
   priceRow: {
     flexDirection: "row",
     alignItems: "baseline",
     gap: 5,
     marginBottom: 8,
   },
-  price: { fontSize: 14, fontWeight: "900", color: C.gray900 },
+  price: { fontSize: 15, fontWeight: "900", color: C.gray900 },
   orig: { fontSize: 10, color: C.gray400, textDecorationLine: "line-through" },
   addBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    backgroundColor: C.green,
-    borderRadius: 7,
-    paddingVertical: 7,
+    gap: 5,
+    backgroundColor: C.white,
+    borderRadius: 10,
+    paddingVertical: 8,
+    borderWidth: 1.5,
+    borderColor: C.green,
   },
-  addText: { fontSize: 12, fontWeight: "800", color: C.white },
+  addText: { fontSize: 12, fontWeight: "800", color: C.green },
   qtyRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: C.green,
-    borderRadius: 7,
+    borderRadius: 10,
     overflow: "hidden",
   },
-  qtyBtn: { paddingHorizontal: 10, paddingVertical: 7 },
+  qtyBtn: { paddingHorizontal: 10, paddingVertical: 8 },
   qtyNum: { fontSize: 12, fontWeight: "800", color: C.white },
 });
 
@@ -1216,7 +1233,7 @@ function WeightPickerModal({ item, onClose, onAdd }) {
             />
             <View style={{ flex: 1 }}>
               <View style={wp.looseBadge}>
-                <Feather name="droplet" size={10} color={C.cyan} />
+                <MaterialIcons name="water-drop" size={10} color={C.cyan} />
                 <Text style={wp.looseBadgeText}>Loose item</Text>
               </View>
               <Text style={wp.productName} numberOfLines={2}>{item.name}</Text>
@@ -1257,7 +1274,7 @@ function WeightPickerModal({ item, onClose, onAdd }) {
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={wp.addBtnGrad}
             >
-              <Feather name="shopping-cart" size={16} color={C.white} />
+              <MaterialIcons name="shopping-cart" size={16} color={C.white} />
               <Text style={wp.addBtnText}>Add {formatWeight(selected)} to Cart</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -1771,7 +1788,7 @@ export default function HomeScreen() {
       <Animated.View style={[s.headerWrap, { opacity: headerOpacity }]}>
         {wide ? (
           <View style={[s.headerRow, { paddingHorizontal: hPad }]}>
-            {winW >= 900 && (
+            {/* {winW >= 900 && (
               <>
                 <View style={s.brandSection}>
                   <View style={s.miniLogoWrap}>
@@ -1779,14 +1796,14 @@ export default function HomeScreen() {
                       colors={[C.orange, C.orangeDark]}
                       style={s.miniLogo}
                     >
-                      <Feather name="shopping-cart" size={15} color={C.white} />
+                      <MaterialIcons name="shopping-cart" size={15} color={C.white} />
                     </LinearGradient>
                   </View>
                   <GradientText text="DesiDukaan" style={s.brandName} />
                 </View>
                 <View style={s.headerDivider} />
               </>
-            )}
+            )} */}
             <TouchableOpacity
               style={s.locationBtn}
               onPress={openAddressPicker}
@@ -1808,7 +1825,7 @@ export default function HomeScreen() {
                     <Text style={s.locationBottom} numberOfLines={1}>
                       {locationShort || "Set location"}
                     </Text>
-                    <Feather name="chevron-down" size={13} color={C.gray500} />
+                    <MaterialIcons name="expand-more" size={13} color={C.gray500} />
                   </View>
                 </>
               )}
@@ -1818,7 +1835,7 @@ export default function HomeScreen() {
               onPress={() => navigation.navigate("Search")}
               activeOpacity={0.8}
             >
-              <Feather name="search" size={16} color={C.gray400} />
+              <MaterialIcons name="search" size={16} color={C.gray400} />
               <Text style={s.webSearchText} numberOfLines={1}>
                 {winW < 850 ? "Search…" : 'Search "rice", "daal", "milk"…'}
               </Text>
@@ -1828,23 +1845,23 @@ export default function HomeScreen() {
               onPress={() => navigation.navigate("Profile")}
               activeOpacity={0.8}
             >
-              <Feather name="user" size={16} color={C.gray700} />
+              <MaterialIcons name="person" size={16} color={C.green} />
               {winW >= 900 && (
                 <Text style={s.accountBtnText} numberOfLines={1}>
                   {firstName || "Account"}
                 </Text>
               )}
-              <Feather name="chevron-down" size={13} color={C.gray500} />
+              <MaterialIcons name="expand-more" size={13} color={C.gray500} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[s.cartBtn, cartCount > 0 && s.cartBtnActive]}
               onPress={() => navigation.navigate("Cart")}
               activeOpacity={0.8}
             >
-              <Feather
+              <MaterialIcons
                 name="shopping-cart"
                 size={16}
-                color={cartCount > 0 ? C.white : C.gray700}
+                color={cartCount > 0 ? C.white : C.green}
               />
               {winW >= 850 && (
                 <Text
@@ -1886,8 +1903,8 @@ export default function HomeScreen() {
                       <Text style={s.mobileLocBottom} numberOfLines={1}>
                         {locationShort || "Set location"}
                       </Text>
-                      <Feather
-                        name="chevron-down"
+                      <MaterialIcons
+                        name="expand-more"
                         size={13}
                         color={C.gray700}
                       />
@@ -1900,7 +1917,9 @@ export default function HomeScreen() {
                 onPress={() => navigation.navigate("Profile")}
                 activeOpacity={0.8}
               >
-                <Feather name="user" size={19} color={C.gray700} />
+                <View style={s.mobileAvatarRing}>
+                  <MaterialIcons name="person" size={18} color={C.orange} />
+                </View>
               </TouchableOpacity>
             </View>
             <TouchableOpacity
@@ -1908,7 +1927,7 @@ export default function HomeScreen() {
               onPress={() => navigation.navigate("Search")}
               activeOpacity={0.8}
             >
-              <Feather name="search" size={15} color={C.gray400} />
+              <MaterialIcons name="search" size={16} color={C.gray400} />
               <Text style={s.mobileSearchText}>Search stores, items…</Text>
             </TouchableOpacity>
           </>
@@ -1934,14 +1953,12 @@ export default function HomeScreen() {
         {/* 1. GREETING */}
         <View style={[s.greetingRow, { paddingHorizontal: hPad }]}>
           <Text style={s.greetingLine}>
-            {getGreeting()}
-            {firstName ? ", " : "! "}
+            {getGreeting()}{firstName ? "," : "!"}
             {firstName ? (
-              <Text style={s.greetingName}>{firstName} 👋</Text>
-            ) : (
-              "👋"
-            )}
+              <Text style={s.greetingName}> {firstName}</Text>
+            ) : null}
           </Text>
+          <Text style={s.greetingEmoji}>👋</Text>
           <Text style={s.greetingSub}>
             Fresh groceries & daily essentials, delivered fast.
           </Text>
@@ -1983,22 +2000,6 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
           </View>
-          <View style={s.infoPillRow}>
-            <View style={s.infoPill}>
-              <Feather name="truck" size={12} color={C.green} />
-              <Text style={s.infoPillText}>Free delivery above ₹299</Text>
-            </View>
-            <View style={s.infoPillDot} />
-            <View style={s.infoPill}>
-              <Feather name="clock" size={12} color={C.orange} />
-              <Text style={s.infoPillText}>30 min delivery</Text>
-            </View>
-            <View style={s.infoPillDot} />
-            <View style={s.infoPill}>
-              <Feather name="shield" size={12} color="#7C3AED" />
-              <Text style={s.infoPillText}>100% fresh guarantee</Text>
-            </View>
-          </View>
         </View>
 
         {/* 3. NEARBY STORES */}
@@ -2020,7 +2021,7 @@ export default function HomeScreen() {
         ) : vendors.length === 0 ? (
           <View style={s.emptyBox}>
             <View style={s.emptyIconWrap}>
-              <Feather name="map-pin" size={26} color={C.green} />
+              <MaterialIcons name="location-on" size={26} color={C.green} />
             </View>
             <Text style={s.emptyTitle}>No stores found nearby</Text>
             <Text style={s.emptySub}>Try updating your delivery location</Text>
@@ -2060,23 +2061,23 @@ export default function HomeScreen() {
                     colors={["transparent", "rgba(0,0,0,0.5)"]}
                     style={s.storeImgOverlay}
                   />
-                  <View style={s.statusBadge}>
-                    <View
-                      style={[
-                        s.statusDot,
-                        {
-                          backgroundColor: vendor.is_open
-                            ? "#4ADE80"
-                            : "#F87171",
-                        },
-                      ]}
-                    />
+                  {/* OPEN/CLOSED pill — solid, no dot */}
+                  <View
+                    style={[
+                      s.statusBadge,
+                      {
+                        backgroundColor: vendor.is_open
+                          ? C.green
+                          : "rgba(0,0,0,0.6)",
+                      },
+                    ]}
+                  >
                     <Text style={s.statusText}>
-                      {vendor.is_open ? "Open" : "Closed"}
+                      {vendor.is_open ? "OPEN" : "CLOSED"}
                     </Text>
                   </View>
                   <View style={s.ratingBadge}>
-                    <Feather name="star" size={10} color="#FBBF24" />
+                    <MaterialIcons name="star" size={10} color="#FBBF24" />
                     <Text style={s.ratingText}>
                       {vendor.avg_rating
                         ? parseFloat(vendor.avg_rating).toFixed(1)
@@ -2089,19 +2090,20 @@ export default function HomeScreen() {
                     {vendor.shop_name}
                   </Text>
                   <View style={s.storeMetaRow}>
-                    <Feather name="map-pin" size={10} color={C.green} />
+                    <MaterialIcons name="location-on" size={10} color={C.green} />
                     <Text style={s.storeMeta}>
                       {vendor.distance_km
                         ? `${parseFloat(vendor.distance_km).toFixed(1)} km`
                         : "Nearby"}
                     </Text>
                     <View style={s.metaDot} />
-                    <Feather name="clock" size={10} color={C.gray400} />
+                    <MaterialIcons name="access-time" size={10} color={C.gray400} />
                     <Text style={s.storeMeta}>30 min</Text>
                   </View>
                   <View style={s.storeTagRow}>
-                    <View style={s.storeTag}>
-                      <Text style={s.storeTagText}>
+                    {/* Min order — orange pill */}
+                    <View style={[s.storeTag, { backgroundColor: C.orangeLight, borderColor: "#FED7AA" }]}>
+                      <Text style={[s.storeTagText, { color: C.orangeDark }]}>
                         Min ₹{vendor.min_order || 99}
                       </Text>
                     </View>
@@ -2196,12 +2198,14 @@ export default function HomeScreen() {
                     }}
                     activeOpacity={0.8}
                   >
-                    <View style={[s.catCardBand, { width: bandSize, height: bandSize, backgroundColor: cat.bg }]}>
-                      <Image
-                        source={{ uri: cat.img }}
-                        style={s.catImg}
-                        resizeMode="cover"
-                      />
+                    <View style={[s.catCardBand, { width: bandSize, height: bandSize }]}>
+                      <View style={[s.catCardImgWrap, { backgroundColor: cat.bg }]}>
+                        <Image
+                          source={{ uri: cat.img }}
+                          style={s.catImg}
+                          resizeMode="cover"
+                        />
+                      </View>
                       {cat.icon && (
                         <View style={[s.catCardEmojiWrap, { width: bandSize * 0.35, height: bandSize * 0.35 }]}>
                           <Text style={[s.catCardEmoji, { fontSize: bandSize * 0.22 }]}>{cat.icon}</Text>
@@ -2311,7 +2315,7 @@ export default function HomeScreen() {
                       order.status.slice(1)}
                   </Text>
                 </View>
-                <Feather
+                <MaterialIcons
                   name="chevron-right"
                   size={15}
                   color={C.gray300}
@@ -2403,8 +2407,12 @@ export default function HomeScreen() {
           style={[s.floatingCart, { transform: [{ translateY: floatingY }] }]}
         >
           <View style={s.floatingLeft}>
-            <View style={s.floatingBadge}>
-              <Text style={s.floatingBadgeText}>{cartCount}</Text>
+            {/* Basket icon with orange count badge */}
+            <View style={{ position: "relative" }}>
+              <MaterialIcons name="shopping-basket" size={30} color={C.white} />
+              <View style={s.floatingCountBadge}>
+                <Text style={s.floatingCountBadgeText}>{cartCount}</Text>
+              </View>
             </View>
             <View>
               <Text style={s.floatingItems}>
@@ -2419,7 +2427,7 @@ export default function HomeScreen() {
             activeOpacity={0.85}
           >
             <Text style={s.floatingCTAText}>View Cart</Text>
-            <Feather name="arrow-right" size={14} color={C.white} />
+            <MaterialIcons name="arrow-forward" size={14} color={C.white} />
           </TouchableOpacity>
         </Animated.View>
       )}
@@ -2552,29 +2560,51 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  mobileAvatarRing: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 2,
+    borderColor: C.orange,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: C.orangeLight,
+    overflow: "hidden",
+  },
   mobileSearch: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: C.gray100,
-    borderRadius: 10,
+    backgroundColor: C.white,
+    borderRadius: 26,
     borderWidth: 1,
     borderColor: C.gray200,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
     marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   mobileSearchText: { flex: 1, fontSize: 14, color: C.gray400 },
   scroll: { paddingBottom: 40 },
   greetingRow: { paddingTop: 14, paddingBottom: 12 },
   greetingLine: {
-    fontSize: 18,
-    color: C.gray700,
-    fontWeight: "500",
-    lineHeight: 24,
+    fontSize: 24,
+    color: C.gray900,
+    fontWeight: "800",
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+    lineHeight: 32,
   },
-  greetingName: { color: C.gray900, fontWeight: "800" },
-  greetingSub: { fontSize: 13, color: C.gray400, marginTop: 2 },
+  greetingName: {
+    color: C.gray900,
+    fontWeight: "800",
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+  },
+  greetingEmoji: { fontSize: 28, marginTop: 4 },
+  greetingSub: { fontSize: 13, color: C.gray500, marginTop: 6, fontWeight: "400" },
   bannerWrap: { marginBottom: 24 },
   heroBanner: {
     borderRadius: 20,
@@ -2588,6 +2618,7 @@ const s = StyleSheet.create({
     color: C.white,
     lineHeight: 28,
     marginBottom: 6,
+    fontFamily: "PlusJakartaSans_800ExtraBold",
   },
   heroSub: {
     fontSize: 12,
@@ -2596,13 +2627,18 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
   heroCTA: {
-    backgroundColor: C.white,
+    backgroundColor: C.green,
     alignSelf: "flex-start",
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 9999,
+    shadowColor: C.greenDark,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  heroCTAText: { fontSize: 13, fontWeight: "900", color: C.greenDark },
+  heroCTAText: { fontSize: 14, fontWeight: "800", color: C.white },
   infoPillRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2625,9 +2661,14 @@ const s = StyleSheet.create({
     marginBottom: 16,
     marginTop: 4,
   },
-  sectionTitle: { fontSize: 20, fontWeight: "900", color: C.gray900 },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: C.gray900,
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+  },
   sectionSub: { fontSize: 12, color: C.gray400, marginTop: 2 },
-  viewAll: { fontSize: 13, color: C.green, fontWeight: "700", marginTop: 2 },
+  viewAll: { fontSize: 13, color: C.orange, fontWeight: "700", marginTop: 2 },
   loadingRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2658,18 +2699,13 @@ const s = StyleSheet.create({
   },
   statusBadge: {
     position: "absolute",
-    top: 9,
-    left: 9,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
+    top: 10,
+    left: 10,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 9999,
   },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 11, color: C.white, fontWeight: "700" },
+  statusText: { fontSize: 10, color: C.white, fontWeight: "800", letterSpacing: 0.5 },
   ratingBadge: {
     position: "absolute",
     bottom: 9,
@@ -2686,9 +2722,10 @@ const s = StyleSheet.create({
   storeInfo: { padding: 14 },
   storeName: {
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "700",
     color: C.gray900,
     marginBottom: 5,
+    fontFamily: "PlusJakartaSans_700Bold",
   },
   storeMetaRow: {
     flexDirection: "row",
@@ -2741,18 +2778,20 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
   catCardBand: {
-    borderRadius: 14,
+    borderRadius: 22,
     position: "relative",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
     marginBottom: 6,
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.03)",
+    borderColor: "rgba(0,0,0,0.05)",
+    backgroundColor: C.white,
+    padding: 9,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
     elevation: 2,
   },
   catCardEmojiWrap: {
@@ -2776,6 +2815,8 @@ const s = StyleSheet.create({
   catCardImgWrap: {
     width: "100%",
     height: "100%",
+    borderRadius: 14,
+    overflow: "hidden",
   },
   catCardLabel: {
     fontSize: 9,
@@ -2837,6 +2878,20 @@ const s = StyleSheet.create({
     zIndex: 99,
   },
   floatingLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  floatingCountBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: C.orange,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: C.green,
+  },
+  floatingCountBadgeText: { fontSize: 9, fontWeight: "900", color: C.white },
   floatingBadge: {
     width: 32,
     height: 32,

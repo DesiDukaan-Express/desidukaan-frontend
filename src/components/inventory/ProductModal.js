@@ -938,6 +938,7 @@ const s = StyleSheet.create({
   },
   kavWrap: {
     position: "absolute",
+    top: 0,
     bottom: 0,
     left: 0,
     right: 0,
@@ -1000,7 +1001,7 @@ const s = StyleSheet.create({
   },
   closeBtnText: { color: TEXT_MED, fontWeight: "700", fontSize: 14 },
 
-  scroll: { flexGrow: 0 },
+  scroll: { flex: 1 },
   body:   { paddingTop: 6, paddingBottom: 24 },
 
   section: { paddingHorizontal: 20, paddingVertical: 14, gap: 0 },
