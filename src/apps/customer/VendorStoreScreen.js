@@ -4,11 +4,12 @@ import {
   TouchableOpacity, ActivityIndicator, Animated,
   TextInput, Platform, StatusBar, Pressable, Dimensions,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import useCartStore from "../../store/cartStore";
 import useAuthStore from "../../store/authStore";
+import { categoriesAPI } from "../../services/api";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
@@ -28,19 +29,123 @@ const C = {
 };
 
 // ─── Category visual config ────────────────────────────────────────────────────
-const CAT_META = {
-  Groceries: { bg: "#FEF9C3", accent: "#CA8A04", emoji: "🥦", img: "https://images.unsplash.com/photo-1543168256-418811576931?w=300&q=80" },
-  Dairy: { bg: "#EFF6FF", accent: "#2563EB", emoji: "🥛", img: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&q=80" },
-  Snacks: { bg: "#FFF7ED", accent: "#EA580C", emoji: "🍿", img: "https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=300&q=80" },
-  Beverages: { bg: "#F0FDF4", accent: "#16A34A", emoji: "🧃", img: "https://images.unsplash.com/photo-1544145945-f90425340c7e?w=300&q=80" },
-  Bakery: { bg: "#FDF4FF", accent: "#9333EA", emoji: "🍞", img: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&q=80" },
-  Fruits: { bg: "#ECFDF5", accent: "#059669", emoji: "🍎", img: "https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=300&q=80" },
-  Medicines: { bg: "#F0F9FF", accent: "#0284C7", emoji: "💊", img: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&q=80" },
-  "Personal Care": { bg: "#FFF1F2", accent: "#E11D48", emoji: "🧴", img: "https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=300&q=80" },
-  Other: { bg: "#F3F4F6", accent: "#6B7280", emoji: "📦", img: "https://images.unsplash.com/photo-1585386959984-a4155224a1ad?w=300&q=80" },
+const CAT_FALLBACK_IMGS = {
+  "Dairy, Bread & Eggs": "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80",
+  "Fruits & Vegetables": "https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=400&q=80",
+  "Cold Drinks & Juices": "https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&q=80",
+  "Snacks & Munchies": "https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=80",
+  "Breakfast & Instant Food": "https://images.unsplash.com/photo-1569058242252-62324e7d5567?w=400&q=80",
+  "Sweet Tooth": "https://images.unsplash.com/photo-1582231229718-4c5931bc1184?w=400&q=80",
+  "Bakery & Biscuits": "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80",
+  "Tea, Coffee & Milk Drinks": "https://images.unsplash.com/photo-1544787210-2211d7c309c7?w=400&q=80",
+  "Atta, Rice & Dal": "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=80",
+  "Masala, Oil & More": "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&q=80",
+  "Sauces & Spreads": "https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=400&q=80",
+  "Cleaning Essentials": "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&q=80",
+  "Personal Care": "https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&q=80",
+  "Home & Office": "https://images.unsplash.com/photo-1586075010633-2445c9ff093b?w=400&q=80",
+  _default: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80",
 };
-const getCatMeta = (cat) => CAT_META[cat] || CAT_META["Other"];
-const normalizeCat = (cat) => CAT_META[cat] ? cat : "Other";
+
+const CAT_ACCENT = {
+  "Dairy, Bread & Eggs": { bg: "#EFF6FF", accent: "#2563EB", icon: "🥛" },
+  "Fruits & Vegetables": { bg: "#ECFDF5", accent: "#059669", icon: "🍎" },
+  "Cold Drinks & Juices": { bg: "#F0FDF4", accent: "#16A34A", icon: "🧃" },
+  "Snacks & Munchies": { bg: "#FFF7ED", accent: "#EA580C", icon: "🍿" },
+  "Breakfast & Instant Food": { bg: "#FEF9C3", accent: "#CA8A04", icon: "🥣" },
+  "Sweet Tooth": { bg: "#FDF4FF", accent: "#9333EA", icon: "🍫" },
+  "Bakery & Biscuits": { bg: "#FFF1F2", accent: "#E11D48", icon: "🍪" },
+  "Tea, Coffee & Milk Drinks": { bg: "#F5F5F4", accent: "#57534E", icon: "☕" },
+  "Atta, Rice & Dal": { bg: "#FEFCE8", accent: "#A16207", icon: "🌾" },
+  "Masala, Oil & More": { bg: "#FFF7ED", accent: "#C2410C", icon: "🌶️" },
+  "Sauces & Spreads": { bg: "#F0FDFA", accent: "#0D9488", icon: "🥫" },
+  "Cleaning Essentials": { bg: "#F0F9FF", accent: "#0284C7", icon: "🧼" },
+  "Personal Care": { bg: "#FAF5FF", accent: "#7C3AED", icon: "🧴" },
+  "Home & Office": { bg: "#F8FAFC", accent: "#475569", icon: "🖇️" },
+  "Bread": { bg: "#FFFBEB", accent: "#D97706", icon: "🍞" },
+  "Chips": { bg: "#FEF2F2", accent: "#EF4444", icon: "🍟" },
+  "Milk": { bg: "#F0F9FF", accent: "#0EA5E9", icon: "🥛" },
+  "Rice": { bg: "#FEFCE8", accent: "#EAB308", icon: "🌾" },
+  _default: { bg: "#F3F4F6", accent: "#6B7280", icon: "📦" },
+};
+
+const getCatMeta = (cat) => {
+  if (cat === "All") {
+    return {
+      bg: "#F0FDF4",
+      accent: "#16A34A",
+      emoji: "🛒",
+      img: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80",
+    };
+  }
+  const accent = CAT_ACCENT[cat] || CAT_ACCENT._default;
+  const img = CAT_FALLBACK_IMGS[cat] || CAT_FALLBACK_IMGS._default;
+  return {
+    bg: accent.bg,
+    accent: accent.accent,
+    emoji: accent.icon,
+    img: img,
+  };
+};
+
+const normalizeCatName = (name) => {
+  if (!name) return null;
+  const EXCLUDE = new Set(["Personal Care", "personal care", "PersonalCare"]);
+  if (EXCLUDE.has(name)) return null;
+  const MAP = {
+    Grocery: "Groceries",
+    Snack: "Snacks",
+    Beverage: "Beverages",
+    Fruit: "Fruits",
+    Medicine: "Medicines",
+  };
+  return MAP.hasOwnProperty(name) ? MAP[name] : name;
+};
+
+const normalizeCat = (cat) => normalizeCatName(cat) || "Other";
+
+function buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCategories) {
+  const parentOf = {};
+  const catById = {};
+  if (apiCategories && apiCategories.length > 0) {
+    apiCategories.forEach(c => { catById[c.id] = c; });
+    apiCategories.forEach(c => {
+      if (c.parent_id && catById[c.parent_id]) {
+        parentOf[c.name] = catById[c.parent_id].name;
+      } else {
+        parentOf[c.name] = null;
+      }
+    });
+  }
+
+  const hierarchy = {};
+
+  allInventoryItems.forEach(inv => {
+    const catName = getCategoryName(inv);
+    if (!catName) return;
+
+    let topCat, subCat;
+    if (parentOf.hasOwnProperty(catName)) {
+      if (parentOf[catName] === null) {
+        topCat = catName;
+        subCat = "All";
+      } else {
+        topCat = parentOf[catName];
+        subCat = catName;
+      }
+    } else {
+      topCat = catName;
+      const p = inv.product;
+      subCat = p?.unit || "General";
+    }
+
+    if (!hierarchy[topCat]) hierarchy[topCat] = {};
+    if (!hierarchy[topCat][subCat]) hierarchy[topCat][subCat] = [];
+    hierarchy[topCat][subCat].push(inv);
+  });
+
+  return hierarchy;
+}
 
 // ─── Responsive helpers ────────────────────────────────────────────────────────
 function useWindowWidth() {
@@ -523,12 +628,20 @@ export default function VendorStoreScreen() {
 
   const [vendor, setVendor] = useState(null);
   const [inventory, setInventory] = useState([]);
+  const [apiCategories, setApiCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [searchFocus, setSearchFocus] = useState(false);
   const [activeCat, setActiveCat] = useState("All");
   const [detailItem, setDetailItem] = useState(null);
   const [loosePickerItem, setLoosePickerItem] = useState(null); // weight picker
+
+  // Fetch category tree on mount
+  useEffect(() => {
+    categoriesAPI.getAll()
+      .then(res => setApiCategories(res.data?.categories || []))
+      .catch(() => setApiCategories([]));
+  }, []);
 
   const floatingY = useRef(new Animated.Value(120)).current;
   const cartItems = cart?.items || [];
@@ -573,52 +686,56 @@ export default function VendorStoreScreen() {
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const getCatName = useCallback((item) => {
-    const cat = item.product?.category;
-    if (!cat) return "Other";
-    if (typeof cat === "string") return normalizeCat(cat);
-    if (typeof cat === "object" && cat.name) return normalizeCat(cat.name);
-    return "Other";
+    const p = item.product;
+    const cat = p?.category;
+    let raw;
+    if (cat && typeof cat === "object" && cat.name) raw = cat.name;
+    else if (typeof cat === "string" && cat) raw = cat;
+    else return "Other";
+    return normalizeCatName(raw) || "Other";
   }, []);
 
+  const categoryHierarchy = useMemo(
+    () => buildHierarchyFromInventory(inventory, getCatName, apiCategories),
+    [inventory, getCatName, apiCategories],
+  );
+
   const categories = useMemo(() => {
-    const seen = new Set();
-    inventory.forEach(i => { if (i.stock_qty > 0) seen.add(getCatName(i)); });
-    return ["All", ...[...seen].sort()];
-  }, [inventory, getCatName]);
+    return ["All", ...Object.keys(categoryHierarchy).sort()];
+  }, [categoryHierarchy]);
 
-  const catCounts = useMemo(() => {
-    const counts = {};
-    inventory.forEach(i => {
-      if (i.stock_qty > 0) {
-        const key = getCatName(i);
-        counts[key] = (counts[key] || 0) + 1;
-      }
+  const inStockTotal = useMemo(() => inventory.filter(i => i.stock_qty > 0).length, [inventory]);
+
+  const getTopCatCount = useCallback((catName) => {
+    if (catName === "All") return inStockTotal;
+    const subCats = categoryHierarchy[catName] || {};
+    let total = 0;
+    Object.values(subCats).forEach(items => {
+      total += items.filter(i => i.stock_qty > 0).length;
     });
-    return counts;
-  }, [inventory, getCatName]);
+    return total;
+  }, [categoryHierarchy, inStockTotal]);
 
-  const inStockTotal = inventory.filter(i => i.stock_qty > 0).length;
+  // Active Category syncing
+  useEffect(() => {
+    if (categories.length > 0 && (!activeCat || !categories.includes(activeCat))) {
+      setActiveCat("All");
+    }
+  }, [categories, activeCat]);
 
+  // For global search and category filtering
   const filtered = useMemo(() => inventory.filter(item => {
     const name = (item.product?.name || "").toLowerCase();
     const cat = getCatName(item);
-    return (!search || name.includes(search.toLowerCase()))
-      && (activeCat === "All" || cat === activeCat);
+    const matchesSearch = !search || name.includes(search.toLowerCase());
+    const matchesCat = activeCat === "All" || cat === activeCat;
+    return matchesSearch && matchesCat;
   }), [inventory, search, activeCat, getCatName]);
 
   const inStock = filtered.filter(i => i.stock_qty > 0);
   const outStock = filtered.filter(i => i.stock_qty <= 0);
 
-  const catSections = useMemo(() => {
-    if (activeCat !== "All" || search) return null;
-    const groups = {};
-    inStock.forEach(item => {
-      const key = getCatName(item);
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(item);
-    });
-    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-  }, [inStock, activeCat, search, getCatName]);
+
 
   // ── Cart helpers ──────────────────────────────────────────────────────────
   const getQty = useCallback((pid) =>
@@ -678,6 +795,8 @@ export default function VendorStoreScreen() {
       ))}
     </View>
   );
+
+
 
   // ── Loading state ─────────────────────────────────────────────────────────
   if (loading) {
@@ -741,7 +860,7 @@ export default function VendorStoreScreen() {
             placeholder={`Search in ${vendor?.shop_name || "store"}…`}
             placeholderTextColor={C.gray400}
             value={search}
-            onChangeText={t => { setSearch(t); if (t) setActiveCat("All"); }}
+            onChangeText={t => setSearch(t)}
             onFocus={() => setSearchFocus(true)}
             onBlur={() => setSearchFocus(false)}
             underlineColorAndroid="transparent"
@@ -756,24 +875,13 @@ export default function VendorStoreScreen() {
       </View>
 
       {/* CATEGORY TABS — hidden on wide screens where sidebar shows */}
-      {!search && categories.length > 1 && !(isWide && categories.length > 2) && (
+      {!search && categories.length > 0 && !(isWide && categories.length > 2) && (
         <View style={s.catTabsWrap}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.catTabsRow}>
-            <TouchableOpacity
-              style={[ct.pill, activeCat === "All" && ct.pillActive]}
-              onPress={() => setActiveCat("All")}
-              activeOpacity={0.8}
-            >
-              <Text style={ct.emoji}>🛒</Text>
-              <Text style={[ct.label, activeCat === "All" && ct.labelActive]}>All</Text>
-              <View style={[ct.bubble, { backgroundColor: activeCat === "All" ? "rgba(255,255,255,0.25)" : C.gray100 }]}>
-                <Text style={[ct.bubbleText, { color: activeCat === "All" ? C.white : C.gray500 }]}>{inStockTotal}</Text>
-              </View>
-            </TouchableOpacity>
-            {categories.filter(c => c !== "All").map(cat => (
+            {categories.map(cat => (
               <CatTabPill
                 key={cat} cat={cat}
-                count={catCounts[cat] || 0}
+                count={getTopCatCount(cat) || 0}
                 isActive={activeCat === cat}
                 onPress={() => setActiveCat(cat)}
               />
@@ -785,12 +893,12 @@ export default function VendorStoreScreen() {
       {/* PRODUCTS BODY */}
       <View style={s.bodyRow}>
         {/* Desktop sidebar — category list */}
-        {isWide && categories.length > 2 && (
+        {isWide && categories.length > 1 && (
           <View style={s.sidebar}>
             <ScrollView showsVerticalScrollIndicator={false}>
               {categories.map(cat => {
                 const isActive = activeCat === cat;
-                const meta = cat === "All" ? { emoji: "🛒", bg: C.gray100, accent: C.gray600 } : getCatMeta(cat);
+                const meta = getCatMeta(cat);
                 return (
                   <TouchableOpacity
                     key={cat}
@@ -827,25 +935,11 @@ export default function VendorStoreScreen() {
               <Text style={s.emptySub}>
                 {search ? "Try a different keyword" : activeCat === "All" ? "Check back later" : "Nothing in this category right now"}
               </Text>
-              {activeCat !== "All" && !search && (
-                <TouchableOpacity style={s.browseAllBtn} onPress={() => setActiveCat("All")}>
-                  <Text style={s.browseAllText}>Browse all items</Text>
-                </TouchableOpacity>
-              )}
             </View>
           ) : (
             <>
-              {/* All tab — sectioned by category */}
-              {catSections && catSections.map(([cat, items]) => (
-                <View key={cat}>
-                  <CatSectionHeader cat={cat} count={items.length} />
-                  {renderProductGrid(items)}
-                  <View style={s.sectionDivider} />
-                </View>
-              ))}
-
-              {/* Specific category or search — flat grid */}
-              {(activeCat !== "All" || search) && inStock.length > 0 && (
+              {/* Product grid list */}
+              {inStock.length > 0 && (
                 <>
                   {activeCat !== "All" && !search && <CatSectionHeader cat={activeCat} count={inStock.length} />}
                   {search && (
@@ -924,24 +1018,24 @@ export default function VendorStoreScreen() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   centered: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-  loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500" },
+  loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" },
 
   header: { padding: 14, paddingTop: Platform.OS === "android" ? 14 : 52, flexDirection: "row", alignItems: "center", gap: 10 },
   backBtn: { width: 34, height: 34, borderRadius: 11, backgroundColor: "rgba(0,0,0,0.18)", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   headerMid: { flex: 1 },
-  appName: { fontSize: 10, fontWeight: "700", color: "rgba(255,255,255,0.7)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 2 },
-  shopName: { fontSize: 17, fontWeight: "900", color: C.white, letterSpacing: -0.2 },
+  appName: { fontSize: 10, fontWeight: "700", color: "rgba(255,255,255,0.7)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 2, fontFamily: "PlusJakartaSans_700Bold" },
+  shopName: { fontSize: 17, fontWeight: "900", color: C.white, letterSpacing: -0.2, fontFamily: "PlusJakartaSans_800ExtraBold" },
   shopMetaRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
   statusDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
-  metaText: { fontSize: 11, color: "rgba(255,255,255,0.82)", fontWeight: "500" },
+  metaText: { fontSize: 11, color: "rgba(255,255,255,0.82)", fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" },
   metaSep: { color: "rgba(255,255,255,0.45)", fontSize: 11 },
   ratingChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(0,0,0,0.18)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 18, flexShrink: 0 },
-  ratingText: { fontSize: 12, fontWeight: "700", color: C.white },
+  ratingText: { fontSize: 12, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
 
   searchWrap: { paddingHorizontal: 14, paddingVertical: 10, backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.gray100 },
   searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: C.gray100, borderRadius: 12, borderWidth: 1.5, borderColor: "transparent", paddingHorizontal: 12, paddingVertical: 9, gap: 9 },
   searchBoxActive: { borderColor: C.greenBorder, backgroundColor: C.greenLight },
-  searchInput: { flex: 1, fontSize: 14, color: C.gray900, ...Platform.select({ web: { outlineStyle: "none" } }) },
+  searchInput: { flex: 1, fontSize: 14, color: C.gray900, fontFamily: "PlusJakartaSans_500Medium", ...Platform.select({ web: { outlineStyle: "none" } }) },
   searchClearBtn: { width: 20, height: 20, borderRadius: 10, backgroundColor: C.gray300, alignItems: "center", justifyContent: "center" },
 
   catTabsWrap: { backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.gray100 },
@@ -953,8 +1047,8 @@ const s = StyleSheet.create({
   sidebarItem: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 13, position: "relative" },
   sidebarItemActive: { backgroundColor: C.greenLight },
   sidebarEmoji: { fontSize: 16 },
-  sidebarLabel: { fontSize: 12, fontWeight: "600", color: C.gray600, flex: 1 },
-  sidebarLabelActive: { color: C.green, fontWeight: "800" },
+  sidebarLabel: { fontSize: 12, fontWeight: "600", color: C.gray600, flex: 1, fontFamily: "PlusJakartaSans_600SemiBold" },
+  sidebarLabelActive: { color: C.green, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold" },
   sidebarDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: C.green, position: "absolute", right: 10 },
 
   body: { paddingTop: 4 },
@@ -962,24 +1056,26 @@ const s = StyleSheet.create({
   sectionDivider: { height: 1, backgroundColor: C.gray100, marginTop: 16, marginHorizontal: 4 },
 
   searchResultHeader: { paddingTop: 14, paddingBottom: 6 },
-  searchResultText: { fontSize: 14, color: C.gray500, fontWeight: "600" },
+  searchResultText: { fontSize: 14, color: C.gray500, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold" },
   oosSectionHeader: { flexDirection: "row", alignItems: "center", gap: 8, paddingBottom: 12 },
-  oosSectionTitle: { fontSize: 16, fontWeight: "800", color: C.gray400 },
+  oosSectionTitle: { fontSize: 16, fontWeight: "800", color: C.gray400, fontFamily: "PlusJakartaSans_800ExtraBold" },
 
   emptyBox: { alignItems: "center", paddingTop: 70, paddingBottom: 40 },
   emptyIconWrap: { width: 72, height: 72, borderRadius: 24, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center", marginBottom: 14, overflow: "hidden" },
-  emptyTitle: { fontSize: 18, fontWeight: "700", color: C.gray700, textAlign: "center" },
-  emptySub: { fontSize: 14, color: C.gray400, marginTop: 4, textAlign: "center", lineHeight: 20 },
+  emptyTitle: { fontSize: 18, fontWeight: "700", color: C.gray700, textAlign: "center", fontFamily: "PlusJakartaSans_700Bold" },
+  emptySub: { fontSize: 14, color: C.gray400, marginTop: 4, textAlign: "center", lineHeight: 20, fontFamily: "PlusJakartaSans_500Medium" },
   browseAllBtn: { marginTop: 16, backgroundColor: C.greenLight, borderWidth: 1.5, borderColor: C.greenBorder, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12 },
-  browseAllText: { fontSize: 14, fontWeight: "700", color: C.green },
+  browseAllText: { fontSize: 14, fontWeight: "700", color: C.green, fontFamily: "PlusJakartaSans_700Bold" },
+
+
 
   floatingCart: { position: "absolute", bottom: 20, left: 16, right: 16, backgroundColor: C.green, borderRadius: 18, shadowColor: C.green, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 14, zIndex: 100 },
   floatingInner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14, paddingHorizontal: 18, borderRadius: 18 },
   floatingLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   floatingBadge: { width: 34, height: 34, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
-  floatingBadgeText: { fontSize: 15, fontWeight: "900", color: C.white },
-  floatingItems: { fontSize: 14, fontWeight: "700", color: C.white },
-  floatingTotal: { fontSize: 12, color: "rgba(255,255,255,0.82)", marginTop: 1 },
+  floatingBadgeText: { fontSize: 15, fontWeight: "900", color: C.white, fontFamily: "PlusJakartaSans_800ExtraBold" },
+  floatingItems: { fontSize: 14, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
+  floatingTotal: { fontSize: 12, color: "rgba(255,255,255,0.82)", marginTop: 1, fontFamily: "PlusJakartaSans_500Medium" },
   floatingCTA: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 16, paddingVertical: 9, borderRadius: 12 },
-  floatingCTAText: { fontSize: 14, fontWeight: "800", color: C.white },
+  floatingCTAText: { fontSize: 14, fontWeight: "800", color: C.white, fontFamily: "PlusJakartaSans_800ExtraBold" },
 });

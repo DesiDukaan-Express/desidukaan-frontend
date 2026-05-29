@@ -755,17 +755,21 @@ function CategoryBrowseSheet({
   onStoreSelect, apiCategories,
 }) {
   const [activeSubCat, setActiveSubCat] = React.useState(null);
-  const subCats = category && hierarchy[category] ? Object.keys(hierarchy[category]) : [];
+  const subCats = category && hierarchy[category]
+    ? Object.keys(hierarchy[category]).filter(sc => sc !== "All")
+    : [];
 
   React.useEffect(() => {
-    if (visible && subCats.length > 0) {
-      setActiveSubCat(subCats[0]);
+    if (visible) {
+      setActiveSubCat(null);
     }
   }, [visible, category]);
 
   if (!visible || !category) return null;
 
-  const subCatItems = (activeSubCat && hierarchy[category]?.[activeSubCat]) || [];
+  const subCatItems = activeSubCat
+    ? (hierarchy[category]?.[activeSubCat] || [])
+    : (subCats.length === 0 ? (hierarchy[category]?.["All"] || []) : []);
   const catAccent = CAT_ACCENT[category] || CAT_ACCENT._default;
   const apiCat = apiCategories?.find(c => c.name === category);
 
@@ -798,154 +802,209 @@ function CategoryBrowseSheet({
             </TouchableOpacity>
           </View>
 
-          {/* ── Sub-Category Pills ── */}
-          {subCats.length > 1 && (
+          {activeSubCat === null && subCats.length > 0 ? (
             <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={cbs.subCatRow}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={cbs.subCatGridContainer}
             >
-              {subCats.map(sc => {
-                const isActive = sc === activeSubCat;
-                const count = hierarchy[category]?.[sc]?.length || 0;
-                return (
+              <Text style={cbs.subCatGridTitle}>Select a sub-category to browse</Text>
+              <View style={cbs.subCatGrid}>
+                {subCats.map(sc => {
+                  const count = hierarchy[category]?.[sc]?.length || 0;
+                  const firstItemImg = hierarchy[category]?.[sc]?.[0]?.product?.image_url;
+
+                  return (
+                    <TouchableOpacity
+                      key={sc}
+                      style={[cbs.subCatCard, { borderColor: catAccent.bg }]}
+                      onPress={() => setActiveSubCat(sc)}
+                      activeOpacity={0.85}
+                    >
+                      <View style={[cbs.subCatCardIconWrap, { backgroundColor: catAccent.bg }]}>
+                        {firstItemImg ? (
+                          <Image source={{ uri: firstItemImg }} style={cbs.subCatCardImg} resizeMode="cover" />
+                        ) : (
+                          <Text style={cbs.subCatCardEmoji}>{catAccent.icon || "📂"}</Text>
+                        )}
+                      </View>
+                      <View style={cbs.subCatCardInfo}>
+                        <Text style={cbs.subCatCardName} numberOfLines={2}>{sc}</Text>
+                        <Text style={cbs.subCatCardCount}>{count} Item{count !== 1 ? "s" : ""}</Text>
+                      </View>
+                      <MaterialIcons name="chevron-right" size={20} color={catAccent.accent} />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          ) : (
+            <>
+              {activeSubCat !== null && (
+                <View style={cbs.backRow}>
                   <TouchableOpacity
-                    key={sc}
-                    style={[
-                      cbs.subCatChip,
-                      isActive && { backgroundColor: catAccent.accent, borderColor: catAccent.accent },
-                    ]}
-                    onPress={() => setActiveSubCat(sc)}
+                    style={[cbs.backToSubCatsBtn, { backgroundColor: catAccent.bg }]}
+                    onPress={() => setActiveSubCat(null)}
                     activeOpacity={0.8}
                   >
-                    <Text style={[cbs.subCatChipText, isActive && { color: C.white }]}>
-                      {sc}
+                    <MaterialIcons name="arrow-back" size={16} color={catAccent.accent} />
+                    <Text style={[cbs.backToSubCatsText, { color: catAccent.accent }]}>
+                      Back to Subcategories
                     </Text>
-                    <View style={[cbs.subCatCount, isActive && { backgroundColor: "rgba(255,255,255,0.25)" }]}>
-                      <Text style={[cbs.subCatCountText, isActive && { color: C.white }]}>
-                        {count}
-                      </Text>
-                    </View>
                   </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          )}
+                  <Text style={cbs.activeSubCatTitle}>{activeSubCat}</Text>
+                </View>
+              )}
 
-          {/* ── Column Headers ── */}
-          <View style={cbs.tableHeader}>
-            <Text style={[cbs.thCell, { flex: 2 }]}>PRODUCT</Text>
-            <Text style={[cbs.thCell, { flex: 1, textAlign: "center" }]}>BRAND</Text>
-            <Text style={[cbs.thCell, { flex: 1, textAlign: "center" }]}>QTY / UNIT</Text>
-            <Text style={[cbs.thCell, { width: 80, textAlign: "right" }]}>PRICE</Text>
-          </View>
-
-          {/* ── Product Rows ── */}
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            style={{ flex: 1 }}
-          >
-            {subCatItems.length === 0 ? (
-              <View style={cbs.emptyWrap}>
-                <MaterialIcons name="inventory" size={32} color={C.gray300} />
-                <Text style={cbs.emptyText}>No items in this sub-category</Text>
-              </View>
-            ) : (
-              subCatItems.map((inv, idx) => {
-                const p = inv.product;
-                if (!p) return null;
-                const qty = getCartQty(p.id);
-                const loose = isLooseItem(p);
-                const hasMrp = p.mrp && p.mrp > p.price;
-                const discPct = hasMrp ? Math.round((1 - p.price / p.mrp) * 100) : 0;
-                const vendorName = inv._vendorName || "";
-
-                const item = {
-                  id: p.id, name: p.name, price: p.price,
-                  img: p.image_url || null, unit: p.unit || "1 pc",
-                  orig: hasMrp ? p.mrp : null, category,
-                  item_type: p.item_type, weight_options: p.weight_options,
-                };
-
-                return (
-                  <View key={`${p.id}-${idx}`} style={[
-                    cbs.productRow,
-                    idx % 2 === 0 && cbs.productRowAlt,
-                  ]}>
-                    {/* Image + Name */}
-                    <View style={[cbs.productCell, { flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }]}>
-                      <View style={cbs.productImgWrap}>
-                        <Image
-                          source={{
-                            uri: p.image_url ||
-                              CAT_FALLBACK_IMGS[category] ||
-                              CAT_FALLBACK_IMGS._default
-                          }}
-                          style={cbs.productImg}
-                          resizeMode="cover"
-                        />
-                        {hasMrp && (
-                          <View style={cbs.discPill}>
-                            <Text style={cbs.discPillText}>{discPct}%</Text>
-                          </View>
-                        )}
-                        {loose && (
-                          <View style={[cbs.discPill, { backgroundColor: "#0891B2" }]}>
-                            <Text style={cbs.discPillText}>Loose</Text>
-                          </View>
-                        )}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={cbs.productName} numberOfLines={2}>{p.name}</Text>
-                        {p.description ? (
-                          <Text style={cbs.productDesc} numberOfLines={1}>{p.description}</Text>
-                        ) : null}
-                      </View>
-                    </View>
-
-                    {/* Brand (vendor) */}
-                    <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
-                      <Text style={cbs.brandText} numberOfLines={2}>{vendorName}</Text>
-                    </View>
-
-                    {/* Qty / Unit (Particulars) */}
-                    <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
-                      <Text style={cbs.unitText}>{p.unit || "1 pc"}</Text>
-                    </View>
-
-                    {/* Price + ADD */}
-                    <View style={[cbs.productCell, { width: 80, alignItems: "flex-end" }]}>
-                      <Text style={cbs.priceText}>₹{p.price}</Text>
-                      {hasMrp && <Text style={cbs.mrpText}>₹{p.mrp}</Text>}
-                      {qty === 0 ? (
-                        <TouchableOpacity
-                          style={[cbs.addBtn, loose && { backgroundColor: "#0891B2" }]}
-                          activeOpacity={0.8}
-                          onPress={() => {
-                            if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
-                            else onAdd(item);
-                          }}
-                        >
-                          <Text style={cbs.addBtnText}>{loose ? "SELECT" : "ADD"}</Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <View style={cbs.qtyRow}>
-                          <TouchableOpacity style={cbs.qtyBtn} onPress={() => onRemove(item)}>
-                            <MaterialIcons name="remove" size={10} color={C.white} />
-                          </TouchableOpacity>
-                          <Text style={cbs.qtyNum}>{qty}</Text>
-                          <TouchableOpacity style={cbs.qtyBtn} onPress={() => onAdd(item)}>
-                            <MaterialIcons name="add" size={10} color={C.white} />
-                          </TouchableOpacity>
+              {/* ── Sub-Category Pills ── */}
+              {activeSubCat !== null && subCats.length > 1 && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={cbs.subCatRow}
+                >
+                  {subCats.map(sc => {
+                    const isActive = sc === activeSubCat;
+                    const count = hierarchy[category]?.[sc]?.length || 0;
+                    return (
+                      <TouchableOpacity
+                        key={sc}
+                        style={[
+                          cbs.subCatChip,
+                          isActive && { backgroundColor: catAccent.accent, borderColor: catAccent.accent },
+                        ]}
+                        onPress={() => setActiveSubCat(sc)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[cbs.subCatChipText, isActive && { color: C.white }]}>
+                          {sc}
+                        </Text>
+                        <View style={[cbs.subCatCount, isActive && { backgroundColor: "rgba(255,255,255,0.25)" }]}>
+                          <Text style={[cbs.subCatCountText, isActive && { color: C.white }]}>
+                            {count}
+                          </Text>
                         </View>
-                      )}
-                    </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+
+              {/* ── Column Headers ── */}
+              <View style={cbs.tableHeader}>
+                <Text style={[cbs.thCell, { flex: 2 }]}>PRODUCT</Text>
+                <Text style={[cbs.thCell, { flex: 1, textAlign: "center" }]}>BRAND</Text>
+                <Text style={[cbs.thCell, { flex: 1, textAlign: "center" }]}>QTY / UNIT</Text>
+                <Text style={[cbs.thCell, { width: 80, textAlign: "right" }]}>PRICE</Text>
+              </View>
+
+              {/* ── Product Rows ── */}
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                style={{ flex: 1 }}
+              >
+                {subCatItems.length === 0 ? (
+                  <View style={cbs.emptyWrap}>
+                    <MaterialIcons name="inventory" size={32} color={C.gray300} />
+                    <Text style={cbs.emptyText}>No items in this sub-category</Text>
                   </View>
-                );
-              })
-            )}
-            <View style={{ height: 24 }} />
-          </ScrollView>
+                ) : (
+                  subCatItems.map((inv, idx) => {
+                    const p = inv.product;
+                    if (!p) return null;
+                    const qty = getCartQty(p.id);
+                    const loose = isLooseItem(p);
+                    const hasMrp = p.mrp && p.mrp > p.price;
+                    const discPct = hasMrp ? Math.round((1 - p.price / p.mrp) * 100) : 0;
+                    const vendorName = inv._vendorName || "";
+
+                    const item = {
+                      id: p.id, name: p.name, price: p.price,
+                      img: p.image_url || null, unit: p.unit || "1 pc",
+                      orig: hasMrp ? p.mrp : null, category,
+                      item_type: p.item_type, weight_options: p.weight_options,
+                    };
+
+                    return (
+                      <View key={`${p.id}-${idx}`} style={[
+                        cbs.productRow,
+                        idx % 2 === 0 && cbs.productRowAlt,
+                      ]}>
+                        {/* Image + Name */}
+                        <View style={[cbs.productCell, { flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }]}>
+                          <View style={cbs.productImgWrap}>
+                            <Image
+                              source={{
+                                uri: p.image_url ||
+                                  CAT_FALLBACK_IMGS[category] ||
+                                  CAT_FALLBACK_IMGS._default
+                              }}
+                              style={cbs.productImg}
+                              resizeMode="cover"
+                            />
+                            {hasMrp && (
+                              <View style={cbs.discPill}>
+                                <Text style={cbs.discPillText}>{discPct}%</Text>
+                              </View>
+                            )}
+                            {loose && (
+                              <View style={[cbs.discPill, { backgroundColor: "#0891B2" }]}>
+                                <Text style={cbs.discPillText}>Loose</Text>
+                              </View>
+                            )}
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={cbs.productName} numberOfLines={2}>{p.name}</Text>
+                            {p.description ? (
+                              <Text style={cbs.productDesc} numberOfLines={1}>{p.description}</Text>
+                            ) : null}
+                          </View>
+                        </View>
+
+                        {/* Brand (vendor) */}
+                        <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
+                          <Text style={cbs.brandText} numberOfLines={2}>{vendorName}</Text>
+                        </View>
+
+                        {/* Qty / Unit (Particulars) */}
+                        <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
+                          <Text style={cbs.unitText}>{p.unit || "1 pc"}</Text>
+                        </View>
+
+                        {/* Price + ADD */}
+                        <View style={[cbs.productCell, { width: 80, alignItems: "flex-end" }]}>
+                          <Text style={cbs.priceText}>₹{p.price}</Text>
+                          {hasMrp && <Text style={cbs.mrpText}>₹{p.mrp}</Text>}
+                          {qty === 0 ? (
+                            <TouchableOpacity
+                              style={[cbs.addBtn, loose && { backgroundColor: "#0891B2" }]}
+                              activeOpacity={0.8}
+                              onPress={() => {
+                                if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
+                                else onAdd(item);
+                              }}
+                            >
+                              <Text style={cbs.addBtnText}>{loose ? "SELECT" : "ADD"}</Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <View style={cbs.qtyRow}>
+                              <TouchableOpacity style={cbs.qtyBtn} onPress={() => onRemove(item)}>
+                                <MaterialIcons name="remove" size={10} color={C.white} />
+                              </TouchableOpacity>
+                              <Text style={cbs.qtyNum}>{qty}</Text>
+                              <TouchableOpacity style={cbs.qtyBtn} onPress={() => onAdd(item)}>
+                                <MaterialIcons name="add" size={10} color={C.white} />
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    );
+                  })
+                )}
+                <View style={{ height: 24 }} />
+              </ScrollView>
+            </>
+          )}
         </Pressable>
       </Pressable>
     </Modal>
@@ -1057,6 +1116,63 @@ const cbs = StyleSheet.create({
   qtyNum: { fontSize: 11, fontWeight: "800", color: C.white, minWidth: 18, textAlign: "center" },
   emptyWrap: { alignItems: "center", paddingVertical: 40, gap: 12 },
   emptyText: { fontSize: 14, color: C.gray400 },
+
+  // Custom subcategory grid
+  subCatGridContainer: { paddingHorizontal: 20, paddingVertical: 16, paddingBottom: 40 },
+  subCatGridTitle: { fontSize: 13, fontWeight: "600", color: C.gray500, marginBottom: 16 },
+  subCatGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  subCatCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    backgroundColor: C.white,
+    gap: 12,
+    flexGrow: 1,
+    flexBasis: "46%",
+    minWidth: 140,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  subCatCardIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  subCatCardImg: { width: "100%", height: "100%" },
+  subCatCardEmoji: { fontSize: 20 },
+  subCatCardInfo: { flex: 1 },
+  subCatCardName: { fontSize: 13, fontWeight: "800", color: C.gray900, lineHeight: 16 },
+  subCatCardCount: { fontSize: 11, color: C.gray400, marginTop: 2, fontWeight: "600" },
+
+  // Back row styles
+  backRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+    justifyContent: "space-between",
+  },
+  backToSubCatsBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  backToSubCatsText: { fontSize: 12, fontWeight: "800" },
+  activeSubCatTitle: { fontSize: 15, fontWeight: "800", color: C.gray800 },
 });
 
 // ─── Vendor type display config ──────────────────────────────────────────────

@@ -161,12 +161,12 @@ function AddBtn({ product, vendorId, vendorName, outOfStock }) {
 }
 const ab = StyleSheet.create({
   add:    { backgroundColor: C.white, borderWidth: 1.5, borderColor: C.green, borderRadius: 9, paddingHorizontal: 14, paddingVertical: 7 },
-  addTxt: { fontSize: 13, fontWeight: "800", color: C.green },
+  addTxt: { fontSize: 13, fontWeight: "800", color: C.green, fontFamily: "PlusJakartaSans_800ExtraBold" },
   qtyRow: { flexDirection: "row", alignItems: "center", backgroundColor: C.green, borderRadius: 9, overflow: "hidden" },
   qtyBtn: { paddingHorizontal: 9, paddingVertical: 7 },
-  qtyNum: { fontSize: 13, fontWeight: "800", color: C.white, paddingHorizontal: 8, minWidth: 24, textAlign: "center" },
+  qtyNum: { fontSize: 13, fontWeight: "800", color: C.white, paddingHorizontal: 8, minWidth: 24, textAlign: "center", fontFamily: "PlusJakartaSans_800ExtraBold" },
   oosBtn: { backgroundColor: C.gray100, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: C.gray200 },
-  oosTxt: { fontSize: 11, fontWeight: "700", color: C.gray400 },
+  oosTxt: { fontSize: 11, fontWeight: "700", color: C.gray400, fontFamily: "PlusJakartaSans_700Bold" },
 });
 
 // ─── Product card (items tab) ─────────────────────────────────────────────────
@@ -221,18 +221,18 @@ const pc = StyleSheet.create({
   imgWrap:   { width: 88, height: 88, borderRadius: 12, overflow: "hidden", backgroundColor: C.gray100, position: "relative" },
   img:       { width: "100%", height: "100%" },
   discBadge: { position: "absolute", top: 5, left: 0, backgroundColor: C.orange, paddingHorizontal: 6, paddingVertical: 2, borderTopRightRadius: 6, borderBottomRightRadius: 6 },
-  discText:  { fontSize: 9, color: C.white, fontWeight: "800" },
+  discText:  { fontSize: 9, color: C.white, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold" },
   oosOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.48)", alignItems: "center", justifyContent: "center" },
-  oosOverlayText: { fontSize: 10, fontWeight: "800", color: C.white, textAlign: "center", lineHeight: 14 },
+  oosOverlayText: { fontSize: 10, fontWeight: "800", color: C.white, textAlign: "center", lineHeight: 14, fontFamily: "PlusJakartaSans_800ExtraBold" },
   info:      { flex: 1, gap: 2 },
-  brand:     { fontSize: 10, color: C.green, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
-  name:      { fontSize: 14, fontWeight: "700", color: C.gray900, lineHeight: 19 },
-  unit:      { fontSize: 12, color: C.gray400 },
+  brand:     { fontSize: 10, color: C.green, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4, fontFamily: "PlusJakartaSans_700Bold" },
+  name:      { fontSize: 14, fontWeight: "700", color: C.gray900, lineHeight: 19, fontFamily: "PlusJakartaSans_700Bold" },
+  unit:      { fontSize: 12, color: C.gray400, fontFamily: "PlusJakartaSans_500Medium" },
   priceRow:  { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
-  price:     { fontSize: 16, fontWeight: "800", color: C.gray900 },
-  mrp:       { fontSize: 12, color: C.gray400, textDecorationLine: "line-through" },
+  price:     { fontSize: 16, fontWeight: "800", color: C.gray900, fontFamily: "PlusJakartaSans_800ExtraBold" },
+  mrp:       { fontSize: 12, color: C.gray400, textDecorationLine: "line-through", fontFamily: "PlusJakartaSans_500Medium" },
   storeBtn:  { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 },
-  storeBtnText: { fontSize: 11, color: C.green, fontWeight: "600" },
+  storeBtnText: { fontSize: 11, color: C.green, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold" },
   ctaWrap:   { paddingTop: 16 },
 });
 
@@ -323,22 +323,22 @@ const vc = StyleSheet.create({
   img:        { width: "100%", height: "100%" },
   imgGrad:    { position: "absolute", bottom: 0, left: 0, right: 0, height: 60 },
   openBadge:  { position: "absolute", top: 10, left: 10, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  openText:   { fontSize: 11, fontWeight: "700", color: C.white },
+  openText:   { fontSize: 11, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
   distBadge:  { position: "absolute", bottom: 10, right: 10, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.92)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: C.greenBorder },
-  distText:   { fontSize: 10, color: C.green, fontWeight: "700" },
+  distText:   { fontSize: 10, color: C.green, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" },
   matchBadge: { position: "absolute", top: 10, right: 10, backgroundColor: C.green, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  matchText:  { fontSize: 11, color: C.white, fontWeight: "700" },
+  matchText:  { fontSize: 11, color: C.white, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" },
   farOverlay: { position: "absolute", bottom: 10, left: 10, flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
-  farText:    { fontSize: 12, color: C.white, fontWeight: "700" },
+  farText:    { fontSize: 12, color: C.white, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" },
   info:       { padding: 14 },
   topRow:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
-  name:       { fontSize: 16, fontWeight: "800", color: C.gray900, flex: 1, marginRight: 8 },
+  name:       { fontSize: 16, fontWeight: "800", color: C.gray900, flex: 1, marginRight: 8, fontFamily: "PlusJakartaSans_800ExtraBold" },
   rating:     { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#FEF9C3", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
-  ratingText: { fontSize: 12, fontWeight: "700", color: "#CA8A04" },
-  address:    { fontSize: 12, color: C.gray400, marginBottom: 8 },
+  ratingText: { fontSize: 12, fontWeight: "700", color: "#CA8A04", fontFamily: "PlusJakartaSans_700Bold" },
+  address:    { fontSize: 12, color: C.gray400, marginBottom: 8, fontFamily: "PlusJakartaSans_500Medium" },
   meta:       { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   metaChip:   { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.gray100, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  metaText:   { fontSize: 11, color: C.gray600 },
+  metaText:   { fontSize: 11, color: C.gray600, fontFamily: "PlusJakartaSans_500Medium" },
 });
 
 // ─── Stores for item modal ────────────────────────────────────────────────────
@@ -401,14 +401,14 @@ const iss = StyleSheet.create({
   sheet:       { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "70%", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
   handle:      { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
   header:      { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 },
-  title:       { fontSize: 12, color: C.gray400, fontWeight: "600", textTransform: "uppercase" },
-  productName: { fontSize: 17, fontWeight: "900", color: C.gray900, marginTop: 2, maxWidth: 260 },
+  title:       { fontSize: 12, color: C.gray400, fontWeight: "600", textTransform: "uppercase", fontFamily: "PlusJakartaSans_600SemiBold" },
+  productName: { fontSize: 17, fontWeight: "900", color: C.gray900, marginTop: 2, maxWidth: 260, fontFamily: "PlusJakartaSans_800ExtraBold" },
   closeBtn:    { width: 30, height: 30, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
   storeRow:    { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.gray100 },
   storeImg:    { width: 48, height: 48, borderRadius: 10, backgroundColor: C.gray100 },
-  storeName:   { fontSize: 14, fontWeight: "700", color: C.gray900 },
-  storeAddr:   { fontSize: 12, color: C.gray400, marginTop: 2 },
-  storeDist:   { fontSize: 11, color: C.green, fontWeight: "600", marginTop: 2 },
+  storeName:   { fontSize: 14, fontWeight: "700", color: C.gray900, fontFamily: "PlusJakartaSans_700Bold" },
+  storeAddr:   { fontSize: 12, color: C.gray400, marginTop: 2, fontFamily: "PlusJakartaSans_500Medium" },
+  storeDist:   { fontSize: 11, color: C.green, fontWeight: "600", marginTop: 2, fontFamily: "PlusJakartaSans_600SemiBold" },
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1085,61 +1085,61 @@ const s = StyleSheet.create({
   floatingInner:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14, paddingHorizontal: 18, borderRadius: 18 },
   floatingLeft:      { flexDirection: "row", alignItems: "center", gap: 12 },
   floatingBadge:     { width: 34, height: 34, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
-  floatingBadgeText: { fontSize: 15, fontWeight: "900", color: C.white },
-  floatingItems:     { fontSize: 14, fontWeight: "700", color: C.white },
-  floatingTotal:     { fontSize: 12, color: "rgba(255,255,255,0.82)", marginTop: 1 },
+  floatingBadgeText: { fontSize: 15, fontWeight: "900", color: C.white, fontFamily: "PlusJakartaSans_800ExtraBold" },
+  floatingItems:     { fontSize: 14, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
+  floatingTotal:     { fontSize: 12, color: "rgba(255,255,255,0.82)", marginTop: 1, fontFamily: "PlusJakartaSans_500Medium" },
   floatingCTA:       { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 16, paddingVertical: 9, borderRadius: 12 },
-  floatingCTAText:   { fontSize: 14, fontWeight: "800", color: C.white },
+  floatingCTAText:   { fontSize: 14, fontWeight: "800", color: C.white, fontFamily: "PlusJakartaSans_800ExtraBold" },
 
   // Header
   topBar:         { flexDirection: "row", alignItems: "center", gap: 10, paddingBottom: 12 },
   backBtn:        { width: 38, height: 38, borderRadius: 12, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
   inputWrap:      { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.gray100, borderRadius: 14, borderWidth: 1.5, borderColor: "transparent", paddingHorizontal: 14, paddingVertical: 11 },
   inputWrapActive:{ borderColor: C.greenBorder, backgroundColor: C.greenLight },
-  input:          { flex: 1, fontSize: 15, color: C.gray900, outlineStyle: "none" },
+  input:          { flex: 1, fontSize: 15, color: C.gray900, fontFamily: "PlusJakartaSans_500Medium", outlineStyle: "none" },
   searchBtn:      { backgroundColor: C.green, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11 },
-  searchBtnText:  { fontSize: 14, fontWeight: "800", color: C.white },
+  searchBtnText:  { fontSize: 14, fontWeight: "800", color: C.white, fontFamily: "PlusJakartaSans_800ExtraBold" },
 
   // Tabs
   tabs:              { flexDirection: "row", borderBottomWidth: 1.5, borderBottomColor: C.gray200, backgroundColor: C.white },
   tab:               { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, paddingVertical: 13 },
   tabActive:         { borderBottomWidth: 2.5, borderBottomColor: C.green },
-  tabLabel:          { fontSize: 14, fontWeight: "600", color: C.gray500 },
-  tabLabelActive:    { color: C.green, fontWeight: "800" },
+  tabLabel:          { fontSize: 14, fontWeight: "600", color: C.gray500, fontFamily: "PlusJakartaSans_600SemiBold" },
+  tabLabelActive:    { color: C.green, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold" },
   tabBubble:         { backgroundColor: C.gray100, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 },
   tabBubbleActive:   { backgroundColor: C.greenMid },
-  tabBubbleText:     { fontSize: 11, fontWeight: "700", color: C.gray500 },
-  tabBubbleTextActive:{ color: C.green },
+  tabBubbleText:     { fontSize: 11, fontWeight: "700", color: C.gray500, fontFamily: "PlusJakartaSans_700Bold" },
+  tabBubbleTextActive:{ color: C.green, fontFamily: "PlusJakartaSans_700Bold" },
 
   // Suggestions
   suggBox:    { backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.gray100 },
 
   // Idle
-  sectionTitle:  { fontSize: 16, fontWeight: "800", color: C.gray900, marginBottom: 12, marginTop: 4 },
+  sectionTitle:  { fontSize: 16, fontWeight: "800", color: C.gray900, marginBottom: 12, marginTop: 4, fontFamily: "PlusJakartaSans_800ExtraBold" },
   sectionRow:    { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 20, marginBottom: 12 },
-  sectionAction: { fontSize: 13, color: C.green, fontWeight: "700" },
+  sectionAction: { fontSize: 13, color: C.green, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" },
   // Category chips — matches HomeScreen style exactly
   catChip:       { alignItems: "center", width: 100 },
   catImgWrap:    { width: 86, height: 86, borderRadius: 22, overflow: "hidden", marginBottom: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3 },
   catImg:        { width: "100%", height: "100%" },
-  catChipLabel:  { fontSize: 13, color: C.gray900, fontWeight: "700", textAlign: "center" },
+  catChipLabel:  { fontSize: 13, color: C.gray900, fontWeight: "700", textAlign: "center", fontFamily: "PlusJakartaSans_700Bold" },
   histRow:       { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  histText:      { flex: 1, fontSize: 14, color: C.gray700, fontWeight: "500" },
+  histText:      { flex: 1, fontSize: 14, color: C.gray700, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" },
 
   // Loading
   loadingWrap: { alignItems: "center", paddingTop: 60, gap: 12 },
-  loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500" },
+  loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" },
 
   // Results
-  resultNote:  { fontSize: 12, color: C.gray400, fontWeight: "500", marginBottom: 14 },
+  resultNote:  { fontSize: 12, color: C.gray400, fontWeight: "500", marginBottom: 14, fontFamily: "PlusJakartaSans_500Medium" },
   itemsCard:   { backgroundColor: C.white, borderRadius: 16, borderWidth: 1, borderColor: C.gray200, overflow: "hidden", marginBottom: 16 },
   farHeader:   { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.amberLight, borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: "#FDE68A" },
-  farHeaderText:{ fontSize: 13, color: C.amber, fontWeight: "600", flex: 1 },
+  farHeaderText:{ fontSize: 13, color: C.amber, fontWeight: "600", flex: 1, fontFamily: "PlusJakartaSans_600SemiBold" },
 
   // Empty
   emptyWrap:  { alignItems: "center", paddingTop: 60, gap: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: "700", color: C.gray700 },
-  emptySub:   { fontSize: 14, color: C.gray400, textAlign: "center", lineHeight: 20 },
+  emptyTitle: { fontSize: 18, fontWeight: "700", color: C.gray700, fontFamily: "PlusJakartaSans_700Bold" },
+  emptySub:   { fontSize: 14, color: C.gray400, textAlign: "center", lineHeight: 20, fontFamily: "PlusJakartaSans_500Medium" },
 });
 
 const sg = StyleSheet.create({
