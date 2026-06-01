@@ -19,6 +19,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
+import useCartStore from "../../store/cartStore";
 import { TextInput, Alert } from "react-native";
 
 const SOCKET_URL =
@@ -980,235 +981,295 @@ const od = StyleSheet.create({
 });
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
-function OrderCard({ order, onPress, onRate, alreadyRated }) {
+// ─── Order Card ───────────────────────────────────────────────────────────────
+const formatCardDate = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const datePart = d.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+  });
+  
+  let hours = d.getHours();
+  const minutes = d.getMinutes();
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const minutesStr = minutes < 10 ? '0'+minutes : minutes;
+  
+  return `${datePart}, ${hours}:${minutesStr} ${ampm}`;
+};
+
+function OrderCard({ order, onPress, onRate, alreadyRated, onReorder, onDownloadInvoice, isFirstDelivered }) {
   const st = getStatus(order.status);
   const stepIdx = stepIndex(order.status);
   const items = order.order_items || order.items || [];
   const subtotal = order.subtotal || 0;
   const total = order.total || subtotal;
-  const itemCount =
-    items.reduce((s, i) => s + (i.quantity || 1), 0) || order.item_count || 0;
   const isFailed = order.status === "cancelled" || order.status === "rejected";
 
+  let statusTitle = st.label;
+  if (order.status === "delivered") {
+    statusTitle = `Arrived in ${order.delivery_time_mins || (10 + (order.id % 15))} minutes`;
+  } else if (order.status === "picked_up") {
+    statusTitle = "Arriving soon / Out for delivery";
+  } else if (order.status === "preparing") {
+    statusTitle = "Preparing in shop";
+  } else if (order.status === "ready") {
+    statusTitle = "Ready for pickup";
+  } else if (order.status === "accepted") {
+    statusTitle = "Order accepted";
+  } else if (order.status === "pending") {
+    statusTitle = "Order placed";
+  }
+
+  let iconBg = C.greenLight;
+  let iconColor = C.green;
+  let iconName = "check";
+
+  if (isFailed) {
+    iconBg = C.redLight;
+    iconColor = C.red;
+    iconName = "x";
+  } else if (order.status === "pending") {
+    iconBg = "#FEF3C7";
+    iconColor = "#D97706";
+    iconName = "clock";
+  } else if (order.status === "accepted") {
+    iconBg = "#EFF6FF";
+    iconColor = "#2563EB";
+    iconName = "check-circle";
+  } else if (order.status === "preparing") {
+    iconBg = "#F5F3FF";
+    iconColor = "#7C3AED";
+    iconName = "package";
+  } else if (order.status === "ready" || order.status === "picked_up") {
+    iconBg = "#ECFEFF";
+    iconColor = "#0891B2";
+    iconName = order.status === "picked_up" ? "truck" : "star";
+  }
+
+  const showDownloadInvoice = order.status === "delivered" && isFirstDelivered;
+
   return (
-    <TouchableOpacity style={oc.card} onPress={onPress} activeOpacity={0.88}>
+    <View style={oc.card}>
       {/* Top row */}
-      <View style={oc.top}>
-        <View
-          style={[
-            oc.storeIcon,
-            { backgroundColor: isFailed ? "#FEF2F2" : C.greenLight },
-          ]}
-        >
-          <Feather
-            name="shopping-bag"
-            size={16}
-            color={isFailed ? C.red : C.green}
-          />
+      <TouchableOpacity style={oc.topRow} onPress={onPress} activeOpacity={0.7}>
+        <View style={[oc.statusIconBg, { backgroundColor: iconBg }]}>
+          <Feather name={iconName} size={20} color={iconColor} />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={oc.storeName} numberOfLines={1}>
-            {order.vendor?.shop_name || order.vendor_name || "DesiDukaan Store"}
-          </Text>
-          <Text style={oc.dateText}>{formatDateShort(order.created_at)}</Text>
+        <View style={oc.headerTextContainer}>
+          <Text style={oc.statusTitleText}>{statusTitle}</Text>
+          <Text style={oc.subheadText}>₹{total} • {formatCardDate(order.created_at)}</Text>
         </View>
-        <View style={[oc.statusBadge, { backgroundColor: st.bg }]}>
-          <Feather name={st.icon} size={11} color={st.color} />
-          <Text style={[oc.statusText, { color: st.color }]}>{st.label}</Text>
-        </View>
-      </View>
+        <TouchableOpacity style={oc.menuBtn} onPress={onPress}>
+          <Feather name="more-vertical" size={20} color={C.gray500} />
+        </TouchableOpacity>
+      </TouchableOpacity>
 
-      {/* Order number */}
-      <Text style={oc.orderNum}>
-        {order.order_number ||
-          `#${order.id?.toString().slice(-6).toUpperCase()}`}
-      </Text>
+      {/* Divider */}
+      <View style={oc.cardDivider} />
 
-      {/* Item thumbnails */}
+      {/* Thumbnails list */}
       {items.length > 0 && (
-        <View style={oc.thumbsRow}>
-          {items.slice(0, 4).map((item, i) => {
-            const p = item.product || {};
-            return (
-              <Image
-                key={i}
-                source={{
-                  uri:
-                    p.image_url ||
-                    "https://images.unsplash.com/photo-1542838132-92c53300491e?w=100",
-                }}
-                style={oc.thumb}
-                resizeMode="cover"
-              />
-            );
-          })}
-          {items.length > 4 && (
-            <View style={oc.thumbMore}>
-              <Text style={oc.thumbMoreText}>+{items.length - 4}</Text>
-            </View>
-          )}
-        </View>
+        <TouchableOpacity style={oc.thumbsContainer} onPress={onPress} activeOpacity={0.7}>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            {items.slice(0, 4).map((item, i) => {
+              const p = item.product || {};
+              const imgUri =
+                p.image_url ||
+                item.product_image ||
+                item.image_url ||
+                item.image ||
+                p.image ||
+                "https://images.unsplash.com/photo-1542838132-92c53300491e?w=100";
+              return (
+                <View key={i} style={oc.thumbBox}>
+                  <Image
+                    source={{ uri: imgUri }}
+                    style={oc.thumbImg}
+                    resizeMode="cover"
+                  />
+                </View>
+              );
+            })}
+            {items.length > 4 && (
+              <View style={[oc.thumbBox, oc.thumbMoreBox]}>
+                <Text style={oc.thumbMoreText}>+{items.length - 4}</Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
       )}
 
-      {/* Bottom row */}
-      <View style={oc.bottom}>
-        <View>
-          <Text style={oc.itemCount}>
-            {itemCount > 0
-              ? `${itemCount} item${itemCount !== 1 ? "s" : ""}`
-              : ""}
-          </Text>
-          <Text style={oc.totalText}>₹{total}</Text>
-        </View>
-        <TouchableOpacity
-          style={oc.detailBtn}
-          onPress={onPress}
-          activeOpacity={0.8}
-        >
-          <Text style={oc.detailText}>View Details</Text>
-          <Feather name="chevron-right" size={13} color={C.green} />
-        </TouchableOpacity>
-        {order.status === "delivered" && !alreadyRated && (
-          <TouchableOpacity
-            style={[
-              oc.detailBtn,
-              {
-                backgroundColor: "#FEF3C7",
-                borderColor: "#FDE68A",
-                marginLeft: 8,
-              },
-            ]}
-            onPress={(e) => {
-              e.stopPropagation?.();
-              onRate();
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={{ fontSize: 13, fontWeight: "700", color: "#D97706" }}>
-              ⭐ Rate
-            </Text>
-          </TouchableOpacity>
+      {/* Divider */}
+      <View style={oc.cardDivider} />
+
+      {/* Actions Row */}
+      <View style={oc.actionsRow}>
+        {order.status === "delivered" ? (
+          <>
+            {showDownloadInvoice ? (
+              <TouchableOpacity style={oc.actionBtn} onPress={onDownloadInvoice} activeOpacity={0.7}>
+                <Text style={oc.actionBtnText}>Download invoice</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={oc.actionBtn} onPress={onReorder} activeOpacity={0.7}>
+                <Text style={oc.actionBtnText}>Reorder</Text>
+              </TouchableOpacity>
+            )}
+            
+            <View style={oc.actionDivider} />
+
+            <TouchableOpacity 
+              style={oc.actionBtn} 
+              onPress={alreadyRated ? null : onRate} 
+              activeOpacity={alreadyRated ? 1 : 0.7}
+            >
+              <Text style={[oc.actionBtnText, alreadyRated && { color: C.gray400 }]}>
+                {alreadyRated ? "Rated ⭐" : "Rate order"}
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            {["accepted", "preparing", "ready", "picked_up"].includes(order.status) &&
+            (order.delivery_partner_id || order.delivery_partner) ? (
+              <TouchableOpacity style={oc.actionBtn} onPress={onPress} activeOpacity={0.7}>
+                <Text style={oc.actionBtnText}>Track Order</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={oc.actionBtn} onPress={onPress} activeOpacity={0.7}>
+                <Text style={oc.actionBtnText}>View Details</Text>
+              </TouchableOpacity>
+            )}
+            
+            <View style={oc.actionDivider} />
+
+            <TouchableOpacity style={oc.actionBtn} onPress={onPress} activeOpacity={0.7}>
+              <Text style={oc.actionBtnText}>Support</Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
-
-      {/* Progress bar — only for active non-failed orders */}
-      {!isFailed && stepIdx >= 0 && stepIdx < TRACK_STEPS.length - 1 && (
-        <View style={oc.progressWrap}>
-          <View
-            style={[
-              oc.progressBar,
-              {
-                width: `${((stepIdx + 1) / TRACK_STEPS.length) * 100}%`,
-              },
-            ]}
-          />
-        </View>
-      )}
-    </TouchableOpacity>
+    </View>
   );
 }
 
 const oc = StyleSheet.create({
   card: {
     backgroundColor: C.white,
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 16,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: C.gray100,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
-  },
-  top: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
-  storeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: C.greenBorder,
-  },
-  storeName: { fontSize: 15, fontWeight: "800", color: C.gray900 },
-  dateText: { fontSize: 12, color: C.gray400, marginTop: 2 },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-  statusText: { fontSize: 11, fontWeight: "700" },
-  orderNum: {
-    fontSize: 12,
-    color: C.gray400,
-    fontWeight: "600",
-    marginBottom: 10,
-  },
-  thumbsRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
-  thumb: {
-    width: 52,
-    height: 52,
-    borderRadius: 10,
-    backgroundColor: C.gray100,
-  },
-  thumbMore: {
-    width: 52,
-    height: 52,
-    borderRadius: 10,
-    backgroundColor: C.gray100,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  thumbMoreText: { fontSize: 13, fontWeight: "700", color: C.gray500 },
-  bottom: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-  },
-  itemCount: { fontSize: 12, color: C.gray400 },
-  totalText: {
-    fontSize: 17,
-    fontWeight: "900",
-    color: C.gray900,
-    marginTop: 1,
-  },
-  detailBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: C.greenLight,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: C.greenBorder,
-  },
-  detailText: { fontSize: 13, fontWeight: "700", color: C.green },
-  progressWrap: {
-    height: 3,
-    backgroundColor: C.gray100,
-    borderRadius: 2,
-    marginTop: 12,
     overflow: "hidden",
   },
-  progressBar: { height: 3, backgroundColor: C.green, borderRadius: 2 },
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    gap: 12,
+  },
+  statusIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTextContainer: {
+    flex: 1,
+  },
+  statusTitleText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: C.gray900,
+    letterSpacing: -0.2,
+  },
+  subheadText: {
+    fontSize: 13,
+    color: C.gray500,
+    marginTop: 2,
+    fontWeight: "500",
+  },
+  menuBtn: {
+    padding: 4,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: C.gray100,
+  },
+  thumbsContainer: {
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  thumbBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: C.gray100,
+    backgroundColor: C.gray100,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  thumbImg: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 12,
+  },
+  thumbMoreBox: {
+    backgroundColor: C.gray100,
+    borderColor: C.gray200,
+  },
+  thumbMoreText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.gray600,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.white,
+  },
+  actionBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+  },
+  actionBtnText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: C.green,
+  },
+  actionDivider: {
+    width: 1,
+    height: "100%",
+    backgroundColor: C.gray100,
+  },
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function MyOrdersScreen() {
   const navigation = useNavigation();
   const { token } = useAuthStore();
+  const { addItem, updateQty, clearCart } = useCartStore();
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
   const [detailOrder, setDetailOrder] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [reviewOrder, setReviewOrder] = useState(null);
   const [reviewRating, setReviewRating] = useState(0);
@@ -1322,9 +1383,75 @@ export default function MyOrdersScreen() {
   ];
   const PAST_STATUSES = ["delivered", "cancelled", "rejected"];
 
+  const handleReorder = (order) => {
+    const items = order.order_items || order.items || [];
+    if (items.length === 0) {
+      Alert.alert("Error", "No items found in this order to reorder.");
+      return;
+    }
+    
+    const vendorId = order.vendor_id || order.vendor?.id;
+    
+    // Clear cart first so we can fill it with the reordered items cleanly
+    clearCart();
+    
+    // Add each item
+    items.forEach(item => {
+      const p = item.product || {};
+      const name = item.product_name || p.name || "Item";
+      const price = item.product_price || p.price || item.price || 0;
+      const qty = item.quantity || 1;
+      const prod = {
+        id: p.id || item.product_id,
+        name: name,
+        price: price,
+        image: p.image_url,
+        unit: p.unit || item.unit || "1 pc"
+      };
+      
+      addItem(prod, vendorId);
+      if (qty > 1) {
+        updateQty(prod.id, qty);
+      }
+    });
+    
+    Alert.alert(
+      "Reordered!",
+      "All items have been added to your cart.",
+      [
+        {
+          text: "Go to Cart",
+          onPress: () => navigation.navigate("Cart")
+        },
+        {
+          text: "OK",
+          style: "cancel"
+        }
+      ]
+    );
+  };
+
   const filtered = orders.filter((o) => {
-    if (activeTab === "active") return ACTIVE_STATUSES.includes(o.status);
-    if (activeTab === "past") return PAST_STATUSES.includes(o.status);
+    if (activeTab === "active" && !ACTIVE_STATUSES.includes(o.status)) return false;
+    if (activeTab === "past" && !PAST_STATUSES.includes(o.status)) return false;
+    
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      const shopName = (o.vendor?.shop_name || o.vendor_name || "").toLowerCase();
+      const orderNum = (o.order_number || o.id?.toString() || "").toLowerCase();
+      
+      const matchesShop = shopName.includes(query);
+      const matchesOrderNum = orderNum.includes(query);
+      
+      const items = o.order_items || o.items || [];
+      const matchesItems = items.some(item => {
+        const name = (item.product_name || item.product?.name || "").toLowerCase();
+        return name.includes(query);
+      });
+      
+      return matchesShop || matchesOrderNum || matchesItems;
+    }
+    
     return true;
   });
 
@@ -1337,36 +1464,61 @@ export default function MyOrdersScreen() {
 
   const goBack = () => navigation.goBack();
 
+  const firstDelivered = filtered.find(o => o.status === "delivered");
+  const firstDeliveredId = firstDelivered ? firstDelivered.id : null;
+
+  const handleDownloadInvoice = async (order) => {
+    if (!order) return;
+    try {
+      await downloadInvoice(order.id, order.order_number || order.id);
+    } catch (e) {
+      console.error("Invoice download error:", e);
+      Alert.alert("Error", "Could not download invoice. Please try again.");
+    }
+  };
+
   return (
     <View style={s.root}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={Platform.OS === 'ios' ? 'dark-content' : 'default'} backgroundColor="#FFFFFF" />
 
       {/* HEADER */}
-      <LinearGradient
-        colors={[C.orange, C.orangeDark, C.greenDark, C.green]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={s.header}
-      >
+      <View style={s.header}>
         <TouchableOpacity
           style={s.backBtn}
           onPress={goBack}
           activeOpacity={0.8}
         >
-          <Feather name="arrow-left" size={20} color={C.white} />
+          <Feather name="arrow-left" size={20} color={C.gray800} />
         </TouchableOpacity>
-        <View style={s.headerMid}>
-          <Text style={s.appName}>DesiDukaan</Text>
-          <Text style={s.headerTitle}>My Orders</Text>
-        </View>
+        <Text style={s.headerTitle}>Order History</Text>
         <TouchableOpacity
           style={s.refreshBtn}
           onPress={() => fetchOrders(true)}
           activeOpacity={0.8}
         >
-          <Feather name="refresh-cw" size={16} color={C.white} />
+          <Feather name="refresh-cw" size={16} color={C.gray800} />
         </TouchableOpacity>
-      </LinearGradient>
+      </View>
+
+      {/* SEARCH BAR */}
+      <View style={s.searchBarContainer}>
+        <View style={s.searchBar}>
+          <Feather name="search" size={18} color={C.gray400} style={s.searchIcon} />
+          <TextInput
+            style={s.searchInput}
+            placeholder="Search your grocery orders"
+            placeholderTextColor={C.gray400}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            clearButtonMode="while-editing"
+          />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery("")} style={s.clearBtn}>
+              <Feather name="x" size={16} color={C.gray400} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
 
       {/* TABS */}
       <View style={s.tabs}>
@@ -1487,6 +1639,9 @@ export default function MyOrdersScreen() {
                 setReviewComment("");
               }}
               alreadyRated={!!reviewDone[order.id]}
+              onReorder={() => handleReorder(order)}
+              onDownloadInvoice={() => handleDownloadInvoice(order)}
+              isFirstDelivered={order.id === firstDeliveredId}
             />
           ))}
           <View style={{ height: 32 }} />
@@ -1634,36 +1789,65 @@ const s = StyleSheet.create({
   loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500" },
 
   header: {
-    paddingTop: Platform.OS === "android" ? 28 : 36,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
+    paddingTop: Platform.OS === "android" ? 36 : 48,
+    paddingBottom: 14,
+    paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 12,
+    backgroundColor: C.white,
   },
   backBtn: {
     width: 38,
     height: 38,
-    borderRadius: 13,
-    backgroundColor: "rgba(0,0,0,0.15)",
+    borderRadius: 19,
+    backgroundColor: C.gray100,
     alignItems: "center",
     justifyContent: "center",
   },
-  headerMid: { flex: 1 },
-  appName: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.8)",
-    letterSpacing: 0.5,
+  headerTitle: { 
+    fontSize: 20, 
+    fontWeight: "800", 
+    color: C.gray900, 
+    flex: 1,
+    letterSpacing: -0.5,
   },
-  headerTitle: { fontSize: 20, fontWeight: "900", color: C.white },
   refreshBtn: {
     width: 38,
     height: 38,
-    borderRadius: 13,
-    backgroundColor: "rgba(0,0,0,0.15)",
+    borderRadius: 19,
+    backgroundColor: C.gray100,
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  searchBarContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: C.white,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.gray100,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 46,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: C.gray900,
+    fontWeight: "600",
+    padding: 0,
+  },
+  clearBtn: {
+    padding: 4,
   },
 
   tabs: {
