@@ -86,7 +86,7 @@ function useBreakpoint() {
 }
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
-function Section({ num, title, icon, children, cardR, px }) {
+function Section({ num, title, icon, children, cardR, px, rightElement }) {
   return (
     <View style={[sec.wrap, { borderRadius: cardR, marginHorizontal: px }]}>
       <View style={sec.header}>
@@ -95,6 +95,7 @@ function Section({ num, title, icon, children, cardR, px }) {
         </View>
         <Feather name={icon} size={16} color={C.green} />
         <Text style={sec.title}>{title}</Text>
+        {rightElement}
       </View>
       {children}
     </View>
@@ -104,7 +105,7 @@ const sec = StyleSheet.create({
   wrap: {
     backgroundColor: C.white,
     marginBottom: 12,
-    padding: 18,
+    padding: 16,
     borderWidth: 1,
     borderColor: C.gray200,
   },
@@ -112,18 +113,21 @@ const sec = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginBottom: 18,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
   },
   numWrap: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: C.green,
     alignItems: "center",
     justifyContent: "center",
   },
-  num: { fontSize: 13, fontWeight: "900", color: C.white },
-  title: { fontSize: 17, fontWeight: "900", color: C.gray900, flex: 1 },
+  num: { fontSize: 12, fontWeight: "900", color: C.white },
+  title: { fontSize: 16, fontWeight: "800", color: C.gray900, flex: 1 },
 });
 
 function SlotBanner({ slot }) {
@@ -263,8 +267,8 @@ function CancellationPolicy() {
   );
 }
 const cp = StyleSheet.create({
-  trigger:       { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.white, borderRadius: 14, borderWidth: 1, borderColor: C.gray200, padding: 14 },
-  triggerTitle:  { flex: 1, fontSize: 14, fontWeight: "700", color: C.gray700 },
+  trigger:       { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#FFFBEB", borderRadius: 14, borderWidth: 1, borderColor: "#FDE68A", padding: 14 },
+  triggerTitle:  { flex: 1, fontSize: 14, fontWeight: "700", color: "#92400E" },
   backdrop:      { flex: 1, backgroundColor: "rgba(0,0,0,0.48)", justifyContent: "flex-end" },
   sheet:         { backgroundColor: C.white, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingTop: 10, maxHeight: "80%" },
   handle:        { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
@@ -280,7 +284,7 @@ const cp = StyleSheet.create({
 });
 
 // ─── Order Summary card ───────────────────────────────────────────────────────
-function OrderSummaryCard({ items, subtotal, deliveryFee, total, onNegotiate, fs = 1 }) {
+function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNegotiate, fs = 1 }) {
   return (
     <View style={osc.wrap}>
       {items.map((item, i) => (
@@ -320,8 +324,8 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, total, onNegotiate, fs
         <Text style={[osc.label, { fontSize: Math.round(13 * fs) }]}>
           Taxes (GST 5%)
         </Text>
-        <Text style={[osc.value, { fontSize: Math.round(13 * fs) }]}>
-          ₹{parseFloat((subtotal * 0.05).toFixed(2))}
+        <Text style={[osc.value, { color: C.green, fontSize: Math.round(13 * fs) }]}>
+          Included
         </Text>
       </View>
       <View style={osc.row}>
@@ -329,33 +333,30 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, total, onNegotiate, fs
           <Text style={[osc.label, { fontSize: Math.round(13 * fs) }]}>
             Delivery fee
           </Text>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          {baseFee != null && baseFee !== deliveryFee && (
+            <Text style={{ fontSize: 12, color: C.gray400, textDecorationLine: "line-through" }}>
+              ₹{baseFee}
+            </Text>
+          )}
+          {deliveryFee === 0 ? (
+            <Text style={[osc.value, { color: C.green, fontSize: Math.round(13 * fs) }]}>FREE</Text>
+          ) : (
+            <Text style={[osc.value, { fontSize: Math.round(13 * fs) }]}>₹{deliveryFee}</Text>
+          )}
           {deliveryFee > 0 && (
-            <TouchableOpacity 
-              style={osc.negotiateBtn} 
+            <TouchableOpacity
+              style={osc.negotiateBtn}
               onPress={() => onNegotiate && onNegotiate()}
               activeOpacity={0.7}
             >
-              <Feather name="edit-2" size={10} color={C.green} />
-              <Text style={osc.negotiateBtnText}>Negotiate</Text>
+              <Text style={osc.negotiateBtnText}>NEGOTIATE</Text>
             </TouchableOpacity>
           )}
         </View>
-        {deliveryFee === 0 ? (
-          <Text
-            style={[
-              osc.value,
-              { color: C.green, fontSize: Math.round(13 * fs) },
-            ]}
-          >
-            FREE
-          </Text>
-        ) : (
-          <Text style={[osc.value, { fontSize: Math.round(13 * fs) }]}>
-            ₹{deliveryFee}
-          </Text>
-        )}
       </View>
-      <View style={osc.divider} />
+      <View style={osc.dottedDivider} />
       <View style={osc.row}>
         <Text style={[osc.totalLabel, { fontSize: Math.round(16 * fs) }]}>
           Total payable
@@ -369,20 +370,19 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, total, onNegotiate, fs
 }
 const osc = StyleSheet.create({
   wrap: {
-    backgroundColor: C.bg,
+    backgroundColor: C.white,
     borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: C.gray200,
+    padding: 0,
+    borderWidth: 0,
   },
   itemRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingVertical: 7,
+    paddingVertical: 8,
   },
   itemBorder: { borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  itemDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green },
+  itemDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green, flexShrink: 0 },
   itemName: { flex: 1, fontSize: 13, color: C.gray700, fontWeight: "500" },
   itemQty: { fontSize: 12, color: C.gray400 },
   itemPrice: {
@@ -393,18 +393,20 @@ const osc = StyleSheet.create({
     textAlign: "right",
   },
   moreText: { fontSize: 12, color: C.gray400, paddingVertical: 6 },
-  divider: { height: 1, backgroundColor: C.gray200, marginVertical: 8 },
+  divider: { height: 1, backgroundColor: C.gray200, marginVertical: 10 },
+  dottedDivider: { borderTopWidth: 2, borderTopColor: C.gray200, borderStyle: "dashed", marginVertical: 10 },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 3,
+    alignItems: "center",
+    paddingVertical: 4,
   },
-  label: { fontSize: 13, color: C.gray600 },
+  label: { fontSize: 13, color: C.gray500 },
   value: { fontSize: 13, fontWeight: "600", color: C.gray900 },
-  totalLabel: { fontSize: 16, fontWeight: "900", color: C.gray900 },
-  totalVal: { fontSize: 16, fontWeight: "900", color: C.gray900 },
-  negotiateBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.greenLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  negotiateBtnText: { fontSize: 10, fontWeight: "700", color: C.green },
+  totalLabel: { fontSize: 15, fontWeight: "900", color: C.gray900 },
+  totalVal: { fontSize: 16, fontWeight: "900", color: C.green },
+  negotiateBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FFF7ED", borderWidth: 1, borderColor: "#FDBA74", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  negotiateBtnText: { fontSize: 10, fontWeight: "700", color: C.orange },
 });
 
 // ─── Negotiation Banner (Shown while waiting or after response) ──────────────
@@ -1116,10 +1118,10 @@ export default function CheckoutScreen() {
           <Feather name="arrow-left" size={20} color={C.gray900} />
         </TouchableOpacity>
         <View style={s.headerMid}>
-          <Text style={[s.headerTitle, { fontSize: Math.round(20 * fs) }]}>
+          <Text style={[s.headerTitle, { fontSize: Math.round(20 * fs), color: C.orange }]}>
             Checkout
           </Text>
-          <Text style={[s.headerSub, { fontSize: Math.round(14 * fs), fontWeight: "800", color: C.greenDark }]}>
+          <Text style={[s.headerSub, { fontSize: Math.round(12 * fs), color: C.gray500, fontWeight: "400" }]}>
             {vendorName}
           </Text>
         </View>
@@ -1135,7 +1137,7 @@ export default function CheckoutScreen() {
         <ScrollView
           style={s.mainCol}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: 14, paddingBottom: 32 }}
+          contentContainerStyle={{ paddingTop: 14, paddingBottom: 100 }}
           keyboardShouldPersistTaps="handled"
         >
           {/* Slot banner — only if slot was negotiated */}
@@ -1252,80 +1254,46 @@ export default function CheckoutScreen() {
               );
             })}
 
-            {/* GPS detect */}
-            <TouchableOpacity
-              style={[
-                s.addrOption,
-                selectedAddrId === "detected" && s.addrOptionActive,
-                { borderRadius: cardR - 4 },
-              ]}
-              onPress={detectLocation}
-              activeOpacity={0.8}
-              disabled={detectingLoc}
-            >
-              <View style={[s.addrIcon, { backgroundColor: "#EFF6FF" }]}>
+            {/* GPS + Manual — 2-column row */}
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 8 }}>
+              <TouchableOpacity
+                style={[
+                  s.addrActionBtn,
+                  selectedAddrId === "detected" && s.addrActionBtnActive,
+                  { borderRadius: cardR - 4, flex: 1 },
+                ]}
+                onPress={detectLocation}
+                activeOpacity={0.8}
+                disabled={detectingLoc}
+              >
                 {detectingLoc ? (
                   <ActivityIndicator size="small" color="#2563EB" />
                 ) : (
-                  <Feather name="navigation" size={17} color="#2563EB" />
+                  <Feather name="navigation" size={15} color={selectedAddrId === "detected" ? C.green : "#2563EB"} />
                 )}
-              </View>
-              <View style={s.addrBody}>
-                <Text style={[s.addrTitle, { fontSize: Math.round(14 * fs) }]}>
-                  Use my current location
+                <Text style={[s.addrActionText, { fontSize: Math.round(12 * fs), color: selectedAddrId === "detected" ? C.green : "#2563EB" }]}>
+                  Use current location
                 </Text>
-                {detectedAddr ? (
-                  <Text
-                    style={[s.addrDetected, { fontSize: Math.round(12 * fs) }]}
-                    numberOfLines={2}
-                  >
-                    {detectedAddr}
-                  </Text>
-                ) : (
-                  <Text style={[s.addrSub, { fontSize: Math.round(12 * fs) }]}>
-                    Auto-detect via GPS
-                  </Text>
-                )}
-              </View>
-              {selectedAddrId === "detected" ? (
-                <View style={s.radioOuterActive}>
-                  <View style={s.radioDot} />
-                </View>
-              ) : (
-                <View style={s.radioOuter} />
-              )}
-            </TouchableOpacity>
+              </TouchableOpacity>
 
-            {/* Manual entry */}
-            <TouchableOpacity
-              style={[
-                s.addrOption,
-                manualOpen && s.addrOptionActive,
-                { borderRadius: cardR - 4 },
-              ]}
-              onPress={() => {
-                setManualOpen((o) => !o);
-                if (!manualOpen) setSelectedAddrId("manual");
-              }}
-              activeOpacity={0.8}
-            >
-              <View style={[s.addrIcon, { backgroundColor: "#FFF7ED" }]}>
-                <Feather name="edit-2" size={17} color={C.orange} />
-              </View>
-              <View style={s.addrBody}>
-                <Text style={[s.addrTitle, { fontSize: Math.round(14 * fs) }]}>
+              <TouchableOpacity
+                style={[
+                  s.addrActionBtn,
+                  manualOpen && s.addrActionBtnOrange,
+                  { borderRadius: cardR - 4, flex: 1 },
+                ]}
+                onPress={() => {
+                  setManualOpen((o) => !o);
+                  if (!manualOpen) setSelectedAddrId("manual");
+                }}
+                activeOpacity={0.8}
+              >
+                <Feather name="edit-2" size={15} color={manualOpen ? C.white : C.orange} />
+                <Text style={[s.addrActionText, { fontSize: Math.round(12 * fs), color: manualOpen ? C.white : C.orange }]}>
                   Add address manually
                 </Text>
-                <Text style={[s.addrSub, { fontSize: Math.round(12 * fs) }]}>
-                  Type your full delivery address
-                </Text>
-              </View>
-              <Feather
-                name={manualOpen ? "chevron-up" : "chevron-down"}
-                size={17}
-                color={C.gray400}
-              />
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
 
             {manualOpen && (
               <View style={[s.manualForm, { borderRadius: cardR - 4 }]}>
@@ -1460,40 +1428,26 @@ export default function CheckoutScreen() {
             icon="clock"
             cardR={cardR}
             px={px}
+            rightElement={
+              confirmedSlot ? (
+                <TouchableOpacity onPress={() => setSlotModalVisible(true)}>
+                  <Text style={{ color: C.green, fontWeight: "700", fontSize: 14 }}>Change</Text>
+                </TouchableOpacity>
+              ) : null
+            }
           >
             {confirmedSlot ? (
-              <View style={s.slotDisplay}>
+              <View style={[s.slotDisplay, { backgroundColor: C.greenLight, borderColor: C.greenBorder }]}>
                 <View style={s.slotInfo}>
-                  <Text style={s.slotTimeText}>
-                    {new Date(confirmedSlot.start).toLocaleTimeString("en-IN", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      hour12: true,
-                    })}{" "}
-                    –{" "}
-                    {new Date(confirmedSlot.end).toLocaleTimeString("en-IN", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      hour12: true,
-                    })}
-                  </Text>
-                  <Text style={s.slotDateText}>
-                    {new Date(confirmedSlot.start).toDateString() ===
-                    new Date().toDateString()
-                      ? "Today"
-                      : "Tomorrow"} ·{" "}
-                    {new Date(confirmedSlot.start).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                    })}
+                  <Text style={[s.slotDateText, { color: C.gray500, fontWeight: "500", fontSize: 12 }]}>Selected Slot</Text>
+                  <Text style={[s.slotTimeText, { color: C.greenDark }]}>
+                    {new Date(confirmedSlot.start).toDateString() === new Date().toDateString() ? "Today" : "Tomorrow"},{" "}
+                    {new Date(confirmedSlot.start).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                    {" – "}
+                    {new Date(confirmedSlot.end).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  onPress={() => setSlotModalVisible(true)}
-                  style={s.slotChangeBtn}
-                >
-                  <Text style={s.slotChangeText}>Change</Text>
-                </TouchableOpacity>
+                <Feather name="check-circle" size={24} color={C.green} />
               </View>
             ) : (
               <TouchableOpacity
@@ -1903,24 +1857,20 @@ export default function CheckoutScreen() {
             </Section>
           )}
 
-          {/* ── SECTION 3: ORDER SUMMARY (mobile/tablet inline) ─────── */}
+          {/* ── ORDER SUMMARY (mobile/tablet inline) ─────────────────── */}
           {!isDesktop && (
-            <Section
-              num="3"
-              title="Order Summary"
-              icon="shopping-bag"
-              cardR={cardR}
-              px={px}
-            >
+            <View style={[sec.wrap, { borderRadius: cardR, marginHorizontal: px }]}>
+              <Text style={[sec.title, { marginBottom: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.gray100 }]}>Order Summary</Text>
               <OrderSummaryCard
                 items={items}
                 subtotal={subtotal}
                 deliveryFee={activeFee}
+                baseFee={baseFee}
                 total={total}
                 onNegotiate={() => setFeeModalVisible(true)}
                 fs={fs}
               />
-            </Section>
+            </View>
           )}
 
           {/* ── CANCELLATION POLICY — only on mobile/tablet (sidebar has it on desktop) */}
@@ -1957,6 +1907,7 @@ export default function CheckoutScreen() {
                 items={items}
                 subtotal={subtotal}
                 deliveryFee={activeFee}
+                baseFee={baseFee}
                 total={total}
                 onNegotiate={() => setFeeModalVisible(true)}
                 fs={fs}
@@ -2175,24 +2126,24 @@ const extraStyles = {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: C.bg,
+    backgroundColor: C.greenLight,
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: C.gray200,
+    borderColor: C.greenBorder,
   },
   slotInfo: { gap: 2 },
-  slotTimeText: { fontSize: 16, fontWeight: "900", color: C.gray900 },
-  slotDateText: { fontSize: 12, color: C.gray500, fontWeight: "600" },
+  slotTimeText: { fontSize: 16, fontWeight: "900", color: C.greenDark },
+  slotDateText: { fontSize: 12, color: C.green, fontWeight: "600" },
   slotChangeBtn: {
     backgroundColor: C.white,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: C.gray300,
+    borderColor: C.greenBorder,
   },
-  slotChangeText: { fontSize: 13, fontWeight: "700", color: C.gray600 },
+  slotChangeText: { fontSize: 13, fontWeight: "700", color: C.green },
   phoneBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -2221,12 +2172,12 @@ const extraStyles = {
     justifyContent: "center",
     gap: 8,
     backgroundColor: C.gray100,
-    padding: 14,
+    padding: 16,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: C.gray200,
   },
-  phoneRequestText: { fontSize: 14, fontWeight: "700", color: C.gray700 },
+  phoneRequestText: { fontSize: 14, fontWeight: "700", color: C.gray600 },
   callBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -2591,23 +2542,23 @@ const s = StyleSheet.create({
     borderBottomColor: C.gray100,
   },
   backBtn: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    backgroundColor: C.gray100,
+    backgroundColor: C.white,
+    borderWidth: 1,
+    borderColor: C.gray200,
     alignItems: "center",
     justifyContent: "center",
   },
   headerMid: { flex: 1 },
   headerTitle: { fontSize: 20, fontWeight: "900", color: C.gray900 },
-  headerSub: { fontSize: 12, color: C.gray400, marginTop: 1 },
+  headerSub: { fontSize: 12, color: C.green, marginTop: 1, fontWeight: "700" },
   totalChip: {
     backgroundColor: C.greenMid,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: C.greenBorder,
   },
   totalChipText: { fontSize: 14, fontWeight: "900", color: C.greenDark },
 
@@ -2676,12 +2627,12 @@ const s = StyleSheet.create({
   },
   addrBody: { flex: 1 },
   addrTitle: { fontSize: 14, fontWeight: "700", color: C.gray900 },
-  addrSub: { fontSize: 12, color: C.gray400, marginTop: 2 },
+  addrSub: { fontSize: 12, color: C.gray500, marginTop: 2 },
   addrDetected: {
     fontSize: 12,
     color: C.green,
     marginTop: 2,
-    fontWeight: "500",
+    fontWeight: "600",
   },
 
   // Radio buttons
@@ -2711,6 +2662,22 @@ const s = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: C.green,
   },
+
+  // Address action buttons (2-col GPS + Manual)
+  addrActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    backgroundColor: C.white,
+  },
+  addrActionBtnActive: { borderColor: C.green, backgroundColor: C.greenLight },
+  addrActionBtnOrange: { borderColor: C.orange, backgroundColor: C.orange },
+  addrActionText: { fontSize: 12, fontWeight: "600", textAlign: "center" },
 
   // Manual form
   manualForm: {
@@ -2774,7 +2741,7 @@ const s = StyleSheet.create({
   },
   payBody: { flex: 1 },
   payLabel: { fontSize: 15, fontWeight: "700", color: C.gray900 },
-  paySub: { fontSize: 12, color: C.gray400, marginTop: 2 },
+  paySub: { fontSize: 12, color: C.gray500, marginTop: 2 },
   paySubRow: {
     flexDirection: "row",
     flexWrap: "wrap",
