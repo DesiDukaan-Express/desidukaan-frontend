@@ -694,7 +694,7 @@ function OrderDetailModal({ order, onClose }) {
                         fontWeight: "700",
                       }}
                     >
-                      {order.payment.status === "paid" ? "Paid" : "Pending"}
+                      {displayOrder.payment.status === "paid" ? "Paid" : "Pending"}
                     </Text>
                   </Text>
                 </View>
