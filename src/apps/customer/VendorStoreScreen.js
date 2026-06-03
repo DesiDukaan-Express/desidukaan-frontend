@@ -104,20 +104,7 @@ const normalizeCatName = (name) => {
 
 const normalizeCat = (cat) => normalizeCatName(cat) || "Other";
 
-function buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCategories) {
-  const parentOf = {};
-  const catById = {};
-  if (apiCategories && apiCategories.length > 0) {
-    apiCategories.forEach(c => { catById[c.id] = c; });
-    apiCategories.forEach(c => {
-      if (c.parent_id && catById[c.parent_id]) {
-        parentOf[c.name] = catById[c.parent_id].name;
-      } else {
-        parentOf[c.name] = null;
-      }
-    });
-  }
-
+function buildHierarchyFromInventory(allInventoryItems, getCategoryName, parentOfMap) {
   const hierarchy = {};
 
   allInventoryItems.forEach(inv => {
@@ -125,12 +112,12 @@ function buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCate
     if (!catName) return;
 
     let topCat, subCat;
-    if (parentOf.hasOwnProperty(catName)) {
-      if (parentOf[catName] === null) {
+    if (parentOfMap && parentOfMap.hasOwnProperty(catName)) {
+      if (parentOfMap[catName] === null) {
         topCat = catName;
         subCat = "All";
       } else {
-        topCat = parentOf[catName];
+        topCat = parentOfMap[catName];
         subCat = catName;
       }
     } else {
@@ -695,9 +682,29 @@ export default function VendorStoreScreen() {
     return normalizeCatName(raw) || "Other";
   }, []);
 
+  const parentOfMap = useMemo(() => {
+    const map = {};
+    const catById = {};
+    if (apiCategories && apiCategories.length > 0) {
+      apiCategories.forEach(c => { catById[c.id] = c; });
+      apiCategories.forEach(c => {
+        const normName = normalizeCatName(c.name);
+        if (normName) {
+          if (c.parent_id && catById[c.parent_id]) {
+            const normParent = normalizeCatName(catById[c.parent_id].name);
+            map[normName] = normParent;
+          } else {
+            map[normName] = null;
+          }
+        }
+      });
+    }
+    return map;
+  }, [apiCategories]);
+
   const categoryHierarchy = useMemo(
-    () => buildHierarchyFromInventory(inventory, getCatName, apiCategories),
-    [inventory, getCatName, apiCategories],
+    () => buildHierarchyFromInventory(inventory, getCatName, parentOfMap),
+    [inventory, getCatName, parentOfMap],
   );
 
   const categories = useMemo(() => {
@@ -728,9 +735,20 @@ export default function VendorStoreScreen() {
     const name = (item.product?.name || "").toLowerCase();
     const cat = getCatName(item);
     const matchesSearch = !search || name.includes(search.toLowerCase());
-    const matchesCat = activeCat === "All" || cat === activeCat;
+    
+    let matchesCat = activeCat === "All";
+    if (!matchesCat) {
+      if (cat === activeCat) {
+        matchesCat = true;
+      } else {
+        const parentCatName = parentOfMap[cat];
+        if (parentCatName === activeCat) {
+          matchesCat = true;
+        }
+      }
+    }
     return matchesSearch && matchesCat;
-  }), [inventory, search, activeCat, getCatName]);
+  }), [inventory, search, activeCat, getCatName, parentOfMap]);
 
   const inStock = filtered.filter(i => i.stock_qty > 0);
   const outStock = filtered.filter(i => i.stock_qty <= 0);
