@@ -1257,16 +1257,16 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
 // ─── Popular Item Card (horizontal scroll, HTML-reference style) ───────────────
 function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker }) {
   const CARD_W = 160;
-  const IMG_H  = 100;
+  const IMG_H = 100;
 
   const imgUri =
     item.img ||
     item.image_url ||
     CAT_FALLBACK_IMGS[item.category] ||
     CAT_FALLBACK_IMGS._default;
-  const hasMrp  = item.orig && item.orig > item.price;
+  const hasMrp = item.orig && item.orig > item.price;
   const discPct = hasMrp ? Math.round((1 - item.price / item.orig) * 100) : 0;
-  const loose   = isLooseItem(item);
+  const loose = isLooseItem(item);
 
   return (
     <View style={pic.card}>
@@ -2295,6 +2295,152 @@ export default function HomeScreen() {
         </View>
 
         {/* 3. NEARBY STORES — hidden as per design (user request) */}
+        <View style={[s.sectionHeader, { paddingHorizontal: hPad }]}>
+          <View>
+            <Text style={s.sectionTitle}>Nearby Stores</Text>
+            <Text style={s.sectionSub}>Delivering to your location</Text>
+          </View>
+          <TouchableOpacity onPress={() => navigation.navigate("AllStores")}>
+            <Text style={s.viewAll}>View all</Text>
+          </TouchableOpacity>
+        </View>
+
+        {loadingVendors ? (
+          <View style={[s.loadingRow, { paddingHorizontal: hPad }]}>
+            <ActivityIndicator size="small" color={C.green} />
+            <Text style={s.loadingText}>Finding stores near you…</Text>
+          </View>
+        ) : vendors.length === 0 ? (
+          <View style={s.emptyBox}>
+            <View style={s.emptyIconWrap}>
+              <MaterialIcons name="location-on" size={26} color={C.green} />
+            </View>
+            <Text style={s.emptyTitle}>No stores found nearby</Text>
+            <Text style={s.emptySub}>Try updating your delivery location</Text>
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingLeft: hPad,
+              paddingRight: 8,
+              paddingBottom: 6,
+            }}
+          >
+            {vendors.map((vendor) => (
+              <TouchableOpacity
+                key={vendor.id}
+                style={[s.storeCard, wide && s.storeCardWide]}
+                onPress={() =>
+                  navigation.navigate("VendorStore", {
+                    vendorId: vendor.id,
+                    vendorName: vendor.shop_name,
+                  })
+                }
+                activeOpacity={0.88}
+              >
+                <View style={s.storeImgWrap}>
+                  <Image
+                    source={{
+                      uri:
+                        vendor.shop_image_url ||
+                        `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${vendor.id}`,
+                    }}
+                    style={s.storeImg}
+                  />
+                  <LinearGradient
+                    colors={["transparent", "rgba(0,0,0,0.5)"]}
+                    style={s.storeImgOverlay}
+                  />
+                  {/* OPEN/CLOSED pill — solid, no dot */}
+                  <View
+                    style={[
+                      s.statusBadge,
+                      {
+                        backgroundColor: vendor.is_open
+                          ? C.green
+                          : "rgba(0,0,0,0.6)",
+                      },
+                    ]}
+                  >
+                    <Text style={s.statusText}>
+                      {vendor.is_open ? "OPEN" : "CLOSED"}
+                    </Text>
+                  </View>
+                  <View style={s.ratingBadge}>
+                    <MaterialIcons name="star" size={10} color="#FBBF24" />
+                    <Text style={s.ratingText}>
+                      {vendor.avg_rating
+                        ? parseFloat(vendor.avg_rating).toFixed(1)
+                        : "New"}
+                    </Text>
+                  </View>
+                </View>
+                <View style={s.storeInfo}>
+                  <Text style={s.storeName} numberOfLines={1}>
+                    {vendor.shop_name}
+                  </Text>
+                  <View style={s.storeMetaRow}>
+                    <MaterialIcons name="location-on" size={10} color={C.green} />
+                    <Text style={s.storeMeta}>
+                      {vendor.distance_km
+                        ? `${parseFloat(vendor.distance_km).toFixed(1)} km`
+                        : "Nearby"}
+                    </Text>
+                    <View style={s.metaDot} />
+                    <MaterialIcons name="access-time" size={10} color={C.gray400} />
+                    <Text style={s.storeMeta}>30 min</Text>
+                  </View>
+                  <View style={s.storeTagRow}>
+                    {/* Min order — orange pill */}
+                    <View style={[s.storeTag, { backgroundColor: C.orangeLight, borderColor: "#FED7AA" }]}>
+                      <Text style={[s.storeTagText, { color: C.orangeDark }]}>
+                        Min ₹{vendor.min_order || 99}
+                      </Text>
+                    </View>
+                    {vendor.is_open && (
+                      <View
+                        style={[
+                          s.storeTag,
+                          {
+                            backgroundColor: C.greenLight,
+                            borderColor: C.greenBorder,
+                          },
+                        ]}
+                      >
+                        <Text style={[s.storeTagText, { color: C.green }]}>
+                          Accepting orders
+                        </Text>
+                      </View>
+                    )}
+                    {vendor.vendor_type && vendor.vendor_type !== "all" &&
+                      VENDOR_TYPE_META[vendor.vendor_type] && (
+                        <View
+                          style={[
+                            s.storeTag,
+                            {
+                              backgroundColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
+                              borderColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              s.storeTagText,
+                              { color: VENDOR_TYPE_META[vendor.vendor_type].color },
+                            ]}
+                          >
+                            {VENDOR_TYPE_META[vendor.vendor_type].label}
+                          </Text>
+                        </View>
+                      )}
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
 
         {/* 4. SHOP BY CATEGORY */}
         {showCategories && (
