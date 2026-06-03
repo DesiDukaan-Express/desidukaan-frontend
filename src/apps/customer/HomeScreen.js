@@ -1182,10 +1182,9 @@ const VENDOR_TYPE_META = {
   fruits: { label: "Fruits", bg: "#ECFDF5", color: "#065F46" },
 };
 
-// ─── Item Card ─────────────────────────────────────────────────────────────────
+// ─── Item Card (grid, used inside CategoryBrowseSheet) ────────────────────────
 function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker }) {
   const size = cardWidth || 130;
-  console.log(item)
   const imgUri =
     item.img ||
     item.image_url ||
@@ -1254,6 +1253,184 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
     </View>
   );
 }
+
+// ─── Popular Item Card (horizontal scroll, HTML-reference style) ───────────────
+function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker }) {
+  const CARD_W = 160;
+  const IMG_H  = 100;
+
+  const imgUri =
+    item.img ||
+    item.image_url ||
+    CAT_FALLBACK_IMGS[item.category] ||
+    CAT_FALLBACK_IMGS._default;
+  const hasMrp  = item.orig && item.orig > item.price;
+  const discPct = hasMrp ? Math.round((1 - item.price / item.orig) * 100) : 0;
+  const loose   = isLooseItem(item);
+
+  return (
+    <View style={pic.card}>
+      {/* ── Image section ── */}
+      <View style={[pic.imgWrap, { height: IMG_H }]}>
+        {/* Discount badge – top-left */}
+        {hasMrp && (
+          <View style={pic.discBadge}>
+            <Text style={pic.discBadgeText}>{discPct}% OFF</Text>
+          </View>
+        )}
+        {/* Loose badge – top-right */}
+        {loose && (
+          <View style={[pic.discBadge, { right: 0, left: 'auto', backgroundColor: C.cyan }]}>
+            <Text style={pic.discBadgeText}>Loose</Text>
+          </View>
+        )}
+        <Image
+          source={{ uri: imgUri }}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="cover"
+        />
+      </View>
+
+      {/* ── Info section ── */}
+      <View style={pic.info}>
+        <Text style={pic.name} numberOfLines={1}>{item.name}</Text>
+        <Text style={pic.unit}>{item.unit}</Text>
+
+        {/* Price + Add button row */}
+        <View style={pic.priceRow}>
+          <View>
+            <Text style={pic.price}>₹{item.price}</Text>
+            {hasMrp && <Text style={pic.orig}>₹{item.orig}</Text>}
+          </View>
+
+          {qty === 0 ? (
+            <TouchableOpacity
+              style={pic.addBtn}
+              onPress={() => {
+                if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
+                else onAdd(item);
+              }}
+              activeOpacity={0.85}
+            >
+              <MaterialIcons
+                name={loose ? 'tune' : 'add'}
+                size={18}
+                color={C.white}
+              />
+            </TouchableOpacity>
+          ) : (
+            <View style={pic.qtyRow}>
+              <TouchableOpacity
+                style={pic.qtyBtn}
+                onPress={() => onRemove(item)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <MaterialIcons name="remove" size={12} color={C.white} />
+              </TouchableOpacity>
+              <Text style={pic.qtyNum}>{qty}</Text>
+              <TouchableOpacity
+                style={pic.qtyBtn}
+                onPress={() => onAdd(item)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <MaterialIcons name="add" size={12} color={C.white} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const pic = StyleSheet.create({
+  card: {
+    width: 160,
+    backgroundColor: C.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  imgWrap: {
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: 0,
+    backgroundColor: C.gray100,
+  },
+  discBadge: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    zIndex: 2,
+    backgroundColor: C.orange,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderBottomRightRadius: 8,
+  },
+  discBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: C.white,
+    letterSpacing: 0.3,
+  },
+  info: {
+    padding: 10,
+    paddingTop: 8,
+  },
+  name: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: C.gray900,
+    marginBottom: 2,
+    lineHeight: 18,
+  },
+  unit: {
+    fontSize: 11,
+    color: C.gray400,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 'auto',
+  },
+  price: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: C.gray900,
+  },
+  orig: {
+    fontSize: 10,
+    color: C.gray400,
+    textDecorationLine: 'line-through',
+    marginTop: 1,
+  },
+  addBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: C.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qtyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.green,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  qtyBtn: { paddingHorizontal: 7, paddingVertical: 7 },
+  qtyNum: { fontSize: 12, fontWeight: '800', color: C.white, minWidth: 18, textAlign: 'center' },
+});
 
 const ic = StyleSheet.create({
   card: {
@@ -1997,6 +2174,7 @@ export default function HomeScreen() {
           </View>
         ) : (
           <>
+            {/* ── Mobile header row: location (left) + account (right) ── */}
             <View style={[s.mobileRow1, { paddingHorizontal: hPad }]}>
               <TouchableOpacity
                 style={s.mobileLocBtn}
@@ -2013,49 +2191,47 @@ export default function HomeScreen() {
                     <Text style={s.locLoadText}>Locating…</Text>
                   </View>
                 ) : (
-                  <>
-                    <Text style={s.locationTop}>Delivering to</Text>
-                    <View style={s.locationBottomRow}>
-                      <Text style={s.mobileLocBottom} numberOfLines={1}>
-                        {locationShort || "Set location"}
-                      </Text>
-                      <MaterialIcons
-                        name="expand-more"
-                        size={13}
-                        color={C.gray700}
-                      />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <MaterialIcons name="location-on" size={20} color={C.green} />
+                    <View style={{ flexShrink: 1 }}>
+                      <Text style={s.locationTop}>Deliver to</Text>
+                      <View style={s.locationBottomRow}>
+                        <Text style={s.mobileLocBottom} numberOfLines={1}>
+                          {locationShort || "Set location"}
+                        </Text>
+                        <MaterialIcons
+                          name="expand-more"
+                          size={15}
+                          color={C.gray700}
+                        />
+                      </View>
                     </View>
-                  </>
+                  </View>
                 )}
               </TouchableOpacity>
+              {/* Account icon — clean circle */}
               <TouchableOpacity
                 style={s.mobileProfileBtn}
                 onPress={() => navigation.navigate("Profile")}
                 activeOpacity={0.8}
               >
-                <View style={s.mobileAvatarRing}>
-                  <MaterialIcons name="person" size={18} color={C.orange} />
-                </View>
+                <MaterialIcons name="account-circle" size={36} color={C.green} />
               </TouchableOpacity>
             </View>
+
+            {/* ── Rounded pill search bar with mic ── */}
             <TouchableOpacity
               style={[s.mobileSearch, { marginHorizontal: hPad }]}
               onPress={() => navigation.navigate("Search")}
-              activeOpacity={0.8}
+              activeOpacity={0.9}
             >
-              <MaterialIcons name="search" size={16} color={C.gray400} />
-              <Text style={s.mobileSearchText}>Search stores, items…</Text>
+              <MaterialIcons name="search" size={18} color={C.gray400} />
+              <Text style={s.mobileSearchText}>Search 'fresh milk' or 'chips'…</Text>
+              <MaterialIcons name="mic" size={18} color={C.green} />
             </TouchableOpacity>
           </>
         )}
       </Animated.View>
-
-      <LinearGradient
-        colors={[C.orange, C.orangeDark, C.green, C.greenDark]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={s.accentLine}
-      />
 
       {/* ══ BODY ════════════════════════════════════════════════════════════ */}
       <Animated.ScrollView
@@ -2118,153 +2294,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* 3. NEARBY STORES */}
-        <View style={[s.sectionHeader, { paddingHorizontal: hPad }]}>
-          <View>
-            <Text style={s.sectionTitle}>Nearby Stores</Text>
-            <Text style={s.sectionSub}>Delivering to your location</Text>
-          </View>
-          <TouchableOpacity onPress={() => navigation.navigate("AllStores")}>
-            <Text style={s.viewAll}>View all</Text>
-          </TouchableOpacity>
-        </View>
-
-        {loadingVendors ? (
-          <View style={[s.loadingRow, { paddingHorizontal: hPad }]}>
-            <ActivityIndicator size="small" color={C.green} />
-            <Text style={s.loadingText}>Finding stores near you…</Text>
-          </View>
-        ) : vendors.length === 0 ? (
-          <View style={s.emptyBox}>
-            <View style={s.emptyIconWrap}>
-              <MaterialIcons name="location-on" size={26} color={C.green} />
-            </View>
-            <Text style={s.emptyTitle}>No stores found nearby</Text>
-            <Text style={s.emptySub}>Try updating your delivery location</Text>
-          </View>
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingLeft: hPad,
-              paddingRight: 8,
-              paddingBottom: 6,
-            }}
-          >
-            {vendors.map((vendor) => (
-              <TouchableOpacity
-                key={vendor.id}
-                style={[s.storeCard, wide && s.storeCardWide]}
-                onPress={() =>
-                  navigation.navigate("VendorStore", {
-                    vendorId: vendor.id,
-                    vendorName: vendor.shop_name,
-                  })
-                }
-                activeOpacity={0.88}
-              >
-                <View style={s.storeImgWrap}>
-                  <Image
-                    source={{
-                      uri:
-                        vendor.shop_image_url ||
-                        `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${vendor.id}`,
-                    }}
-                    style={s.storeImg}
-                  />
-                  <LinearGradient
-                    colors={["transparent", "rgba(0,0,0,0.5)"]}
-                    style={s.storeImgOverlay}
-                  />
-                  {/* OPEN/CLOSED pill — solid, no dot */}
-                  <View
-                    style={[
-                      s.statusBadge,
-                      {
-                        backgroundColor: vendor.is_open
-                          ? C.green
-                          : "rgba(0,0,0,0.6)",
-                      },
-                    ]}
-                  >
-                    <Text style={s.statusText}>
-                      {vendor.is_open ? "OPEN" : "CLOSED"}
-                    </Text>
-                  </View>
-                  <View style={s.ratingBadge}>
-                    <MaterialIcons name="star" size={10} color="#FBBF24" />
-                    <Text style={s.ratingText}>
-                      {vendor.avg_rating
-                        ? parseFloat(vendor.avg_rating).toFixed(1)
-                        : "New"}
-                    </Text>
-                  </View>
-                </View>
-                <View style={s.storeInfo}>
-                  <Text style={s.storeName} numberOfLines={1}>
-                    {vendor.shop_name}
-                  </Text>
-                  <View style={s.storeMetaRow}>
-                    <MaterialIcons name="location-on" size={10} color={C.green} />
-                    <Text style={s.storeMeta}>
-                      {vendor.distance_km
-                        ? `${parseFloat(vendor.distance_km).toFixed(1)} km`
-                        : "Nearby"}
-                    </Text>
-                    <View style={s.metaDot} />
-                    <MaterialIcons name="access-time" size={10} color={C.gray400} />
-                    <Text style={s.storeMeta}>30 min</Text>
-                  </View>
-                  <View style={s.storeTagRow}>
-                    {/* Min order — orange pill */}
-                    <View style={[s.storeTag, { backgroundColor: C.orangeLight, borderColor: "#FED7AA" }]}>
-                      <Text style={[s.storeTagText, { color: C.orangeDark }]}>
-                        Min ₹{vendor.min_order || 99}
-                      </Text>
-                    </View>
-                    {vendor.is_open && (
-                      <View
-                        style={[
-                          s.storeTag,
-                          {
-                            backgroundColor: C.greenLight,
-                            borderColor: C.greenBorder,
-                          },
-                        ]}
-                      >
-                        <Text style={[s.storeTagText, { color: C.green }]}>
-                          Accepting orders
-                        </Text>
-                      </View>
-                    )}
-                    {vendor.vendor_type && vendor.vendor_type !== "all" &&
-                      VENDOR_TYPE_META[vendor.vendor_type] && (
-                        <View
-                          style={[
-                            s.storeTag,
-                            {
-                              backgroundColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
-                              borderColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              s.storeTagText,
-                              { color: VENDOR_TYPE_META[vendor.vendor_type].color },
-                            ]}
-                          >
-                            {VENDOR_TYPE_META[vendor.vendor_type].label}
-                          </Text>
-                        </View>
-                      )}
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
+        {/* 3. NEARBY STORES — hidden as per design (user request) */}
 
         {/* 4. SHOP BY CATEGORY */}
         {showCategories && (
@@ -2272,14 +2302,15 @@ export default function HomeScreen() {
             <View
               style={[
                 s.sectionHeader,
-                { marginTop: 28, paddingHorizontal: hPad },
+                { marginTop: 24, paddingHorizontal: hPad },
               ]}
             >
-              <View>
-                <Text style={s.sectionTitle}>Shop by Category</Text>
-                <Text style={s.sectionSub}>Tap to browse items inside</Text>
-              </View>
+              <Text style={s.sectionTitle}>Shop by Category</Text>
+              <TouchableOpacity>
+                <Text style={s.viewAll}>View All</Text>
+              </TouchableOpacity>
             </View>
+            {/* 4-column clean tile grid */}
             <View
               style={{
                 flexDirection: "row",
@@ -2287,22 +2318,13 @@ export default function HomeScreen() {
                 paddingHorizontal: hPad,
                 paddingBottom: 8,
                 rowGap: 16,
-                columnGap: 8,
+                columnGap: 0,
               }}
             >
               {dynamicCategories.map((cat) => {
-                const subCats = categoryHierarchy[cat.label]
-                  ? Object.keys(categoryHierarchy[cat.label])
-                  : [];
-                const itemCount = subCats.reduce(
-                  (sum, sc) => sum + (categoryHierarchy[cat.label]?.[sc]?.length || 0), 0
-                );
-
-                // Responsive columns
                 const catCols = winW >= 1024 ? 10 : winW >= 768 ? 6 : winW >= 480 ? 5 : 4;
-                const catGap = 8;
-                const catItemW = (winW - (hPad * 2) - (catGap * (catCols - 1))) / catCols;
-                const bandSize = catItemW;
+                const catItemW = (winW - (hPad * 2)) / catCols;
+                const tileSize = catItemW * 0.72;
 
                 return (
                   <TouchableOpacity
@@ -2314,19 +2336,22 @@ export default function HomeScreen() {
                     }}
                     activeOpacity={0.8}
                   >
-                    <View style={[s.catCardBand, { width: bandSize, height: bandSize }]}>
-                      <View style={[s.catCardImgWrap, { backgroundColor: cat.bg }]}>
-                        <Image
-                          source={{ uri: cat.img }}
-                          style={s.catImg}
-                          resizeMode="cover"
-                        />
-                      </View>
-                      {cat.icon && (
-                        <View style={[s.catCardEmojiWrap, { width: bandSize * 0.35, height: bandSize * 0.35 }]}>
-                          <Text style={[s.catCardEmoji, { fontSize: bandSize * 0.22 }]}>{cat.icon}</Text>
-                        </View>
-                      )}
+                    {/* Square tile with image */}
+                    <View
+                      style={[
+                        s.catTile,
+                        {
+                          width: tileSize,
+                          height: tileSize,
+                          backgroundColor: cat.bg,
+                        },
+                      ]}
+                    >
+                      <Image
+                        source={{ uri: cat.img }}
+                        style={{ width: tileSize * 0.72, height: tileSize * 0.72 }}
+                        resizeMode="contain"
+                      />
                     </View>
                     <Text style={s.catCardLabel} numberOfLines={2}>{cat.label}</Text>
                   </TouchableOpacity>
@@ -2345,7 +2370,7 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* 5. POPULAR ITEMS */}
+        {/* 5. POPULAR ITEMS — horizontal scroll like HTML reference */}
         {showPopular && (
           <>
             <View
@@ -2354,27 +2379,33 @@ export default function HomeScreen() {
                 { marginTop: 28, paddingHorizontal: hPad },
               ]}
             >
-              <View>
-                <Text style={s.sectionTitle}>Popular Items</Text>
-                <Text style={s.sectionSub}>Available at nearby stores</Text>
-              </View>
+              <Text style={s.sectionTitle}>Popular Items</Text>
               <TouchableOpacity onPress={() => navigation.navigate("Search")}>
                 <Text style={s.viewAll}>See all</Text>
               </TouchableOpacity>
             </View>
-            <View style={[s.itemsGrid, { paddingHorizontal: hPad }]}>
+            {/* Horizontal scroll cards */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingLeft: hPad,
+                paddingRight: 8,
+                paddingBottom: 8,
+                gap: 14,
+              }}
+            >
               {popularItems.map((item) => (
-                <ItemCard
+                <PopularItemCard
                   key={item.id}
                   item={item}
-                  qty={getCartQty(item.id)} // ← single source of truth
+                  qty={getCartQty(item.id)}
                   onAdd={handleAdd}
                   onRemove={handleRemove}
-                  cardWidth={cardW}
                   onOpenWeightPicker={setLoosePickerItem}
                 />
               ))}
-            </View>
+            </ScrollView>
           </>
         )}
 
@@ -2559,8 +2590,14 @@ const s = StyleSheet.create({
     paddingTop: Platform.OS === "android" ? 18 : 22,
     borderBottomWidth: 1,
     borderBottomColor: C.gray200,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 4,
+    zIndex: 10,
   },
-  accentLine: { height: 2.5 },
+  accentLine: { height: 0 },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2664,63 +2701,61 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingBottom: 10,
+    paddingTop: 2,
   },
-  mobileLocBtn: { flex: 1, marginRight: 12 },
-  mobileLocBottom: { fontSize: 16, fontWeight: "700", color: C.gray900 },
+  mobileLocBtn: { flex: 1, marginRight: 8 },
+  mobileLocBottom: { fontSize: 16, fontWeight: "700", color: C.gray900, flexShrink: 1 },
   mobileProfileBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1.5,
-    borderColor: C.gray200,
     alignItems: "center",
     justifyContent: "center",
+    padding: 2,
   },
   mobileAvatarRing: {
     width: 38,
     height: 38,
     borderRadius: 19,
     borderWidth: 2,
-    borderColor: C.orange,
+    borderColor: C.green,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: C.orangeLight,
+    backgroundColor: C.greenLight,
     overflow: "hidden",
   },
   mobileSearch: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    backgroundColor: C.white,
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: C.gray200,
-    paddingVertical: 11,
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    gap: 10,
+    backgroundColor: C.gray100,
+    borderRadius: 9999,
+    borderWidth: 0,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    marginBottom: 14,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
   mobileSearchText: { flex: 1, fontSize: 14, color: C.gray400 },
   scroll: { paddingBottom: 40 },
   greetingRow: { paddingTop: 14, paddingBottom: 12 },
   greetingLine: {
-    fontSize: 24,
+    fontSize: 22,
     color: C.gray900,
     fontWeight: "800",
     fontFamily: "PlusJakartaSans_800ExtraBold",
-    lineHeight: 32,
+    lineHeight: 30,
+    flexDirection: "row",
+    alignItems: "center",
   },
   greetingName: {
     color: C.gray900,
     fontWeight: "800",
     fontFamily: "PlusJakartaSans_800ExtraBold",
   },
-  greetingEmoji: { fontSize: 28, marginTop: 4 },
-  greetingSub: { fontSize: 13, color: C.gray500, marginTop: 6, fontWeight: "400" },
+  greetingEmoji: { fontSize: 24, marginTop: 2 },
+  greetingSub: { fontSize: 13, color: C.gray500, marginTop: 4, fontWeight: "400" },
   bannerWrap: { marginBottom: 24 },
   heroBanner: {
     borderRadius: 20,
@@ -2778,13 +2813,13 @@ const s = StyleSheet.create({
     marginTop: 4,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "800",
     color: C.gray900,
     fontFamily: "PlusJakartaSans_800ExtraBold",
   },
   sectionSub: { fontSize: 12, color: C.gray400, marginTop: 2 },
-  viewAll: { fontSize: 13, color: C.orange, fontWeight: "700", marginTop: 2 },
+  viewAll: { fontSize: 13, color: C.green, fontWeight: "700", marginTop: 2 },
   loadingRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2890,61 +2925,65 @@ const s = StyleSheet.create({
 
   // ── New category card (HomeScreen) ─────────────────────────────────────────
   catCard: {
-    alignItems: "center",
+    alignItems: 'center',
     marginBottom: 4,
   },
-  catCardBand: {
-    borderRadius: 22,
-    position: "relative",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.05)",
-    backgroundColor: C.white,
-    padding: 9,
-    shadowColor: "#000",
+  // New HTML-style clean tile
+  catTile: {
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 7,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.05)',
+    overflow: 'hidden',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
     elevation: 2,
   },
+  // Keep legacy styles for CategoryBrowseSheet compatibility
+  catCardBand: {
+    borderRadius: 22,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: C.white,
+    padding: 9,
+  },
   catCardEmojiWrap: {
-    position: "absolute",
+    position: 'absolute',
     top: 4,
     right: 4,
     zIndex: 3,
-    backgroundColor: "rgba(255,255,255,0.9)",
+    backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: 100,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  catCardEmoji: {
-    textAlign: "center",
-  },
+  catCardEmoji: { textAlign: 'center' },
   catCardImgWrap: {
-    width: "100%",
-    height: "100%",
+    width: '100%',
+    height: '100%',
     borderRadius: 14,
-    overflow: "hidden",
+    overflow: 'hidden',
   },
   catCardLabel: {
-    fontSize: 9,
-    fontWeight: "600",
+    fontSize: 10,
+    fontWeight: '600',
     color: C.gray800,
-    textAlign: "center",
-    paddingHorizontal: 1,
-    lineHeight: 11,
+    textAlign: 'center',
+    paddingHorizontal: 2,
+    lineHeight: 13,
   },
   // keep catImgWrap for compatibility
   catImgWrap: {
-    width: 114, height: 114, borderRadius: 28, overflow: "hidden",
+    width: 114, height: 114, borderRadius: 28, overflow: 'hidden',
     marginBottom: 10, elevation: 3,
   },
   itemsGrid: {
