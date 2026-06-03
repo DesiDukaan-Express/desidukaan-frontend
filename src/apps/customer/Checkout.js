@@ -689,20 +689,6 @@ export default function CheckoutScreen() {
   const [detectedCoords, setDetectedCoords] = useState(currentLocation.lat ? { lat: currentLocation.lat, lng: currentLocation.lng } : null);
   const [manualOpen, setManualOpen] = useState(false);
 
-  // ── Socket: listen for vendor responses ────────────────────────────────────
-  useEffect(() => {
-    if (!token) return;
-    const socket = io(SOCKET_URL, { auth: { token } });
-
-    socket.on("phone:approved", (data) => {
-      setPhoneStatus("approved");
-      setVendorPhone(data.phone);
-    });
-    socket.on("phone:rejected", () => setPhoneStatus("rejected"));
-
-    return () => socket.disconnect();
-  }, [token]);
-
   // ── Fetch vendor details (for timings) ─────────────────────────────────────
   useEffect(() => {
     if (!vendorId) return;
@@ -823,6 +809,12 @@ export default function CheckoutScreen() {
         }
       }
     });
+
+    socket.on("phone:approved", (data) => {
+  setPhoneStatus("approved");
+  setVendorPhone(data.phone);
+});
+socket.on("phone:rejected", () => setPhoneStatus("rejected"));
 
     socket.on("phone:update", (data) => {
       if (data.status === "approved" && data.phone) {
@@ -2350,13 +2342,13 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
   };
 
   const getISODate = (decimalHour) => {
-    const d = new Date();
-    if (day === "tomorrow") d.setDate(d.getDate() + 1);
-    const h = Math.floor(decimalHour);
-    const m = Math.round((decimalHour - h) * 60);
-    d.setHours(h, m, 0, 0);
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, -1);
-  };
+  const d = new Date();
+  if (day === "tomorrow") d.setDate(d.getDate() + 1);
+  const h = Math.floor(decimalHour);
+  const m = Math.round((decimalHour - h) * 60);
+  d.setHours(h, m, 0, 0);
+  return d.toISOString();
+};
 
   // Validation Logic
   const validation = useMemo(() => {

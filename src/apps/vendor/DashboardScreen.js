@@ -21,10 +21,11 @@ import { LineChart } from "react-native-chart-kit";
 import { useNavigation } from "@react-navigation/native";
 import { TextInput } from "react-native";
 
-import { io } from 'socket.io-client';
-import useOrderSound from '../../hooks/useOrderSound';
+import { io } from "socket.io-client";
+import useOrderSound from "../../hooks/useOrderSound";
 
-const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3000';
+const SOCKET_URL =
+  process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 // ─── Color Tokens ───────────────────────────────────────────────
@@ -163,7 +164,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           return;
         }
 
-        if (data.success) {
+        if (data.success && data.data?.stats) {
           const s = data.data.stats;
           setStats({
             pendingOrders: s.pending_orders ?? 0,
@@ -213,35 +214,35 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           if (addr) setVendorLocation(addr.city || addr.area || addr);
         }
 
-// Build notifications from stats data instead of a missing endpoint
+        // Build notifications from stats data instead of a missing endpoint
         const builtNotifs = [];
 
         if (s.pending_orders > 0) {
           builtNotifs.push({
-            type: 'order',
-            title: `${s.pending_orders} order${s.pending_orders > 1 ? 's' : ''} waiting for your response`,
-            body: 'Tap to go to Orders and respond.',
-            time: 'Just now',
+            type: "order",
+            title: `${s.pending_orders} order${s.pending_orders > 1 ? "s" : ""} waiting for your response`,
+            body: "Tap to go to Orders and respond.",
+            time: "Just now",
             read: false,
           });
         }
 
         if (s.low_stock_count > 0) {
           builtNotifs.push({
-            type: 'system',
-            title: `${s.low_stock_count} product${s.low_stock_count > 1 ? 's' : ''} running low on stock`,
-            body: 'Check your inventory before accepting more orders.',
-            time: 'Today',
+            type: "system",
+            title: `${s.low_stock_count} product${s.low_stock_count > 1 ? "s" : ""} running low on stock`,
+            body: "Check your inventory before accepting more orders.",
+            time: "Today",
             read: false,
           });
         }
 
         if (s.today_revenue > 0) {
           builtNotifs.push({
-            type: 'order',
-            title: `₹${Number(s.today_revenue).toLocaleString('en-IN')} earned today`,
+            type: "order",
+            title: `₹${Number(s.today_revenue).toLocaleString("en-IN")} earned today`,
             body: `${s.today_orders} orders completed successfully.`,
-            time: 'Today',
+            time: "Today",
             read: true,
           });
         }
@@ -257,50 +258,66 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
   }, [token]);
 
   useEffect(() => {
-  if (!token) return;
+    if (!token) return;
 
-  const socket = io(SOCKET_URL, {
-    auth: { token },
-    transports: ['websocket'],
-  });
+    const socket = io(SOCKET_URL, {
+      auth: { token },
+      transports: ["websocket"],
+    });
 
-  socket.on('connect', () => console.log('Dashboard socket connected'));
+    socket.on("connect", () => console.log("Dashboard socket connected"));
 
-  socket.on('order:new', (data) => {
-    playOrderSound();
-    showNewOrderBanner(data);
-    setNotifications(prev => [{
-      type: 'order',
-      title: `New order ${data.order_number || '#' + data.order_id} received!`,
-      body: `₹${data.total || ''} · Tap Orders to respond.`,
-      time: 'Just now',
-      read: false,
-      action: 'orders',
-    }, ...prev]);
-    setStats(prev => prev ? {
-      ...prev,
-      pendingOrders: (prev.pendingOrders || 0) + 1,
-      today: {
-        ...prev.today,
-        totalOrders: (prev.today?.totalOrders || 0) + 1,
-      }
-    } : prev);
-  });
+    socket.on("order:new", (data) => {
+      playOrderSound();
+      showNewOrderBanner(data);
+      setNotifications((prev) => [
+        {
+          type: "order",
+          title: `New order ${data.order_number || "#" + data.order_id} received!`,
+          body: `₹${data.total || ""} · Tap Orders to respond.`,
+          time: "Just now",
+          read: false,
+          action: "orders",
+        },
+        ...prev,
+      ]);
+      setStats((prev) =>
+        prev
+          ? {
+              ...prev,
+              pendingOrders: (prev.pendingOrders || 0) + 1,
+              today: {
+                ...prev.today,
+                totalOrders: (prev.today?.totalOrders || 0) + 1,
+              },
+            }
+          : prev,
+      );
+    });
 
-  socket.on('phone:request', () => {
-    playOrderSound();
-    setNotifications(prev => [{
-      type: 'system',
-      title: 'New phone number request',
-      body: 'A customer wants to see your phone number.',
-      time: 'Just now',
-      read: false,
-      action: 'requests',
-    }, ...prev]);
-  });
+    socket.on("phone:request", (data) => {
+      playOrderSound();
+      setNotifications((prev) => [
+        {
+          type: "system",
+          title: "New phone number request",
+          body: "A customer wants to see your phone number.",
+          time: "Just now",
+          read: false,
+          action: "requests",
+        },
+        ...prev,
+      ]);
+      showNewOrderBanner({
+        order_number: null,
+        order_id: null,
+        total: null,
+        _type: "phone",
+      });
+    });
 
-  return () => socket.disconnect();
-}, [token]);
+    return () => socket.disconnect();
+  }, [token]);
 
   // ─── Loading ─────────────────────────────────────────────────
   if (loading) {
@@ -641,7 +658,12 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                   borderColor: "rgba(255,255,255,0.2)",
                 },
               ]}
-              onPress={() => setNotifVisible(true)}
+              onPress={() => {
+                setNotifVisible(true);
+                setNotifications((prev) =>
+                  prev.map((n) => ({ ...n, read: true })),
+                );
+              }}
             >
               <MaterialIcons
                 name="notifications-none"
@@ -1431,14 +1453,14 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               data={notifications}
               keyExtractor={(_, i) => i.toString()}
               renderItem={({ item }) => (
-  <NotifItem
-    item={item}
-    onPress={(action) => {
-      setNotifVisible(false);
-      navigation.navigate('Orders', { initialTab: action });
-    }}
-  />
-)}
+                <NotifItem
+                  item={item}
+                  onPress={(action) => {
+                    setNotifVisible(false);
+                    navigation.navigate("Orders", { initialTab: action });
+                  }}
+                />
+              )}
               contentContainerStyle={{ paddingBottom: 40 }}
             />
           ) : (
@@ -1931,44 +1953,53 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           </TouchableOpacity>
         </View>
       </Modal>
-    {/* ── NEW ORDER BANNER ── */}
-      {newOrderBanner && (
-        <Animated.View
-          style={[
-            bannerStyles.wrap,
-            { transform: [{ translateY: bannerAnim }] }
-          ]}
-        >
-          <View style={bannerStyles.iconWrap}>
-            <MaterialIcons name="shopping-bag" size={22} color="#147538" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={bannerStyles.title}>New Order Received!</Text>
-            <Text style={bannerStyles.sub} numberOfLines={1}>
-              {newOrderBanner.order_number
+      {/* ── NEW ORDER BANNER ── */}
+      <Animated.View
+        pointerEvents={newOrderBanner ? "auto" : "none"}
+        style={[
+          bannerStyles.wrap,
+          {
+            transform: [{ translateY: bannerAnim }],
+            opacity: newOrderBanner ? 1 : 0,
+          },
+        ]}
+      >
+        <View style={bannerStyles.iconWrap}>
+          <MaterialIcons name="shopping-bag" size={22} color="#147538" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={bannerStyles.title}>
+            {newOrderBanner?._type === "phone"
+              ? "Phone Request!"
+              : "New Order Received!"}
+          </Text>
+          <Text style={bannerStyles.sub} numberOfLines={1}>
+            {newOrderBanner?._type === "phone"
+              ? "A customer wants your contact number."
+              : newOrderBanner?.order_number
                 ? `Order ${newOrderBanner.order_number}`
-                : `Order #${newOrderBanner.order_id}`}
-              {newOrderBanner.total ? `  ·  ₹${newOrderBanner.total}` : ''}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={bannerStyles.actionBtn}
-            onPress={() => {
-              dismissBanner();
-              navigation.navigate('Orders');
-            }}
-          >
-            <Text style={bannerStyles.actionText}>View</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={dismissBanner}
-            style={bannerStyles.closeBtn}
-          >
-            <MaterialIcons name="close" size={16} color="#64748B" />
-          </TouchableOpacity>
-        </Animated.View>
-      )}
-
+                : `Order #${newOrderBanner?.order_id ?? ""}`}
+            {newOrderBanner?._type !== "phone" && newOrderBanner?.total
+              ? `  ·  ₹${newOrderBanner.total}`
+              : ""}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={bannerStyles.actionBtn}
+          onPress={() => {
+            dismissBanner();
+            navigation.navigate("Orders", {
+              initialTab:
+                newOrderBanner?._type === "phone" ? "requests" : "orders",
+            });
+          }}
+        >
+          <Text style={bannerStyles.actionText}>View</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={dismissBanner} style={bannerStyles.closeBtn}>
+          <MaterialIcons name="close" size={16} color="#64748B" />
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 }
@@ -3009,61 +3040,61 @@ const styles = StyleSheet.create({
 
 const bannerStyles = StyleSheet.create({
   wrap: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 54 : 42,
+    position: "absolute",
+    top: Platform.OS === "ios" ? 54 : 42,
     left: 12,
     right: 12,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18,
     shadowRadius: 20,
     elevation: 20,
     zIndex: 9999,
     borderWidth: 1.5,
-    borderColor: '#BBF7D0',
+    borderColor: "#BBF7D0",
   },
   iconWrap: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#DCFCE7',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#DCFCE7",
+    alignItems: "center",
+    justifyContent: "center",
   },
   title: {
     fontSize: 15,
-    fontWeight: '800',
-    color: '#1F2937',
+    fontWeight: "800",
+    color: "#1F2937",
   },
   sub: {
     fontSize: 12,
-    color: '#64748B',
+    color: "#64748B",
     marginTop: 2,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   actionBtn: {
-    backgroundColor: '#147538',
+    backgroundColor: "#147538",
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
   },
   actionText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   closeBtn: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
