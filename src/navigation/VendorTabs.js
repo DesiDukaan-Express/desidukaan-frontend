@@ -1,57 +1,84 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
-import { colors } from '../styles/colors';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import DashboardScreen from '../apps/vendor/DashboardScreen';
 import InventoryScreen from '../apps/vendor/InventoryScreen';
 import VendorOrdersScreen from '../apps/vendor/VendorOrdersScreen';
 import EarningsScreen from '../apps/vendor/EarningsScreen';
-import VendorProfileScreen from '../apps/vendor/VendorProfileScreen';   
+import VendorProfileScreen from '../apps/vendor/VendorProfileScreen';
 
 const Tab = createBottomTabNavigator();
+
+const TABS = [
+  { name: 'Dashboard', icon: 'bar-chart',    label: 'Dashboard',  component: DashboardScreen  },
+  { name: 'Inventory', icon: 'inventory',    label: 'Inventory',  component: InventoryScreen  },
+  { name: 'Orders',    icon: 'receipt-long', label: 'Orders',     component: VendorOrdersScreen },
+  { name: 'Earnings',  icon: 'payments',     label: 'Earnings',   component: EarningsScreen   },
+  { name: 'Profile',   icon: 'person',       label: 'Profile',    component: VendorProfileScreen },
+];
 
 export default function VendorTabs() {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textLight,
-        tabBarStyle: { paddingBottom: 8, paddingTop: 4, height: 60 },
-      }}
+        tabBarStyle: styles.tabBar,
+        tabBarShowLabel: true,
+        tabBarActiveTintColor: '#FFFFFF',
+        tabBarInactiveTintColor: 'rgba(255,255,255,0.55)',
+        tabBarIcon: ({ focused, color }) => {
+          const tab = TABS.find(t => t.name === route.name);
+          return (
+            <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+              <MaterialIcons name={tab?.icon} size={22} color={color} />
+            </View>
+          );
+        },
+        tabBarLabel: ({ focused, color, children }) => (
+          <Text style={[styles.label, { color }]}>{children}</Text>
+        ),
+      })}
     >
-      <Tab.Screen
-        name="Dashboard"
-        component={DashboardScreen}
-        options={{ tabBarIcon: () => <Text style={{fontSize:20}}>📊</Text> }}
-      />
-
-      <Tab.Screen
-        name="Inventory"
-        component={InventoryScreen}
-        options={{ tabBarIcon: () => <Text style={{fontSize:20}}>📦</Text> }}
-      />
-
-      <Tab.Screen
-        name="Orders"
-        component={VendorOrdersScreen}
-        options={{ tabBarIcon: () => <Text style={{fontSize:20}}>🧾</Text> }}
-      />
-
-      <Tab.Screen
-        name="Earnings"
-        component={EarningsScreen}
-        options={{ tabBarIcon: () => <Text style={{fontSize:20}}>💰</Text> }}
-      />
-
-      {/* 👇 New Profile Tab */}
-      <Tab.Screen
-        name="Profile"
-        component={VendorProfileScreen}
-        options={{ tabBarIcon: () => <Text style={{fontSize:20}}>👤</Text> }}
-      />
-
+      {TABS.map(tab => (
+        <Tab.Screen
+          key={tab.name}
+          name={tab.name}
+          component={tab.component}
+        />
+      ))}
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: '#147538',
+    borderTopWidth: 0,
+    height: Platform.OS === 'ios' ? 82 : 64,
+    paddingBottom: Platform.OS === 'ios' ? 22 : 8,
+    paddingTop: 6,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+  },
+  iconWrap: {
+    width: 40,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+  },
+  iconWrapActive: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.1,
+    marginTop: -2,
+  },
+});
