@@ -2692,7 +2692,7 @@ export default function HomeScreen() {
         apiCategories={apiCategories}
       />
 
-      <ChatWidget />
+      {/* <ChatWidget /> */}
 
       {/* ══ FLOATING CART — mobile ══════════════════════════════════════════ */}
       {!wide && cartCount > 0 && (
