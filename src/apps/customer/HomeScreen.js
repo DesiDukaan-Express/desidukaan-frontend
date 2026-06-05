@@ -1789,14 +1789,6 @@ export default function HomeScreen() {
       const res = await vendorsAPI.getNearby(lat, lng, 10);
       const list = res.data || [];
       // ── TEMP DEBUG — remove after checking terminal ──
-      if (list.length > 0) {
-        console.log("🔍 VENDOR:", JSON.stringify({
-          shop_name: list[0].shop_name,
-          vendor_type: list[0].vendor_type,
-          delivery_type: list[0].delivery_type,
-        }, null, 2));
-      }
-      console.log(list);
       setVendors(list);
       // Pass list directly — state update is async, list is synchronous
       await fetchInventoryForVendors(list);
@@ -2071,6 +2063,40 @@ export default function HomeScreen() {
 
   const showCategories = !loadingInventory && dynamicCategories.length > 0;
   const showPopular = !loadingInventory && popularItems.length > 0;
+  const openStoreCount = vendors.filter((vendor) => vendor.is_open).length;
+  const nearestStoreDistance = vendors
+    .map((vendor) => Number(vendor.distance_km))
+    .filter((distance) => Number.isFinite(distance))
+    .sort((a, b) => a - b)[0];
+  const heroTitle = locationCoords
+    ? "Your neighborhood market, online"
+    : "Set your location to start shopping";
+  const heroSub = locationCoords
+    ? `${openStoreCount || vendors.length || "Local"} stores ready with groceries, snacks, dairy and home essentials.`
+    : "Find nearby stores, compare essentials and get everything delivered to your door.";
+  const homeStats = [
+    {
+      icon: "storefront",
+      value: vendors.length ? `${vendors.length}` : "--",
+      label: "nearby stores",
+    },
+    {
+      icon: "inventory-2",
+      value: popularItems.length ? `${popularItems.length}+` : "--",
+      label: "popular picks",
+    },
+    {
+      icon: "near-me",
+      value: nearestStoreDistance ? `${nearestStoreDistance.toFixed(1)} km` : "Near you",
+      label: "closest store",
+    },
+  ];
+  const quickActions = [
+    { icon: "search", label: "Find Items", onPress: () => navigation.navigate("Search") },
+    { icon: "shopping-bag", label: "Open Stores", onPress: () => navigation.navigate("Search") },
+    { icon: "receipt-long", label: "Orders", onPress: () => navigation.navigate("Orders") },
+    { icon: "location-on", label: "Address", onPress: openAddressPicker },
+  ];
 
 
   return (
@@ -2081,6 +2107,28 @@ export default function HomeScreen() {
       <Animated.View style={[s.headerWrap, { opacity: headerOpacity }]}>
         {wide ? (
           <View style={[s.headerRow, { paddingHorizontal: hPad }]}>
+            <TouchableOpacity
+              style={s.brandSection}
+              onPress={() => navigation.navigate("Home")}
+              activeOpacity={0.8}
+            >
+              <View style={s.miniLogoWrap}>
+                <LinearGradient
+                  colors={["#147538", "#0EE627"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={s.miniLogo}
+                >
+                  <MaterialIcons name="storefront" size={17} color={C.white} />
+                </LinearGradient>
+              </View>
+              {winW >= 900 && (
+                <Text style={s.brandName}>
+                  Kwik<Text style={s.brandAccent}>Pik</Text>
+                </Text>
+              )}
+            </TouchableOpacity>
+            <View style={s.headerDivider} />
             {/* {winW >= 900 && (
               <>
                 <View style={s.brandSection}>
@@ -2092,7 +2140,7 @@ export default function HomeScreen() {
                       <MaterialIcons name="shopping-cart" size={15} color={C.white} />
                     </LinearGradient>
                   </View>
-                  <GradientText text="DesiDukaan" style={s.brandName} />
+                  <GradientText text="KwikPik" style={s.brandName} />
                 </View>
                 <View style={s.headerDivider} />
               </>
@@ -2211,6 +2259,20 @@ export default function HomeScreen() {
               </TouchableOpacity>
               {/* Account icon — clean circle */}
               <TouchableOpacity
+                style={s.mobileBrandBtn}
+                onPress={() => navigation.navigate("Home")}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={["#147538", "#0EE627"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={s.mobileBrandMark}
+                >
+                  <MaterialIcons name="storefront" size={18} color={C.white} />
+                </LinearGradient>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={s.mobileProfileBtn}
                 onPress={() => navigation.navigate("Profile")}
                 activeOpacity={0.8}
@@ -2243,7 +2305,7 @@ export default function HomeScreen() {
         contentContainerStyle={s.scroll}
       >
         {/* 1. GREETING */}
-        <View style={[s.greetingRow, { paddingHorizontal: hPad }]}>
+        <View style={s.legacyGreetingRow}>
           <Text style={s.greetingLine}>
             {getGreeting()}{firstName ? "," : "!"}
             {firstName ? (
@@ -2258,7 +2320,15 @@ export default function HomeScreen() {
 
         {/* 2. HERO BANNER */}
         <View style={[s.bannerWrap, { paddingHorizontal: hPad }]}>
-          <View style={[s.heroBanner, { height: wide ? 200 : 160 }]}>
+          <View style={[s.heroIntro, wide && s.heroIntroWide]}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.greetingKicker}>{getGreeting()}</Text>
+              <Text style={s.heroIntroTitle}>
+                {firstName ? `Welcome back, ${firstName}` : "Welcome to KwikPik"}
+              </Text>
+            </View>
+          </View>
+          <View style={[s.heroBanner, { minHeight: wide ? 260 : 250 }]}>
             <Image
               source={{
                 uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&q=85&sig=banner",
@@ -2268,40 +2338,87 @@ export default function HomeScreen() {
             />
             <LinearGradient
               colors={[
-                "rgba(21,128,61,0.98)",
-                "rgba(21,128,61,0.92)",
-                "rgba(21,128,61,0.6)",
-                "rgba(21,128,61,0.1)",
-                "transparent",
+                "rgba(17,24,39,0.86)",
+                "rgba(21,128,61,0.76)",
+                "rgba(249,115,22,0.38)",
+                "rgba(17,24,39,0.12)",
               ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={StyleSheet.absoluteFillObject}
             />
-            <View style={[s.heroLeft, { width: wide ? "55%" : "70%" }]}>
-              <Text style={s.heroTitle}>{"Stock up on\ndaily essentials"}</Text>
-              <Text style={s.heroSub}>
-                {"Farm-fresh fruits, vegetables,\ndairy, eggs & more"}
-              </Text>
-              <TouchableOpacity
-                style={s.heroCTA}
-                onPress={() => navigation.navigate("Search")}
-                activeOpacity={0.85}
-              >
-                <Text style={s.heroCTAText}>Shop Now</Text>
-              </TouchableOpacity>
+            <View style={[s.heroLeft, { width: wide ? "62%" : "100%" }]}>
+              <View style={s.heroBadge}>
+                <MaterialIcons name="verified" size={13} color={C.green} />
+                <Text style={s.heroBadgeText}>Fresh from nearby stores</Text>
+              </View>
+              <Text style={s.heroTitle}>{heroTitle}</Text>
+              <Text style={s.heroSub}>{heroSub}</Text>
+              <View style={s.heroActions}>
+                <TouchableOpacity
+                  style={s.heroCTA}
+                  onPress={() => navigation.navigate("Search")}
+                  activeOpacity={0.85}
+                >
+                  <MaterialIcons name="search" size={16} color={C.white} />
+                  <Text style={s.heroCTAText}>Start Shopping</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.heroGhostCTA}
+                  onPress={openAddressPicker}
+                  activeOpacity={0.85}
+                >
+                  <MaterialIcons name="location-on" size={15} color={C.white} />
+                  <Text style={s.heroGhostText}>Change Address</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={s.heroStats}>
+                {homeStats.map((stat) => (
+                  <View key={stat.label} style={s.heroStat}>
+                    <MaterialIcons name={stat.icon} size={16} color={C.white} />
+                    <Text style={s.heroStatValue}>{stat.value}</Text>
+                    <Text style={s.heroStatLabel}>{stat.label}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
           </View>
         </View>
 
         {/* 3. NEARBY STORES — hidden as per design (user request) */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingLeft: hPad,
+            paddingRight: hPad,
+            paddingBottom: 8,
+            gap: 10,
+          }}
+          style={s.quickActionRail}
+        >
+          {quickActions.map((action) => (
+            <TouchableOpacity
+              key={action.label}
+              style={s.quickAction}
+              onPress={action.onPress}
+              activeOpacity={0.85}
+            >
+              <View style={s.quickActionIcon}>
+                <MaterialIcons name={action.icon} size={17} color={C.green} />
+              </View>
+              <Text style={s.quickActionText}>{action.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
         <View style={[s.sectionHeader, { paddingHorizontal: hPad }]}>
           <View>
             <Text style={s.sectionTitle}>Nearby Stores</Text>
             <Text style={s.sectionSub}>Delivering to your location</Text>
           </View>
-          <TouchableOpacity onPress={() => navigation.navigate("AllStores")}>
-            <Text style={s.viewAll}>View all</Text>
+          <TouchableOpacity onPress={() => navigation.navigate("Search")}>
+            <Text style={s.viewAll}>Explore</Text>
           </TouchableOpacity>
         </View>
 
@@ -2452,7 +2569,7 @@ export default function HomeScreen() {
               ]}
             >
               <Text style={s.sectionTitle}>Shop by Category</Text>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation.navigate("Search")}>
                 <Text style={s.viewAll}>View All</Text>
               </TouchableOpacity>
             </View>
@@ -2565,7 +2682,7 @@ export default function HomeScreen() {
               ]}
             >
               <Text style={s.sectionTitle}>Recent Orders</Text>
-              <TouchableOpacity onPress={() => navigation.navigate("MyOrders")}>
+              <TouchableOpacity onPress={() => navigation.navigate("Orders")}>
                 <Text style={s.viewAll}>View all</Text>
               </TouchableOpacity>
             </View>
@@ -2573,7 +2690,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={order.id}
                 style={[s.orderCard, { marginHorizontal: hPad }]}
-                onPress={() => navigation.navigate("MyOrders")}
+                onPress={() => navigation.navigate("Orders")}
                 activeOpacity={0.85}
               >
                 <Image
@@ -2637,7 +2754,7 @@ export default function HomeScreen() {
             const encoded = encodeURIComponent(text);
             const res = await fetch(
               `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1`,
-              { headers: { "User-Agent": "DesiDukaan/1.0" } },
+              { headers: { "User-Agent": "KwikPik/1.0" } },
             );
             const results = await res.json();
             if (results?.length > 0) {
@@ -2756,9 +2873,24 @@ const s = StyleSheet.create({
     gap: 8,
     flexShrink: 0,
   },
-  miniLogoWrap: { width: 34, height: 34, borderRadius: 10, overflow: "hidden" },
+  miniLogoWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    overflow: "hidden",
+    backgroundColor: C.white,
+    borderWidth: 1,
+    borderColor: C.greenBorder,
+  },
   miniLogo: { flex: 1, alignItems: "center", justifyContent: "center" },
-  brandName: { fontSize: 24, fontWeight: "900", letterSpacing: -0.5 },
+  brandName: {
+    fontSize: 24,
+    fontWeight: "900",
+    letterSpacing: 0,
+    color: C.gray900,
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+  },
+  brandAccent: { color: "#0EE627" },
   headerDivider: {
     width: 1,
     height: 38,
@@ -2856,6 +2988,23 @@ const s = StyleSheet.create({
     justifyContent: "center",
     padding: 2,
   },
+  mobileBrandBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    marginRight: 8,
+    overflow: "hidden",
+    shadowColor: C.green,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 7,
+    elevation: 3,
+  },
+  mobileBrandMark: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   mobileAvatarRing: {
     width: 38,
     height: 38,
@@ -2885,6 +3034,7 @@ const s = StyleSheet.create({
   },
   mobileSearchText: { flex: 1, fontSize: 14, color: C.gray400 },
   scroll: { paddingBottom: 40 },
+  legacyGreetingRow: { display: "none" },
   greetingRow: { paddingTop: 14, paddingBottom: 12 },
   greetingLine: {
     fontSize: 22,
@@ -2902,32 +3052,97 @@ const s = StyleSheet.create({
   },
   greetingEmoji: { fontSize: 24, marginTop: 2 },
   greetingSub: { fontSize: 13, color: C.gray500, marginTop: 4, fontWeight: "400" },
-  bannerWrap: { marginBottom: 24 },
+  bannerWrap: { marginBottom: 14 },
+  heroIntro: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
+  },
+  heroIntroWide: { paddingTop: 18 },
+  greetingKicker: {
+    fontSize: 12,
+    color: C.green,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  heroIntroTitle: {
+    fontSize: 22,
+    color: C.gray900,
+    fontWeight: "900",
+    lineHeight: 29,
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+  },
+  deliveryPromise: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: C.orangeLight,
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+  },
+  deliveryPromiseText: {
+    fontSize: 11,
+    color: C.orangeDark,
+    fontWeight: "800",
+  },
   heroBanner: {
-    borderRadius: 20,
+    borderRadius: 18,
     overflow: "hidden",
     justifyContent: "center",
   },
   heroLeft: { paddingHorizontal: 22, paddingVertical: 22, zIndex: 2 },
+  heroBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.94)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 12,
+  },
+  heroBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: C.greenDark,
+  },
   heroTitle: {
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: "900",
     color: C.white,
-    lineHeight: 28,
-    marginBottom: 6,
+    lineHeight: 34,
+    marginBottom: 8,
     fontFamily: "PlusJakartaSans_800ExtraBold",
   },
   heroSub: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.85)",
-    lineHeight: 18,
-    marginBottom: 16,
+    fontSize: 14,
+    color: "rgba(255,255,255,0.92)",
+    lineHeight: 20,
+    marginBottom: 18,
+    maxWidth: 520,
+  },
+  heroActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 18,
   },
   heroCTA: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     backgroundColor: C.green,
     alignSelf: "flex-start",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
     borderRadius: 9999,
     shadowColor: C.greenDark,
     shadowOffset: { width: 0, height: 3 },
@@ -2936,6 +3151,76 @@ const s = StyleSheet.create({
     elevation: 4,
   },
   heroCTAText: { fontSize: 14, fontWeight: "800", color: C.white },
+  heroGhostCTA: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.48)",
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+  heroGhostText: { fontSize: 13, fontWeight: "800", color: C.white },
+  heroStats: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  heroStat: {
+    minWidth: 96,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  heroStatValue: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: C.white,
+    marginTop: 4,
+  },
+  heroStatLabel: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.78)",
+    marginTop: 1,
+    fontWeight: "600",
+  },
+  quickActionRail: { marginBottom: 16 },
+  quickAction: {
+    minWidth: 132,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    backgroundColor: C.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  quickActionIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: C.greenLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickActionText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: C.gray800,
+  },
   infoPillRow: {
     flexDirection: "row",
     alignItems: "center",

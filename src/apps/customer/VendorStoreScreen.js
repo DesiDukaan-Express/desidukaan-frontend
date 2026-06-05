@@ -16,15 +16,24 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
-  orange: "#F97316", orangeDark: "#EA580C",
-  green: "#16A34A", greenDark: "#15803D",
-  greenDeep: "#14532D", greenLight: "#F0FDF4",
-  greenMid: "#DCFCE7", greenBorder: "#BBF7D0",
-  white: "#FFFFFF", bg: "#F8FAFC",
-  gray100: "#F3F4F6", gray200: "#E5E7EB",
+  // Brand greens
+  green: "#005e26", greenDark: "#007a33", greenDeep: "#002b12",
+  greenLight: "#F0FDF4", greenMid: "#DCFCE7", greenBorder: "#BBF7D0",
+  greenFixed: "#93f9a2", greenFixedDim: "#77dc88",
+  // Brand oranges
+  orange: "#FC8125", orangeDark: "#994700",
+  orangeLight: "#FFDBC8", orangeMid: "#FFF7ED",
+  // Neutrals
+  white: "#FFFFFF", bg: "#F8F9FA",
+  gray100: "#F3F4F5", gray200: "#E1E3E4",
   gray300: "#D1D5DB", gray400: "#9CA3AF",
-  gray500: "#6B7280", gray600: "#4B5563",
-  gray700: "#374151", gray900: "#111827",
+  gray500: "#6F7A6D", gray600: "#3F4A3E",
+  gray700: "#374151", gray900: "#191C1D",
+  // Surfaces
+  surface: "#F8F9FA", surfaceLow: "#F3F4F5",
+  surfaceHigh: "#E7E8E9", surfaceLowest: "#FFFFFF",
+  outlineVar: "#BECABB",
+  // Other
   cyan: "#0891B2", cyanLight: "#ECFEFF",
 };
 
@@ -523,28 +532,41 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
   );
 }
 const pc = StyleSheet.create({
-  card: { backgroundColor: C.white, borderRadius: 14, overflow: "hidden", borderWidth: 1, borderColor: C.gray200, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 3 },
-  imgWrap: { position: "relative", width: "100%" },
+  card: {
+    backgroundColor: C.surfaceLowest,
+    borderRadius: 24,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  imgWrap: { position: "relative", width: "100%", backgroundColor: C.white },
   img: { width: "100%", height: "100%" },
-  discBadge: { position: "absolute", top: 6, left: 6, backgroundColor: C.orange, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
-  discText: { fontSize: 9, color: C.white, fontWeight: "800" },
-  looseBadge: { position: "absolute", top: 6, right: 6, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(236,254,255,0.92)", paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8 },
+  discBadge: { position: "absolute", top: 8, left: 8, backgroundColor: C.orange, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
+  discText: { fontSize: 10, color: C.white, fontWeight: "800", letterSpacing: 0.2 },
+  looseBadge: { position: "absolute", top: 8, right: 8, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(236,254,255,0.92)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: C.outlineVar },
   looseBadgeText: { fontSize: 9, fontWeight: "800", color: C.cyan },
   oosOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.48)", alignItems: "center", justifyContent: "center" },
   oosText: { fontSize: 11, fontWeight: "800", color: C.white, textAlign: "center" },
-  info: { padding: 9 },
-  name: { fontSize: 13, fontWeight: "700", color: C.gray900, lineHeight: 17, marginBottom: 2 },
-  unit: { fontSize: 11, color: C.gray400, marginBottom: 6 },
-  priceRow: { flexDirection: "row", alignItems: "baseline", gap: 5, marginBottom: 8 },
-  price: { fontSize: 14, fontWeight: "900", color: C.gray900 },
-  mrp: { fontSize: 10, color: C.gray400, textDecorationLine: "line-through" },
-  addBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, backgroundColor: C.green, borderRadius: 9, paddingVertical: 9 },
-  addBtnLoose: { backgroundColor: C.cyan },   // cyan for loose items
-  addText: { fontSize: 12, fontWeight: "800", color: C.white },
-  qtyRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: C.green, borderRadius: 9, overflow: "hidden" },
-  qtyBtn: { paddingHorizontal: 12, paddingVertical: 9 },
-  qtyNum: { fontSize: 13, fontWeight: "900", color: C.white },
-  oosBtn: { backgroundColor: C.gray100, borderRadius: 9, paddingVertical: 8, alignItems: "center" },
+  info: { padding: 12 },
+  name: { fontSize: 14, fontWeight: "700", color: C.gray900, lineHeight: 19, marginBottom: 2 },
+  unit: { fontSize: 11, color: C.gray500, marginBottom: 6 },
+  priceRow: { flexDirection: "row", alignItems: "baseline", gap: 6, marginBottom: 10 },
+  price: { fontSize: 16, fontWeight: "900", color: C.green },
+  mrp: { fontSize: 11, color: C.gray400, textDecorationLine: "line-through" },
+  addBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5,
+    backgroundColor: C.greenDark, borderRadius: 12, paddingVertical: 10,
+    shadowColor: "rgba(0,122,51,0.2)", shadowOffset: { width: 0, height: 4 }, shadowRadius: 12, elevation: 3,
+  },
+  addBtnLoose: { backgroundColor: C.cyan },
+  addText: { fontSize: 12, fontWeight: "800", color: "#a1ffad", letterSpacing: 0.5 },
+  qtyRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: C.green, borderRadius: 12, overflow: "hidden" },
+  qtyBtn: { paddingHorizontal: 14, paddingVertical: 10 },
+  qtyNum: { fontSize: 14, fontWeight: "900", color: C.white },
+  oosBtn: { backgroundColor: C.gray100, borderRadius: 12, paddingVertical: 9, alignItems: "center" },
   oosBtnText: { fontSize: 11, fontWeight: "600", color: C.gray400 },
 });
 
@@ -567,13 +589,24 @@ function CatSectionHeader({ cat, count }) {
   );
 }
 const csh = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12, backgroundColor: C.bg },
-  iconWrap: { width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  row: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    paddingHorizontal: 16, paddingTop: 22, paddingBottom: 12,
+    backgroundColor: C.bg,
+  },
+  iconWrap: {
+    width: 44, height: 44, borderRadius: 14,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: C.outlineVar,
+  },
   emoji: { fontSize: 22 },
-  title: { fontSize: 17, fontWeight: "900", color: C.gray900 },
-  sub: { fontSize: 12, color: C.gray400, marginTop: 1 },
-  badge: { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20 },
-  badgeText: { fontSize: 12, fontWeight: "800" },
+  title: { fontSize: 17, fontWeight: "900", color: C.gray900, letterSpacing: -0.3 },
+  sub: { fontSize: 12, color: C.gray500, marginTop: 2 },
+  badge: {
+    paddingHorizontal: 11, paddingVertical: 5,
+    borderRadius: 999, backgroundColor: C.greenMid,
+  },
+  badgeText: { fontSize: 12, fontWeight: "800", color: C.green },
 });
 
 // ─── Category Tab Pill ─────────────────────────────────────────────────────────
@@ -583,19 +616,32 @@ function CatTabPill({ cat, count, isActive, onPress }) {
     <TouchableOpacity style={[ct.pill, isActive && ct.pillActive]} onPress={onPress} activeOpacity={0.8}>
       <Text style={ct.emoji}>{meta.emoji}</Text>
       <Text style={[ct.label, isActive && ct.labelActive]} numberOfLines={1}>{cat}</Text>
-      <View style={[ct.bubble, { backgroundColor: isActive ? "rgba(255,255,255,0.25)" : meta.bg }]}>
-        <Text style={[ct.bubbleText, { color: isActive ? C.white : meta.accent }]}>{count}</Text>
+      <View style={[ct.bubble, { backgroundColor: isActive ? "rgba(255,255,255,0.22)" : C.surfaceHigh }]}>
+        <Text style={[ct.bubbleText, { color: isActive ? C.white : C.gray600 }]}>{count}</Text>
       </View>
     </TouchableOpacity>
   );
 }
 const ct = StyleSheet.create({
-  pill: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 22, borderWidth: 1.5, borderColor: C.gray200, backgroundColor: C.white, marginRight: 8 },
-  pillActive: { backgroundColor: C.green, borderColor: C.green },
+  pill: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999,
+    borderWidth: 1, borderColor: C.outlineVar,
+    backgroundColor: C.surfaceLowest, marginRight: 8,
+  },
+  pillActive: {
+    backgroundColor: C.orange, borderColor: C.orange,
+    shadowColor: C.orange, shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3, shadowRadius: 7, elevation: 4,
+  },
   emoji: { fontSize: 14 },
   label: { fontSize: 12, fontWeight: "700", color: C.gray600 },
   labelActive: { color: C.white },
-  bubble: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, minWidth: 20, alignItems: "center" },
+  bubble: {
+    paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999,
+    minWidth: 20, alignItems: "center",
+    backgroundColor: C.surfaceHigh,
+  },
   bubbleText: { fontSize: 10, fontWeight: "800" },
 });
 
@@ -735,7 +781,7 @@ export default function VendorStoreScreen() {
     const name = (item.product?.name || "").toLowerCase();
     const cat = getCatName(item);
     const matchesSearch = !search || name.includes(search.toLowerCase());
-    
+
     let matchesCat = activeCat === "All";
     if (!matchesCat) {
       if (cat === activeCat) {
@@ -772,7 +818,7 @@ export default function VendorStoreScreen() {
     }
 
     const unitStr = formatWeight(selectedWeight || p.unit);
-    const finalPrice = loose 
+    const finalPrice = loose
       ? calculateProportionalPrice(p.price, unitStr, p.unit || "1kg")
       : p.price;
 
@@ -820,13 +866,13 @@ export default function VendorStoreScreen() {
   if (loading) {
     return (
       <View style={s.root}>
-        <StatusBar barStyle="light-content" />
-        <LinearGradient colors={[C.orange, C.orangeDark, C.greenDark, C.green]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.header}>
+        <StatusBar barStyle="dark-content" backgroundColor={C.surfaceLowest} />
+        <LinearGradient colors={[C.orange, C.orangeDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.loadingHeader}>
           <TouchableOpacity style={s.backBtn} onPress={goBack}>
             <Feather name="arrow-left" size={18} color={C.white} />
           </TouchableOpacity>
           <View style={s.headerMid}>
-            <Text style={s.appName}>DesiDukaan</Text>
+            <Text style={s.appName}>KwikPik</Text>
             <Text style={s.shopName}>{vendorName || "Store"}</Text>
           </View>
         </LinearGradient>
@@ -840,19 +886,15 @@ export default function VendorStoreScreen() {
 
   return (
     <View style={s.root}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" backgroundColor={C.surfaceLowest} />
 
       {/* HEADER */}
-      <LinearGradient
-        colors={[C.orange, C.orangeDark, C.greenDark, C.green]}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={s.header}
-      >
+      <View style={s.header}>
         <TouchableOpacity style={s.backBtn} onPress={goBack} activeOpacity={0.8}>
           <Feather name="arrow-left" size={18} color={C.white} />
         </TouchableOpacity>
         <View style={s.headerMid}>
-          <Text style={s.appName}>DesiDukaan</Text>
+          <Text style={s.appName}>KwikPik</Text>
           <Text style={s.shopName} numberOfLines={1}>{vendor?.shop_name || vendorName}</Text>
           <View style={s.shopMetaRow}>
             <View style={[s.statusDot, { backgroundColor: vendor?.is_open ? "#4ADE80" : "#F87171" }]} />
@@ -862,12 +904,12 @@ export default function VendorStoreScreen() {
           </View>
         </View>
         <View style={s.ratingChip}>
-          <Feather name="star" size={11} color="#FCD34D" />
+          <Feather name="star" size={12} color={C.green} />
           <Text style={s.ratingText}>
             {vendor?.avg_rating ? parseFloat(vendor.avg_rating).toFixed(1) : "New"}
           </Text>
         </View>
-      </LinearGradient>
+      </View>
 
       {/* SEARCH */}
       <View style={s.searchWrap}>
@@ -1036,37 +1078,77 @@ export default function VendorStoreScreen() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   centered: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-  loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" },
+  loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500" },
 
-  header: { padding: 14, paddingTop: Platform.OS === "android" ? 14 : 52, flexDirection: "row", alignItems: "center", gap: 10 },
-  backBtn: { width: 34, height: 34, borderRadius: 11, backgroundColor: "rgba(0,0,0,0.18)", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  // ── Header — white surface card style ──
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === "android" ? 14 : 52,
+    paddingBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: C.surfaceLowest,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 6,
+    elevation: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray200,
+  },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 999,
+    backgroundColor: C.orange,
+    alignItems: "center", justifyContent: "center", flexShrink: 0,
+  },
   headerMid: { flex: 1 },
-  appName: { fontSize: 10, fontWeight: "700", color: "rgba(255,255,255,0.7)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 2, fontFamily: "PlusJakartaSans_700Bold" },
-  shopName: { fontSize: 17, fontWeight: "900", color: C.white, letterSpacing: -0.2, fontFamily: "PlusJakartaSans_800ExtraBold" },
-  shopMetaRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
-  statusDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
-  metaText: { fontSize: 11, color: "rgba(255,255,255,0.82)", fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" },
-  metaSep: { color: "rgba(255,255,255,0.45)", fontSize: 11 },
-  ratingChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(0,0,0,0.18)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 18, flexShrink: 0 },
-  ratingText: { fontSize: 12, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
+  appName: {
+    fontSize: 10, fontWeight: "700", color: C.orange,
+    letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2,
+  },
+  shopName: { fontSize: 18, fontWeight: "900", color: C.green, letterSpacing: -0.3 },
+  shopMetaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
+  statusDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
+  metaText: { fontSize: 12, color: C.gray600, fontWeight: "600" },
+  metaSep: { color: C.outlineVar, fontSize: 12 },
+  ratingChip: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: C.greenMid,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, flexShrink: 0,
+  },
+  ratingText: { fontSize: 12, fontWeight: "800", color: C.green },
 
-  searchWrap: { paddingHorizontal: 14, paddingVertical: 10, backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: C.gray100, borderRadius: 12, borderWidth: 1.5, borderColor: "transparent", paddingHorizontal: 12, paddingVertical: 9, gap: 9 },
-  searchBoxActive: { borderColor: C.greenBorder, backgroundColor: C.greenLight },
-  searchInput: { flex: 1, fontSize: 14, color: C.gray900, fontFamily: "PlusJakartaSans_500Medium", ...Platform.select({ web: { outlineStyle: "none" } }) },
-  searchClearBtn: { width: 20, height: 20, borderRadius: 10, backgroundColor: C.gray300, alignItems: "center", justifyContent: "center" },
+  // ── Search ──
+  searchWrap: {
+    paddingHorizontal: 16, paddingVertical: 10,
+    backgroundColor: C.surfaceLowest,
+    borderBottomWidth: 1, borderBottomColor: C.gray200,
+  },
+  searchBox: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: C.surfaceLow, borderRadius: 14,
+    borderWidth: 1, borderColor: "transparent",
+    paddingHorizontal: 14, paddingVertical: 11, gap: 10,
+  },
+  searchBoxActive: { borderColor: C.greenBorder, backgroundColor: C.greenMid },
+  searchInput: { flex: 1, fontSize: 14, color: C.gray900, ...Platform.select({ web: { outlineStyle: "none" } }) },
+  searchClearBtn: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.gray300, alignItems: "center", justifyContent: "center" },
 
-  catTabsWrap: { backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  // ── Category tabs ──
+  catTabsWrap: { backgroundColor: C.surfaceLowest, borderBottomWidth: 1, borderBottomColor: C.gray200 },
   catTabsRow: { paddingHorizontal: 14, paddingVertical: 10, flexDirection: "row" },
+
+  loadingHeader: { paddingHorizontal: 16, paddingTop: Platform.OS === "android" ? 14 : 52, paddingBottom: 14, flexDirection: "row", alignItems: "center", gap: 12 },
 
   // Desktop layout
   bodyRow: { flex: 1, flexDirection: "row" },
-  sidebar: { width: 140, backgroundColor: C.white, borderRightWidth: 1, borderRightColor: C.gray100, paddingTop: 8 },
-  sidebarItem: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 13, position: "relative" },
-  sidebarItemActive: { backgroundColor: C.greenLight },
-  sidebarEmoji: { fontSize: 16 },
-  sidebarLabel: { fontSize: 12, fontWeight: "600", color: C.gray600, flex: 1, fontFamily: "PlusJakartaSans_600SemiBold" },
-  sidebarLabelActive: { color: C.green, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold" },
+  sidebar: { width: 144, backgroundColor: C.surfaceLowest, borderRightWidth: 1, borderRightColor: C.gray200, paddingTop: 8 },
+  sidebarItem: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 14, position: "relative" },
+  sidebarItemActive: { backgroundColor: C.greenMid },
+  sidebarEmoji: { fontSize: 17 },
+  sidebarLabel: { fontSize: 12, fontWeight: "600", color: C.gray600, flex: 1 },
+  sidebarLabelActive: { color: C.green, fontWeight: "800" },
   sidebarDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: C.green, position: "absolute", right: 10 },
 
   body: { paddingTop: 4 },
@@ -1078,22 +1160,27 @@ const s = StyleSheet.create({
   oosSectionHeader: { flexDirection: "row", alignItems: "center", gap: 8, paddingBottom: 12 },
   oosSectionTitle: { fontSize: 16, fontWeight: "800", color: C.gray400, fontFamily: "PlusJakartaSans_800ExtraBold" },
 
-  emptyBox: { alignItems: "center", paddingTop: 70, paddingBottom: 40 },
-  emptyIconWrap: { width: 72, height: 72, borderRadius: 24, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center", marginBottom: 14, overflow: "hidden" },
-  emptyTitle: { fontSize: 18, fontWeight: "700", color: C.gray700, textAlign: "center", fontFamily: "PlusJakartaSans_700Bold" },
-  emptySub: { fontSize: 14, color: C.gray400, marginTop: 4, textAlign: "center", lineHeight: 20, fontFamily: "PlusJakartaSans_500Medium" },
-  browseAllBtn: { marginTop: 16, backgroundColor: C.greenLight, borderWidth: 1.5, borderColor: C.greenBorder, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12 },
-  browseAllText: { fontSize: 14, fontWeight: "700", color: C.green, fontFamily: "PlusJakartaSans_700Bold" },
+  emptyBox: { alignItems: "center", paddingTop: 70, paddingBottom: 40, gap: 8 },
+  emptyIconWrap: {
+    width: 80, height: 80, borderRadius: 999,
+    backgroundColor: C.surfaceLow,
+    alignItems: "center", justifyContent: "center",
+    marginBottom: 6, overflow: "hidden",
+  },
+  emptyTitle: { fontSize: 18, fontWeight: "700", color: C.gray700, textAlign: "center" },
+  emptySub: { fontSize: 14, color: C.gray400, textAlign: "center", lineHeight: 20 },
+  browseAllBtn: { marginTop: 10, backgroundColor: C.greenMid, borderWidth: 1, borderColor: C.greenBorder, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 999 },
+  browseAllText: { fontSize: 14, fontWeight: "700", color: C.green },
 
 
 
-  floatingCart: { position: "absolute", bottom: 20, left: 16, right: 16, backgroundColor: C.green, borderRadius: 18, shadowColor: C.green, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 14, zIndex: 100 },
-  floatingInner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14, paddingHorizontal: 18, borderRadius: 18 },
+  floatingCart: { position: "absolute", bottom: 20, left: 16, right: 16, backgroundColor: C.green, borderRadius: 20, shadowColor: C.green, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 14, zIndex: 100 },
+  floatingInner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 15, paddingHorizontal: 18, borderRadius: 20 },
   floatingLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  floatingBadge: { width: 34, height: 34, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
-  floatingBadgeText: { fontSize: 15, fontWeight: "900", color: C.white, fontFamily: "PlusJakartaSans_800ExtraBold" },
-  floatingItems: { fontSize: 14, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
-  floatingTotal: { fontSize: 12, color: "rgba(255,255,255,0.82)", marginTop: 1, fontFamily: "PlusJakartaSans_500Medium" },
-  floatingCTA: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 16, paddingVertical: 9, borderRadius: 12 },
-  floatingCTAText: { fontSize: 14, fontWeight: "800", color: C.white, fontFamily: "PlusJakartaSans_800ExtraBold" },
+  floatingBadge: { width: 36, height: 36, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
+  floatingBadgeText: { fontSize: 16, fontWeight: "900", color: C.white },
+  floatingItems: { fontSize: 14, fontWeight: "700", color: C.white },
+  floatingTotal: { fontSize: 12, color: "rgba(255,255,255,0.82)", marginTop: 1 },
+  floatingCTA: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14 },
+  floatingCTAText: { fontSize: 14, fontWeight: "800", color: C.white },
 });
