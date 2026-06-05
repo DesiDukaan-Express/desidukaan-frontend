@@ -161,8 +161,8 @@ function useWindowWidth() {
 // Responsive card grid — 2 cols mobile, 3 tablet, 4-5 desktop
 function useCardLayout(winW) {
   return useMemo(() => {
-    const H_PAD = winW >= 1024 ? 24 : winW >= 640 ? 16 : 12;
-    const GAP = winW >= 640 ? 12 : 10;
+    const H_PAD = winW >= 1024 ? 24 : winW >= 640 ? 16 : 16;
+    const GAP = winW >= 640 ? 16 : 14;
     let cols;
     if (winW >= 1200) cols = 5;
     else if (winW >= 900) cols = 4;
@@ -454,7 +454,7 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
   const loose = isLooseItem(p);
   const discount = p.mrp && p.mrp > p.price
     ? Math.round((1 - p.price / p.mrp) * 100) : null;
-  const imgH = Math.max(90, Math.round(cardW * 0.85));
+  const imgH = Math.max(120, Math.round(cardW));
 
   return (
     <TouchableOpacity
@@ -466,10 +466,10 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
       <View style={[pc.imgWrap, { height: imgH }]}>
         <Image
           source={{ uri: p.image_url || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300" }}
-          style={pc.img} resizeMode="cover"
+          style={pc.img} resizeMode={loose ? "cover" : "contain"}
         />
         {discount && inStock && (
-          <View style={pc.discBadge}><Text style={pc.discText}>{discount}%</Text></View>
+          <View style={pc.discBadge}><Text style={pc.discText}>{discount}% OFF</Text></View>
         )}
         {/* Loose badge — top right */}
         {loose && inStock && (
@@ -542,23 +542,30 @@ const pc = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  imgWrap: { position: "relative", width: "100%", backgroundColor: C.white },
+  imgWrap: {
+    position: "relative",
+    width: "100%",
+    backgroundColor: C.white,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 14,
+  },
   img: { width: "100%", height: "100%" },
-  discBadge: { position: "absolute", top: 8, left: 8, backgroundColor: C.orange, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
-  discText: { fontSize: 10, color: C.white, fontWeight: "800", letterSpacing: 0.2 },
-  looseBadge: { position: "absolute", top: 8, right: 8, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(236,254,255,0.92)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: C.outlineVar },
+  discBadge: { position: "absolute", top: 8, left: 8, backgroundColor: C.orange, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  discText: { fontSize: 9, color: C.white, fontWeight: "800", letterSpacing: 0 },
+  looseBadge: { position: "absolute", top: 8, right: 8, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.88)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, borderWidth: 1, borderColor: C.green },
   looseBadgeText: { fontSize: 9, fontWeight: "800", color: C.cyan },
   oosOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.48)", alignItems: "center", justifyContent: "center" },
   oosText: { fontSize: 11, fontWeight: "800", color: C.white, textAlign: "center" },
-  info: { padding: 12 },
-  name: { fontSize: 14, fontWeight: "700", color: C.gray900, lineHeight: 19, marginBottom: 2 },
+  info: { padding: 12, flex: 1 },
+  name: { fontSize: 16, fontWeight: "800", color: C.gray900, lineHeight: 21, marginBottom: 2 },
   unit: { fontSize: 11, color: C.gray500, marginBottom: 6 },
   priceRow: { flexDirection: "row", alignItems: "baseline", gap: 6, marginBottom: 10 },
-  price: { fontSize: 16, fontWeight: "900", color: C.green },
+  price: { fontSize: 20, fontWeight: "900", color: C.green },
   mrp: { fontSize: 11, color: C.gray400, textDecorationLine: "line-through" },
   addBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5,
-    backgroundColor: C.greenDark, borderRadius: 12, paddingVertical: 10,
+    backgroundColor: C.greenDark, borderRadius: 12, paddingVertical: 10, minHeight: 40,
     shadowColor: "rgba(0,122,51,0.2)", shadowOffset: { width: 0, height: 4 }, shadowRadius: 12, elevation: 3,
   },
   addBtnLoose: { backgroundColor: C.cyan },
@@ -630,8 +637,8 @@ const ct = StyleSheet.create({
     backgroundColor: C.surfaceLowest, marginRight: 8,
   },
   pillActive: {
-    backgroundColor: C.orange, borderColor: C.orange,
-    shadowColor: C.orange, shadowOffset: { width: 0, height: 3 },
+    backgroundColor: C.greenDark, borderColor: C.greenDark,
+    shadowColor: C.green, shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3, shadowRadius: 7, elevation: 4,
   },
   emoji: { fontSize: 14 },
@@ -665,6 +672,7 @@ export default function VendorStoreScreen() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [searchFocus, setSearchFocus] = useState(false);
+  const searchInputRef = useRef(null);
   const [activeCat, setActiveCat] = useState("All");
   const [detailItem, setDetailItem] = useState(null);
   const [loosePickerItem, setLoosePickerItem] = useState(null); // weight picker
@@ -891,7 +899,7 @@ export default function VendorStoreScreen() {
       {/* HEADER */}
       <View style={s.header}>
         <TouchableOpacity style={s.backBtn} onPress={goBack} activeOpacity={0.8}>
-          <Feather name="arrow-left" size={18} color={C.white} />
+          <Feather name="arrow-left" size={18} color={C.orangeDark} />
         </TouchableOpacity>
         <View style={s.headerMid}>
           <Text style={s.appName}>KwikPik</Text>
@@ -903,12 +911,19 @@ export default function VendorStoreScreen() {
             <Text style={s.metaText}>{inStockTotal} in stock</Text>
           </View>
         </View>
-        <View style={s.ratingChip}>
-          <Feather name="star" size={12} color={C.green} />
-          <Text style={s.ratingText}>
-            {vendor?.avg_rating ? parseFloat(vendor.avg_rating).toFixed(1) : "New"}
+        <View style={[s.statusChip, !vendor?.is_open && s.statusChipClosed]}>
+          <View style={[s.statusDot, { backgroundColor: vendor?.is_open ? C.greenFixed : "#F87171" }]} />
+          <Text style={[s.statusText, !vendor?.is_open && s.statusTextClosed]}>
+            {vendor?.is_open ? "Open" : "Closed"}
           </Text>
         </View>
+        <TouchableOpacity
+          style={s.headerSearchBtn}
+          onPress={() => searchInputRef.current?.focus?.()}
+          activeOpacity={0.8}
+        >
+          <Feather name="search" size={18} color={C.green} />
+        </TouchableOpacity>
       </View>
 
       {/* SEARCH */}
@@ -916,6 +931,7 @@ export default function VendorStoreScreen() {
         <View style={[s.searchBox, searchFocus && s.searchBoxActive]}>
           <Feather name="search" size={15} color={searchFocus ? C.green : C.gray400} />
           <TextInput
+            ref={searchInputRef}
             style={s.searchInput}
             placeholder={`Search in ${vendor?.shop_name || "store"}…`}
             placeholderTextColor={C.gray400}
@@ -1023,6 +1039,32 @@ export default function VendorStoreScreen() {
                   {renderProductGrid(outStock)}
                 </View>
               )}
+              {!search && activeCat === "All" && inStock.length > 0 && (
+                <View style={s.promoWrap}>
+                  <View style={s.promoLarge}>
+                    <Text style={s.promoTitle}>Neighborhood Special</Text>
+                    <Text style={s.promoSub}>
+                      Free delivery on orders above ₹500 today.
+                    </Text>
+                    <MaterialIcons name="local-shipping" size={36} color={C.orangeDark} style={s.promoIcon} />
+                  </View>
+                  <View style={s.promoStack}>
+                    <View style={s.promoMini}>
+                      <View>
+                        <Text style={s.promoOverline}>STORE</Text>
+                        <Text style={s.promoMiniValue}>{inStockTotal} items</Text>
+                      </View>
+                      <MaterialIcons name="inventory-2" size={24} color={C.green} />
+                    </View>
+                    <View style={[s.promoMini, s.promoMiniGreen]}>
+                      <View style={s.couponIcon}>
+                        <MaterialIcons name="redeem" size={18} color={C.green} />
+                      </View>
+                      <Text style={s.couponText}>Fresh deals available</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
             </>
           )}
           <View style={{ height: 130 }} />
@@ -1082,12 +1124,12 @@ const s = StyleSheet.create({
 
   // ── Header — white surface card style ──
   header: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     paddingTop: Platform.OS === "android" ? 14 : 52,
-    paddingBottom: 12,
+    paddingBottom: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
     backgroundColor: C.surfaceLowest,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -1099,15 +1141,15 @@ const s = StyleSheet.create({
   },
   backBtn: {
     width: 40, height: 40, borderRadius: 999,
-    backgroundColor: C.orange,
+    backgroundColor: C.orangeLight,
     alignItems: "center", justifyContent: "center", flexShrink: 0,
   },
   headerMid: { flex: 1 },
   appName: {
-    fontSize: 10, fontWeight: "700", color: C.orange,
+    fontSize: 10, fontWeight: "800", color: C.orangeDark,
     letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2,
   },
-  shopName: { fontSize: 18, fontWeight: "900", color: C.green, letterSpacing: -0.3 },
+  shopName: { fontSize: 22, fontWeight: "900", color: C.green, letterSpacing: 0 },
   shopMetaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   statusDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
   metaText: { fontSize: 12, color: C.gray600, fontWeight: "600" },
@@ -1118,26 +1160,46 @@ const s = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, flexShrink: 0,
   },
   ratingText: { fontSize: 12, fontWeight: "800", color: C.green },
+  statusChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: C.greenDark,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    flexShrink: 0,
+  },
+  statusChipClosed: { backgroundColor: C.gray200 },
+  statusText: { fontSize: 12, fontWeight: "800", color: C.greenFixed },
+  statusTextClosed: { color: C.gray600 },
+  headerSearchBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: C.surfaceLow,
+  },
 
   // ── Search ──
   searchWrap: {
-    paddingHorizontal: 16, paddingVertical: 10,
-    backgroundColor: C.surfaceLowest,
-    borderBottomWidth: 1, borderBottomColor: C.gray200,
+    paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8,
+    backgroundColor: C.bg,
   },
   searchBox: {
     flexDirection: "row", alignItems: "center",
-    backgroundColor: C.surfaceLow, borderRadius: 14,
+    backgroundColor: C.surfaceLow, borderRadius: 12,
     borderWidth: 1, borderColor: "transparent",
-    paddingHorizontal: 14, paddingVertical: 11, gap: 10,
+    paddingHorizontal: 14, paddingVertical: 13, gap: 10,
   },
   searchBoxActive: { borderColor: C.greenBorder, backgroundColor: C.greenMid },
   searchInput: { flex: 1, fontSize: 14, color: C.gray900, ...Platform.select({ web: { outlineStyle: "none" } }) },
   searchClearBtn: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.gray300, alignItems: "center", justifyContent: "center" },
 
   // ── Category tabs ──
-  catTabsWrap: { backgroundColor: C.surfaceLowest, borderBottomWidth: 1, borderBottomColor: C.gray200 },
-  catTabsRow: { paddingHorizontal: 14, paddingVertical: 10, flexDirection: "row" },
+  catTabsWrap: { backgroundColor: C.bg },
+  catTabsRow: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 10, flexDirection: "row" },
 
   loadingHeader: { paddingHorizontal: 16, paddingTop: Platform.OS === "android" ? 14 : 52, paddingBottom: 14, flexDirection: "row", alignItems: "center", gap: 12 },
 
@@ -1151,7 +1213,7 @@ const s = StyleSheet.create({
   sidebarLabelActive: { color: C.green, fontWeight: "800" },
   sidebarDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: C.green, position: "absolute", right: 10 },
 
-  body: { paddingTop: 4 },
+  body: { paddingTop: 8 },
   grid: { flexDirection: "row", flexWrap: "wrap" },
   sectionDivider: { height: 1, backgroundColor: C.gray100, marginTop: 16, marginHorizontal: 4 },
 
@@ -1171,6 +1233,52 @@ const s = StyleSheet.create({
   emptySub: { fontSize: 14, color: C.gray400, textAlign: "center", lineHeight: 20 },
   browseAllBtn: { marginTop: 10, backgroundColor: C.greenMid, borderWidth: 1, borderColor: C.greenBorder, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 999 },
   browseAllText: { fontSize: 14, fontWeight: "700", color: C.green },
+
+  promoWrap: {
+    flexDirection: "row",
+    gap: 14,
+    marginTop: 28,
+    minHeight: 192,
+  },
+  promoLarge: {
+    flex: 1,
+    borderRadius: 24,
+    padding: 16,
+    backgroundColor: "rgba(252,129,37,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(252,129,37,0.28)",
+    justifyContent: "space-between",
+    overflow: "hidden",
+  },
+  promoTitle: { fontSize: 14, fontWeight: "900", color: C.orangeDark, lineHeight: 19 },
+  promoSub: { fontSize: 12, color: C.gray600, lineHeight: 17, marginTop: 8 },
+  promoIcon: { alignSelf: "flex-end", opacity: 0.55 },
+  promoStack: { flex: 1, gap: 14 },
+  promoMini: {
+    flex: 1,
+    borderRadius: 24,
+    padding: 14,
+    backgroundColor: C.greenLight,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  promoMiniGreen: {
+    backgroundColor: "rgba(0,94,38,0.1)",
+    justifyContent: "flex-start",
+    gap: 12,
+  },
+  promoOverline: { fontSize: 10, fontWeight: "900", color: C.green, letterSpacing: 1 },
+  promoMiniValue: { fontSize: 15, fontWeight: "900", color: C.gray900, marginTop: 4 },
+  couponIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: C.greenFixed,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  couponText: { flex: 1, fontSize: 11, fontWeight: "800", color: C.green, lineHeight: 15 },
 
 
 
