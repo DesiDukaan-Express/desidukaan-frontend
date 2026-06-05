@@ -13,6 +13,7 @@ import {
   TextInput,
   Dimensions,
   Alert,
+  Platform,
 } from "react-native";
 
 import VendorMapView from "../../components/VendorMapView";
@@ -306,7 +307,15 @@ export default function VendorOrdersScreen() {
       const result = await res.json();
 
       if (result.success) {
-        setOrders(result.data.orders || []);
+        const fetchedOrders = result.data.orders || [];
+        setOrders(fetchedOrders);
+        // Auto-expand all customer groups so no orders are hidden
+        const expanded = {};
+        fetchedOrders.forEach((o) => {
+          const key = o.customer?.name || `Customer #${o.customer_id}`;
+          expanded[key] = true;
+        });
+        setExpandedCustomers(expanded);
       }
     } catch (err) {
       console.log(err);
@@ -442,11 +451,18 @@ export default function VendorOrdersScreen() {
       });
       const result = await res.json();
       if (res.ok && result.success) {
-        Alert.alert("Success", `Order marked as ${status}`);
-        fetchOrders();
+        showVendorToast(`Order marked as ${status} ✓`, "success");
+        await fetchOrders();
         setSelectedOrder((prev) =>
           prev && prev.id === id ? { ...prev, status } : prev,
         );
+        // Auto-expand the customer group so the updated order is visible
+        if (selectedOrder) {
+          const customerName =
+            selectedOrder.customer?.name ||
+            `Customer #${selectedOrder.customer_id}`;
+          setExpandedCustomers((prev) => ({ ...prev, [customerName]: true }));
+        }
       } else {
         Alert.alert(
           "Error",
@@ -579,8 +595,9 @@ export default function VendorOrdersScreen() {
   };
 
   const isSlotActive = (slot) => {
-    if (!slot) return true; // No slot = skip check
-    const start = slot.slot_start || slot.start;
+    if (!slot) return true;
+    // Use vendor's confirmed start if available, else customer's requested start
+    const start = slot.vendor_slot_start || slot.slot_start || slot.start;
     if (!start) return true;
     return new Date() >= new Date(start);
   };
@@ -599,6 +616,22 @@ export default function VendorOrdersScreen() {
       map[key].total += order.total || 0;
     });
     return Object.values(map).sort((a, b) => b.orders.length - a.orders.length);
+  };
+
+  const groupPhoneRequestsByCustomer = (phones) => {
+    const map = {};
+    phones.forEach((p) => {
+      const key = p.customer?.name || `Customer #${p.customer_id}`;
+      if (!map[key])
+        map[key] = { name: key, requests: [], latestAt: p.created_at };
+      map[key].requests.push(p);
+      if (new Date(p.created_at) > new Date(map[key].latestAt)) {
+        map[key].latestAt = p.created_at;
+      }
+    });
+    return Object.values(map).sort(
+      (a, b) => new Date(b.latestAt) - new Date(a.latestAt),
+    );
   };
 
   const handlePhoneRequest = async (id, status) => {
@@ -732,7 +765,10 @@ export default function VendorOrdersScreen() {
             ? groupByCustomer(orders)
             : activeTab === "requests"
               ? [
-                  ...requests.phones.map((p) => ({ ...p, type: "phone" })),
+                  ...groupPhoneRequestsByCustomer(requests.phones).map((g) => ({
+                    ...g,
+                    type: "phone_group",
+                  })),
                   ...requests.slots.map((s) => ({ ...s, type: "slot" })),
                 ]
               : groupByCustomer(history)
@@ -745,9 +781,11 @@ export default function VendorOrdersScreen() {
         keyExtractor={(item) =>
           activeTab === "history" || activeTab === "orders"
             ? `group-${item.name}`
-            : item.type
-              ? `${item.type}-${item.id}`
-              : String(item.id)
+            : item.type === "phone_group"
+              ? `phone_group-${item.name}`
+              : item.type
+                ? `${item.type}-${item.id}`
+                : String(item.id)
         }
         refreshControl={
           <RefreshControl
@@ -1006,19 +1044,128 @@ export default function VendorOrdersScreen() {
                   </TouchableOpacity>
                 ))}
             </View>
+          ) : item.type === "phone_group" ? (
+            <View style={styles.customerGroupCard}>
+              <View style={styles.customerGroupHeader}>
+                <View style={styles.customerGroupAvatar}>
+                  <Text style={styles.customerGroupAvatarText}>
+                    {item.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.customerGroupName}>{item.name}</Text>
+                  <Text style={styles.customerGroupMeta}>
+                    {item.requests.length} phone request
+                    {item.requests.length !== 1 ? "s" : ""}
+                  </Text>
+                </View>
+                <View style={styles.customerGroupBadge}>
+                  <Text style={styles.customerGroupBadgeText}>
+                    {item.requests.length}
+                  </Text>
+                </View>
+              </View>
+              {item.requests.map((req, idx) => (
+                <View
+                  key={req.id}
+                  style={[
+                    styles.historyOrderRow,
+                    idx === item.requests.length - 1 && {
+                      borderBottomWidth: 0,
+                    },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <View
+                        style={[
+                          styles.historyStatusPill,
+                          {
+                            backgroundColor:
+                              req.status === "approved"
+                                ? "#DCFCE7"
+                                : req.status === "rejected"
+                                  ? "#FEE2E2"
+                                  : "#FEF3C7",
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.historyStatusText,
+                            {
+                              color:
+                                req.status === "approved"
+                                  ? "#16A34A"
+                                  : req.status === "rejected"
+                                    ? "#DC2626"
+                                    : "#D97706",
+                            },
+                          ]}
+                        >
+                          {req.status.charAt(0).toUpperCase() +
+                            req.status.slice(1)}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.historyOrderTime}>
+                      {formatOrderTime(req.created_at)}
+                    </Text>
+                  </View>
+                  {req.status === "pending" && (
+                    <View
+                      style={{ flexDirection: "row", gap: 6, flexShrink: 1 }}
+                    >
+                      <TouchableOpacity
+                        style={[
+                          styles.actionBtn,
+                          styles.rejectBtn,
+                          {
+                            flex: 1,
+                            minWidth: 64,
+                            paddingHorizontal: 10,
+                            paddingVertical: 8,
+                          },
+                        ]}
+                        onPress={() => handlePhoneRequest(req.id, "rejected")}
+                      >
+                        <Text style={[styles.rejectBtnText, { fontSize: 12 }]}>
+                          Reject
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.actionBtn,
+                          styles.approveBtn,
+                          {
+                            flex: 1,
+                            minWidth: 70,
+                            paddingHorizontal: 10,
+                            paddingVertical: 8,
+                          },
+                        ]}
+                        onPress={() => handlePhoneRequest(req.id, "approved")}
+                      >
+                        <Text style={[styles.approveBtnText, { fontSize: 12 }]}>
+                          Approve
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
           ) : (
             <View style={styles.requestCard}>
               <View style={styles.requestHeader}>
                 <View style={styles.requestIcon}>
-                  <Ionicons
-                    name={
-                      item.type === "phone"
-                        ? "phone-portrait-outline"
-                        : "alarm-outline"
-                    }
-                    size={20}
-                    color="#1F2937"
-                  />
+                  <Ionicons name="alarm-outline" size={20} color="#1F2937" />
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={styles.requestTitle}>
@@ -1084,337 +1231,305 @@ export default function VendorOrdersScreen() {
         }
       />
 
-      <Modal visible={isDeliveryModalVisible} animationType="slide" transparent>
-        <View style={styles.deliveryModalOverlay}>
-          <View style={styles.deliveryModalContent}>
-            {/* Header */}
-            <View style={styles.assignHeader}>
-              <TouchableOpacity
-                onPress={() => setIsDeliveryModalVisible(false)}
-              >
-                <Ionicons name="arrow-back" size={24} color="#1F2937" />
-              </TouchableOpacity>
-              <Text style={styles.assignTitle}>Assign Rider</Text>
-              <TouchableOpacity style={styles.headerIcon}>
-                <View style={styles.headerIconInner}>
-                  <MaterialIcons name="storefront" size={20} color="#fff" />
-                </View>
-              </TouchableOpacity>
-            </View>
-
-            <View
-              style={{
-                backgroundColor: "#fff",
-                margin: 16,
-                padding: 14,
-                borderRadius: 16,
-              }}
+      <Modal
+        visible={isDeliveryModalVisible}
+        animationType="slide"
+        transparent={false}
+      >
+        <View style={dmStyles.root}>
+          {/* ── HEADER ── */}
+          <View style={dmStyles.header}>
+            <TouchableOpacity
+              style={dmStyles.backBtn}
+              onPress={() => setIsDeliveryModalVisible(false)}
             >
-              <Text style={{ fontWeight: "800" }}>
+              <Ionicons name="arrow-back" size={20} color="#fff" />
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={dmStyles.headerTitle}>Assign Rider</Text>
+              <Text style={dmStyles.headerSub}>
                 {selectedOrder?.order_number}
               </Text>
+            </View>
+            <View style={dmStyles.headerBadge}>
+              <View style={dmStyles.headerBadgeDot} />
+              <Text style={dmStyles.headerBadgeText}>LIVE</Text>
+            </View>
+          </View>
 
-              <Text style={{ color: "#6B7280", marginTop: 4 }}>
-                {selectedOrder?.customer?.name}
-              </Text>
-
-              <Text
-                style={{
-                  marginTop: 6,
-                  fontWeight: "800",
-                  color: "#111827",
-                  fontSize: 16,
-                }}
-              >
+          {/* ── ORDER SUMMARY STRIP ── */}
+          <View style={dmStyles.orderStrip}>
+            <View style={dmStyles.orderStripLeft}>
+              <View style={dmStyles.orderStripAvatar}>
+                <Text style={dmStyles.orderStripAvatarText}>
+                  {(selectedOrder?.customer?.name || "C")
+                    .charAt(0)
+                    .toUpperCase()}
+                </Text>
+              </View>
+              <View>
+                <Text style={dmStyles.orderStripName}>
+                  {selectedOrder?.customer?.name}
+                </Text>
+                <Text style={dmStyles.orderStripItems} numberOfLines={1}>
+                  {(selectedOrder?.items || [])
+                    .slice(0, 2)
+                    .map((i) => `${i.quantity}× ${i.product_name}`)
+                    .join(" · ")}
+                  {(selectedOrder?.items || []).length > 2
+                    ? ` +${(selectedOrder?.items || []).length - 2} more`
+                    : ""}
+                </Text>
+              </View>
+            </View>
+            <View style={dmStyles.orderStripRight}>
+              <Text style={dmStyles.orderStripTotal}>
                 ₹{selectedOrder?.total}
               </Text>
+            </View>
+          </View>
 
-              {/* Added Items List for better context */}
-              <View
-                style={{
-                  marginTop: 12,
-                  borderTopWidth: 1,
-                  borderColor: "#F3F4F6",
-                  paddingTop: 8,
-                }}
-              >
-                {(selectedOrder?.items || []).slice(0, 3).map((item, i) => (
-                  <Text
-                    key={i}
-                    style={{ fontSize: 12, color: "#4B5563" }}
-                    numberOfLines={1}
-                  >
-                    • {item.quantity}x {item.product_name}
-                  </Text>
-                ))}
-                {(selectedOrder?.items || []).length > 3 && (
-                  <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
-                    + {(selectedOrder.items || []).length - 3} more items...
-                  </Text>
-                )}
+          <ScrollView
+            bounces={false}
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* ── MAP ── */}
+            <View style={dmStyles.mapCard}>
+              <VendorMapView
+                storeLocation={storeLocation}
+                riders={riders}
+                silverMapStyle={silverMapStyle}
+                destinationLocation={
+                  selectedOrder?.delivery_address?.latitude
+                    ? {
+                        latitude: selectedOrder.delivery_address.latitude,
+                        longitude: selectedOrder.delivery_address.longitude,
+                      }
+                    : null
+                }
+              />
+              <View style={dmStyles.mapOverlayBadge}>
+                <MaterialIcons name="people" size={14} color="#147538" />
+                <Text style={dmStyles.mapOverlayText}>
+                  {riders.length} partner{riders.length !== 1 ? "s" : ""} nearby
+                </Text>
               </View>
             </View>
 
-            <ScrollView bounces={false} style={{ flex: 1 }}>
-              {/* Map Section */}
-              <View style={styles.mapWrapper}>
-                <VendorMapView
-                  storeLocation={storeLocation}
-                  riders={riders}
-                  silverMapStyle={silverMapStyle}
-                  destinationLocation={
-                    selectedOrder?.delivery_address?.latitude
-                      ? {
-                          latitude: selectedOrder.delivery_address.latitude,
-                          longitude: selectedOrder.delivery_address.longitude,
-                        }
-                      : null
-                  }
-                />
-
-                {/* Status Bar */}
-                <View style={styles.activeStatusBar}>
-                  <Text style={styles.partnersCount}>
-                    {riders.length}{" "}
-                    {riders.length === 1 ? "PARTNER" : "PARTNERS"} NEARBY
-                  </Text>
-                  <View style={styles.activeIndicator}>
-                    <View style={styles.activeDot} />
-                    <Text style={styles.activeTextStatus}>Active</Text>
-                  </View>
+            {/* ── RIDERS SECTION ── */}
+            <View style={dmStyles.section}>
+              <View style={dmStyles.sectionHeader}>
+                <Text style={dmStyles.sectionTitle}>Available Riders</Text>
+                <View style={dmStyles.liveChip}>
+                  <View style={dmStyles.liveDot} />
+                  <Text style={dmStyles.liveText}>LIVE</Text>
                 </View>
               </View>
 
-              {/* Rider List */}
-              <View style={styles.riderListContainer}>
-                <View style={styles.listHeaderRow}>
-                  <Text style={styles.riderListTitle}>Available Riders</Text>
-                  <Text style={styles.liveUpdatesText}>LIVE UPDATES</Text>
-                </View>
-
-                {/* ── AUTO ASSIGN BUTTON ── */}
-                {!selectedOrder?.delivery?.partner && (
-                  <View style={styles.autoAssignSection}>
-                    {selectedOrder?.delivery_slot &&
-                      !isSlotActive(selectedOrder?.delivery_slot) && (
-                        <View
-                          style={{
-                            backgroundColor: "#FEF3C7",
-                            borderRadius: 12,
-                            padding: 12,
-                            marginBottom: 12,
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 8,
-                            borderWidth: 1,
-                            borderColor: "#FDE68A",
-                          }}
-                        >
-                          <MaterialIcons
-                            name="lock-clock"
-                            size={18}
-                            color="#D97706"
-                          />
-                          <View style={{ flex: 1 }}>
-                            <Text
-                              style={{
-                                fontWeight: "700",
-                                color: "#92400E",
-                                fontSize: 13,
-                              }}
-                            >
-                              Delivery slot not started yet
-                            </Text>
-                            <Text
-                              style={{
-                                color: "#B45309",
-                                fontSize: 11,
-                                marginTop: 2,
-                              }}
-                            >
-                              Slot begins at{" "}
-                              {new Date(
-                                selectedOrder.delivery_slot.slot_start ||
-                                  selectedOrder.delivery_slot.start,
-                              ).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                              . You can assign a rider once it starts.
-                            </Text>
-                          </View>
-                        </View>
-                      )}
-
-                    {selectedOrder?.delivery_slot &&
-                      isSlotActive(selectedOrder?.delivery_slot) && (
-                        <View
-                          style={{
-                            backgroundColor: "#ECFDF5",
-                            borderRadius: 12,
-                            padding: 12,
-                            marginBottom: 12,
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 8,
-                            borderWidth: 1,
-                            borderColor: "#BBF7D0",
-                          }}
-                        >
-                          <View
-                            style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: 4,
-                              backgroundColor: "#16A34A",
-                            }}
-                          />
-                          <Text
-                            style={{
-                              fontWeight: "700",
-                              color: "#166534",
-                              fontSize: 13,
-                            }}
-                          >
-                            Slot is active — you can assign a rider now
-                          </Text>
-                        </View>
-                      )}
-                    <TouchableOpacity
-                      style={[
-                        styles.autoAssignBtn,
-                        (autoAssigning ||
-                          !isSlotActive(selectedOrder?.delivery_slot)) && {
-                          opacity: 0.5,
-                        },
-                      ]}
-                      onPress={handleAutoAssign}
-                      disabled={
-                        autoAssigning ||
-                        !isSlotActive(selectedOrder?.delivery_slot)
-                      }
-                    >
-                      {autoAssigning ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <MaterialIcons name="near-me" size={18} color="#fff" />
-                      )}
-                      <Text style={styles.autoAssignBtnText}>
-                        {!isSlotActive(selectedOrder?.delivery_slot)
-                          ? "Slot not started yet"
-                          : autoAssigning
-                            ? "Broadcasting..."
-                            : "Auto Assign Nearby Rider"}
+              {/* Slot status banner */}
+              {selectedOrder?.delivery_slot &&
+                !isSlotActive(selectedOrder?.delivery_slot) && (
+                  <View style={dmStyles.slotBannerLocked}>
+                    <MaterialIcons
+                      name="lock-clock"
+                      size={18}
+                      color="#D97706"
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={dmStyles.slotBannerTitle}>
+                        Slot not started yet
                       </Text>
-                    </TouchableOpacity>
-                    {broadcastStatus && (
-                      <View style={styles.broadcastStatus}>
-                        <View style={styles.broadcastDot} />
-                        <Text style={styles.broadcastText}>
-                          {broadcastStatus.message}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                )}
-
-                {riders.length > 0 ? (
-                  riders.map((rider, index) => (
-                    <View
-                      key={rider.id}
-                      style={[
-                        styles.riderCard,
-                        index === 0 && styles.firstRiderCard,
-                      ]}
-                    >
-                      <View style={styles.riderInfoRow}>
-                        <Image
-                          source={{ uri: rider.image }}
-                          style={styles.riderAvatar}
-                        />
-                        <View style={styles.riderDetails}>
-                          <Text style={styles.riderName}>{rider.name}</Text>
-                          <View style={styles.timeRow}>
-                            <FontAwesome5
-                              name="bolt"
-                              size={12}
-                              color="#16A34A"
-                            />
-                            <Text
-                              style={[styles.riderStatus, styles.fastestText]}
-                            >
-                              {rider.status} · {rider.distance}
-                            </Text>
-                          </View>
-                        </View>
-                        <TouchableOpacity
-                          style={styles.callRiderBtn}
-                          onPress={() =>
-                            Alert.alert("Call", `Calling ${rider.name}...`)
-                          }
-                        >
-                          <Ionicons name="call" size={20} color="#1F2937" />
-                        </TouchableOpacity>
-
-                        {rider.status === "Available" && (
-                          <TouchableOpacity
-                            style={[
-                              styles.assignBtnSmall,
-                              !isSlotActive(selectedOrder?.delivery_slot) && {
-                                backgroundColor: "#9CA3AF",
-                              },
-                            ]}
-                            onPress={() => handleAssignRider(rider.id)}
-                            disabled={
-                              !isSlotActive(selectedOrder?.delivery_slot)
-                            }
-                          >
-                            <Text style={styles.assignBtnTextSmall}>
-                              {!isSlotActive(selectedOrder?.delivery_slot)
-                                ? "Locked"
-                                : "Assign"}
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
+                      <Text style={dmStyles.slotBannerSub}>
+                        Starts at{" "}
+                        {new Date(
+                          selectedOrder.delivery_slot.vendor_slot_start ||
+                            selectedOrder.delivery_slot.slot_start,
+                        ).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </Text>
                     </View>
-                  ))
-                ) : (
-                  <View style={{ padding: 20, alignItems: "center" }}>
-                    {selectedOrder?.delivery?.partner ? (
-                      <Text style={{ color: "#16A34A", fontWeight: "600" }}>
-                        ✓ Rider is on the way
-                      </Text>
+                  </View>
+                )}
+
+              {selectedOrder?.delivery_slot &&
+                isSlotActive(selectedOrder?.delivery_slot) && (
+                  <View style={dmStyles.slotBannerActive}>
+                    <View style={dmStyles.slotBannerActiveDot} />
+                    <Text style={dmStyles.slotBannerActiveText}>
+                      Slot is active — assign a rider now
+                    </Text>
+                  </View>
+                )}
+
+              {/* Auto Assign */}
+              {!selectedOrder?.delivery?.partner && (
+                <TouchableOpacity
+                  style={[
+                    dmStyles.autoBtn,
+                    (autoAssigning ||
+                      !isSlotActive(selectedOrder?.delivery_slot)) &&
+                      dmStyles.autoBtnDisabled,
+                  ]}
+                  onPress={handleAutoAssign}
+                  disabled={
+                    autoAssigning || !isSlotActive(selectedOrder?.delivery_slot)
+                  }
+                  activeOpacity={0.85}
+                >
+                  <View style={dmStyles.autoBtnIcon}>
+                    {autoAssigning ? (
+                      <ActivityIndicator size="small" color="#147538" />
                     ) : (
-                      <Text style={{ color: "#6B7280", textAlign: "center" }}>
-                        No riders assigned yet.{"\n"}Tap Auto Assign above to
-                        broadcast to nearby riders.
-                      </Text>
+                      <MaterialIcons name="near-me" size={18} color="#147538" />
                     )}
-                    {!selectedOrder?.delivery?.partner &&
-                      selectedOrder?.status !== "ready" && (
+                  </View>
+                  <Text style={dmStyles.autoBtnText}>
+                    {autoAssigning
+                      ? "Broadcasting to riders…"
+                      : "Auto Assign Nearby Rider"}
+                  </Text>
+                  <MaterialIcons
+                    name="chevron-right"
+                    size={18}
+                    color="#147538"
+                  />
+                </TouchableOpacity>
+              )}
+
+              {broadcastStatus && (
+                <View style={dmStyles.broadcastBanner}>
+                  <View style={dmStyles.broadcastDot} />
+                  <Text style={dmStyles.broadcastText}>
+                    {broadcastStatus.message}
+                  </Text>
+                </View>
+              )}
+
+              {/* Rider Cards */}
+              {riders.length > 0 ? (
+                riders.map((rider, index) => (
+                  <View
+                    key={rider.id}
+                    style={[
+                      dmStyles.riderCard,
+                      index === 0 && dmStyles.riderCardFirst,
+                    ]}
+                  >
+                    {index === 0 && (
+                      <View style={dmStyles.riderTopBadge}>
+                        <MaterialIcons name="bolt" size={11} color="#fff" />
+                        <Text style={dmStyles.riderTopBadgeText}>FASTEST</Text>
+                      </View>
+                    )}
+                    <View style={dmStyles.riderRow}>
+                      <Image
+                        source={{ uri: rider.image }}
+                        style={dmStyles.riderAvatar}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={dmStyles.riderName}>{rider.name}</Text>
+                        <View style={dmStyles.riderMeta}>
+                          <MaterialIcons
+                            name="location-on"
+                            size={12}
+                            color="#147538"
+                          />
+                          <Text style={dmStyles.riderDist}>
+                            {rider.distance}
+                          </Text>
+                          <Text style={dmStyles.riderStatus}>
+                            {" "}
+                            · {rider.status}
+                          </Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        style={dmStyles.callBtn}
+                        onPress={() =>
+                          Alert.alert("Call", `Calling ${rider.name}...`)
+                        }
+                      >
+                        <Ionicons
+                          name="call-outline"
+                          size={16}
+                          color="#147538"
+                        />
+                      </TouchableOpacity>
+                      {rider.status === "Available" && (
                         <TouchableOpacity
-                          style={{
-                            marginTop: 12,
-                            backgroundColor: "#0F172A",
-                            paddingVertical: 10,
-                            paddingHorizontal: 20,
-                            borderRadius: 8,
-                          }}
-                          onPress={() =>
-                            updateOrderStatus(selectedOrder.id, "ready")
-                          }
+                          style={[
+                            dmStyles.assignBtn,
+                            !isSlotActive(selectedOrder?.delivery_slot) &&
+                              dmStyles.assignBtnDisabled,
+                          ]}
+                          onPress={() => handleAssignRider(rider.id)}
+                          disabled={!isSlotActive(selectedOrder?.delivery_slot)}
                         >
-                          <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                            Mark Order as Ready
+                          <Text style={dmStyles.assignBtnText}>
+                            {!isSlotActive(selectedOrder?.delivery_slot)
+                              ? "Locked"
+                              : "Assign"}
                           </Text>
                         </TouchableOpacity>
                       )}
+                    </View>
                   </View>
+                ))
+              ) : (
+                <View style={dmStyles.emptyRiders}>
+                  {selectedOrder?.delivery?.partner ? (
+                    <>
+                      <MaterialIcons
+                        name="check-circle"
+                        size={32}
+                        color="#147538"
+                      />
+                      <Text style={dmStyles.emptyRidersText}>
+                        Rider is on the way
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <MaterialIcons
+                        name="delivery-dining"
+                        size={32}
+                        color="#9CA3AF"
+                      />
+                      <Text style={dmStyles.emptyRidersText}>
+                        No riders nearby
+                      </Text>
+                      <Text style={dmStyles.emptyRidersSub}>
+                        Use Auto Assign to broadcast to all available riders
+                      </Text>
+                    </>
+                  )}
+                </View>
+              )}
+
+              {/* Mark Ready fallback */}
+              {!selectedOrder?.delivery?.partner &&
+                selectedOrder?.status !== "ready" && (
+                  <TouchableOpacity
+                    style={dmStyles.markReadyBtn}
+                    onPress={() => updateOrderStatus(selectedOrder.id, "ready")}
+                  >
+                    <MaterialIcons
+                      name="check-circle"
+                      size={18}
+                      color="#147538"
+                    />
+                    <Text style={dmStyles.markReadyText}>
+                      Mark Order as Ready
+                    </Text>
+                  </TouchableOpacity>
                 )}
-              </View>
-            </ScrollView>
-          </View>
+            </View>
+
+            <View style={{ height: 40 }} />
+          </ScrollView>
         </View>
       </Modal>
 
@@ -1618,8 +1733,15 @@ export default function VendorOrdersScreen() {
                   <TouchableOpacity
                     style={{
                       alignItems: "center",
-                      paddingVertical: 10,
+                      justifyContent: "center",
+                      paddingVertical: 12,
                       marginTop: 2,
+                      width: "100%",
+                      minHeight: 44,
+                      borderRadius: 12,
+                      backgroundColor: "#F8FAFC",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
                     }}
                     onPress={() => setModalVisible(false)}
                     activeOpacity={0.7}
@@ -1717,6 +1839,16 @@ export default function VendorOrdersScreen() {
                       updateOrderStatus(selectedOrder.id, "accepted");
                       setModalVisible(false);
                       setAcceptedModalVisible(true);
+                      // Expand this customer's group so the accepted order stays visible
+                      if (selectedOrder) {
+                        const customerName =
+                          selectedOrder.customer?.name ||
+                          `Customer #${selectedOrder.customer_id}`;
+                        setExpandedCustomers((prev) => ({
+                          ...prev,
+                          [customerName]: true,
+                        }));
+                      }
                     }}
                     activeOpacity={0.85}
                   >
@@ -1761,152 +1893,177 @@ export default function VendorOrdersScreen() {
       {/* ── ORDER ACCEPTED CONFIRMATION MODAL ── */}
       <Modal visible={acceptedModalVisible} animationType="fade" transparent>
         <View style={styles.modalContainer}>
-          <View style={[styles.modalContent, { paddingBottom: 32 }]}>
-            <View style={amStyles.handle} />
+          <View
+            style={[
+              styles.modalContent,
+              { paddingBottom: 32, maxHeight: "92%" },
+            ]}
+          >
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 8 }}
+            >
+              <View style={amStyles.handle} />
 
-            {/* Success icon */}
-            <View style={amStyles.iconCircle}>
-              <MaterialIcons name="check-circle" size={52} color="#147538" />
-            </View>
-
-            <Text style={amStyles.title}>Order Accepted!</Text>
-            <Text style={amStyles.subtitle}>
-              {selectedOrder?.order_number} has been confirmed.{"\n"}
-              The customer has been notified.
-            </Text>
-
-            {/* Slot info */}
-            {selectedOrder?.delivery_slot ? (
-              <View style={amStyles.slotCard}>
-                <View style={amStyles.slotIconWrap}>
-                  <MaterialIcons name="schedule" size={20} color="#059669" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={amStyles.slotCardLabel}>
-                    Delivery Slot Requested
-                  </Text>
-                  <Text style={amStyles.slotCardTime}>
-                    {new Date(
-                      selectedOrder.delivery_slot.slot_start,
-                    ).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                    {" – "}
-                    {new Date(
-                      selectedOrder.delivery_slot.slot_end,
-                    ).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </Text>
-                  <Text style={amStyles.slotCardDate}>
-                    {new Date(
-                      selectedOrder.delivery_slot.slot_start,
-                    ).toDateString() === new Date().toDateString()
-                      ? "Today"
-                      : "Tomorrow"}
-                  </Text>
-                </View>
-                {/* Live countdown */}
-                {!isSlotActive(selectedOrder?.delivery_slot) && (
-                  <View style={amStyles.slotLockBadge}>
-                    <MaterialIcons
-                      name="lock-clock"
-                      size={14}
-                      color="#D97706"
-                    />
-                    <Text style={amStyles.slotLockText}>Not yet</Text>
-                  </View>
-                )}
-                {isSlotActive(selectedOrder?.delivery_slot) && (
-                  <View style={amStyles.slotActiveBadge}>
-                    <View style={amStyles.slotActiveDot} />
-                    <Text style={amStyles.slotActiveText}>Active</Text>
-                  </View>
-                )}
+              {/* Success icon */}
+              <View style={amStyles.iconCircle}>
+                <MaterialIcons name="check-circle" size={52} color="#147538" />
               </View>
-            ) : (
-              <View
-                style={[
-                  amStyles.slotCard,
-                  { backgroundColor: "#F8FAFC", borderColor: "#E2E8F0" },
-                ]}
-              >
+
+              <Text style={amStyles.title}>Order Accepted!</Text>
+              <Text style={amStyles.subtitle}>
+                {selectedOrder?.order_number} has been confirmed.{"\n"}
+                The customer has been notified.
+              </Text>
+
+              {/* Slot info */}
+              {selectedOrder?.delivery_slot ? (
+                <View style={amStyles.slotCard}>
+                  <View style={amStyles.slotIconWrap}>
+                    <MaterialIcons name="schedule" size={20} color="#059669" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={amStyles.slotCardLabel}>
+                      Delivery Slot Requested
+                    </Text>
+                    <Text style={amStyles.slotCardTime}>
+                      {new Date(
+                        selectedOrder.delivery_slot.slot_start,
+                      ).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                      {" – "}
+                      {new Date(
+                        selectedOrder.delivery_slot.slot_end,
+                      ).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Text>
+                    <Text style={amStyles.slotCardDate}>
+                      {new Date(
+                        selectedOrder.delivery_slot.slot_start,
+                      ).toDateString() === new Date().toDateString()
+                        ? "Today"
+                        : "Tomorrow"}
+                    </Text>
+                  </View>
+                  {/* Live countdown */}
+                  {!isSlotActive(selectedOrder?.delivery_slot) && (
+                    <View style={amStyles.slotLockBadge}>
+                      <MaterialIcons
+                        name="lock-clock"
+                        size={14}
+                        color="#D97706"
+                      />
+                      <Text style={amStyles.slotLockText}>Not yet</Text>
+                    </View>
+                  )}
+                  {isSlotActive(selectedOrder?.delivery_slot) && (
+                    <View style={amStyles.slotActiveBadge}>
+                      <View style={amStyles.slotActiveDot} />
+                      <Text style={amStyles.slotActiveText}>Active</Text>
+                    </View>
+                  )}
+                </View>
+              ) : (
                 <View
                   style={[
-                    amStyles.slotIconWrap,
-                    { backgroundColor: "#F1F5F9" },
+                    amStyles.slotCard,
+                    { backgroundColor: "#F8FAFC", borderColor: "#E2E8F0" },
                   ]}
                 >
-                  <MaterialIcons
-                    name="delivery-dining"
-                    size={20}
-                    color="#64748B"
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[amStyles.slotCardLabel, { color: "#64748B" }]}>
-                    No specific slot requested
-                  </Text>
-                  <Text
+                  <View
                     style={[
-                      amStyles.slotCardTime,
-                      { color: "#1F2937", fontSize: 13 },
+                      amStyles.slotIconWrap,
+                      { backgroundColor: "#F1F5F9" },
                     ]}
                   >
-                    Deliver as soon as possible
+                    <MaterialIcons
+                      name="delivery-dining"
+                      size={20}
+                      color="#64748B"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[amStyles.slotCardLabel, { color: "#64748B" }]}
+                    >
+                      No specific slot requested
+                    </Text>
+                    <Text
+                      style={[
+                        amStyles.slotCardTime,
+                        { color: "#1F2937", fontSize: 13 },
+                      ]}
+                    >
+                      Deliver as soon as possible
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {/* What happens next */}
+              <View style={amStyles.nextStepsCard}>
+                <Text style={amStyles.nextStepsTitle}>What happens next?</Text>
+                <View style={amStyles.nextStep}>
+                  <View style={amStyles.nextStepDot} />
+                  <Text style={amStyles.nextStepText}>
+                    Prepare the order items
+                  </Text>
+                </View>
+                <View style={amStyles.nextStep}>
+                  <View style={amStyles.nextStepDot} />
+                  <Text style={amStyles.nextStepText}>
+                    {selectedOrder?.delivery_slot &&
+                    !isSlotActive(selectedOrder?.delivery_slot)
+                      ? "Assign a rider once the slot begins"
+                      : "Assign a delivery rider now"}
+                  </Text>
+                </View>
+                <View style={amStyles.nextStep}>
+                  <View style={amStyles.nextStepDot} />
+                  <Text style={amStyles.nextStepText}>
+                    Mark order ready when packed
                   </Text>
                 </View>
               </View>
-            )}
 
-            {/* What happens next */}
-            <View style={amStyles.nextStepsCard}>
-              <Text style={amStyles.nextStepsTitle}>What happens next?</Text>
-              <View style={amStyles.nextStep}>
-                <View style={amStyles.nextStepDot} />
-                <Text style={amStyles.nextStepText}>
-                  Prepare the order items
+              {/* Buttons */}
+              <TouchableOpacity
+                style={amStyles.primaryBtn}
+                onPress={() => {
+                  setAcceptedModalVisible(false);
+                  setIsDeliveryModalVisible(true);
+                }}
+                activeOpacity={0.85}
+              >
+                <MaterialIcons name="person-pin" size={18} color="#fff" />
+                <Text style={amStyles.primaryBtnText}>
+                  Assign Delivery Rider
                 </Text>
-              </View>
-              <View style={amStyles.nextStep}>
-                <View style={amStyles.nextStepDot} />
-                <Text style={amStyles.nextStepText}>
-                  {selectedOrder?.delivery_slot &&
-                  !isSlotActive(selectedOrder?.delivery_slot)
-                    ? "Assign a rider once the slot begins"
-                    : "Assign a delivery rider now"}
-                </Text>
-              </View>
-              <View style={amStyles.nextStep}>
-                <View style={amStyles.nextStepDot} />
-                <Text style={amStyles.nextStepText}>
-                  Mark order ready when packed
-                </Text>
-              </View>
-            </View>
+              </TouchableOpacity>
 
-            {/* Buttons */}
-            <TouchableOpacity
-              style={amStyles.primaryBtn}
-              onPress={() => {
-                setAcceptedModalVisible(false);
-                setIsDeliveryModalVisible(true);
-              }}
-              activeOpacity={0.85}
-            >
-              <MaterialIcons name="person-pin" size={18} color="#fff" />
-              <Text style={amStyles.primaryBtnText}>Assign Delivery Rider</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={amStyles.secondaryBtn}
-              onPress={() => setAcceptedModalVisible(false)}
-              activeOpacity={0.85}
-            >
-              <Text style={amStyles.secondaryBtnText}>I'll assign later</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={amStyles.secondaryBtn}
+                onPress={() => {
+                  setAcceptedModalVisible(false);
+                  if (selectedOrder) {
+                    const customerName =
+                      selectedOrder.customer?.name ||
+                      `Customer #${selectedOrder.customer_id}`;
+                    setExpandedCustomers((prev) => ({
+                      ...prev,
+                      [customerName]: true,
+                    }));
+                  }
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={amStyles.secondaryBtnText}>I'll assign later</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -2344,6 +2501,7 @@ export default function VendorOrdersScreen() {
                     alignItems: "center",
                     paddingHorizontal: 14,
                     gap: 10,
+                    minHeight: 52,
                   }}
                 >
                   <MaterialIcons
@@ -2383,6 +2541,7 @@ export default function VendorOrdersScreen() {
                           paddingHorizontal: 8,
                           paddingVertical: 4,
                           borderRadius: 8,
+                          flexShrink: 0,
                         }}
                       >
                         <Text
@@ -2408,11 +2567,54 @@ export default function VendorOrdersScreen() {
                     color: "#94A3B8",
                     letterSpacing: 0.8,
                     textTransform: "uppercase",
-                    marginBottom: 10,
+                    marginBottom: 6,
                   }}
                 >
                   Delivery Slot
                 </Text>
+                {selectedOrder?.delivery_slot?.slot_start && (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 6,
+                      backgroundColor: "#FEF3C7",
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      marginBottom: 10,
+                      borderWidth: 1,
+                      borderColor: "#FDE68A",
+                    }}
+                  >
+                    <MaterialIcons name="person" size={14} color="#D97706" />
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: "#92400E",
+                        fontWeight: "600",
+                        flex: 1,
+                      }}
+                    >
+                      Customer requested:{" "}
+                      <Text style={{ fontWeight: "800" }}>
+                        {new Date(
+                          selectedOrder.delivery_slot.slot_start,
+                        ).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                        {" – "}
+                        {new Date(
+                          selectedOrder.delivery_slot.slot_end,
+                        ).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </Text>
+                    </Text>
+                  </View>
+                )}
                 <View
                   style={{
                     backgroundColor: "#fff",
@@ -2738,10 +2940,16 @@ export default function VendorOrdersScreen() {
               numberOfLines={4}
             />
             <TouchableOpacity
-              style={[
-                styles.rejectBtn,
-                { backgroundColor: "#EF4444", marginTop: 10 },
-              ]}
+              style={{
+                backgroundColor: "#EF4444",
+                marginTop: 10,
+                borderRadius: 10,
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+              }}
               onPress={() => {
                 if (rejectReason.trim().length === 0) {
                   Alert.alert(
@@ -3910,7 +4118,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#F1F5F9",
-    gap: 10,
+    gap: 8,
+    flexWrap: "nowrap",
   },
   historyOrderNumber: {
     fontSize: 13,
@@ -4139,6 +4348,420 @@ const vendorToastStyles = StyleSheet.create({
   error: { backgroundColor: "#DC2626" },
   info: { backgroundColor: "#1D4ED8" },
   text: { color: "#fff", fontSize: 14, fontWeight: "700", lineHeight: 20 },
+});
+
+const dmStyles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#147538",
+    paddingTop: Platform.OS === "ios" ? 56 : Platform.OS === "web" ? 24 : 40,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.3,
+  },
+  headerSub: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.7)",
+    marginTop: 1,
+    fontWeight: "500",
+  },
+  headerBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  headerBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#4ADE80",
+  },
+  headerBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: 0.8,
+  },
+  orderStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  orderStripLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  orderStripAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#147538",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  orderStripAvatarText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 15,
+  },
+  orderStripName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1F2937",
+  },
+  orderStripItems: {
+    fontSize: 11,
+    color: "#9CA3AF",
+    marginTop: 1,
+    fontWeight: "500",
+    maxWidth: 220,
+  },
+  orderStripRight: {
+    alignItems: "flex-end",
+  },
+  orderStripTotal: {
+    fontSize: 17,
+    fontWeight: "900",
+    color: "#147538",
+  },
+  mapCard: {
+    margin: 16,
+    borderRadius: 18,
+    overflow: "hidden",
+    height: 200,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+    position: "relative",
+  },
+  mapOverlayBadge: {
+    position: "absolute",
+    bottom: 12,
+    left: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#fff",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  mapOverlayText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#147538",
+  },
+  section: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  liveChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#DCFCE7",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#16A34A",
+  },
+  liveText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#16A34A",
+    letterSpacing: 0.8,
+  },
+  slotBannerLocked: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#FEF3C7",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  slotBannerTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#92400E",
+  },
+  slotBannerSub: {
+    fontSize: 11,
+    color: "#B45309",
+    marginTop: 2,
+    fontWeight: "500",
+  },
+  slotBannerActive: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#DCFCE7",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+  },
+  slotBannerActiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#16A34A",
+  },
+  slotBannerActiveText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#166534",
+  },
+  autoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: "#147538",
+    shadowColor: "#147538",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  autoBtnDisabled: {
+    borderColor: "#E2E8F0",
+    shadowOpacity: 0,
+    elevation: 0,
+    opacity: 0.5,
+  },
+  autoBtnIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: "#DCFCE7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  autoBtnText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#147538",
+  },
+  broadcastBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#DCFCE7",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+  },
+  broadcastDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#16A34A",
+  },
+  broadcastText: {
+    fontSize: 12,
+    color: "#166534",
+    fontWeight: "600",
+    flex: 1,
+  },
+  riderCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+    position: "relative",
+    overflow: "hidden",
+  },
+  riderCardFirst: {
+    borderColor: "#BBF7D0",
+    backgroundColor: "#F0FDF4",
+  },
+  riderTopBadge: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "#147538",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderBottomLeftRadius: 10,
+  },
+  riderTopBadgeText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: 0.5,
+  },
+  riderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  riderAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+  },
+  riderName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#1F2937",
+  },
+  riderMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 3,
+  },
+  riderDist: {
+    fontSize: 12,
+    color: "#147538",
+    fontWeight: "700",
+    marginLeft: 2,
+  },
+  riderStatus: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    fontWeight: "500",
+  },
+  callBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#F0FDF4",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+  },
+  assignBtn: {
+    backgroundColor: "#147538",
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 10,
+    shadowColor: "#147538",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  assignBtnDisabled: {
+    backgroundColor: "#9CA3AF",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  assignBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  emptyRiders: {
+    alignItems: "center",
+    paddingVertical: 32,
+    gap: 8,
+  },
+  emptyRidersText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#374151",
+  },
+  emptyRidersSub: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    textAlign: "center",
+    paddingHorizontal: 24,
+    fontWeight: "500",
+  },
+  markReadyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#BBF7D0",
+    backgroundColor: "#F0FDF4",
+  },
+  markReadyText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#147538",
+  },
 });
 
 const omStyles = StyleSheet.create({
@@ -4375,15 +4998,18 @@ const omStyles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+    width: "100%",
   },
   acceptBtnText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "800",
+    flexShrink: 1,
   },
   secondaryActions: {
     flexDirection: "row",
     gap: 10,
+    width: "100%",
   },
   counterBtn: {
     flex: 1,
@@ -4393,14 +5019,18 @@ const omStyles = StyleSheet.create({
     gap: 6,
     backgroundColor: "#EFF6FF",
     paddingVertical: 14,
+    paddingHorizontal: 8,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#BFDBFE",
+    minWidth: 0,
   },
   counterBtnText: {
     color: "#2563EB",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
+    flexShrink: 1,
+    textAlign: "center",
   },
   declineBtn: {
     flex: 1,
@@ -4410,14 +5040,18 @@ const omStyles = StyleSheet.create({
     gap: 6,
     backgroundColor: "#FFF1F2",
     paddingVertical: 14,
+    paddingHorizontal: 8,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#FECDD3",
+    minWidth: 0,
   },
   declineBtnText: {
     color: "#E11D48",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
+    flexShrink: 1,
+    textAlign: "center",
   },
 });
 
