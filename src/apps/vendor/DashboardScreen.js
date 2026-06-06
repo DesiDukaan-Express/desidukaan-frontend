@@ -595,81 +595,81 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         style={{
           paddingTop: Platform.OS === "ios" ? 52 : 40,
           paddingHorizontal: rs(12, 16, 20),
-          backgroundColor: "#147538",
-          paddingBottom: 10,
+          backgroundColor: C.surface,
+          paddingBottom: rs(10, 12, 12),
           borderBottomWidth: 1,
-          borderBottomColor: "rgba(255,255,255,0.1)",
+          borderBottomColor: C.border,
         }}
       >
-        {/* Row 1: Logo + Icons */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 10,
-          }}
-        >
-          {/* Logo */}
-          <View style={styles.logoWrap}>
-            <View
-              style={[
-                styles.logoIconBox,
-                {
-                  width: rs(32, 36, 40),
-                  height: rs(32, 36, 40),
-                  borderRadius: rs(9, 10, 11),
-                },
-              ]}
-            >
-              <MaterialIcons
-                name="shopping-cart"
-                size={rs(17, 19, 21)}
-                color="#147538"
-              />
-            </View>
-            <Text
-              style={[
-                styles.logoText,
-                { fontSize: rs(17, 20, 23), color: "#FFFFFF" },
-              ]}
-            >
-              Kwik<Text style={{ color: C.primary }}>Pik</Text>
-            </Text>
-          </View>
-
-          {/* Right icons */}
+        {SCREEN_W >= 768 ? (
+          /* ── TABLET / WEB: single row ── */
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: rs(6, 8, 10),
+              gap: 12,
             }}
           >
-            {/* Notification bell */}
+            {/* Logo */}
+            <View style={styles.logoWrap}>
+              <View
+                style={[
+                  styles.logoIconBox,
+                  { width: 38, height: 38, borderRadius: 10 },
+                ]}
+              >
+                <MaterialIcons name="shopping-cart" size={20} color="#147538" />
+              </View>
+              <Text style={[styles.logoText, { fontSize: 21, color: C.text }]}>
+                Kwik<Text style={{ color: C.primary }}>Pik</Text>
+              </Text>
+            </View>
+
+            {/* Search */}
             <TouchableOpacity
-              style={[
-                styles.iconBtn,
-                {
-                  width: rs(36, 40, 44),
-                  height: rs(36, 40, 44),
-                  borderRadius: rs(10, 11, 12),
-                  backgroundColor: "rgba(255,255,255,0.15)",
-                  borderColor: "rgba(255,255,255,0.2)",
-                },
-              ]}
+              style={{
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                backgroundColor: C.bg,
+                borderColor: C.border,
+                borderWidth: 1,
+                borderRadius: 999,
+                paddingHorizontal: 14,
+                paddingVertical: 9,
+              }}
+              activeOpacity={0.7}
+              onPress={() => setSearchVisible(true)}
+            >
+              <MaterialIcons name="search" size={16} color={C.textLight} />
+              <Text
+                style={{ fontSize: 13, color: C.textLight, flex: 1 }}
+                numberOfLines={1}
+              >
+                Search inventory, partners, earnings…
+              </Text>
+            </TouchableOpacity>
+
+            {/* Bell */}
+            <TouchableOpacity
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 11,
+                backgroundColor: C.bg,
+                borderWidth: 1,
+                borderColor: C.border,
+                alignItems: "center",
+                justifyContent: "center",
+                position: "relative",
+              }}
               onPress={() => {
                 setNotifVisible(true);
-                setNotifications((prev) =>
-                  prev.map((n) => ({ ...n, read: true })),
-                );
+                setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
               }}
             >
-              <MaterialIcons
-                name="notifications-none"
-                size={rs(20, 22, 24)}
-                color="#FFFFFF"
-              />
+              <MaterialIcons name="notifications-none" size={22} color={C.text} />
               {unreadCount > 0 && (
                 <View style={styles.notifBadge}>
                   <Text style={styles.notifBadgeText}>
@@ -679,69 +679,236 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               )}
             </TouchableOpacity>
 
-            {/* Avatar → Profile */}
+            {/* Avatar pill */}
             <TouchableOpacity
-              style={[
-                styles.avatarBtn,
-                {
-                  width: rs(36, 40, 44),
-                  height: rs(36, 40, 44),
-                  borderRadius: rs(18, 20, 22),
-                  backgroundColor: C.primary,
-                },
-              ]}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                backgroundColor: C.bg,
+                borderWidth: 1,
+                borderColor: C.border,
+                borderRadius: 999,
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+              }}
               onPress={() => navigation.navigate("Profile")}
               activeOpacity={0.8}
             >
-              <Text
-                style={[
-                  styles.avatarInitials,
-                  { fontSize: rs(11, 12, 13), color: "#000000" },
-                ]}
+              <View
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  backgroundColor: C.primary,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
               >
-                {vendorName
-                  .split(" ")
-                  .map((w) => w[0])
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase()}
+                <Text style={{ fontSize: 10, fontWeight: "800", color: "#000" }}>
+                  {vendorName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
+                </Text>
+              </View>
+              <Text
+                style={{ fontSize: 13, fontWeight: "700", color: C.text, maxWidth: 70 }}
+                numberOfLines={1}
+              >
+                {vendorName.split(" ")[0]}
               </Text>
+              <MaterialIcons name="keyboard-arrow-down" size={16} color={C.textSub} />
             </TouchableOpacity>
           </View>
-        </View>
+        ) : (
+          /* ── MOBILE: two rows ── */
+          <>
+            {/* Row 1: Logo + Bell + Avatar */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 10,
+              }}
+            >
+              {/* Logo block */}
+              <View style={styles.logoWrap}>
+                <View
+                  style={[
+                    styles.logoIconBox,
+                    {
+                      width: rs(32, 36, 38),
+                      height: rs(32, 36, 38),
+                      borderRadius: rs(9, 10, 10),
+                    },
+                  ]}
+                >
+                  <MaterialIcons
+                    name="shopping-cart"
+                    size={rs(17, 19, 20)}
+                    color="#147538"
+                  />
+                </View>
+                <View>
+                  {/* <Text
+                    style={{
+                      fontSize: rs(8, 9, 10),
+                      color: C.textSub,
+                      fontWeight: "500",
+                    }}
+                  >
+                    Welcome back
+                  </Text> */}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Text
+                      style={[
+                        styles.logoText,
+                        { fontSize: rs(15, 17, 19), color: C.text },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      Kwik<Text style={{ color: C.primary }}>Pik</Text>
+                    </Text>
+                    {/* <MaterialIcons
+                      name="keyboard-arrow-down"
+                      size={rs(14, 15, 16)}
+                      color={C.textSub}
+                    /> */}
+                  </View>
+                </View>
+              </View>
 
-        {/* Row 2: Full-width Search Bar */}
-        <TouchableOpacity
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            backgroundColor: "rgba(255,255,255,0.15)",
-            borderColor: "rgba(255,255,255,0.25)",
-            borderWidth: 1,
-            borderRadius: 999,
-            paddingHorizontal: 14,
-            paddingVertical: 9,
-            width: "100%",
-          }}
-          activeOpacity={0.7}
-          onPress={() => setSearchVisible(true)}
-        >
-          <MaterialIcons
-            name="search"
-            size={rs(15, 16, 17)}
-            color="rgba(255,255,255,0.7)"
-          />
-          <Text
-            style={{
-              fontSize: rs(12, 13, 14),
-              color: "rgba(255,255,255,0.6)",
-              flex: 1,
-            }}
-          >
-            Search inventory, partners, earnings…
-          </Text>
-        </TouchableOpacity>
+              {/* Right: Bell + Avatar */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: rs(6, 8, 10) }}>
+                {/* Bell */}
+                <TouchableOpacity
+                  style={{
+                    width: rs(36, 40, 42),
+                    height: rs(36, 40, 42),
+                    borderRadius: rs(10, 11, 12),
+                    backgroundColor: C.bg,
+                    borderWidth: 1,
+                    borderColor: C.border,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    position: "relative",
+                  }}
+                  onPress={() => {
+                    setNotifVisible(true);
+                    setNotifications((prev) =>
+                      prev.map((n) => ({ ...n, read: true }))
+                    );
+                  }}
+                >
+                  <MaterialIcons
+                    name="notifications-none"
+                    size={rs(20, 22, 22)}
+                    color={C.text}
+                  />
+                  {unreadCount > 0 && (
+                    <View style={styles.notifBadge}>
+                      <Text style={styles.notifBadgeText}>
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {/* Avatar pill */}
+                <TouchableOpacity
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: rs(5, 6, 6),
+                    backgroundColor: C.bg,
+                    borderWidth: 1,
+                    borderColor: C.border,
+                    borderRadius: 999,
+                    paddingHorizontal: rs(8, 10, 10),
+                    paddingVertical: rs(5, 6, 6),
+                  }}
+                  onPress={() => navigation.navigate("Profile")}
+                  activeOpacity={0.8}
+                >
+                  <View
+                    style={{
+                      width: rs(22, 24, 26),
+                      height: rs(22, 24, 26),
+                      borderRadius: rs(11, 12, 13),
+                      backgroundColor: C.primary,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: rs(9, 10, 11),
+                        fontWeight: "800",
+                        color: "#000",
+                      }}
+                    >
+                      {vendorName
+                        .split(" ")
+                        .map((w) => w[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: rs(11, 12, 13),
+                      fontWeight: "700",
+                      color: C.text,
+                      maxWidth: rs(48, 60, 70),
+                    }}
+                    numberOfLines={1}
+                  >
+                    {vendorName.split(" ")[0]}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Row 2: Search bar full width */}
+            <TouchableOpacity
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                backgroundColor: C.bg,
+                borderColor: C.border,
+                borderWidth: 1,
+                borderRadius: 999,
+                paddingHorizontal: rs(12, 14, 14),
+                paddingVertical: rs(9, 10, 10),
+                width: "100%",
+              }}
+              activeOpacity={0.7}
+              onPress={() => setSearchVisible(true)}
+            >
+              <MaterialIcons
+                name="search"
+                size={rs(15, 16, 16)}
+                color={C.textLight}
+              />
+              <Text
+                style={{
+                  fontSize: rs(12, 13, 13),
+                  color: C.textLight,
+                  flex: 1,
+                }}
+                numberOfLines={1}
+              >
+                Search inventory, partners, earnings…
+              </Text>
+              <MaterialIcons
+                name="mic"
+                size={rs(15, 16, 16)}
+                color={C.primary}
+              />
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {/* ── STATUS BANNERS ──────────────────────────────────── */}
