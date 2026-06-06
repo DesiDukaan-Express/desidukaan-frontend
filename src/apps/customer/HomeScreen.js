@@ -2092,10 +2092,10 @@ export default function HomeScreen() {
     },
   ];
   const quickActions = [
-    { icon: "search", label: "Find Items", onPress: () => navigation.navigate("Search") },
+    { icon: "search", label: "Find Stores", onPress: () => navigation.navigate("Search") },
     { icon: "shopping-bag", label: "Open Stores", onPress: () => navigation.navigate("Search") },
-    { icon: "receipt-long", label: "Orders", onPress: () => navigation.navigate("Orders") },
-    { icon: "location-on", label: "Address", onPress: openAddressPicker },
+    // { icon: "receipt-long", label: "Orders", onPress: () => navigation.navigate("Orders") },
+    // { icon: "location-on", label: "Address", onPress: openAddressPicker },
   ];
 
 
@@ -2354,7 +2354,7 @@ export default function HomeScreen() {
               </View>
               <Text style={s.heroTitle}>{heroTitle}</Text>
               <Text style={s.heroSub}>{heroSub}</Text>
-              <View style={s.heroActions}>
+              {/* <View style={s.heroActions}>
                 <TouchableOpacity
                   style={s.heroCTA}
                   onPress={() => navigation.navigate("Search")}
@@ -2371,7 +2371,7 @@ export default function HomeScreen() {
                   <MaterialIcons name="location-on" size={15} color={C.white} />
                   <Text style={s.heroGhostText}>Change Address</Text>
                 </TouchableOpacity>
-              </View>
+              </View> */}
               <View style={s.heroStats}>
                 {homeStats.map((stat) => (
                   <View key={stat.label} style={s.heroStat}>
