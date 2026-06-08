@@ -123,31 +123,82 @@ function AddressPicker({
   onClose,
   onSelect,
   onSaveNew,
+  onUpdate,
   onUseLocation,
   onDelete,
 }) {
-  const [showForm, setShowForm] = React.useState(false);
+  // mode: 'list' | 'add' | 'edit'
+  const [mode, setMode] = React.useState("list");
+  const [editingAddr, setEditingAddr] = React.useState(null);
   const [inputText, setInputText] = React.useState("");
+  const [inputLabel, setInputLabel] = React.useState("");
   const [inputErr, setInputErr] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
     if (!visible) {
-      setShowForm(false);
+      setMode("list");
+      setEditingAddr(null);
       setInputText("");
+      setInputLabel("");
       setInputErr("");
+      setSaving(false);
     }
   }, [visible]);
 
-  const handleSave = () => {
+  const openAdd = () => {
+    setEditingAddr(null);
+    setInputText("");
+    setInputLabel("");
+    setInputErr("");
+    setMode("add");
+  };
+
+  const openEdit = (addr) => {
+    setEditingAddr(addr);
+    setInputText(addr.address_line || addr.address || "");
+    setInputLabel(addr.label || "Home");
+    setInputErr("");
+    setMode("edit");
+  };
+
+  const handleSaveAdd = () => {
     if (inputText.trim().length < 5) {
       setInputErr("Please enter a valid address (at least 5 characters)");
       return;
     }
     onSaveNew(inputText.trim());
+    setMode("list");
     setInputText("");
     setInputErr("");
-    setShowForm(false);
   };
+
+  const handleSaveEdit = async () => {
+    if (inputText.trim().length < 5) {
+      setInputErr("Please enter a valid address (at least 5 characters)");
+      return;
+    }
+    setSaving(true);
+    await onUpdate?.(editingAddr.id, {
+      address_line: inputText.trim(),
+      label: inputLabel.trim() || editingAddr.label || "Home",
+    });
+    setSaving(false);
+    setMode("list");
+    setEditingAddr(null);
+    setInputText("");
+    setInputLabel("");
+  };
+
+  // helper: pick icon name by label
+  const getAddrIcon = (label) => {
+    const l = (label || "").toLowerCase();
+    if (l.includes("home")) return "home";
+    if (l.includes("office") || l.includes("work")) return "business";
+    return "location-on";
+  };
+
+  const isFormMode = mode === "add" || mode === "edit";
 
   return (
     <Modal
@@ -157,32 +208,64 @@ function AddressPicker({
       onRequestClose={onClose}
     >
       <Pressable style={ap.backdrop} onPress={onClose}>
-        <Pressable style={ap.sheet} onPress={() => { }}>
+        <Pressable style={ap.sheet} onPress={() => {}}>
+          {/* Handle */}
           <View style={ap.handle} />
+
+          {/* Header */}
           <View style={ap.titleRow}>
             <Text style={ap.title}>
-              {showForm ? "Add new address" : "Select delivery address"}
+              {mode === "add"
+                ? "Add new address"
+                : mode === "edit"
+                ? "Edit address"
+                : "Select delivery address"}
             </Text>
             <TouchableOpacity
-              onPress={() => (showForm ? setShowForm(false) : onClose())}
+              onPress={() => (isFormMode ? setMode("list") : onClose())}
               style={ap.closeBtn}
             >
               <MaterialIcons
-                name={showForm ? "arrow-back" : "close"}
-                size={16}
-                color={C.gray500}
+                name={isFormMode ? "arrow-back" : "close"}
+                size={18}
+                color={C.gray600}
               />
             </TouchableOpacity>
           </View>
 
-          {showForm ? (
+          {isFormMode ? (
+            /* ── Add / Edit Form ── */
             <View style={ap.formWrap}>
+              {/* Label field (only shown in edit) */}
+              {mode === "edit" && (
+                <>
+                  <Text style={ap.formLabel}>Label (e.g. Home, Office)</Text>
+                  <View style={[ap.inputBoxSingle, inputErr ? ap.inputBoxError : null]}>
+                    <MaterialIcons
+                      name="label"
+                      size={15}
+                      color={C.green}
+                      style={{ marginLeft: 14 }}
+                    />
+                    <TextInput
+                      style={ap.input}
+                      placeholder="Home"
+                      placeholderTextColor={C.gray400}
+                      value={inputLabel}
+                      onChangeText={(t) => setInputLabel(t)}
+                      underlineColorAndroid="transparent"
+                    />
+                  </View>
+                  <View style={{ height: 12 }} />
+                </>
+              )}
+
               <Text style={ap.formLabel}>Full address</Text>
               <View style={[ap.inputBox, inputErr ? ap.inputBoxError : null]}>
                 <MaterialIcons
                   name="location-on"
                   size={15}
-                  color={inputErr ? "#DC2626" : C.green}
+                  color={inputErr ? C.red : C.green}
                   style={{ marginLeft: 14 }}
                 />
                 <TextInput
@@ -190,10 +273,7 @@ function AddressPicker({
                   placeholder="House no., street, area, city…"
                   placeholderTextColor={C.gray400}
                   value={inputText}
-                  onChangeText={(t) => {
-                    setInputText(t);
-                    setInputErr("");
-                  }}
+                  onChangeText={(t) => { setInputText(t); setInputErr(""); }}
                   multiline
                   numberOfLines={3}
                   autoFocus
@@ -204,107 +284,110 @@ function AddressPicker({
               <TouchableOpacity
                 style={[
                   ap.saveBtn,
-                  inputText.trim().length < 5 && ap.saveBtnDisabled,
+                  (inputText.trim().length < 5 || saving) && ap.saveBtnDisabled,
                 ]}
-                onPress={handleSave}
+                onPress={mode === "edit" ? handleSaveEdit : handleSaveAdd}
                 activeOpacity={0.85}
-                disabled={inputText.trim().length < 5}
+                disabled={inputText.trim().length < 5 || saving}
               >
-                <MaterialIcons name="check" size={16} color={C.white} />
-                <Text style={ap.saveBtnText}>Save address</Text>
+                {saving ? (
+                  <ActivityIndicator size="small" color={C.white} />
+                ) : (
+                  <>
+                    <MaterialIcons name="check" size={16} color={C.white} />
+                    <Text style={ap.saveBtnText}>
+                      {mode === "edit" ? "Update address" : "Save address"}
+                    </Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           ) : (
+            /* ── Address List ── */
             <>
-              <TouchableOpacity
-                style={ap.locationRow}
-                onPress={onUseLocation}
-                activeOpacity={0.8}
-              >
+              {/* Use Current Location row */}
+              <TouchableOpacity style={ap.locationRow} onPress={onUseLocation} activeOpacity={0.8}>
                 <View style={ap.locationIconWrap}>
-                  <MaterialIcons name="my-location" size={18} color={C.orange} />
+                  <MaterialIcons name="my-location" size={20} color={C.green} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={ap.locationRowTitle}>Use current location</Text>
-                  <Text style={ap.locationRowSub}>
-                    Detect my location automatically
-                  </Text>
+                  <Text style={ap.locationRowSub}>Detect my location automatically</Text>
                 </View>
-                <MaterialIcons name="chevron-right" size={16} color={C.gray400} />
+                <MaterialIcons name="chevron-right" size={22} color={C.gray400} />
               </TouchableOpacity>
+
               <View style={ap.divider} />
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                style={{ maxHeight: 300 }}
-              >
+
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 340 }}>
                 {addresses.length === 0 ? (
                   <View style={ap.emptyWrap}>
-                    <MaterialIcons name="location-on" size={28} color={C.gray300} />
+                    <MaterialIcons name="location-on" size={32} color={C.gray300} />
                     <Text style={ap.emptyText}>No saved addresses yet</Text>
                   </View>
                 ) : (
                   addresses.map((addr) => {
                     const isActive = addr.id === selectedId;
                     const displayText = addr.address_line || addr.address || "";
+                    const iconName = getAddrIcon(addr.label);
                     return (
-                      <View key={addr.id} style={ap.addrRowWrapper}>
-                        <TouchableOpacity
-                          style={[ap.addrRow, isActive && { borderColor: C.green, backgroundColor: C.greenLight }]}
-                          onPress={() => onSelect(addr)}
-                          activeOpacity={0.8}
-                        >
-                          <View
-                            style={[
-                              ap.addrIconWrap,
-                              isActive && { backgroundColor: C.green },
-                            ]}
-                          >
-                            <MaterialIcons
-                              name="location-on"
-                              size={15}
-                              color={isActive ? C.white : C.gray500}
-                            />
-                          </View>
-                          <View style={{ flex: 1, paddingRight: 8 }}>
-                            <Text
-                              style={[
-                                ap.addrLabel,
-                                isActive && { color: C.greenDark },
-                              ]}
-                            >
+                      <TouchableOpacity
+                        key={addr.id}
+                        style={[ap.addrCard, isActive && ap.addrCardActive]}
+                        onPress={() => onSelect(addr)}
+                        activeOpacity={0.85}
+                      >
+                        {/* Icon badge */}
+                        <View style={[ap.addrIconBadge, isActive && ap.addrIconBadgeActive]}>
+                          <MaterialIcons name={iconName} size={20} color={isActive ? C.white : C.gray500} />
+                        </View>
+
+                        {/* Content */}
+                        <View style={{ flex: 1 }}>
+                          <View style={ap.addrCardTopRow}>
+                            <Text style={[ap.addrLabel, isActive && ap.addrLabelActive]}>
                               {addr.label || "Home"}
                             </Text>
-                            <Text style={ap.addrText} numberOfLines={2}>
-                              {displayText}
-                            </Text>
+                            {/* Radio / Check indicator */}
+                            {isActive ? (
+                              <View style={ap.checkCircle}>
+                                <MaterialIcons name="check" size={13} color={C.white} />
+                              </View>
+                            ) : (
+                              <View style={ap.radioCircle} />
+                            )}
                           </View>
-                          {isActive && (
-                            <View style={ap.activeTick}>
-                              <MaterialIcons name="check" size={12} color={C.white} />
-                            </View>
-                          )}
-                        </TouchableOpacity>
-
-                        {!isActive && (
-                          <TouchableOpacity
-                            style={ap.deleteBtn}
-                            onPress={() => onDelete && onDelete(addr.id)}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                          >
-                            <MaterialIcons name="delete" size={16} color={C.red} />
-                          </TouchableOpacity>
-                        )}
-                      </View>
+                          <Text style={ap.addrText} numberOfLines={2}>{displayText}</Text>
+                          {/* Action buttons */}
+                          <View style={ap.addrActions}>
+                            <TouchableOpacity
+                              style={ap.editBtn}
+                              onPress={() => openEdit(addr)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <MaterialIcons name="edit" size={14} color={C.gray700} />
+                              <Text style={ap.editBtnText}>Edit</Text>
+                            </TouchableOpacity>
+                            {!isActive && (
+                              <TouchableOpacity
+                                style={ap.deleteBtn}
+                                onPress={() => onDelete && onDelete(addr.id)}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              >
+                                <MaterialIcons name="delete" size={18} color={C.red} />
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        </View>
+                      </TouchableOpacity>
                     );
                   })
                 )}
               </ScrollView>
-              <TouchableOpacity
-                style={ap.addNewBtn}
-                onPress={() => setShowForm(true)}
-                activeOpacity={0.85}
-              >
-                <MaterialIcons name="add" size={16} color={C.green} />
+
+              {/* Add new address */}
+              <TouchableOpacity style={ap.addNewBtn} onPress={openAdd} activeOpacity={0.85}>
+                <MaterialIcons name="add" size={20} color={C.green} />
                 <Text style={ap.addNewText}>Add new address</Text>
               </TouchableOpacity>
             </>
@@ -315,144 +398,168 @@ function AddressPicker({
   );
 }
 
+
 const ap = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(0,0,0,0.50)",
     justifyContent: "flex-end",
   },
   sheet: {
     backgroundColor: C.white,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 36,
+    paddingTop: 10,
+    paddingBottom: 40,
   },
   handle: {
-    width: 40,
-    height: 4,
+    width: 48,
+    height: 5,
     backgroundColor: C.gray200,
-    borderRadius: 2,
+    borderRadius: 3,
     alignSelf: "center",
-    marginBottom: 20,
-  },
-  addrRowWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-    gap: 8,
-  },
-  deleteBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: C.redLight,
-    alignItems: "center",
-    justifyContent: "center",
+    marginBottom: 16,
   },
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 18,
+    marginBottom: 20,
   },
-  title: { fontSize: 18, fontWeight: "900", color: C.gray900 },
+  title: { fontSize: 20, fontWeight: "800", color: C.gray900 },
   closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: C.gray100,
     alignItems: "center",
     justifyContent: "center",
   },
+  // Location row
   locationRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    paddingVertical: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    backgroundColor: C.white,
   },
   locationIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: C.greenLight,
     alignItems: "center",
     justifyContent: "center",
   },
   locationRowTitle: { fontSize: 15, fontWeight: "700", color: C.gray900 },
-  locationRowSub: { fontSize: 12, color: C.gray400, marginTop: 2 },
-  divider: { height: 1, backgroundColor: C.gray100, marginVertical: 12 },
-  emptyWrap: { alignItems: "center", paddingVertical: 32, gap: 10 },
+  locationRowSub: { fontSize: 12, color: C.gray500, marginTop: 2 },
+  divider: { height: 1, backgroundColor: C.gray100, marginVertical: 14 },
+  emptyWrap: { alignItems: "center", paddingVertical: 36, gap: 10 },
   emptyText: { fontSize: 14, color: C.gray400 },
-  addrRow: {
+  // New card-style address row
+  addrCard: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 14,
-    paddingVertical: 13,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    marginBottom: 6,
+    padding: 14,
+    borderRadius: 20,
+    marginBottom: 12,
     borderWidth: 1.5,
     borderColor: C.gray200,
     backgroundColor: C.white,
   },
-  addrRowActive: { borderColor: C.green, backgroundColor: C.greenLight },
-  addrIconWrap: {
-    width: 38,
-    height: 38,
+  addrCardActive: {
+    borderColor: C.green,
+    borderWidth: 2,
+    backgroundColor: C.greenLight,
+  },
+  addrIconBadge: {
+    width: 42,
+    height: 42,
     borderRadius: 12,
     backgroundColor: C.gray100,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+    marginTop: 2,
   },
-  addrIconActive: { backgroundColor: C.green },
-  addrLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: C.gray900,
-    textTransform: "capitalize",
+  addrIconBadgeActive: { backgroundColor: C.green },
+  addrCardTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
   },
-  addrLabelActive: { color: C.greenDark },
-  addrText: { fontSize: 12, color: C.gray500, lineHeight: 17 },
-  activeTick: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
+  addrLabel: { fontSize: 15, fontWeight: "700", color: C.gray900, textTransform: "capitalize" },
+  addrLabelActive: { color: C.green },
+  radioCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: C.gray300,
+  },
+  checkCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: C.green,
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
   },
+  addrText: { fontSize: 13, color: C.gray500, lineHeight: 18 },
+  addrActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 10,
+  },
+  editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: C.gray100,
+  },
+  editBtnText: { fontSize: 12, fontWeight: "600", color: C.gray700 },
+  deleteBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: C.redLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // Add new button (dashed)
   addNewBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    marginTop: 14,
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: C.greenBorder,
+    marginTop: 6,
+    paddingVertical: 16,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: C.green,
     backgroundColor: C.greenLight,
   },
   addNewText: { fontSize: 15, fontWeight: "700", color: C.green },
+  // Form
   formWrap: { paddingTop: 4 },
-  formLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: C.gray700,
-    marginBottom: 8,
-    letterSpacing: 0.2,
-  },
+  formLabel: { fontSize: 12, fontWeight: "700", color: C.gray700, marginBottom: 8, letterSpacing: 0.2 },
   inputBox: {
     flexDirection: "row",
     alignItems: "flex-start",
-    backgroundColor: C.greenLight,
+    backgroundColor: C.gray100,
     borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: C.greenBorder,
     minHeight: 90,
     paddingVertical: 12,
     paddingRight: 14,
@@ -467,8 +574,9 @@ const ap = StyleSheet.create({
     fontWeight: "500",
     textAlignVertical: "top",
     lineHeight: 22,
+    ...Platform.select({ web: { outlineStyle: "none" } }),
   },
-  inputErr: { fontSize: 12, color: "#DC2626", marginTop: 6, fontWeight: "500" },
+  inputErr: { fontSize: 12, color: C.red, marginTop: 6, fontWeight: "500" },
   saveBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -481,6 +589,15 @@ const ap = StyleSheet.create({
   },
   saveBtnDisabled: { backgroundColor: C.greenMid },
   saveBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
+  // Single-line input box for label field in edit mode
+  inputBoxSingle: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingRight: 14,
+  },
 });
 
 // ─── Store Picker Modal ────────────────────────────────────────────────────────
@@ -2747,6 +2864,9 @@ export default function HomeScreen() {
         onClose={() => setAddrPickerVisible(false)}
         onSelect={handleSelectAddress}
         onDelete={(id) => addressStore.removeAddress(id, token)}
+        onUpdate={async (id, patch) => {
+          await addressStore.updateAddress(id, patch, token);
+        }}
         onSaveNew={async (text) => {
           let lat = null,
             lng = null;
