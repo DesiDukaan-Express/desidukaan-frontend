@@ -12,7 +12,7 @@ import useAuthStore    from "../../store/authStore";
 import useCartStore    from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
-import { categoriesAPI } from "../../services/api";
+import { categoriesAPI, searchAPI } from "../../services/api";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const NEARBY_RADIUS = 10;   // km — stores within this are shown normally
@@ -426,6 +426,11 @@ export default function SearchScreen() {
   const [history,     setHistory]     = useState([]);
   const [loading,     setLoading]     = useState(false);
 
+  // Autocomplete & correction
+  const [apiSuggestions, setApiSuggestions] = useState([]); // from server
+  const [didYouMean,     setDidYouMean]     = useState(null); // typo correction
+  const autocompleteTimer = useRef(null);
+
   // Search results
   const [vendors,     setVendors]     = useState([]);   // all nearby vendors
   const [products,    setProducts]    = useState([]);   // matched products (items tab)
@@ -470,6 +475,29 @@ export default function SearchScreen() {
   const inputRef = useRef(null);
   const px = isDesktop ? 40 : isTablet ? 24 : 16;
 
+  // ── Debounced autocomplete from API ──────────────────────────────────────
+  useEffect(() => {
+    if (committed) return; // don't fire when results are shown
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setApiSuggestions([]);
+      return;
+    }
+    // Clear previous timer
+    if (autocompleteTimer.current) clearTimeout(autocompleteTimer.current);
+    autocompleteTimer.current = setTimeout(async () => {
+      try {
+        const data = await searchAPI.autocomplete(trimmed);
+        setApiSuggestions(data?.suggestions || []);
+      } catch {
+        setApiSuggestions([]);
+      }
+    }, 250);
+    return () => {
+      if (autocompleteTimer.current) clearTimeout(autocompleteTimer.current);
+    };
+  }, [query, committed]);
+
   // ── User location ─────────────────────────────────────────────────────────
   const selectedAddr = addressStore?.addresses?.find(a => a.id === addressStore?.selectedId)
     || addressStore?.addresses?.[0];
@@ -511,6 +539,8 @@ export default function SearchScreen() {
     setCommitted(true);
     setLoading(true);
     setQuery(trimmed);
+    setDidYouMean(null);      // reset correction on new search
+    setApiSuggestions([]);    // clear dropdown
     Keyboard.dismiss();
 
     // Save to history
@@ -518,6 +548,9 @@ export default function SearchScreen() {
       const deduped = prev.filter(h => h.toLowerCase() !== trimmed.toLowerCase());
       return [trimmed, ...deduped].slice(0, MAX_HISTORY);
     });
+
+    // Track this search (fire-and-forget)
+    searchAPI.track(trimmed);
 
     try {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -681,6 +714,16 @@ export default function SearchScreen() {
 
       setMatchedVendors(matched);
 
+      // Step 5: "Did you mean?" — only fire when 0 results found
+      if (prodList.length === 0 && matched.length === 0) {
+        try {
+          const corrData = await searchAPI.correct(trimmed);
+          setDidYouMean(corrData?.suggestion || null);
+        } catch {
+          setDidYouMean(null);
+        }
+      }
+
     } catch (e) {
       console.error("Search error:", e.message);
     } finally {
@@ -749,16 +792,25 @@ export default function SearchScreen() {
     products.map(p => ({ ...p, _storeCount: products.filter(x => x.name === p.name).length })),
     [products]);
 
-  // ── Idle suggestions from history ─────────────────────────────────────────
+  // ── Suggestions: API-first, fall back to local history ──────────────────
   const trimmed = query.trim();
   const isIdle    = !committed && trimmed.length === 0;
   const isTyping  = !committed && trimmed.length > 0;
 
+  // Merge API suggestions with local history (API takes priority)
   const suggestions = isTyping
-    ? [...new Set(
-        [...history.filter(h => h.toLowerCase().includes(trimmed.toLowerCase())),
-         ...dbCategories.map(c => c.label).filter(l => l.toLowerCase().includes(trimmed.toLowerCase()))]
-      )].slice(0, 6)
+    ? (() => {
+        // API suggestions come with { text, type } shape
+        const apiTexts = apiSuggestions.map(s => ({ text: s.text, type: s.type }));
+        const apiTextSet = new Set(apiTexts.map(s => s.text.toLowerCase()));
+
+        // Local history fallback — only items not already in API results
+        const localFallback = history
+          .filter(h => h.toLowerCase().includes(trimmed.toLowerCase()) && !apiTextSet.has(h.toLowerCase()))
+          .map(h => ({ text: h, type: 'local' }));
+
+        return [...apiTexts, ...localFallback].slice(0, 7);
+      })()
     : [];
 
   // ── Floating cart ─────────────────────────────────────────────────────────
@@ -852,16 +904,23 @@ export default function SearchScreen() {
             {/* ── SUGGESTIONS while typing ─────────────────────────── */}
             {isTyping && (
               <View style={s.suggBox}>
-                {suggestions.map((s_, i) => (
+                {suggestions.map((sugg, i) => (
                   <TouchableOpacity
                     key={i}
                     style={sg.row}
-                    onPress={() => { setQuery(s_); doSearch(s_); }}
+                    onPress={() => { setQuery(sugg.text); doSearch(sugg.text); }}
                     activeOpacity={0.7}
                   >
-                    <Feather name="search" size={14} color={C.gray400} />
-                    <Text style={sg.text}>{s_}</Text>
-                    <Feather name="arrow-up-left" size={13} color={C.gray400} />
+                    {/* Icon differs by type */}
+                    <Feather
+                      name={sugg.type === 'history' ? 'trending-up' : sugg.type === 'local' ? 'clock' : 'search'}
+                      size={14}
+                      color={sugg.type === 'history' ? C.orange : C.gray400}
+                    />
+                    <Text style={[sg.text, sugg.type === 'history' && { color: C.gray700, fontWeight: '600' }]}>
+                      {sugg.text}
+                    </Text>
+                    <Feather name="arrow-up-left" size={13} color={C.gray300} />
                   </TouchableOpacity>
                 ))}
                 <TouchableOpacity style={[sg.row, { borderBottomWidth: 0 }]} onPress={() => doSearch()} activeOpacity={0.7}>
@@ -935,6 +994,27 @@ export default function SearchScreen() {
             )}
 
             {/* ── RESULTS ──────────────────────────────────────────── */}
+            {/* ── DID YOU MEAN banner ──────────────────────────── */}
+            {committed && !loading && didYouMean && (
+              <TouchableOpacity
+                style={dym.banner}
+                onPress={() => { setDidYouMean(null); doSearch(didYouMean); }}
+                activeOpacity={0.85}
+              >
+                <View style={dym.iconWrap}>
+                  <Feather name="search" size={16} color={C.orange} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={dym.label}>Did you mean?</Text>
+                  <Text style={dym.suggestion}>{didYouMean}</Text>
+                </View>
+                <View style={dym.ctaChip}>
+                  <Text style={dym.ctaText}>Search</Text>
+                  <Feather name="arrow-right" size={12} color={C.white} />
+                </View>
+              </TouchableOpacity>
+            )}
+
             {committed && !loading && (
               <View style={{ paddingHorizontal: px, paddingTop: 12 }}>
 
@@ -1146,3 +1226,23 @@ const sg = StyleSheet.create({
   row:  { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: C.gray100 },
   text: { flex: 1, fontSize: 14, color: C.gray700 },
 });
+
+// ─── Did You Mean styles ──────────────────────────────────────────────────────
+const dym = StyleSheet.create({
+  banner: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    marginHorizontal: 16, marginBottom: 12, marginTop: 4,
+    backgroundColor: C.amberLight,
+    borderWidth: 1, borderColor: "#FDE68A",
+    borderRadius: 16, padding: 14,
+  },
+  iconWrap: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: "#FEF3C7",
+    alignItems: "center", justifyContent: "center",
+  },
+  label:      { fontSize: 11, color: C.amber, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", textTransform: "uppercase", letterSpacing: 0.4 },
+  suggestion: { fontSize: 17, fontWeight: "800", color: C.gray900, fontFamily: "PlusJakartaSans_800ExtraBold", marginTop: 1 },
+  ctaChip:    { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.orange, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
+  ctaText:    { fontSize: 13, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
+});

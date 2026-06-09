@@ -173,3 +173,28 @@ export const deliveryAPI = {
   onboard:            (payload, token)   => request("POST",  "/delivery/onboard",            payload,                          token),
   getMyProfile:       (token)            => request("GET",   "/delivery/me/profile",         null,                             token),
 };
+
+// ─── Search ───────────────────────────────────────────────────────────────────
+export const searchAPI = {
+  /**
+   * Prefix autocomplete — called while user is typing (debounced on the caller).
+   * Returns { suggestions: [{ text, type }] }
+   */
+  autocomplete: (q) => request("GET", `/search/autocomplete?q=${encodeURIComponent(q)}`),
+
+  /**
+   * Typo correction — called only when search yields 0 results.
+   * Returns { suggestion: string | null }
+   */
+  correct: (q) => request("GET", `/search/correct?q=${encodeURIComponent(q)}`),
+
+  /**
+   * Fire-and-forget search tracking — called after every successful search.
+   * Increments count in search_history for popularity-based suggestions.
+   */
+  track: (query) => {
+    // Fire and forget — don't await, don't block UI
+    request("POST", "/search/track", { query }).catch(() => {});
+  },
+};
+
