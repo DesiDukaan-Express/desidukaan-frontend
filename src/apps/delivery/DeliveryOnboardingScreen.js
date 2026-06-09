@@ -429,7 +429,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
             // Update the auth store with fresh user data returned from onboard
             const partner = res.data?.partner;
             if (partner?.user) {
-                await login(partner.user, token);
+                await login(partner.user, token, undefined);
             }
 
             // Trigger success flow
