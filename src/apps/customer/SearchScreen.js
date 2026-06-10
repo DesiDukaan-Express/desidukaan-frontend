@@ -488,7 +488,8 @@ export default function SearchScreen() {
     autocompleteTimer.current = setTimeout(async () => {
       try {
         const data = await searchAPI.autocomplete(trimmed);
-        setApiSuggestions(data?.suggestions || []);
+        // Backend wraps response: { success, data: { suggestions } }
+        setApiSuggestions(data?.data?.suggestions || data?.suggestions || []);
       } catch {
         setApiSuggestions([]);
       }
@@ -718,7 +719,8 @@ export default function SearchScreen() {
       if (prodList.length === 0 && matched.length === 0) {
         try {
           const corrData = await searchAPI.correct(trimmed);
-          setDidYouMean(corrData?.suggestion || null);
+          // Backend wraps response: { success, data: { suggestion } }
+          setDidYouMean(corrData?.data?.suggestion || corrData?.suggestion || null);
         } catch {
           setDidYouMean(null);
         }
