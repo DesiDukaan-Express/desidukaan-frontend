@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -551,8 +551,7 @@ const s = StyleSheet.create({
   },
   heading: {
     fontSize: 24,
-    fontWeight: "900",
-    color: "#FFFFFF",
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#FFFFFF",
   },
   subheading: {
     fontSize: 13,
@@ -575,8 +574,7 @@ const s = StyleSheet.create({
   addBtnText: {
     color: "#147538",
     fontSize: 13,
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
 
   // ── Scroll ──
   scroll: { flex: 1 },
@@ -609,8 +607,7 @@ const s = StyleSheet.create({
   statLabel: {
     fontSize: 11,
     color: TEXT_LIGHT,
-    fontWeight: "500",
-    marginTop: 2,
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium", marginTop: 2,
   },
   statValueRow: {
     flexDirection: "row",
@@ -620,8 +617,7 @@ const s = StyleSheet.create({
   },
   statValue: {
     fontSize: 28,
-    fontWeight: "800",
-    color: TEXT,
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: TEXT,
     letterSpacing: -0.5,
   },
   statBadge: {
@@ -631,7 +627,7 @@ const s = StyleSheet.create({
     minWidth: 22,
     alignItems: "center",
   },
-  statBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  statBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
 
   // ── Alert Banner ──
   alertBanner: {
@@ -652,7 +648,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   alertText: { flex: 1 },
-  alertTitle: { fontSize: 14, fontWeight: "700", color: "#fff" },
+  alertTitle: { fontSize: 14, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#fff" },
   alertSub: { fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 2 },
   alertViewBtn: {
     backgroundColor: "#fff",
@@ -660,7 +656,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
   },
-  alertViewBtnText: { fontSize: 13, fontWeight: "700", color: "#1C2331" },
+  alertViewBtnText: { fontSize: 13, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#1C2331" },
 
   // ── Search ──
   searchWrap: {
@@ -702,8 +698,7 @@ const s = StyleSheet.create({
   },
   chipText: {
     fontSize: 13,
-    fontWeight: "600",
-    color: TEXT_LIGHT,
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: TEXT_LIGHT,
   },
   chipTextActive: {
     color: "#fff",
@@ -721,14 +716,14 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#BFDBFE",
   },
-  bulkCount: { fontSize: 14, fontWeight: "700", color: "#1D4ED8" },
+  bulkCount: { fontSize: 14, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#1D4ED8" },
   bulkDeleteBtn: {
     backgroundColor: RED,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  bulkDeleteBtnText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  bulkDeleteBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
 
   // ── List Header ──
   listHeader: {
@@ -737,7 +732,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     marginBottom: 2,
   },
-  listTitle: { fontSize: 15, fontWeight: "800", color: TEXT },
+  listTitle: { fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: TEXT },
   listCount: { fontSize: 12, color: TEXT_LIGHT },
 
   // ── Product Card ──
@@ -785,8 +780,7 @@ const s = StyleSheet.create({
   checkboxTick: {
     color: "#fff",
     fontSize: 13,
-    fontWeight: "800",
-    lineHeight: 15,
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", lineHeight: 15,
   },
 
   // Image
@@ -806,8 +800,7 @@ const s = StyleSheet.create({
   productInfo: { flex: 1, gap: 2 },
   productName: {
     fontSize: 15,
-    fontWeight: "700",
-    color: TEXT,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: TEXT,
     letterSpacing: -0.2,
   },
   productCategory: { fontSize: 12, color: TEXT_LIGHT },
@@ -817,13 +810,13 @@ const s = StyleSheet.create({
     gap: 8,
     marginTop: 3,
   },
-  productPrice: { fontSize: 13, fontWeight: "700", color: TEXT },
+  productPrice: { fontSize: 13, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: TEXT },
   statusPill: {
     borderRadius: 6,
     paddingHorizontal: 7,
     paddingVertical: 2,
   },
-  statusPillText: { fontSize: 11, fontWeight: "700" },
+  statusPillText: { fontSize: 11, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
 
   // Actions
   cardActions: { alignItems: "flex-end", gap: 6 },
@@ -833,7 +826,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  editBtnText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  editBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
   menuBtn: {
     width: 30,
     height: 26,
@@ -877,7 +870,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  dropdownItemText: { fontSize: 14, fontWeight: "600", color: TEXT },
+  dropdownItemText: { fontSize: 14, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: TEXT },
   dropdownDivider: { height: 1, backgroundColor: BORDER },
 
   // Loading / Empty
@@ -891,7 +884,7 @@ const s = StyleSheet.create({
     borderColor: BORDER,
   },
   loadingText: { fontSize: 14, color: TEXT_LIGHT, marginTop: 8 },
-  emptyText: { fontSize: 16, fontWeight: "700", color: TEXT },
+  emptyText: { fontSize: 16, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: TEXT },
   emptySubText: {
     fontSize: 13,
     color: TEXT_LIGHT,

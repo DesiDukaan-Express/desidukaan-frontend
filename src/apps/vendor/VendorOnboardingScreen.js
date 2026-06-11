@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, Alert,
@@ -628,11 +628,11 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
             <Text style={styles.successTitle}>You're Submitted!</Text>
             <Text style={styles.successSub}>
-              <Text style={{ fontWeight: '800', color: '#16A34A' }}>{shopName || 'Your shop'}</Text> is under review.
+              <Text style={{ fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#16A34A' }}>{shopName || 'Your shop'}</Text> is under review.
             </Text>
             <Text style={styles.successDesc}>
               Our team will verify your FSSAI & GST details within{' '}
-              <Text style={{ fontWeight: '700' }}>24–48 hours</Text>. You'll get an
+              <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>24–48 hours</Text>. You'll get an
               email notification once approved and live.
             </Text>
 
@@ -644,7 +644,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
             ].map((step, i) => (
               <View key={i} style={styles.successStep}>
                 <Text style={styles.successStepIcon}>{step.icon}</Text>
-                <Text style={[styles.successStepText, step.done && { color: '#16A34A', fontWeight: '700' }]}>
+                <Text style={[styles.successStepText, step.done && { color: '#16A34A', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }]}>
                   {step.label}
                 </Text>
                 {step.done && <Text style={{ color: '#16A34A', fontSize: 14 }}>✓</Text>}
@@ -849,9 +849,9 @@ export default function VendorOnboardingScreen({ onComplete }) {
               <TextInput style={styles.input} placeholder="Enter Trade License number" maxLength={50} value={tradeLicense} onChangeText={setTradeLicense} />
 
               <View style={[styles.infoBox, { marginTop: 16 }]}>
-                <Text style={[styles.infoText, { fontWeight: '700', marginBottom: 4 }]}>⏳ Admin Approval Process</Text>
+                <Text style={[styles.infoText, { fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", marginBottom: 4 }]}>⏳ Admin Approval Process</Text>
                 <Text style={styles.infoText}>
-                  Once you submit, our team will verify your FSSAI & GST details within <Text style={{ fontWeight: '700' }}>24–48 hours</Text>. You'll receive an email once approved. Your shop will not be visible to customers until then.
+                  Once you submit, our team will verify your FSSAI & GST details within <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>24–48 hours</Text>. You'll receive an email once approved. Your shop will not be visible to customers until then.
                 </Text>
               </View>
 
@@ -939,7 +939,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
                   {/* Category Navigation / Breadcrumbs */}
                   {categoryStack.length > 0 && (
                     <TouchableOpacity onPress={handleBackCategory} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                      <Text style={{ fontSize: 16, color: PRIMARY, fontWeight: '700' }}>← {currentCategory?.name || 'Back'}</Text>
+                      <Text style={{ fontSize: 16, color: PRIMARY, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>← {currentCategory?.name || 'Back'}</Text>
                     </TouchableOpacity>
                   )}
 
@@ -1206,7 +1206,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
                   <Text style={styles.emptyEmoji}>📦</Text>
                   <Text style={styles.emptyTitle}>No products added</Text>
                   <TouchableOpacity onPress={() => setCurrentStep(4)}>
-                    <Text style={{ color: PRIMARY, fontWeight: '700', marginTop: 8 }}>← Go back and add products</Text>
+                    <Text style={{ color: PRIMARY, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", marginTop: 8 }}>← Go back and add products</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -1283,7 +1283,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
               </View>
               <View style={[styles.infoBox, { marginTop: 16 }]}>
                 <Text style={styles.infoText}>
-                  ✅ Your shop will be reviewed within <Text style={{ fontWeight: '700' }}>24–48 hours</Text>. You'll be notified at <Text style={{ fontWeight: '700' }}>{email || 'your email'}</Text> once approved and live.
+                  ✅ Your shop will be reviewed within <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>24–48 hours</Text>. You'll be notified at <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>{email || 'your email'}</Text> once approved and live.
                 </Text>
               </View>
             </View>
@@ -1334,9 +1334,9 @@ const styles = StyleSheet.create({
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   brandEmoji: { fontSize: 26 },
-  brandName: { fontSize: 17, fontWeight: '800', color: '#fff' },
+  brandName: { fontSize: 17, fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#fff' },
   brandSub: { fontSize: 11, color: 'rgba(255,255,255,0.75)' },
-  stepCount: { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: '700' },
+  stepCount: { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" },
 
   progressTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.25)' },
   progressFill: { height: 3, backgroundColor: '#fff' },
@@ -1350,9 +1350,9 @@ const styles = StyleSheet.create({
   stepNum: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' },
   stepNumActive: { backgroundColor: PRIMARY },
   stepNumDone: { backgroundColor: PRIMARY },
-  stepNumText: { fontSize: 10, fontWeight: '700', color: '#aaa' },
+  stepNumText: { fontSize: 10, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#aaa' },
   stepNumTextActive: { color: '#fff' },
-  stepPillText: { fontSize: 11, fontWeight: '600', color: '#aaa' },
+  stepPillText: { fontSize: 11, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold", color: '#aaa' },
   stepPillTextActive: { color: PRIMARY },
   connector: { width: 14, height: 1.5, backgroundColor: '#e0e0e0', marginHorizontal: 2 },
   connectorDone: { backgroundColor: PRIMARY },
@@ -1360,13 +1360,13 @@ const styles = StyleSheet.create({
   content: { flex: 1, paddingHorizontal: 20 },
   stepHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, marginBottom: 16 },
   stepIcon: { fontSize: 34 },
-  stepTitle: { fontSize: 20, fontWeight: '800', color: '#222' },
+  stepTitle: { fontSize: 20, fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#222' },
   stepDesc: { fontSize: 13, color: '#888', marginTop: 2 },
   form: { gap: 2 },
 
-  label: { fontSize: 13, fontWeight: '600', color: '#444', marginBottom: 6, marginTop: 14 },
-  sectionLabel: { fontSize: 15, fontWeight: '700', color: '#222', marginTop: 12, marginBottom: 4 },
-  sectionSep: { fontSize: 14, fontWeight: '700', color: '#333', marginTop: 20, marginBottom: 6, paddingTop: 14, borderTopWidth: 0.5, borderTopColor: '#eee' },
+  label: { fontSize: 13, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold", color: '#444', marginBottom: 6, marginTop: 14 },
+  sectionLabel: { fontSize: 15, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#222', marginTop: 12, marginBottom: 4 },
+  sectionSep: { fontSize: 14, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#333', marginTop: 20, marginBottom: 6, paddingTop: 14, borderTopWidth: 0.5, borderTopColor: '#eee' },
   req: { color: '#e53935' },
   hintText: { fontSize: 11, color: '#999', marginTop: -4, marginBottom: 6 },
   input: {
@@ -1384,15 +1384,15 @@ const styles = StyleSheet.create({
   chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   chip: { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: '#ddd', backgroundColor: '#fff' },
   chipActive: { backgroundColor: PRIMARY_LIGHT, borderColor: PRIMARY },
-  chipText: { fontSize: 12, color: '#555', fontWeight: '500' },
-  chipTextActive: { color: PRIMARY, fontWeight: '700' },
+  chipText: { fontSize: 12, color: '#555', fontWeight: '500', fontFamily: "PlusJakartaSans_500Medium" },
+  chipTextActive: { color: PRIMARY, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" },
 
   // Vendor type — 2x2 grid
   segmentGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   segGridBtn: { width: '48%', paddingVertical: 12, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1.5, borderColor: '#eee', backgroundColor: '#fff', alignItems: 'center' },
   segGridBtnActive: { borderColor: PRIMARY, backgroundColor: PRIMARY_LIGHT },
   segGridImage: { width: 50, height: 50, borderRadius: 10, marginBottom: 8, backgroundColor: '#f9f9f9' },
-  segGridText: { fontSize: 13, color: '#333', fontWeight: '700', textAlign: 'center' },
+  segGridText: { fontSize: 13, color: '#333', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", textAlign: 'center' },
   segGridTextActive: { color: PRIMARY },
 
   infoBox: { backgroundColor: PRIMARY_LIGHT, borderRadius: 10, padding: 13, marginBottom: 8, marginTop: 4 },
@@ -1405,48 +1405,48 @@ const styles = StyleSheet.create({
   uploadHint: { fontSize: 11, color: '#bbb', marginTop: 3 },
   uploadedBox: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#c8e6c9', borderRadius: 10, padding: 12, marginBottom: 6, backgroundColor: '#f1fff5' },
   uploadedIcon: { fontSize: 18 },
-  uploadedText: { fontSize: 13, color: '#2e7d32', flex: 1, fontWeight: '600' },
-  uploadRemove: { fontSize: 12, color: '#e53935', fontWeight: '700' },
+  uploadedText: { fontSize: 13, color: '#2e7d32', flex: 1, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold" },
+  uploadRemove: { fontSize: 12, color: '#e53935', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" },
 
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 16, gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#e0e0e0' },
-  dividerText: { fontSize: 13, color: '#999', fontWeight: '600' },
+  dividerText: { fontSize: 13, color: '#999', fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold" },
 
   modeToggle: { flexDirection: 'row', backgroundColor: '#f0f0f0', borderRadius: 12, padding: 4, marginBottom: 14, marginTop: 4 },
   modeBtn: { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' },
   modeBtnActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
-  modeBtnText: { fontSize: 12, fontWeight: '600', color: '#888' },
+  modeBtnText: { fontSize: 12, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold", color: '#888' },
   modeBtnTextActive: { color: PRIMARY },
 
   selAllRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   catalogMeta: { fontSize: 12, color: '#888' },
-  selAllBtn: { fontSize: 13, color: PRIMARY, fontWeight: '700' },
+  selAllBtn: { fontSize: 13, color: PRIMARY, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" },
 
   catalogCard: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 14, padding: 10, marginBottom: 10, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#eee' },
   catalogCardSelected: { borderColor: PRIMARY, backgroundColor: '#f1fff5' },
   catalogImage: { width: 60, height: 60, borderRadius: 10, backgroundColor: '#f0f0f0' },
   catalogTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 },
-  catalogName: { fontSize: 13, fontWeight: '600', color: '#222', flex: 1, marginRight: 6 },
+  catalogName: { fontSize: 13, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold", color: '#222', flex: 1, marginRight: 6 },
   mrpStrike: { textDecorationLine: 'line-through', color: '#999', fontSize: 11 },
 
   // Weight chips shown inline in catalog + review
   weightChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 5 },
   weightChipSmall: { backgroundColor: '#FFF3E0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  weightChipSmallText: { fontSize: 10, fontWeight: '700', color: '#E65100' },
+  weightChipSmallText: { fontSize: 10, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#E65100' },
 
   checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: '#ccc', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   checkboxSel: { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  checkmark: { fontSize: 11, color: '#fff', fontWeight: '700' },
+  checkmark: { fontSize: 11, color: '#fff', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" },
 
   typeBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
   badgeLoose: { backgroundColor: '#fff3e0' },
-  badgeLooseText: { color: '#e65100', fontSize: 11, fontWeight: '600' },
+  badgeLooseText: { color: '#e65100', fontSize: 11, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold" },
   badgePacked: { backgroundColor: '#e3f2fd' },
-  badgePackedText: { color: '#1565c0', fontSize: 11, fontWeight: '600' },
-  typeBadgeText: { fontSize: 11, fontWeight: '600' },
+  badgePackedText: { color: '#1565c0', fontSize: 11, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold" },
+  typeBadgeText: { fontSize: 11, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold" },
 
   cantFindBtn: { borderWidth: 1, borderColor: PRIMARY, borderRadius: 10, padding: 13, alignItems: 'center', marginTop: 8, marginBottom: 4 },
-  cantFindText: { color: PRIMARY, fontWeight: '600', fontSize: 13 },
+  cantFindText: { color: PRIMARY, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold", fontSize: 13 },
   mapWrapper: {
     height: 180,
     borderRadius: 12,
@@ -1462,8 +1462,8 @@ const styles = StyleSheet.create({
 
   productCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#eaeaea' },
   productCardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  productCardNum: { fontSize: 13, fontWeight: '700', color: '#333' },
-  removeBtn: { fontSize: 12, color: '#e53935', fontWeight: '600' },
+  productCardNum: { fontSize: 13, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#333' },
+  removeBtn: { fontSize: 12, color: '#e53935', fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold" },
 
   photoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
   photoBox: { width: 56, height: 56, borderRadius: 10, borderWidth: 1, borderColor: '#ddd', backgroundColor: '#fafafa', alignItems: 'center', justifyContent: 'center' },
@@ -1472,32 +1472,32 @@ const styles = StyleSheet.create({
   photoPreviewWrap: { position: 'relative', width: 56, height: 56 },
   photoPreview: { width: 56, height: 56, borderRadius: 10, backgroundColor: '#eee' },
   photoRemoveBtn: { position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: '#e53935', alignItems: 'center', justifyContent: 'center' },
-  photoRemoveText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  photoRemoveText: { color: '#fff', fontSize: 10, fontWeight: '900', fontFamily: "PlusJakartaSans_800ExtraBold" },
 
   segmentRow: { flexDirection: 'row', backgroundColor: '#f0f0f0', borderRadius: 8, padding: 3 },
   segBtn: { flex: 1, paddingVertical: 7, borderRadius: 6, alignItems: 'center' },
   segBtnActive: { backgroundColor: '#fff' },
-  segBtnText: { fontSize: 12, color: '#888', fontWeight: '600' },
+  segBtnText: { fontSize: 12, color: '#888', fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold" },
   segBtnTextActive: { color: PRIMARY },
 
   addRowBtn: { borderWidth: 1.5, borderColor: PRIMARY, borderRadius: 10, padding: 13, alignItems: 'center', marginTop: 4 },
-  addRowBtnText: { color: PRIMARY, fontWeight: '700', fontSize: 14 },
+  addRowBtnText: { color: PRIMARY, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", fontSize: 14 },
 
   csvInput: { height: 160, textAlignVertical: 'top', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12 },
   parseBtn: { backgroundColor: PRIMARY, padding: 13, borderRadius: 10, alignItems: 'center', marginTop: 4 },
-  parseBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  parseBtnText: { color: '#fff', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", fontSize: 14 },
   previewBox: { backgroundColor: PRIMARY_LIGHT, borderRadius: 10, padding: 13, marginTop: 12 },
-  previewTitle: { fontSize: 14, fontWeight: '700', color: PRIMARY, marginBottom: 8 },
+  previewTitle: { fontSize: 14, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: PRIMARY, marginBottom: 8 },
   previewItem: { fontSize: 13, color: '#333', marginBottom: 4 },
   previewMore: { fontSize: 12, color: '#666', marginTop: 4 },
 
   inventoryCard: { backgroundColor: '#fff', borderRadius: 12, padding: 13, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', borderWidth: 1, borderColor: '#eaeaea' },
   inventoryLeft: { flex: 1 },
-  inventoryName: { fontSize: 15, fontWeight: '700', color: '#222' },
+  inventoryName: { fontSize: 15, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#222' },
   inventoryMeta: { fontSize: 12, color: '#888', marginTop: 2 },
   inventoryRight: { alignItems: 'flex-end' },
   inventoryMrp: { fontSize: 12, color: '#999', textDecorationLine: 'line-through' },
-  inventoryPrice: { fontSize: 15, fontWeight: '800', color: PRIMARY },
+  inventoryPrice: { fontSize: 15, fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: PRIMARY },
   inventoryStock: { fontSize: 12, color: '#666', marginTop: 2 },
   emptyState: { alignItems: 'center', paddingVertical: 40 },
   emptyEmoji: { fontSize: 48 },
@@ -1505,21 +1505,21 @@ const styles = StyleSheet.create({
 
   goLiveContainer: { alignItems: 'center', paddingTop: 10, marginBottom: 20 },
   goLiveEmoji: { fontSize: 60, marginBottom: 14 },
-  goLiveTitle: { fontSize: 24, fontWeight: '800', color: '#222', marginBottom: 6 },
+  goLiveTitle: { fontSize: 24, fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#222', marginBottom: 6 },
   goLiveSub: { fontSize: 14, color: '#666' },
 
   summaryCard: { backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#eaeaea', overflow: 'hidden' },
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14 },
   summaryIcon: { fontSize: 22 },
   summaryLabel: { fontSize: 11, color: '#888' },
-  summaryValue: { fontSize: 13, fontWeight: '700', color: '#222', marginTop: 2 },
+  summaryValue: { fontSize: 13, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#222', marginTop: 2 },
   summaryDivider: { height: 1, backgroundColor: '#f0f0f0', marginHorizontal: 14 },
 
   bottomBar: { flexDirection: 'row', padding: 14, gap: 10, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#eee' },
   backBtn: { paddingHorizontal: 16, paddingVertical: 13, borderRadius: 10, borderWidth: 1.5, borderColor: '#ddd', justifyContent: 'center' },
-  backText: { fontSize: 14, fontWeight: '600', color: '#555' },
+  backText: { fontSize: 14, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold", color: '#555' },
   nextBtn: { flex: 1, backgroundColor: PRIMARY, paddingVertical: 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  nextText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  nextText: { color: '#fff', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", fontSize: 15 },
 
   // ── Success popup ──────────────────────────────────────────────────────────
   successOverlay: {
@@ -1545,7 +1545,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDF4',
     alignItems: 'center', justifyContent: 'center',
   },
-  successTitle: { fontSize: 26, fontWeight: '900', color: '#111827', marginBottom: 8, textAlign: 'center' },
+  successTitle: { fontSize: 26, fontWeight: '900', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#111827', marginBottom: 8, textAlign: 'center' },
   successSub:   { fontSize: 15, color: '#374151', marginBottom: 6, textAlign: 'center' },
   successDesc:  { fontSize: 13, color: '#6B7280', lineHeight: 20, textAlign: 'center', marginBottom: 22 },
   successStep:  { flexDirection: 'row', alignItems: 'center', gap: 10, width: '100%', paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
@@ -1558,5 +1558,5 @@ const styles = StyleSheet.create({
     shadowColor: '#16A34A', shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
   },
-  successBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  successBtnText: { color: '#fff', fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", fontSize: 16 },
 });
