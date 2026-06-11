@@ -237,7 +237,7 @@ export default function LoginScreen({ navigation }) {
               </View>
 
               <Text style={s.brandName}>KwikPik</Text>
-              <Text style={s.brandTagline}>Pick It Fast, Get It Now</Text>
+              <Text style={s.brandTagline}>Your Neighborhood, Now Delivered</Text>
             </Animated.View>
 
             {/* ── Glass Form Card ── */}
