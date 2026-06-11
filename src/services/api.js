@@ -30,7 +30,8 @@ const request = async (method, endpoint, body = null, token = null, _isRetry = f
   if (!_isRetry && response.status === 401 && data.error === "TOKEN_EXPIRED") {
     // Lazy import to avoid circular dep (authStore imports nothing from api.js)
     const { tryRefreshToken, default: useAuthStore } = await import('../store/authStore');
-    const newAccessToken = await tryRefreshToken();
+    const refreshResult = await tryRefreshToken();
+    const newAccessToken = refreshResult?.token;
 
     if (newAccessToken) {
       // Update the store's in-memory token

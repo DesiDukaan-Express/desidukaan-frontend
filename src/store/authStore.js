@@ -44,13 +44,22 @@ export const tryRefreshToken = async () => {
     });
 
     const data = await res.json();
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        return { error: "INVALID_TOKEN" };
+      }
+      return null;
+    }
 
-    // Persist new tokens
+    // Persist new tokens and user details if returned
     useAuthStore.getState()._setAccessToken(data.accessToken);
     await secureSet(REFRESH_KEY, data.refreshToken);
+    if (data.user) {
+      await AsyncStorage.setItem("user", JSON.stringify(data.user));
+      useAuthStore.setState({ user: data.user, role: data.user.role });
+    }
 
-    return data.accessToken;
+    return { token: data.accessToken, user: data.user };
   } catch {
     return null;
   }
@@ -74,28 +83,45 @@ const useAuthStore = create((set, get) => ({
   // On boot, if a refresh token exists, we silently refresh to get an access token.
   hydrate: async () => {
     try {
-      const userStr = await AsyncStorage.getItem("user");
-      if (!userStr) {
+      const refreshToken = await secureGet(REFRESH_KEY);
+      if (!refreshToken) {
         set({ isLoading: false });
         return;
       }
 
-      const user = JSON.parse(userStr);
-      const newAccessToken = await tryRefreshToken();
+      // Try refreshing the token to restore the session
+      const refreshResult = await tryRefreshToken();
 
-      if (newAccessToken) {
+      if (refreshResult && refreshResult.token) {
+        const currentUser = refreshResult.user;
         set({
-          token: newAccessToken,
-          user,
-          role: user.role,
+          token: refreshResult.token,
+          user: currentUser,
+          role: currentUser ? currentUser.role : null,
           isAuthenticated: true,
           isLoading: false,
         });
-        await useAddressStore.getState().loadAddresses(newAccessToken);
-      } else {
-        // Refresh token missing or expired — clear session
+        await useAddressStore.getState().loadAddresses(refreshResult.token);
+      } else if (refreshResult && refreshResult.error === "INVALID_TOKEN") {
+        // Refresh token explicitly expired or invalid — clear session
         await AsyncStorage.removeItem("user");
+        await secureDelete(REFRESH_KEY);
         set({ isLoading: false });
+      } else {
+        // Network error / server error — try to fall back to cached user in AsyncStorage
+        // so we don't log them out when offline.
+        const userStr = await AsyncStorage.getItem("user");
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          set({
+            user,
+            role: user.role,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+        } else {
+          set({ isLoading: false });
+        }
       }
     } catch {
       set({ isLoading: false });

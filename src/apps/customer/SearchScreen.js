@@ -8,30 +8,30 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import useAuthStore    from "../../store/authStore";
-import useCartStore    from "../../store/cartStore";
+import useAuthStore from "../../store/authStore";
+import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { categoriesAPI, searchAPI } from "../../services/api";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const NEARBY_RADIUS = 10;   // km — stores within this are shown normally
-const FAR_RADIUS    = 10;   // km — backend validation max is 10
-const MAX_HISTORY   = 8;
+const FAR_RADIUS = 10;   // km — backend validation max is 10
+const MAX_HISTORY = 8;
 
 // ─── Palette (matches app design system) ─────────────────────────────────────
 const C = {
-  orange:      "#F97316", orangeDark:  "#EA580C",
-  green:       "#16A34A", greenDark:   "#15803D",
-  greenLight:  "#F0FDF4", greenMid:    "#DCFCE7",
+  orange: "#F97316", orangeDark: "#EA580C",
+  green: "#16A34A", greenDark: "#15803D",
+  greenLight: "#F0FDF4", greenMid: "#DCFCE7",
   greenBorder: "#BBF7D0",
-  white:       "#FFFFFF", bg:          "#F8FAFC",
-  gray100:     "#F3F4F6", gray200:     "#E5E7EB",
-  gray300:     "#D1D5DB", gray400:     "#9CA3AF",
-  gray500:     "#6B7280", gray600:     "#4B5563",
-  gray700:     "#374151", gray900:     "#111827",
-  amber:       "#D97706", amberLight:  "#FEF3C7",
-  red:         "#DC2626", redLight:    "#FEF2F2",
+  white: "#FFFFFF", bg: "#F8FAFC",
+  gray100: "#F3F4F6", gray200: "#E5E7EB",
+  gray300: "#D1D5DB", gray400: "#9CA3AF",
+  gray500: "#6B7280", gray600: "#4B5563",
+  gray700: "#374151", gray900: "#111827",
+  amber: "#D97706", amberLight: "#FEF3C7",
+  red: "#DC2626", redLight: "#FEF2F2",
 };
 
 const CAT_FALLBACK_IMGS = {
@@ -95,28 +95,28 @@ function useBreakpoint() {
     const sub = Dimensions.addEventListener("change", ({ window }) => setW(window.width));
     return () => sub?.remove?.();
   }, []);
-  if (w >= 1024) return { isDesktop: true,  isTablet: false, isMobile: false };
-  if (w >= 640)  return { isDesktop: false, isTablet: true,  isMobile: false };
-  return               { isDesktop: false, isTablet: false, isMobile: true  };
+  if (w >= 1024) return { isDesktop: true, isTablet: false, isMobile: false };
+  if (w >= 640) return { isDesktop: false, isTablet: true, isMobile: false };
+  return { isDesktop: false, isTablet: false, isMobile: true };
 }
 
 // ─── Add/Qty button (uses real cartStore) ─────────────────────────────────────
 function AddBtn({ product, vendorId, vendorName, outOfStock }) {
-  const cart     = useCartStore();
-  const items    = cart?.items || [];
+  const cart = useCartStore();
+  const items = cart?.items || [];
   const cartItem = items.find(i => i.id === product.id);
-  const qty      = cartItem?.qty ?? cartItem?.quantity ?? 0;
+  const qty = cartItem?.qty ?? cartItem?.quantity ?? 0;
 
   const sc = useRef(new Animated.Value(1)).current;
   const pop = () => Animated.sequence([
     Animated.spring(sc, { toValue: 0.85, useNativeDriver: true, tension: 400 }),
-    Animated.spring(sc, { toValue: 1,    useNativeDriver: true, tension: 200 }),
+    Animated.spring(sc, { toValue: 1, useNativeDriver: true, tension: 200 }),
   ]).start();
 
   const doAdd = () => {
     pop();
     const isLoose = product.item_type === "loose";
-    const finalPrice = isLoose 
+    const finalPrice = isLoose
       ? calculateProportionalPrice(product.price, product.unit || "1kg", product.unit || "1kg")
       : product.price;
 
@@ -160,7 +160,7 @@ function AddBtn({ product, vendorId, vendorName, outOfStock }) {
   );
 }
 const ab = StyleSheet.create({
-  add:    { backgroundColor: C.white, borderWidth: 1.5, borderColor: C.green, borderRadius: 9, paddingHorizontal: 14, paddingVertical: 7 },
+  add: { backgroundColor: C.white, borderWidth: 1.5, borderColor: C.green, borderRadius: 9, paddingHorizontal: 14, paddingVertical: 7 },
   addTxt: { fontSize: 13, fontWeight: "800", color: C.green, fontFamily: "PlusJakartaSans_800ExtraBold" },
   qtyRow: { flexDirection: "row", alignItems: "center", backgroundColor: C.green, borderRadius: 9, overflow: "hidden" },
   qtyBtn: { paddingHorizontal: 9, paddingVertical: 7 },
@@ -216,24 +216,24 @@ function ProductCard({ product, vendorId, vendorName, onSeeStores }) {
   );
 }
 const pc = StyleSheet.create({
-  card:      { flexDirection: "row", alignItems: "flex-start", paddingVertical: 14, paddingHorizontal: 16, gap: 12, backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  cardOos:   { opacity: 0.55 },
-  imgWrap:   { width: 88, height: 88, borderRadius: 12, overflow: "hidden", backgroundColor: C.gray100, position: "relative" },
-  img:       { width: "100%", height: "100%" },
+  card: { flexDirection: "row", alignItems: "flex-start", paddingVertical: 14, paddingHorizontal: 16, gap: 12, backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  cardOos: { opacity: 0.55 },
+  imgWrap: { width: 88, height: 88, borderRadius: 12, overflow: "hidden", backgroundColor: C.gray100, position: "relative" },
+  img: { width: "100%", height: "100%" },
   discBadge: { position: "absolute", top: 5, left: 0, backgroundColor: C.orange, paddingHorizontal: 6, paddingVertical: 2, borderTopRightRadius: 6, borderBottomRightRadius: 6 },
-  discText:  { fontSize: 9, color: C.white, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold" },
+  discText: { fontSize: 9, color: C.white, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold" },
   oosOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.48)", alignItems: "center", justifyContent: "center" },
   oosOverlayText: { fontSize: 10, fontWeight: "800", color: C.white, textAlign: "center", lineHeight: 14, fontFamily: "PlusJakartaSans_800ExtraBold" },
-  info:      { flex: 1, gap: 2 },
-  brand:     { fontSize: 10, color: C.green, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4, fontFamily: "PlusJakartaSans_700Bold" },
-  name:      { fontSize: 14, fontWeight: "700", color: C.gray900, lineHeight: 19, fontFamily: "PlusJakartaSans_700Bold" },
-  unit:      { fontSize: 12, color: C.gray400, fontFamily: "PlusJakartaSans_500Medium" },
-  priceRow:  { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
-  price:     { fontSize: 16, fontWeight: "800", color: C.gray900, fontFamily: "PlusJakartaSans_800ExtraBold" },
-  mrp:       { fontSize: 12, color: C.gray400, textDecorationLine: "line-through", fontFamily: "PlusJakartaSans_500Medium" },
-  storeBtn:  { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 },
+  info: { flex: 1, gap: 2 },
+  brand: { fontSize: 10, color: C.green, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4, fontFamily: "PlusJakartaSans_700Bold" },
+  name: { fontSize: 14, fontWeight: "700", color: C.gray900, lineHeight: 19, fontFamily: "PlusJakartaSans_700Bold" },
+  unit: { fontSize: 12, color: C.gray400, fontFamily: "PlusJakartaSans_500Medium" },
+  priceRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  price: { fontSize: 16, fontWeight: "800", color: C.gray900, fontFamily: "PlusJakartaSans_800ExtraBold" },
+  mrp: { fontSize: 12, color: C.gray400, textDecorationLine: "line-through", fontFamily: "PlusJakartaSans_500Medium" },
+  storeBtn: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 },
   storeBtnText: { fontSize: 11, color: C.green, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold" },
-  ctaWrap:   { paddingTop: 16 },
+  ctaWrap: { paddingTop: 16 },
 });
 
 // ─── Vendor card (places tab) ─────────────────────────────────────────────────
@@ -317,28 +317,28 @@ function VendorCard({ vendor, distKm: dist, matchCount, onPress, tooFar }) {
   );
 }
 const vc = StyleSheet.create({
-  card:       { backgroundColor: C.white, borderRadius: 16, overflow: "hidden", marginBottom: 14, borderWidth: 1, borderColor: C.gray200 },
-  cardFar:    { opacity: 0.65 },
-  imgWrap:    { position: "relative", height: 130 },
-  img:        { width: "100%", height: "100%" },
-  imgGrad:    { position: "absolute", bottom: 0, left: 0, right: 0, height: 60 },
-  openBadge:  { position: "absolute", top: 10, left: 10, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  openText:   { fontSize: 11, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
-  distBadge:  { position: "absolute", bottom: 10, right: 10, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.92)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: C.greenBorder },
-  distText:   { fontSize: 10, color: C.green, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" },
+  card: { backgroundColor: C.white, borderRadius: 16, overflow: "hidden", marginBottom: 14, borderWidth: 1, borderColor: C.gray200 },
+  cardFar: { opacity: 0.65 },
+  imgWrap: { position: "relative", height: 130 },
+  img: { width: "100%", height: "100%" },
+  imgGrad: { position: "absolute", bottom: 0, left: 0, right: 0, height: 60 },
+  openBadge: { position: "absolute", top: 10, left: 10, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  openText: { fontSize: 11, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
+  distBadge: { position: "absolute", bottom: 10, right: 10, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.92)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: C.greenBorder },
+  distText: { fontSize: 10, color: C.green, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" },
   matchBadge: { position: "absolute", top: 10, right: 10, backgroundColor: C.green, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  matchText:  { fontSize: 11, color: C.white, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" },
+  matchText: { fontSize: 11, color: C.white, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" },
   farOverlay: { position: "absolute", bottom: 10, left: 10, flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
-  farText:    { fontSize: 12, color: C.white, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" },
-  info:       { padding: 14 },
-  topRow:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
-  name:       { fontSize: 16, fontWeight: "800", color: C.gray900, flex: 1, marginRight: 8, fontFamily: "PlusJakartaSans_800ExtraBold" },
-  rating:     { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#FEF9C3", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
+  farText: { fontSize: 12, color: C.white, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" },
+  info: { padding: 14 },
+  topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
+  name: { fontSize: 16, fontWeight: "800", color: C.gray900, flex: 1, marginRight: 8, fontFamily: "PlusJakartaSans_800ExtraBold" },
+  rating: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#FEF9C3", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
   ratingText: { fontSize: 12, fontWeight: "700", color: "#CA8A04", fontFamily: "PlusJakartaSans_700Bold" },
-  address:    { fontSize: 12, color: C.gray400, marginBottom: 8, fontFamily: "PlusJakartaSans_500Medium" },
-  meta:       { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  metaChip:   { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.gray100, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  metaText:   { fontSize: 11, color: C.gray600, fontFamily: "PlusJakartaSans_500Medium" },
+  address: { fontSize: 12, color: C.gray400, marginBottom: 8, fontFamily: "PlusJakartaSans_500Medium" },
+  meta: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  metaChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.gray100, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  metaText: { fontSize: 11, color: C.gray600, fontFamily: "PlusJakartaSans_500Medium" },
 });
 
 // ─── Stores for item modal ────────────────────────────────────────────────────
@@ -397,48 +397,48 @@ function ItemStoresSheet({ product, stores, userCoords, onClose, onSelectStore }
   );
 }
 const iss = StyleSheet.create({
-  backdrop:    { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end", zIndex: 100 },
-  sheet:       { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "70%", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
-  handle:      { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
-  header:      { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 },
-  title:       { fontSize: 12, color: C.gray400, fontWeight: "600", textTransform: "uppercase", fontFamily: "PlusJakartaSans_600SemiBold" },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end", zIndex: 100 },
+  sheet: { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "70%", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
+  header: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 },
+  title: { fontSize: 12, color: C.gray400, fontWeight: "600", textTransform: "uppercase", fontFamily: "PlusJakartaSans_600SemiBold" },
   productName: { fontSize: 17, fontWeight: "900", color: C.gray900, marginTop: 2, maxWidth: 260, fontFamily: "PlusJakartaSans_800ExtraBold" },
-  closeBtn:    { width: 30, height: 30, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
-  storeRow:    { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  storeImg:    { width: 48, height: 48, borderRadius: 10, backgroundColor: C.gray100 },
-  storeName:   { fontSize: 14, fontWeight: "700", color: C.gray900, fontFamily: "PlusJakartaSans_700Bold" },
-  storeAddr:   { fontSize: 12, color: C.gray400, marginTop: 2, fontFamily: "PlusJakartaSans_500Medium" },
-  storeDist:   { fontSize: 11, color: C.green, fontWeight: "600", marginTop: 2, fontFamily: "PlusJakartaSans_600SemiBold" },
+  closeBtn: { width: 30, height: 30, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
+  storeRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  storeImg: { width: 48, height: 48, borderRadius: 10, backgroundColor: C.gray100 },
+  storeName: { fontSize: 14, fontWeight: "700", color: C.gray900, fontFamily: "PlusJakartaSans_700Bold" },
+  storeAddr: { fontSize: 12, color: C.gray400, marginTop: 2, fontFamily: "PlusJakartaSans_500Medium" },
+  storeDist: { fontSize: 11, color: C.green, fontWeight: "600", marginTop: 2, fontFamily: "PlusJakartaSans_600SemiBold" },
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function SearchScreen() {
-  const navigation   = useNavigation();
-  const route        = useRoute();
-  const { token }    = useAuthStore();
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { token } = useAuthStore();
   const addressStore = useAddressStore();
   const { isDesktop, isTablet } = useBreakpoint();
 
   // ── State ─────────────────────────────────────────────────────────────────
-  const [query,       setQuery]       = useState("");
-  const [committed,   setCommitted]   = useState(false);
-  const [activeTab,   setActiveTab]   = useState("places");
-  const [history,     setHistory]     = useState([]);
-  const [loading,     setLoading]     = useState(false);
+  const [query, setQuery] = useState("");
+  const [committed, setCommitted] = useState(false);
+  const [activeTab, setActiveTab] = useState("places");
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Autocomplete & correction
   const [apiSuggestions, setApiSuggestions] = useState([]); // from server
-  const [didYouMean,     setDidYouMean]     = useState(null); // typo correction
+  const [didYouMean, setDidYouMean] = useState(null); // typo correction
   const autocompleteTimer = useRef(null);
 
   // Search results
-  const [vendors,     setVendors]     = useState([]);   // all nearby vendors
-  const [products,    setProducts]    = useState([]);   // matched products (items tab)
+  const [vendors, setVendors] = useState([]);   // all nearby vendors
+  const [products, setProducts] = useState([]);   // matched products (items tab)
   const [matchedVendors, setMatchedVendors] = useState([]); // vendors with matched items
 
   // Item stores sheet
   const [sheetProduct, setSheetProduct] = useState(null);
-  const [sheetStores,  setSheetStores]  = useState([]);
+  const [sheetStores, setSheetStores] = useState([]);
 
   // Database-fetched categories
   const [apiCategories, setApiCategories] = useState([]);
@@ -506,8 +506,8 @@ export default function SearchScreen() {
     (selectedAddr?.lat && selectedAddr?.lng)
       ? { lat: selectedAddr.lat, lng: selectedAddr.lng }
       : (selectedAddr?.latitude && selectedAddr?.longitude)
-      ? { lat: selectedAddr.latitude, lng: selectedAddr.longitude }
-      : null;
+        ? { lat: selectedAddr.latitude, lng: selectedAddr.longitude }
+        : null;
 
   // ── Handle category filter from HomeScreen ────────────────────────────────
   useEffect(() => {
@@ -530,7 +530,7 @@ export default function SearchScreen() {
         const list = Array.isArray(d) ? d : d.data || d.vendors || [];
         setVendors(list);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [userCoords?.lat, userCoords?.lng]);
 
   // ── Search — uses inventory endpoint which already exists ───────────────────
@@ -578,7 +578,7 @@ export default function SearchScreen() {
               lat = parseFloat(geoData[0].lat);
               lng = parseFloat(geoData[0].lon);
             }
-          } catch {}
+          } catch { }
         }
       }
 
@@ -592,7 +592,7 @@ export default function SearchScreen() {
             lat = loc.coords.latitude;
             lng = loc.coords.longitude;
           }
-        } catch {}
+        } catch { }
       }
 
       console.log("Search coords:", lat, lng, "addr:", currentAddr?.address_line);
@@ -649,7 +649,7 @@ export default function SearchScreen() {
         if (matched.length > 0) {
           vendorMatchMap.set(vendor.id, matched.length);
           for (const inv of matched) {
-            const p   = inv.product;
+            const p = inv.product;
             if (!p) continue;
             const key = p.name?.toLowerCase() || p.id;
             const inStock = inv.stock_qty > 0;
@@ -662,10 +662,10 @@ export default function SearchScreen() {
             ) {
               productMap.set(key, {
                 ...p,
-                vendor_id:    vendor.id,
-                vendor:       vendor,
-                stock_qty:    inv.stock_qty,
-                _inStock:     inStock,
+                vendor_id: vendor.id,
+                vendor: vendor,
+                stock_qty: inv.stock_qty,
+                _inStock: inStock,
                 _allVendorIds: existing?._allVendorIds || [],
               });
             }
@@ -690,7 +690,7 @@ export default function SearchScreen() {
               vendor_id: vendor.id,
               vendor,
               stock_qty: inv.stock_qty,
-              _inStock:  false,
+              _inStock: false,
               _allVendorIds: [vendor.id],
             });
           }
@@ -736,7 +736,7 @@ export default function SearchScreen() {
   // ── Navigate to vendor store ──────────────────────────────────────────────
   const goToStore = useCallback((vendor) => {
     navigation.navigate("VendorStore", {
-      vendorId:   vendor.id,
+      vendorId: vendor.id,
       vendorName: vendor.shop_name,
     });
   }, [navigation]);
@@ -748,7 +748,7 @@ export default function SearchScreen() {
     const carrying = vendors.filter(v => v.id === product.vendor_id);
     // Also fetch from backend if needed
     try {
-      const res  = await fetch(`${BASE_URL}/products/${product.id}/vendors`, {
+      const res = await fetch(`${BASE_URL}/products/${product.id}/vendors`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const data = await res.json();
@@ -787,7 +787,7 @@ export default function SearchScreen() {
     [matchedVendors, userCoords]);
 
   const nearbyVendors = vendorsWithDist.filter(v => !v._tooFar);
-  const farVendors    = vendorsWithDist.filter(v => v._tooFar);
+  const farVendors = vendorsWithDist.filter(v => v._tooFar);
 
   // Products with store count
   const productsWithCount = useMemo(() =>
@@ -796,23 +796,23 @@ export default function SearchScreen() {
 
   // ── Suggestions: API-first, fall back to local history ──────────────────
   const trimmed = query.trim();
-  const isIdle    = !committed && trimmed.length === 0;
-  const isTyping  = !committed && trimmed.length > 0;
+  const isIdle = !committed && trimmed.length === 0;
+  const isTyping = !committed && trimmed.length > 0;
 
   // Merge API suggestions with local history (API takes priority)
   const suggestions = isTyping
     ? (() => {
-        // API suggestions come with { text, type } shape
-        const apiTexts = apiSuggestions.map(s => ({ text: s.text, type: s.type }));
-        const apiTextSet = new Set(apiTexts.map(s => s.text.toLowerCase()));
+      // API suggestions come with { text, type } shape
+      const apiTexts = apiSuggestions.map(s => ({ text: s.text, type: s.type }));
+      const apiTextSet = new Set(apiTexts.map(s => s.text.toLowerCase()));
 
-        // Local history fallback — only items not already in API results
-        const localFallback = history
-          .filter(h => h.toLowerCase().includes(trimmed.toLowerCase()) && !apiTextSet.has(h.toLowerCase()))
-          .map(h => ({ text: h, type: 'local' }));
+      // Local history fallback — only items not already in API results
+      const localFallback = history
+        .filter(h => h.toLowerCase().includes(trimmed.toLowerCase()) && !apiTextSet.has(h.toLowerCase()))
+        .map(h => ({ text: h, type: 'local' }));
 
-        return [...apiTexts, ...localFallback].slice(0, 7);
-      })()
+      return [...apiTexts, ...localFallback].slice(0, 7);
+    })()
     : [];
 
   // ── Floating cart ─────────────────────────────────────────────────────────
@@ -872,8 +872,8 @@ export default function SearchScreen() {
         {committed && (
           <View style={s.tabs}>
             {[
-              { key: "places", label: "Stores",  count: nearbyVendors.length },
-              { key: "items",  label: "Items",   count: products.length      },
+              { key: "places", label: "Stores", count: nearbyVendors.length },
+              { key: "items", label: "Items", count: products.length },
             ].map(tab => (
               <TouchableOpacity
                 key={tab.key}
@@ -1066,7 +1066,7 @@ export default function SearchScreen() {
                                 vendor={v}
                                 distKm={v._dist}
                                 matchCount={v.matchCount}
-                                onPress={() => {}}
+                                onPress={() => { }}
                                 tooFar
                               />
                             ))}
@@ -1160,72 +1160,72 @@ export default function SearchScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root:    { flex: 1, paddingTop: Platform.OS === "ios" ? 52 : 32 },
+  root: { flex: 1, paddingTop: Platform.OS === "ios" ? 52 : 32 },
 
   // Floating cart
-  floatingCart:      { position: "absolute", bottom: 20, left: 16, right: 16, backgroundColor: C.green, borderRadius: 18, shadowColor: C.green, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 14, zIndex: 100 },
-  floatingInner:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14, paddingHorizontal: 18, borderRadius: 18 },
-  floatingLeft:      { flexDirection: "row", alignItems: "center", gap: 12 },
-  floatingBadge:     { width: 34, height: 34, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
+  floatingCart: { position: "absolute", bottom: 20, left: 16, right: 16, backgroundColor: C.green, borderRadius: 18, shadowColor: C.green, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 14, zIndex: 100 },
+  floatingInner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14, paddingHorizontal: 18, borderRadius: 18 },
+  floatingLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  floatingBadge: { width: 34, height: 34, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
   floatingBadgeText: { fontSize: 15, fontWeight: "900", color: C.white, fontFamily: "PlusJakartaSans_800ExtraBold" },
-  floatingItems:     { fontSize: 14, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
-  floatingTotal:     { fontSize: 12, color: "rgba(255,255,255,0.82)", marginTop: 1, fontFamily: "PlusJakartaSans_500Medium" },
-  floatingCTA:       { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 16, paddingVertical: 9, borderRadius: 12 },
-  floatingCTAText:   { fontSize: 14, fontWeight: "800", color: C.white, fontFamily: "PlusJakartaSans_800ExtraBold" },
+  floatingItems: { fontSize: 14, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
+  floatingTotal: { fontSize: 12, color: "rgba(255,255,255,0.82)", marginTop: 1, fontFamily: "PlusJakartaSans_500Medium" },
+  floatingCTA: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 16, paddingVertical: 9, borderRadius: 12 },
+  floatingCTAText: { fontSize: 14, fontWeight: "800", color: C.white, fontFamily: "PlusJakartaSans_800ExtraBold" },
 
   // Header
-  topBar:         { flexDirection: "row", alignItems: "center", gap: 10, paddingBottom: 12 },
-  backBtn:        { width: 38, height: 38, borderRadius: 12, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
-  inputWrap:      { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.gray100, borderRadius: 14, borderWidth: 1.5, borderColor: "transparent", paddingHorizontal: 14, paddingVertical: 11 },
-  inputWrapActive:{ borderColor: C.greenBorder, backgroundColor: C.greenLight },
-  input:          { flex: 1, fontSize: 15, color: C.gray900, fontFamily: "PlusJakartaSans_500Medium", outlineStyle: "none" },
-  searchBtn:      { backgroundColor: C.green, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11 },
-  searchBtnText:  { fontSize: 14, fontWeight: "800", color: C.white, fontFamily: "PlusJakartaSans_800ExtraBold" },
+  topBar: { flexDirection: "row", alignItems: "center", gap: 10, paddingBottom: 12 },
+  backBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
+  inputWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.gray100, borderRadius: 14, borderWidth: 1.5, borderColor: "transparent", paddingHorizontal: 14, paddingVertical: 11 },
+  inputWrapActive: { borderColor: C.greenBorder, backgroundColor: C.greenLight },
+  input: { flex: 1, fontSize: 15, color: C.gray900, fontFamily: "PlusJakartaSans_500Medium", outlineStyle: "none" },
+  searchBtn: { backgroundColor: C.green, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11 },
+  searchBtnText: { fontSize: 14, fontWeight: "800", color: C.white, fontFamily: "PlusJakartaSans_800ExtraBold" },
 
   // Tabs
-  tabs:              { flexDirection: "row", borderBottomWidth: 1.5, borderBottomColor: C.gray200, backgroundColor: C.white },
-  tab:               { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, paddingVertical: 13 },
-  tabActive:         { borderBottomWidth: 2.5, borderBottomColor: C.green },
-  tabLabel:          { fontSize: 14, fontWeight: "600", color: C.gray500, fontFamily: "PlusJakartaSans_600SemiBold" },
-  tabLabelActive:    { color: C.green, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold" },
-  tabBubble:         { backgroundColor: C.gray100, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 },
-  tabBubbleActive:   { backgroundColor: C.greenMid },
-  tabBubbleText:     { fontSize: 11, fontWeight: "700", color: C.gray500, fontFamily: "PlusJakartaSans_700Bold" },
-  tabBubbleTextActive:{ color: C.green, fontFamily: "PlusJakartaSans_700Bold" },
+  tabs: { flexDirection: "row", borderBottomWidth: 1.5, borderBottomColor: C.gray200, backgroundColor: C.white },
+  tab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, paddingVertical: 13 },
+  tabActive: { borderBottomWidth: 2.5, borderBottomColor: C.green },
+  tabLabel: { fontSize: 14, fontWeight: "600", color: C.gray500, fontFamily: "PlusJakartaSans_600SemiBold" },
+  tabLabelActive: { color: C.green, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold" },
+  tabBubble: { backgroundColor: C.gray100, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 },
+  tabBubbleActive: { backgroundColor: C.greenMid },
+  tabBubbleText: { fontSize: 11, fontWeight: "700", color: C.gray500, fontFamily: "PlusJakartaSans_700Bold" },
+  tabBubbleTextActive: { color: C.green, fontFamily: "PlusJakartaSans_700Bold" },
 
   // Suggestions
-  suggBox:    { backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  suggBox: { backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.gray100 },
 
   // Idle
-  sectionTitle:  { fontSize: 16, fontWeight: "800", color: C.gray900, marginBottom: 12, marginTop: 4, fontFamily: "PlusJakartaSans_800ExtraBold" },
-  sectionRow:    { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 20, marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: "800", color: C.gray900, marginBottom: 12, marginTop: 4, fontFamily: "PlusJakartaSans_800ExtraBold" },
+  sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 20, marginBottom: 12 },
   sectionAction: { fontSize: 13, color: C.green, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" },
   // Category chips — matches HomeScreen style exactly
-  catChip:       { alignItems: "center", width: 100 },
-  catImgWrap:    { width: 86, height: 86, borderRadius: 22, overflow: "hidden", marginBottom: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3 },
-  catImg:        { width: "100%", height: "100%" },
-  catChipLabel:  { fontSize: 13, color: C.gray900, fontWeight: "700", textAlign: "center", fontFamily: "PlusJakartaSans_700Bold" },
-  histRow:       { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  histText:      { flex: 1, fontSize: 14, color: C.gray700, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" },
+  catChip: { alignItems: "center", width: 100 },
+  catImgWrap: { width: 86, height: 86, borderRadius: 22, overflow: "hidden", marginBottom: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3 },
+  catImg: { width: "100%", height: "100%" },
+  catChipLabel: { fontSize: 13, color: C.gray900, fontWeight: "700", textAlign: "center", fontFamily: "PlusJakartaSans_700Bold" },
+  histRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  histText: { flex: 1, fontSize: 14, color: C.gray700, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" },
 
   // Loading
   loadingWrap: { alignItems: "center", paddingTop: 60, gap: 12 },
   loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" },
 
   // Results
-  resultNote:  { fontSize: 12, color: C.gray400, fontWeight: "500", marginBottom: 14, fontFamily: "PlusJakartaSans_500Medium" },
-  itemsCard:   { backgroundColor: C.white, borderRadius: 16, borderWidth: 1, borderColor: C.gray200, overflow: "hidden", marginBottom: 16 },
-  farHeader:   { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.amberLight, borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: "#FDE68A" },
-  farHeaderText:{ fontSize: 13, color: C.amber, fontWeight: "600", flex: 1, fontFamily: "PlusJakartaSans_600SemiBold" },
+  resultNote: { fontSize: 12, color: C.gray400, fontWeight: "500", marginBottom: 14, fontFamily: "PlusJakartaSans_500Medium" },
+  itemsCard: { backgroundColor: C.white, borderRadius: 16, borderWidth: 1, borderColor: C.gray200, overflow: "hidden", marginBottom: 16 },
+  farHeader: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.amberLight, borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: "#FDE68A" },
+  farHeaderText: { fontSize: 13, color: C.amber, fontWeight: "600", flex: 1, fontFamily: "PlusJakartaSans_600SemiBold" },
 
   // Empty
-  emptyWrap:  { alignItems: "center", paddingTop: 60, gap: 12 },
+  emptyWrap: { alignItems: "center", paddingTop: 60, gap: 12 },
   emptyTitle: { fontSize: 18, fontWeight: "700", color: C.gray700, fontFamily: "PlusJakartaSans_700Bold" },
-  emptySub:   { fontSize: 14, color: C.gray400, textAlign: "center", lineHeight: 20, fontFamily: "PlusJakartaSans_500Medium" },
+  emptySub: { fontSize: 14, color: C.gray400, textAlign: "center", lineHeight: 20, fontFamily: "PlusJakartaSans_500Medium" },
 });
 
 const sg = StyleSheet.create({
-  row:  { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: C.gray100 },
   text: { flex: 1, fontSize: 14, color: C.gray700 },
 });
 
@@ -1243,8 +1243,8 @@ const dym = StyleSheet.create({
     backgroundColor: "#FEF3C7",
     alignItems: "center", justifyContent: "center",
   },
-  label:      { fontSize: 11, color: C.amber, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", textTransform: "uppercase", letterSpacing: 0.4 },
+  label: { fontSize: 11, color: C.amber, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", textTransform: "uppercase", letterSpacing: 0.4 },
   suggestion: { fontSize: 17, fontWeight: "800", color: C.gray900, fontFamily: "PlusJakartaSans_800ExtraBold", marginTop: 1 },
-  ctaChip:    { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.orange, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
-  ctaText:    { fontSize: 13, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
-});
+  ctaChip: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.orange, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
+  ctaText: { fontSize: 13, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
+});
