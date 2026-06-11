@@ -604,18 +604,28 @@ export default function SearchScreen() {
         return;
       }
 
-      // Step 1: Fetch vendors at current location (always fresh)
-      const vRes = await fetch(
-        `${BASE_URL}/vendors?latitude=${lat}&longitude=${lng}&radius_km=${FAR_RADIUS}`,
-        { headers }
-      );
+      // Step 1: Fetch vendors at current location and correction suggestion in parallel
+      const [vRes, corrData] = await Promise.all([
+        fetch(
+          `${BASE_URL}/vendors?latitude=${lat}&longitude=${lng}&radius_km=${FAR_RADIUS}`,
+          { headers }
+        ),
+        searchAPI.correct(trimmed).catch(() => null)
+      ]);
+
       const vData = await vRes.json();
       let vendorList = Array.isArray(vData) ? vData : vData.data || vData.vendors || [];
       setVendors(vendorList);
 
+      const suggestion = corrData?.data?.suggestion || corrData?.suggestion || null;
+      const hasSuggestion = suggestion && suggestion.toLowerCase() !== trimmed.toLowerCase();
+      setDidYouMean(hasSuggestion ? suggestion : null);
+
       // Step 2: Search across all vendor inventories in parallel
       // Each vendor's inventory endpoint already exists: GET /inventory/vendor/:id
       const q_lower = trimmed.toLowerCase();
+      const sugg_lower = hasSuggestion ? suggestion.toLowerCase() : null;
+
       const inventoryResults = await Promise.all(
         vendorList.map(v =>
           fetch(`${BASE_URL}/inventory/vendor/${v.id}`, { headers })
@@ -628,12 +638,22 @@ export default function SearchScreen() {
                 const catName = typeof p.category === "object"
                   ? (p.category?.name || "")
                   : (p.category || "");
-                return (
+                
+                const matchesOriginal = (
                   p.name?.toLowerCase().includes(q_lower) ||
                   p.description?.toLowerCase().includes(q_lower) ||
                   catName.toLowerCase().includes(q_lower) ||
                   p.unit?.toLowerCase().includes(q_lower)
                 );
+
+                const matchesSuggestion = sugg_lower ? (
+                  p.name?.toLowerCase().includes(sugg_lower) ||
+                  p.description?.toLowerCase().includes(sugg_lower) ||
+                  catName.toLowerCase().includes(sugg_lower) ||
+                  p.unit?.toLowerCase().includes(sugg_lower)
+                ) : false;
+
+                return matchesOriginal || matchesSuggestion;
               });
               return { vendor: v, matched };
             })
@@ -709,22 +729,11 @@ export default function SearchScreen() {
 
       // Step 4: Build matched vendors list for places tab
       const matched = vendorList
-        .filter(v => vendorMatchMap.has(v.id))
-        .map(v => ({ ...v, matchCount: vendorMatchMap.get(v.id) }))
-        .sort((a, b) => b.matchCount - a.matchCount);
+         .filter(v => vendorMatchMap.has(v.id))
+         .map(v => ({ ...v, matchCount: vendorMatchMap.get(v.id) }))
+         .sort((a, b) => b.matchCount - a.matchCount);
 
       setMatchedVendors(matched);
-
-      // Step 5: "Did you mean?" — only fire when 0 results found
-      if (prodList.length === 0 && matched.length === 0) {
-        try {
-          const corrData = await searchAPI.correct(trimmed);
-          // Backend wraps response: { success, data: { suggestion } }
-          setDidYouMean(corrData?.data?.suggestion || corrData?.suggestion || null);
-        } catch {
-          setDidYouMean(null);
-        }
-      }
 
     } catch (e) {
       console.error("Search error:", e.message);
@@ -996,27 +1005,6 @@ export default function SearchScreen() {
             )}
 
             {/* ── RESULTS ──────────────────────────────────────────── */}
-            {/* ── DID YOU MEAN banner ──────────────────────────── */}
-            {committed && !loading && didYouMean && (
-              <TouchableOpacity
-                style={dym.banner}
-                onPress={() => { setDidYouMean(null); doSearch(didYouMean); }}
-                activeOpacity={0.85}
-              >
-                <View style={dym.iconWrap}>
-                  <Feather name="search" size={16} color={C.orange} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={dym.label}>Did you mean?</Text>
-                  <Text style={dym.suggestion}>{didYouMean}</Text>
-                </View>
-                <View style={dym.ctaChip}>
-                  <Text style={dym.ctaText}>Search</Text>
-                  <Feather name="arrow-right" size={12} color={C.white} />
-                </View>
-              </TouchableOpacity>
-            )}
-
             {committed && !loading && (
               <View style={{ paddingHorizontal: px, paddingTop: 12 }}>
 
@@ -1028,7 +1016,7 @@ export default function SearchScreen() {
                         <Feather name="map-pin" size={32} color={C.gray300} />
                         <Text style={s.emptyTitle}>No stores found</Text>
                         <Text style={s.emptySub}>
-                          No nearby stores carry "{trimmed}". Try the Items tab.
+                          No nearby stores carry "{trimmed}"{didYouMean ? ` or "${didYouMean}"` : ""}. Try the Items tab.
                         </Text>
                       </View>
                     ) : (
@@ -1036,7 +1024,7 @@ export default function SearchScreen() {
                         {nearbyVendors.length > 0 && (
                           <>
                             <Text style={s.resultNote}>
-                              {nearbyVendors.length} store{nearbyVendors.length > 1 ? "s" : ""} near you carry "{trimmed}"
+                              {nearbyVendors.length} store{nearbyVendors.length > 1 ? "s" : ""} near you carry "{trimmed}"{didYouMean ? ` or "${didYouMean}"` : ""}
                             </Text>
                             {nearbyVendors.map(v => (
                               <VendorCard
@@ -1085,13 +1073,13 @@ export default function SearchScreen() {
                         <Feather name="package" size={32} color={C.gray300} />
                         <Text style={s.emptyTitle}>No items found</Text>
                         <Text style={s.emptySub}>
-                          Try a different keyword or check the Stores tab.
+                          Try a different keyword or check the Stores tab{didYouMean ? ` (searched for "${trimmed}" and "${didYouMean}")` : ""}.
                         </Text>
                       </View>
                     ) : (
                       <>
                         <Text style={s.resultNote}>
-                          {products.length} item{products.length > 1 ? "s" : ""} found for "{trimmed}"
+                          {products.length} item{products.length > 1 ? "s" : ""} found for "{trimmed}"{didYouMean ? ` or "${didYouMean}"` : ""}
                         </Text>
                         <View style={s.itemsCard}>
                           {productsWithCount.map((product, i) => (
