@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -127,6 +127,34 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
 
   const vendorName = user?.name || "Vendor";
   const greeting = getGreetingConfig();
+
+  // ─── Banner Handlers (defined before early-returns so socket effect can use them) ───
+  const showNewOrderBanner = (data) => {
+    if (bannerTimer.current) clearTimeout(bannerTimer.current);
+    setNewOrderBanner(data);
+    Animated.spring(bannerAnim, {
+      toValue: 0,
+      friction: 8,
+      tension: 60,
+      useNativeDriver: true,
+    }).start();
+    bannerTimer.current = setTimeout(() => {
+      Animated.timing(bannerAnim, {
+        toValue: -120,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => setNewOrderBanner(null));
+    }, 6000);
+  };
+
+  const dismissBanner = () => {
+    if (bannerTimer.current) clearTimeout(bannerTimer.current);
+    Animated.timing(bannerAnim, {
+      toValue: -120,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => setNewOrderBanner(null));
+  };
 
   // ─── Animations start ───────────────────────────────────────
   useEffect(() => {
@@ -553,38 +581,6 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
     }
   };
 
-  const showNewOrderBanner = (data) => {
-    // Clear any existing timer
-    if (bannerTimer.current) clearTimeout(bannerTimer.current);
-
-    setNewOrderBanner(data);
-
-    // Slide down
-    Animated.spring(bannerAnim, {
-      toValue: 0,
-      friction: 8,
-      tension: 60,
-      useNativeDriver: true,
-    }).start();
-
-    // Auto-dismiss after 6 seconds
-    bannerTimer.current = setTimeout(() => {
-      Animated.timing(bannerAnim, {
-        toValue: -120,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => setNewOrderBanner(null));
-    }, 6000);
-  };
-
-  const dismissBanner = () => {
-    if (bannerTimer.current) clearTimeout(bannerTimer.current);
-    Animated.timing(bannerAnim, {
-      toValue: -120,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => setNewOrderBanner(null));
-  };
 
   return (
     <View style={[styles.root, { backgroundColor: C.bg }]}>

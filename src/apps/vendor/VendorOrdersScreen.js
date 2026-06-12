@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -391,9 +391,22 @@ export default function VendorOrdersScreen() {
       console.log("New Order:", data);
       playOrderSound();
       fetchOrders();
-      // Optional: Add local notification/alert
-      if (data.has_loose_items) {
-        // Alert.alert("New Negotiation", `Order ${data.order_number} needs weight confirmation.`);
+      // Show a toast notification on the orders screen too
+      showVendorToast(
+        `🛒 New order ${data.order_number || "#" + data.order_id} — ₹${data.total || ""}`,
+        "info",
+      );
+    });
+
+    // Real-time order status updates (customer accepted/rejected counter, etc.)
+    socket.on("order:update", (data) => {
+      console.log("Order update:", data);
+      fetchOrders();
+      if (data.status) {
+        showVendorToast(
+          `Order ${data.order_number || "#" + data.order_id} updated: ${data.status}`,
+          data.status === "accepted" ? "success" : "info",
+        );
       }
     });
 
@@ -401,6 +414,7 @@ export default function VendorOrdersScreen() {
     socket.on("slot:request", () => {
       fetchOrders();
       fetchRequests();
+      showVendorToast("📅 New delivery slot request from a customer!", "info");
     });
     socket.on("fee:request", () => fetchOrders());
     socket.on("phone:request", () => {
@@ -410,7 +424,10 @@ export default function VendorOrdersScreen() {
     });
 
     // Customer responses
-    socket.on("slot:confirmed", () => fetchOrders());
+    socket.on("slot:confirmed", () => {
+      fetchOrders();
+      showVendorToast("✅ Customer confirmed the delivery slot.", "success");
+    });
     socket.on("fee:confirmed", () => fetchOrders());
 
     // Delivery Updates
@@ -451,8 +468,7 @@ export default function VendorOrdersScreen() {
       });
       const result = await res.json();
       if (res.ok && result.success) {
-        showVendorToast(`Order marked as ${status} ✓`, "success");
-        await fetchOrders();
+        // Instantly update selectedOrder state so modal re-renders with new buttons
         setSelectedOrder((prev) =>
           prev && prev.id === id ? { ...prev, status } : prev,
         );
@@ -463,6 +479,17 @@ export default function VendorOrdersScreen() {
             `Customer #${selectedOrder.customer_id}`;
           setExpandedCustomers((prev) => ({ ...prev, [customerName]: true }));
         }
+        // For preparing/ready, Alert shows ABOVE the modal (toast won't on Android)
+        if (status === "preparing" || status === "ready") {
+          Alert.alert(
+            "✓ Success",
+            `Order marked as ${status === "preparing" ? "Preparing" : "Ready"}!`,
+          );
+        } else {
+          showVendorToast(`Order ${status} ✓`, "success");
+        }
+        // Refresh orders list in background
+        fetchOrders();
       } else {
         Alert.alert(
           "Error",
@@ -542,6 +569,12 @@ export default function VendorOrdersScreen() {
         }
       }
 
+      // Guard against NaN delivery fee
+      const deliveryFeeValue = parseFloat(counterDeliveryFee);
+      const safeDeliveryFee = isNaN(deliveryFeeValue)
+        ? selectedOrder?.delivery_fee || 0
+        : deliveryFeeValue;
+
       const res = await fetch(
         `${API_BASE}/orders/${selectedOrder.id}/counter`,
         {
@@ -552,7 +585,7 @@ export default function VendorOrdersScreen() {
           },
           body: JSON.stringify({
             items: counterItems,
-            delivery_fee: parseFloat(counterDeliveryFee),
+            delivery_fee: safeDeliveryFee,
             note: counterNote,
             slot_start,
             slot_end,
@@ -562,20 +595,24 @@ export default function VendorOrdersScreen() {
 
       const result = await res.json();
 
-      if (result.success) {
-        Alert.alert("Success", "Counter offer sent to customer");
+      if (res.ok && result.success) {
+        showVendorToast("Counter offer sent to customer ✓", "success");
 
         // Update selectedOrder with the full response to prevent loss of details
         setSelectedOrder(result.data.order);
         setCounterModalVisible(false);
-        // We keep the modal open so they can see the 'Countered' status
-        // or we close it as per current flow:
         setModalVisible(false);
 
         fetchOrders();
+      } else {
+        Alert.alert(
+          "Error",
+          result.message || result.msg || "Failed to send counter offer",
+        );
       }
     } catch (err) {
-      console.log(err);
+      console.error("sendCounterOffer error:", err);
+      Alert.alert("Error", "Something went wrong while sending counter offer.");
     }
   };
 
@@ -2933,9 +2970,11 @@ export default function VendorOrdersScreen() {
                   );
                   return;
                 }
+                // Use 'rejected' (not 'cancelled') — backend VALID_TRANSITIONS
+                // for 'pending' only allows: accepted, rejected, countered
                 updateOrderStatus(
                   selectedOrder.id,
-                  "cancelled",
+                  "rejected",
                   rejectReason.trim(),
                 );
                 setRejectModalVisible(false);
