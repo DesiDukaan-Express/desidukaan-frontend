@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -298,13 +298,18 @@ export default function VendorOrdersScreen() {
     }
   };
 
-  const fetchOrders = async () => {
+  // Always-current ref so socket handlers (which close over stale state)
+  // can call the latest fetchOrders without going stale.
+  const fetchOrdersRef = useRef(null);
+
+  const fetchOrders = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/orders/vendor/active`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       const result = await res.json();
+      console.log('[fetchOrders] result.success:', result.success, '| orders count:', result.data?.orders?.length);
 
       if (result.success) {
         const fetchedOrders = result.data.orders || [];
@@ -318,12 +323,17 @@ export default function VendorOrdersScreen() {
         setExpandedCustomers(expanded);
       }
     } catch (err) {
-      console.log(err);
+      console.log('[fetchOrders] error:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [token]);
+
+  // Keep ref always pointing to the latest fetchOrders
+  useEffect(() => {
+    fetchOrdersRef.current = fetchOrders;
+  }, [fetchOrders]);
 
   const fetchRequests = async () => {
     setLoadingRequests(true);
@@ -390,8 +400,8 @@ export default function VendorOrdersScreen() {
     socket.on("order:new", (data) => {
       console.log("New Order:", data);
       playOrderSound();
-      fetchOrders();
-      // Show a toast notification on the orders screen too
+      // Use ref so we always call the latest fetchOrders, not a stale one
+      fetchOrdersRef.current?.();
       showVendorToast(
         `🛒 New order ${data.order_number || "#" + data.order_id} — ₹${data.total || ""}`,
         "info",
@@ -401,7 +411,7 @@ export default function VendorOrdersScreen() {
     // Real-time order status updates (customer accepted/rejected counter, etc.)
     socket.on("order:update", (data) => {
       console.log("Order update:", data);
-      fetchOrders();
+      fetchOrdersRef.current?.();
       if (data.status) {
         showVendorToast(
           `Order ${data.order_number || "#" + data.order_id} updated: ${data.status}`,
@@ -412,11 +422,11 @@ export default function VendorOrdersScreen() {
 
     // Slot & Fee Negotiation updates
     socket.on("slot:request", () => {
-      fetchOrders();
+      fetchOrdersRef.current?.();
       fetchRequests();
       showVendorToast("📅 New delivery slot request from a customer!", "info");
     });
-    socket.on("fee:request", () => fetchOrders());
+    socket.on("fee:request", () => fetchOrdersRef.current?.());
     socket.on("phone:request", () => {
       playOrderSound();
       fetchRequests();
@@ -425,14 +435,14 @@ export default function VendorOrdersScreen() {
 
     // Customer responses
     socket.on("slot:confirmed", () => {
-      fetchOrders();
+      fetchOrdersRef.current?.();
       showVendorToast("✅ Customer confirmed the delivery slot.", "success");
     });
-    socket.on("fee:confirmed", () => fetchOrders());
+    socket.on("fee:confirmed", () => fetchOrdersRef.current?.());
 
     // Delivery Updates
-    socket.on("order_assigned_to_delivery", () => fetchOrders());
-    socket.on("delivery_status_update", () => fetchOrders());
+    socket.on("order_assigned_to_delivery", () => fetchOrdersRef.current?.());
+    socket.on("delivery_status_update", () => fetchOrdersRef.current?.());
     socket.on("delivery_location_update", (data) => {
       if (data.deliveryId) {
         setLiveRiderLocations((prev) => ({
@@ -454,6 +464,7 @@ export default function VendorOrdersScreen() {
   };
 
   const updateOrderStatus = async (id, status, reason = null) => {
+    console.log('[updateOrderStatus] called with id:', id, 'status:', status);
     try {
       const body = { status };
       if (reason) body.reason = reason;
@@ -467,16 +478,22 @@ export default function VendorOrdersScreen() {
         body: JSON.stringify(body),
       });
       const result = await res.json();
+      console.log('[updateOrderStatus] response:', res.status, result.success, result.message);
+
       if (res.ok && result.success) {
         // ── 1. Instantly update the orders LIST so the card re-renders NOW ──
         if (status === "rejected" || status === "cancelled") {
           // Remove from active list immediately — these go to history
-          setOrders((prev) => prev.filter((o) => o.id !== id));
+          setOrders((prev) => {
+            console.log('[updateOrderStatus] removing order from list, prev length:', prev.length);
+            return prev.filter((o) => o.id !== id);
+          });
         } else {
           // Update the status badge on the card
-          setOrders((prev) =>
-            prev.map((o) => (o.id === id ? { ...o, status } : o)),
-          );
+          setOrders((prev) => {
+            console.log('[updateOrderStatus] updating order status in list, prev length:', prev.length);
+            return prev.map((o) => (o.id === id ? { ...o, status } : o));
+          });
         }
 
         // ── 2. Update the modal's selectedOrder so button set changes ──
@@ -495,15 +512,15 @@ export default function VendorOrdersScreen() {
         // ── 3. Feedback ──
         if (status === "preparing" || status === "ready") {
           Alert.alert(
-            "\u2713 Success",
+            "✓ Success",
             `Order marked as ${status === "preparing" ? "Preparing" : "Ready"}!`,
           );
         } else {
-          showVendorToast(`Order ${status} \u2713`, "success");
+          showVendorToast(`Order ${status} ✓`, "success");
         }
 
-        // ── 4. Background refresh to sync with server ──
-        fetchOrders();
+        // ── 4. Background refresh to sync with server (after slight delay to avoid overwriting optimistic state) ──
+        setTimeout(() => fetchOrdersRef.current?.(), 800);
       } else {
         Alert.alert(
           "Error",
@@ -511,7 +528,7 @@ export default function VendorOrdersScreen() {
         );
       }
     } catch (err) {
-      console.log(err);
+      console.log('[updateOrderStatus] catch error:', err);
       Alert.alert("Error", "Something went wrong while updating status.");
     }
   };
