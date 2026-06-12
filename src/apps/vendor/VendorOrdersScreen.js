@@ -99,9 +99,14 @@ export default function VendorOrdersScreen() {
   const fetchNearbyRiders = async () => {
     try {
       const res = await fetch(
-        `${API_BASE}/delivery/nearby?latitude=${storeLocation.latitude}&longitude=${storeLocation.longitude}&radius_km=10`,
+        `${API_BASE}/delivery/nearby?latitude=${storeLocation.latitude}&longitude=${storeLocation.longitude}&radius_km=10&_t=${Date.now()}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
         },
       );
       const result = await res.json();
@@ -304,8 +309,13 @@ export default function VendorOrdersScreen() {
 
   const fetchOrders = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/orders/vendor/active`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`${API_BASE}/orders/vendor/active?_t=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
       });
 
       const result = await res.json();
@@ -338,8 +348,13 @@ export default function VendorOrdersScreen() {
   const fetchRequests = async () => {
     setLoadingRequests(true);
     try {
-      const res = await fetch(`${API_BASE}/slots/vendor/requests`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`${API_BASE}/slots/vendor/requests?_t=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
       });
       const result = await res.json();
       if (result.data) {
@@ -356,9 +371,14 @@ export default function VendorOrdersScreen() {
     setLoadingHistory(true);
     try {
       const res = await fetch(
-        `${API_BASE}/orders/vendor/history?page=${page}&limit=30`,
+        `${API_BASE}/orders/vendor/history?page=${page}&limit=30&_t=${Date.now()}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
         },
       );
       const result = await res.json();
@@ -486,19 +506,19 @@ export default function VendorOrdersScreen() {
           // Remove from active list immediately — these go to history
           setOrders((prev) => {
             console.log('[updateOrderStatus] removing order from list, prev length:', prev.length);
-            return prev.filter((o) => o.id !== id);
+            return prev.filter((o) => Number(o.id) !== Number(id));
           });
         } else {
           // Update the status badge on the card
           setOrders((prev) => {
             console.log('[updateOrderStatus] updating order status in list, prev length:', prev.length);
-            return prev.map((o) => (o.id === id ? { ...o, status } : o));
+            return prev.map((o) => (Number(o.id) === Number(id) ? { ...o, status } : o));
           });
         }
 
         // ── 2. Update the modal's selectedOrder so button set changes ──
         setSelectedOrder((prev) =>
-          prev && prev.id === id ? { ...prev, status } : prev,
+          prev && Number(prev.id) === Number(id) ? { ...prev, status } : prev,
         );
 
         // Auto-expand the customer group
