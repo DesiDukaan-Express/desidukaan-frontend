@@ -468,27 +468,41 @@ export default function VendorOrdersScreen() {
       });
       const result = await res.json();
       if (res.ok && result.success) {
-        // Instantly update selectedOrder state so modal re-renders with new buttons
+        // ── 1. Instantly update the orders LIST so the card re-renders NOW ──
+        if (status === "rejected" || status === "cancelled") {
+          // Remove from active list immediately — these go to history
+          setOrders((prev) => prev.filter((o) => o.id !== id));
+        } else {
+          // Update the status badge on the card
+          setOrders((prev) =>
+            prev.map((o) => (o.id === id ? { ...o, status } : o)),
+          );
+        }
+
+        // ── 2. Update the modal's selectedOrder so button set changes ──
         setSelectedOrder((prev) =>
           prev && prev.id === id ? { ...prev, status } : prev,
         );
-        // Auto-expand the customer group so the updated order is visible
+
+        // Auto-expand the customer group
         if (selectedOrder) {
           const customerName =
             selectedOrder.customer?.name ||
             `Customer #${selectedOrder.customer_id}`;
           setExpandedCustomers((prev) => ({ ...prev, [customerName]: true }));
         }
-        // For preparing/ready, Alert shows ABOVE the modal (toast won't on Android)
+
+        // ── 3. Feedback ──
         if (status === "preparing" || status === "ready") {
           Alert.alert(
-            "✓ Success",
+            "\u2713 Success",
             `Order marked as ${status === "preparing" ? "Preparing" : "Ready"}!`,
           );
         } else {
-          showVendorToast(`Order ${status} ✓`, "success");
+          showVendorToast(`Order ${status} \u2713`, "success");
         }
-        // Refresh orders list in background
+
+        // ── 4. Background refresh to sync with server ──
         fetchOrders();
       } else {
         Alert.alert(
@@ -797,6 +811,7 @@ export default function VendorOrdersScreen() {
       </View>
 
       <FlatList
+        extraData={orders}
         data={
           activeTab === "orders"
             ? groupByCustomer(orders)
