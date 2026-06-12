@@ -18,6 +18,7 @@ import OrderPlaced from "../apps/customer/OrderPlaced";
 import VendorOnboardingScreen from "../apps/vendor/VendorOnboardingScreen";
 import DashboardScreen from "../apps/vendor/DashboardScreen";
 import DeliveryOnboardingScreen from "../apps/delivery/DeliveryOnboardingScreen";
+import DeliveryPendingScreen from "../apps/delivery/DeliveryPendingScreen";
 import HomeScreen from "../apps/customer/HomeScreen";
 
 const Stack = createNativeStackNavigator();
@@ -73,10 +74,16 @@ export default function Navigation() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      // If profile exists and onboarding_submitted is true
-      setDeliveryOnboarded(!!data.data?.profile?.onboarding_submitted);
+      const profile = data.data?.profile;
+      if (!profile?.onboarding_submitted) {
+        setDeliveryOnboarded('not_submitted');
+      } else if (profile?.is_certified) {
+        setDeliveryOnboarded('approved');
+      } else {
+        setDeliveryOnboarded('pending');
+      }
     } catch (err) {
-      setDeliveryOnboarded(false);
+      setDeliveryOnboarded('not_submitted');
     } finally {
       setCheckingOnboard(false);
     }
@@ -154,14 +161,23 @@ export default function Navigation() {
                   </>
                 )
               ) : role?.toLowerCase() === "delivery" ? (
-                deliveryOnboarded ? (
+                deliveryOnboarded === 'approved' ? (
                   <Stack.Screen name="DeliveryApp" component={DeliveryTabs} />
+                ) : deliveryOnboarded === 'pending' ? (
+                  <Stack.Screen name="DeliveryPending">
+                    {() => (
+                      <DeliveryPendingScreen
+                        onRefresh={checkDeliveryProfile}
+                        refreshing={checkingOnboard}
+                      />
+                    )}
+                  </Stack.Screen>
                 ) : (
                   <Stack.Screen name="DeliveryOnboarding">
                     {(props) => (
                       <DeliveryOnboardingScreen
                         {...props}
-                        onComplete={() => setDeliveryOnboarded(true)}
+                        onComplete={() => setDeliveryOnboarded('pending')}
                       />
                     )}
                   </Stack.Screen>

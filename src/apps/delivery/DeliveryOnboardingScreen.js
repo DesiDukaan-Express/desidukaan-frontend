@@ -414,7 +414,9 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
 
     // ── Form submit ───────────────────────────────────────────────────────────
     const handleSubmit = async () => {
+        console.log('submit pressed')
         const validationErrors = validate(form);
+        console.log('validation errors:', validationErrors)
         if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
             Alert.alert('Missing details', 'Please fill all required fields.');
@@ -472,44 +474,42 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                 keyboardShouldPersistTaps="handled"
             >
                 {/* ── Hero Header ── */}
-                <LinearGradient
-                    colors={['#0f5c2e', '#1A9E3F', '#22c55e']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={s.hero}
-                >
-                    <View style={s.heroNav}>
-                        <TouchableOpacity onPress={() => navigation?.goBack()} style={s.backBtn} activeOpacity={0.7}>
-                            <Text style={s.backArrow}>←</Text>
-                        </TouchableOpacity>
-                        <View style={s.heroBadge}>
-                            <Text style={s.heroBadgeTxt}>DELIVERY PARTNER</Text>
-                        </View>
-                    </View>
+<LinearGradient
+    colors={['#0a4d22', '#147832', '#1A9E3F']}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+    style={s.hero}
+>
+    {/* Nav row */}
+    <View style={s.heroNav}>
+        <TouchableOpacity onPress={() => navigation?.goBack()} style={s.backBtn} activeOpacity={0.7}>
+            <Text style={s.backArrow}>←</Text>
+        </TouchableOpacity>
+        <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={s.heroEyebrow}>DELIVERY PARTNER</Text>
+            <Text style={s.heroTitle}>Partner Onboarding</Text>
+        </View>
+        <View style={s.heroBadge}>
+            <Text style={s.heroBadgeTxt}>6 STEPS</Text>
+        </View>
+    </View>
 
-                    <View style={s.heroMain}>
-                        <Text style={s.heroEyebrow}>Get started in 5 minutes</Text>
-                        <Text style={s.heroTitle}>Partner{"\n"}Onboarding</Text>
-                        <Text style={s.heroSub}>
-                            Fill in your details once and start{"\n"}earning on your own schedule.
-                        </Text>
-                    </View>
+    {/* Stat pills — compact row */}
+    <View style={s.heroStats}>
+        {[
+            { value: '⚡ 5 min', label: 'Quick setup' },
+            { value: '🕐 24 hrs', label: 'Verification' },
+            { value: '🔒 100%', label: 'Secure' },
+        ].map((stat, i) => (
+            <View key={i} style={s.heroStatPill}>
+                <Text style={s.heroStatValue}>{stat.value}</Text>
+                <Text style={s.heroStatLabel}>{stat.label}</Text>
+            </View>
+        ))}
+    </View>
 
-                    <View style={s.heroStats}>
-                        {[
-                            { value: '6 steps', label: 'Quick setup' },
-                            { value: '24 hrs',  label: 'Verification' },
-                            { value: '100%',    label: 'Secure' },
-                        ].map((stat, i) => (
-                            <View key={i} style={s.heroStatPill}>
-                                <Text style={s.heroStatValue}>{stat.value}</Text>
-                                <Text style={s.heroStatLabel}>{stat.label}</Text>
-                            </View>
-                        ))}
-                    </View>
-
-                    <View style={s.heroWave} />
-                </LinearGradient>
+    <View style={s.heroWave} />
+</LinearGradient>
 
                 <ProgressBar form={form} />
 
@@ -786,14 +786,17 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                 </SectionCard>
 
                 {/* Summary Strip */}
-                <View style={s.summaryStrip}>
-                    <Text style={s.summaryTitle}>Almost done! 🎉</Text>
-                    <Text style={s.summaryText}>
-                        After submission, our team verifies your documents within{' '}
-                        <Text style={{ fontWeight: '800', color: '#86EFAC' }}>24 hours</Text>.
-                        You'll receive an SMS once approved.
-                    </Text>
-                </View>
+<View style={s.summaryStrip}>
+    <Text style={{ fontSize: 28 }}>🎉</Text>
+    <View style={{ flex: 1 }}>
+        <Text style={s.summaryTitle}>Almost done!</Text>
+        <Text style={s.summaryText}>
+            Documents verified within{' '}
+            <Text style={{ fontWeight: '800', color: '#86EFAC' }}>24 hours</Text>.
+            SMS on approval.
+        </Text>
+    </View>
+</View>
 
                 {/* Submit Button */}
                 <TouchableOpacity
@@ -827,51 +830,49 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
 
 const s = StyleSheet.create({
     // ── Hero ──
-    hero:          { paddingTop: Platform.OS === 'ios' ? 54 : 40, paddingBottom: 0, paddingHorizontal: 24, marginHorizontal: -16, marginTop: -16 },
-    heroNav:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
-    backBtn:       { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-    backArrow:     { fontSize: 20, color: '#fff', fontWeight: '300', letterSpacing: -1 },
-    heroBadge:     { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-    heroBadgeTxt:  { fontSize: 9, color: 'rgba(255,255,255,0.9)', fontWeight: '800', letterSpacing: 2 },
-    heroMain:      { marginBottom: 28 },
-    heroEyebrow:   { fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
-    heroTitle:     { fontSize: 40, fontWeight: '900', color: '#fff', letterSpacing: -1.5, lineHeight: 44, marginBottom: 14 },
-    heroSub:       { fontSize: 14, color: 'rgba(255,255,255,0.65)', lineHeight: 22, fontWeight: '400' },
-    heroStats:     { flexDirection: 'row', gap: 10, marginBottom: 0, paddingBottom: 28 },
-    heroStatPill:  { flex: 1, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-    heroStatValue: { fontSize: 15, fontWeight: '900', color: '#fff', marginBottom: 2 },
-    heroStatLabel: { fontSize: 10, color: 'rgba(255,255,255,0.6)', fontWeight: '600', letterSpacing: 0.3 },
-    heroWave:      { height: 28, backgroundColor: C.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, marginHorizontal: -24, marginBottom: -1 },
+hero: { paddingTop: Platform.OS === 'ios' ? 52 : StatusBar.currentHeight + 12 || 36, paddingBottom: 0, paddingHorizontal: 20, marginHorizontal: -20, marginTop: -16 },
+heroNav:       { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+backBtn:       { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
+backArrow:     { fontSize: 18, color: '#fff', fontWeight: '400' },
+heroBadge:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+heroBadgeTxt:  { fontSize: 10, color: '#fff', fontWeight: '800', letterSpacing: 1.5 },
+heroEyebrow:   { fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase' },
+heroTitle:     { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: -0.3, lineHeight: 26 },
+heroStats:     { flexDirection: 'row', gap: 8, paddingBottom: 22 },
+heroStatPill:  { flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 6, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+heroStatValue: { fontSize: 12, fontWeight: '800', color: '#fff', marginBottom: 1 },
+heroStatLabel: { fontSize: 9, color: 'rgba(255,255,255,0.6)', fontWeight: '600', letterSpacing: 0.2 },
+heroWave:      { height: 22, backgroundColor: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, marginHorizontal: -20, marginBottom: -1 },
 
-    scrollContent: { padding: 16, paddingTop: 16 },
+    scrollContent: { paddingHorizontal: 20, paddingVertical: 16, paddingTop: 16 },
 
-    progressWrap:       { marginBottom: 14 },
-    progressTrack:      { flexDirection: 'row', marginBottom: 5 },
-    progressSeg:        { flex: 1, height: 3, borderRadius: 10, backgroundColor: C.border },
-    progressSegFilled:  { backgroundColor: C.green },
-    progressTxt:        { fontSize: 11, color: C.textLight, fontWeight: '600', textAlign: 'right' },
+    progressWrap:       { marginBottom: 12, marginHorizontal: 2 },
+progressTrack:      { flexDirection: 'row', marginBottom: 4 },
+progressSeg:        { flex: 1, height: 4, borderRadius: 10, backgroundColor: C.border },
+progressSegFilled:  { backgroundColor: C.green },
+progressTxt:        { fontSize: 10, color: C.textLight, fontWeight: '700', textAlign: 'right', letterSpacing: 0.3 },
 
-    card:          { backgroundColor: '#fff', borderRadius: 20, marginBottom: 14, borderWidth: 1, borderColor: '#EAECF0', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
-    cardHeader:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, gap: 14 },
-    stepNumWrap:   { width: 32, height: 32, borderRadius: 8, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center' },
-    stepNum:       { fontSize: 14, fontWeight: '900', color: '#fff' },
-    cardTitle:     { fontSize: 15, fontWeight: '800', color: C.text, marginBottom: 2, letterSpacing: -0.2 },
-    cardSubtitle:  { fontSize: 12, color: C.textXLight, fontWeight: '400' },
-    cardDivider:   { height: 1, backgroundColor: '#F3F4F6' },
-    cardBody:      { padding: 20, gap: 16 },
+    card: { backgroundColor: '#fff', borderRadius: 20, marginBottom: 14, borderWidth: 1, borderColor: '#E8F0E8', shadowColor: '#147832', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.09, shadowRadius: 14, elevation: 5 },
+cardHeader:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
+stepNumWrap:   { width: 30, height: 30, borderRadius: 9, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center' },
+stepNum:       { fontSize: 13, fontWeight: '900', color: '#fff' },
+cardTitle:     { fontSize: 15, fontWeight: '800', color: C.text, marginBottom: 1, letterSpacing: -0.3 },
+cardSubtitle:  { fontSize: 11, color: C.textXLight, fontWeight: '500' },
+cardDivider:   { height: 1, backgroundColor: '#F5F6F5' },
+cardBody:      { padding: 16, gap: 14 },
 
-    field:      { gap: 6 },
-    fieldLabel: { fontSize: 12, fontWeight: '700', color: C.textMed, textTransform: 'uppercase', letterSpacing: 0.4 },
-    fieldError: { fontSize: 11, color: C.red, fontWeight: '600' },
+    field:      { gap: 5 },
+fieldLabel: { fontSize: 11, fontWeight: '700', color: C.textLight, textTransform: 'uppercase', letterSpacing: 0.6 },
+fieldError: { fontSize: 11, color: C.red, fontWeight: '600', marginTop: 1 },
 
-    input:        { borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 14, paddingVertical: Platform.OS === 'ios' ? 13 : 11, fontSize: 14, color: C.text, backgroundColor: '#FAFAFA', fontWeight: '400' },
-    inputFocused: { borderColor: C.green, backgroundColor: '#fff', shadowColor: C.green, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 4, elevation: 2 },
+input:        { borderWidth: 1.5, borderColor: '#E8EAE8', borderRadius: 12, paddingHorizontal: 14, paddingVertical: Platform.OS === 'ios' ? 13 : 12, fontSize: 14, color: C.text, backgroundColor: '#FAFCFA', fontWeight: '500' },
+inputFocused: { borderColor: C.green, backgroundColor: '#fff', shadowColor: C.green, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 3 },
 
-    chipRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    chip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: C.border, backgroundColor: '#fff' },
-    chipActive:  { borderColor: C.green, backgroundColor: C.greenLight },
-    chipTxt:     { fontSize: 13, fontWeight: '600', color: C.textLight },
-    chipTxtActive:{ color: C.greenDark, fontWeight: '700' },
+    chipRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+chip:         { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 24, borderWidth: 1.5, borderColor: '#E2E8E2', backgroundColor: '#F8FAF8' },
+chipActive:   { borderColor: C.green, backgroundColor: C.greenLight },
+chipTxt:      { fontSize: 13, fontWeight: '600', color: C.textLight },
+chipTxtActive:{ color: C.greenDark, fontWeight: '800' },
 
     profilePhotoWrap:        { width: 100, height: 100, borderRadius: 50, backgroundColor: '#F3F4F6', borderWidth: 2.5, borderColor: C.border, alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' },
     profilePhoto:            { width: 100, height: 100, borderRadius: 50 },
@@ -917,12 +918,12 @@ const s = StyleSheet.create({
     securityRow:  { flexDirection: 'row', alignItems: 'center', backgroundColor: C.greenLight, borderRadius: 10, padding: 10, gap: 8, borderWidth: 1, borderColor: C.greenMid },
     securityText: { flex: 1, fontSize: 12, color: C.greenDark, fontWeight: '600' },
 
-    summaryStrip: { backgroundColor: C.greenDark, borderRadius: 16, padding: 20, marginBottom: 16 },
-    summaryTitle: { fontSize: 15, fontWeight: '900', color: '#fff', marginBottom: 6 },
-    summaryText:  { fontSize: 13, color: 'rgba(255,255,255,0.8)', lineHeight: 20 },
+    summaryStrip: { backgroundColor: C.greenDark, borderRadius: 14, padding: 16, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
+summaryTitle: { fontSize: 14, fontWeight: '900', color: '#fff', marginBottom: 3 },
+summaryText:  { fontSize: 12, color: 'rgba(255,255,255,0.75)', lineHeight: 18, flex: 1 },
 
-    submitBtn:      { backgroundColor: C.green, borderRadius: 16, paddingVertical: 16, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, shadowColor: C.green, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 6, marginBottom: 16 },
-    submitBtnTxt:   { fontSize: 16, fontWeight: '900', color: '#fff', letterSpacing: 0.3 },
-    submitBtnArrow: { fontSize: 18, color: '#fff', fontWeight: '900' },
-    bottomNote:     { textAlign: 'center', fontSize: 12, color: C.textXLight, lineHeight: 18 },
+submitBtn:      { backgroundColor: C.green, borderRadius: 16, paddingVertical: 17, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, shadowColor: C.green, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6, marginBottom: 14 },
+submitBtnTxt:   { fontSize: 15, fontWeight: '900', color: '#fff', letterSpacing: 0.2 },
+submitBtnArrow: { fontSize: 16, color: '#fff', fontWeight: '900' },
+bottomNote:     { textAlign: 'center', fontSize: 11, color: C.textXLight, lineHeight: 17, marginBottom: 4 },
 });
