@@ -1,326 +1,529 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  ActivityIndicator, Vibration, Animated, StatusBar, Platform,
 } from 'react-native';
+import { Audio } from 'expo-av';
 import { io } from 'socket.io-client';
+import {
+  useFonts,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+} from '@expo-google-fonts/plus-jakarta-sans';
 import useAuthStore from '../../store/authStore';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_BASE   = process.env.EXPO_PUBLIC_API_URL    || 'http://localhost:3000/api';
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3000';
 
-// ── Colors ────────────────────────────────────────────────────────────────────
 const C = {
-  bg:           '#F5F7F5',
+  bg:           '#F2F2F7',
   white:        '#FFFFFF',
-  primary:      '#2E7D32',
-  primaryLight: '#EAF3DE',
-  primaryText:  '#27500A',
-  blue:         '#378ADD',
-  blueLight:    '#E6F1FB',
-  blueText:     '#0C447C',
-  orange:       '#F59E0B',
-  orangeLight:  '#FAEEDA',
-  orangeText:   '#633806',
-  red:          '#E24B4A',
-  redLight:     '#FCEBEB',
-  redText:      '#791F1F',
-  textPrimary:  '#1A1A1A',
-  textSecond:   '#666666',
-  textLight:    '#999999',
-  border:       '#E8EDE8',
+  green:        '#50C878',
+  greenDark:    '#2EA85A',
+  greenLight:   '#E8F8EE',
+  greenText:    '#1A6B38',
+  gray100:      '#F3F4F6',
+  gray200:      '#E5E7EB',
+  gray300:      '#D1D5DB',
+  gray400:      '#9CA3AF',
+  gray500:      '#6B7280',
+  gray700:      '#374151',
+  gray800:      '#1F2937',
+  gray900:      '#111827',
+  red:          '#FF3B30',
+  redLight:     '#FFEAEA',
+  redText:      '#B91C1C',
+  blue:         '#3B82F6',
+  blueLight:    '#EFF6FF',
+  blueText:     '#1D4ED8',
+  amber:        '#F59E0B',
+  amberLight:   '#FFFBEB',
+  amberText:    '#92400E',
 };
 
-// ── Priority Badge ────────────────────────────────────────────────────────────
-function PriorityBadge({ label }) {
-  return (
-    <View style={[styles.badge, { backgroundColor: C.blueLight }]}>
-      <Text style={[styles.badgeText, { color: C.blueText }]}>🆕 {label}</Text>
-    </View>
-  );
+// ── Sound helper ──────────────────────────────────────────────────────────────
+async function playOrderSound() {
+  try {
+    const { sound } = await Audio.Sound.createAsync(
+      require('../../../assets/sounds/new_order.mp3'),
+      { shouldPlay: true, volume: 1.0 }
+    );
+    sound.setOnPlaybackStatusUpdate((s) => {
+      if (s.didJustFinish) sound.unloadAsync();
+    });
+  } catch (_) {}
 }
 
-// ── Timer Bar ─────────────────────────────────────────────────────────────────
-function TimerBar({ seconds, onExpire }) {
+// ── Timer bar ─────────────────────────────────────────────────────────────────
+function TimerBar({ seconds, onComplete }) {
   const [remaining, setRemaining] = useState(seconds);
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
 
   useEffect(() => {
-    if (remaining <= 0) {
-      onExpire && onExpire();
-      return;
-    }
-    const interval = setInterval(() => setRemaining(r => r - 1), 1000);
-    return () => clearInterval(interval);
+    if (remaining <= 0) { onCompleteRef.current?.(); return; }
+    const id = setInterval(() => setRemaining(r => r - 1), 1000);
+    return () => clearInterval(id);
   }, [remaining]);
 
   const pct = Math.max(0, (remaining / seconds) * 100);
-  const barColor = pct > 50 ? C.primary : pct > 20 ? C.orange : C.red;
+  const color = pct > 50 ? C.green : pct > 20 ? C.amber : C.red;
 
   return (
-    <View style={styles.timerWrap}>
-      <View style={styles.timerTrack}>
-        <View style={[styles.timerFill, { width: `${pct}%`, backgroundColor: barColor }]} />
+    <View style={tb.row}>
+      <View style={tb.track}>
+        <View style={[tb.fill, { width: `${pct}%`, backgroundColor: color }]} />
       </View>
-      <Text style={[styles.timerText, { color: barColor }]}>{remaining}s</Text>
+      <Text style={[tb.label, { color, fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
+        {remaining}s
+      </Text>
     </View>
   );
 }
 
-// ── Queue Card ────────────────────────────────────────────────────────────────
-function QueueCard({ order, onAccept, onDecline }) {
+const tb = StyleSheet.create({
+  row:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
+  track: { flex: 1, height: 5, backgroundColor: C.gray200, borderRadius: 3, overflow: 'hidden' },
+  fill:  { height: 5, borderRadius: 3 },
+  label: { fontSize: 12, minWidth: 32, textAlign: 'right' },
+});
+
+// ── Stat pill ─────────────────────────────────────────────────────────────────
+function StatPill({ label, value, valueColor }) {
   return (
-    <View style={styles.queueCard}>
-      {/* Top row */}
-      <View style={styles.cardTop}>
-        <Text style={styles.orderId}>{order.orderNumber}</Text>
-        <PriorityBadge label="New Order" />
+    <View style={sp.pill}>
+      <Text style={[sp.value, valueColor && { color: valueColor }]}>{value}</Text>
+      <Text style={sp.label}>{label}</Text>
+    </View>
+  );
+}
+
+const sp = StyleSheet.create({
+  pill:  {
+    flex: 1, backgroundColor: C.white, borderRadius: 16, paddingVertical: 14,
+    alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
+  },
+  value: { fontSize: 22, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray900, marginBottom: 2 },
+  label: { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: C.gray400 },
+});
+
+// ── Queue card ────────────────────────────────────────────────────────────────
+function QueueCard({ order, onAccept, onDecline, isAccepting }) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(16)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim,  { toValue: 1, duration: 280, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, tension: 60, friction: 10, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={[qc.card, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+      {/* Header */}
+      <View style={qc.header}>
+        <View>
+          <Text style={qc.orderNum}>{order.orderNumber}</Text>
+          <Text style={qc.orderSub}>New delivery request</Text>
+        </View>
+        <View style={qc.newPill}>
+          <View style={qc.newDot} />
+          <Text style={qc.newPillText}>LIVE</Text>
+        </View>
       </View>
 
-      {/* Route */}
-      <View style={styles.routeRow}>
-        <View style={[styles.dot, { backgroundColor: C.blue }]} />
-        <Text style={styles.routeText} numberOfLines={1}>{order.pickup?.name}</Text>
-        <View style={styles.routeLine} />
-        <View style={[styles.dot, { backgroundColor: C.red }]} />
-        <Text style={styles.routeText} numberOfLines={1}>{order.dropoff?.city || order.dropoff?.address}</Text>
+      {/* Divider */}
+      <View style={qc.divider} />
+
+      {/* Route: vendor → customer city */}
+      <View style={qc.routeWrap}>
+        <View style={qc.routeStop}>
+          <View style={[qc.routeDot, { backgroundColor: C.blue }]} />
+          <View style={{ flex: 1 }}>
+            <Text style={qc.routeStopLabel}>PICKUP</Text>
+            <Text style={qc.routeStopName} numberOfLines={1}>{order.pickup?.name || '—'}</Text>
+          </View>
+        </View>
+        <View style={qc.routeLineWrap}>
+          <View style={qc.routeVertLine} />
+        </View>
+        <View style={qc.routeStop}>
+          <View style={[qc.routeDot, { backgroundColor: C.red }]} />
+          <View style={{ flex: 1 }}>
+            <Text style={qc.routeStopLabel}>DROP</Text>
+            <Text style={qc.routeStopName} numberOfLines={1}>
+              {order.dropoff?.city || order.dropoff?.address || '—'}
+            </Text>
+          </View>
+        </View>
       </View>
 
-      {/* Info pills */}
-      <View style={styles.infoRow}>
-        <View style={styles.infoPill}>
-          <Text style={styles.infoPillText}>📍 {order.pickup?.address}</Text>
+      {/* Divider */}
+      <View style={qc.divider} />
+
+      {/* Earning row */}
+      <View style={qc.earningRow}>
+        <View style={qc.earningBox}>
+          <Text style={qc.earningLabel}>YOUR EARNING</Text>
+          <Text style={qc.earningValue}>₹{order.deliveryFee || 0}</Text>
         </View>
-        <View style={styles.infoPill}>
-          <Text style={styles.infoPillText}>📦 {order.itemCount} items</Text>
-        </View>
-        <View style={[styles.infoPill, { backgroundColor: C.primaryLight }]}>
-          <Text style={[styles.infoPillText, { color: C.primaryText, fontWeight: '700' }]}>
-            ₹{order.deliveryFee} fee
-          </Text>
-        </View>
-        <View style={styles.infoPill}>
-          <Text style={styles.infoPillText}>🛒 ₹{order.total} total</Text>
+        <View style={[qc.earningBox, { borderLeftWidth: 1, borderLeftColor: C.gray200 }]}>
+          <Text style={qc.earningLabel}>ORDER VALUE</Text>
+          <Text style={[qc.earningValue, { color: C.gray700 }]}>₹{order.total || 0}</Text>
         </View>
       </View>
 
-      {/* Timer bar — 60 seconds to decide */}
-      <TimerBar seconds={60} onExpire={() => onDecline(order.orderId)} />
+      {/* Timer */}
+      <TimerBar seconds={60} onComplete={() => onDecline(order.orderId)} />
 
-      {/* Action buttons */}
-      <View style={styles.btnRow}>
-        <TouchableOpacity style={styles.btnDecline} onPress={() => onDecline(order.orderId)}>
-          <Text style={styles.btnDeclineText}>✕  Decline</Text>
+      {/* Buttons */}
+      <View style={qc.btnRow}>
+        <TouchableOpacity
+          style={qc.btnDecline}
+          onPress={() => onDecline(order.orderId)}
+          activeOpacity={0.8}
+        >
+          <Text style={qc.btnDeclineText}>Decline</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btnAccept} onPress={() => onAccept(order.orderId)}>
-          <Text style={styles.btnAcceptText}>✓  Accept</Text>
+        <TouchableOpacity
+          style={[qc.btnAccept, isAccepting && { opacity: 0.7 }]}
+          onPress={() => onAccept(order.orderId)}
+          disabled={isAccepting}
+          activeOpacity={0.85}
+        >
+          {isAccepting ? (
+            <ActivityIndicator size="small" color={C.white} />
+          ) : (
+            <Text style={qc.btnAcceptText}>Accept order</Text>
+          )}
         </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+}
+
+const qc = StyleSheet.create({
+  card: {
+    backgroundColor: C.white, borderRadius: 20, padding: 18, marginBottom: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07, shadowRadius: 10, elevation: 3,
+  },
+  header:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
+  orderNum:      { fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray900 },
+  orderSub:      { fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: C.gray400, marginTop: 2 },
+  newPill:       { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.greenLight, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  newDot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green },
+  newPillText:   { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.greenText, letterSpacing: 0.8 },
+  divider:       { height: 1, backgroundColor: C.gray200, marginBottom: 14 },
+  routeWrap:     { marginBottom: 14 },
+  routeStop:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  routeDot:      { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  routeStopLabel:{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray400, letterSpacing: 0.8 },
+  routeStopName: { fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: C.gray900, marginTop: 1 },
+  routeLineWrap: { paddingLeft: 4, paddingVertical: 4 },
+  routeVertLine: { width: 1.5, height: 14, backgroundColor: C.gray200, marginLeft: 3 },
+  earningRow:    { flexDirection: 'row', marginBottom: 14 },
+  earningBox:    { flex: 1, paddingVertical: 4 },
+  earningLabel:  { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray400, letterSpacing: 0.8, marginBottom: 4, paddingLeft: 2 },
+  earningValue:  { fontSize: 22, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.green, paddingLeft: 2 },
+  btnRow:        { flexDirection: 'row', gap: 10 },
+  btnDecline:    {
+    flex: 1, paddingVertical: 13, borderRadius: 14,
+    borderWidth: 1.5, borderColor: C.gray200,
+    alignItems: 'center', backgroundColor: C.white,
+  },
+  btnDeclineText:{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: C.red },
+  btnAccept:     {
+    flex: 2, paddingVertical: 13, borderRadius: 14,
+    backgroundColor: C.green, alignItems: 'center',
+  },
+  btnAcceptText: { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: C.white },
+});
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+function EmptyState() {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.15, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 900, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  return (
+    <View style={es.wrap}>
+      <View style={es.dotWrap}>
+        <Animated.View style={[es.ring, { transform: [{ scale: pulseAnim }] }]} />
+        <View style={es.dot} />
+      </View>
+      <Text style={es.title}>Listening for orders</Text>
+      <Text style={es.sub}>When a vendor dispatches an order your way,{'\n'}it'll appear here instantly.</Text>
+      <View style={es.liveBadge}>
+        <View style={es.liveDot} />
+        <Text style={es.liveText}>CONNECTED LIVE</Text>
       </View>
     </View>
   );
 }
 
-// ── Main Screen ───────────────────────────────────────────────────────────────
+const es = StyleSheet.create({
+  wrap:      { alignItems: 'center', paddingVertical: 56, paddingHorizontal: 24 },
+  ring: {
+    position: 'absolute',
+    width: 80, height: 80, borderRadius: 40,
+    borderWidth: 2, borderColor: C.green, opacity: 0.35,
+  },
+  dotWrap: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: C.greenLight,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 20,
+  },
+  dot: { width: 20, height: 20, borderRadius: 10, backgroundColor: C.green },
+  title:     { fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray900, marginBottom: 8 },
+  sub:       { fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: C.gray400, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.greenLight, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
+  liveDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green },
+  liveText:  { fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.greenText, letterSpacing: 1 },
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
 export default function QueueScreen({ navigation }) {
   const { token } = useAuthStore();
+
+  const [fontsLoaded] = useFonts({
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+  });
+
   const [queue, setQueue] = useState([]);
-  const [accepted, setAccepted] = useState(0);
-  const [declined, setDeclined] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [acceptingId, setAcceptingId] = useState(null);
   const socketRef = useRef(null);
 
-  // ── Connect socket to listen for incoming orders ──
+  // Session stats — refs to survive socket re-renders, state to trigger re-render
+  const acceptedRef = useRef(0);
+  const declinedRef = useRef(0);
+  const [sessionStats, setSessionStats] = useState({ accepted: 0, declined: 0 });
+
+  // Fade-in animation
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(18)).current;
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      Animated.parallel([
+        Animated.timing(fadeAnim,  { toValue: 1, duration: 380, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 0, tension: 50, friction: 9, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [fontsLoaded]);
+
+  // Socket
   useEffect(() => {
     if (!token) return;
 
-    const socket = io(SOCKET_URL, {
-      auth: { token },
-      transports: ['websocket'],
-    });
+    const socket = io(SOCKET_URL, { auth: { token }, transports: ['websocket'] });
     socketRef.current = socket;
 
-    socket.on('connect', () => console.log('QueueScreen socket connected'));
-
-    // Real-time: vendor broadcasts auto-assign to this partner
     socket.on('order:incoming', (data) => {
       setQueue(prev => {
-        // Avoid duplicate entries
         if (prev.find(o => o.orderId === data.orderId)) return prev;
+        Vibration.vibrate([0, 200, 100, 200]);
+        playOrderSound();
         return [data, ...prev];
       });
     });
 
-    // If someone else accepts this order, remove from queue
     socket.on('order_assigned_to_delivery', (data) => {
       setQueue(prev => prev.filter(o => o.orderId !== data.order?.id));
     });
 
-    return () => {
-      socket.disconnect();
-      socketRef.current = null;
-    };
+    return () => { socket.disconnect(); socketRef.current = null; };
   }, [token]);
 
   const handleAccept = async (orderId) => {
-    setLoading(true);
+    setAcceptingId(orderId);
     try {
-      const res = await fetch(`${API_BASE}/delivery/accept/${orderId}`, {
+      const res  = await fetch(`${API_BASE}/delivery/accept/${orderId}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (data.success) {
         setQueue(prev => prev.filter(o => o.orderId !== orderId));
-        setAccepted(a => a + 1);
-        navigation.navigate('Active');
+        acceptedRef.current += 1;
+        setSessionStats({ accepted: acceptedRef.current, declined: declinedRef.current });
+        navigation?.navigate('Active');
       } else {
-        Alert.alert('Error', data.message || 'Could not accept order');
-        // Remove from queue if it's no longer available
         setQueue(prev => prev.filter(o => o.orderId !== orderId));
       }
-    } catch (e) {
-      console.log(e);
-      Alert.alert('Error', 'Network error');
+    } catch (_) {
+      setQueue(prev => prev.filter(o => o.orderId !== orderId));
     } finally {
-      setLoading(false);
+      setAcceptingId(null);
     }
   };
 
   const handleDecline = (orderId) => {
     setQueue(prev => prev.filter(o => o.orderId !== orderId));
-    setDeclined(d => d + 1);
+    declinedRef.current += 1;
+    setSessionStats({ accepted: acceptedRef.current, declined: declinedRef.current });
   };
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* ── Header ── */}
-      <Text style={styles.screenTitle}>Order Queue</Text>
-      <Text style={styles.screenSub}>
-        {queue.length > 0 ? 'New orders waiting for your response' : 'Listening for incoming orders...'}
-      </Text>
+  const acceptRate = sessionStats.accepted + sessionStats.declined === 0
+    ? '—'
+    : `${Math.round((sessionStats.accepted / (sessionStats.accepted + sessionStats.declined)) * 100)}%`;
 
-      {/* ── Session Stats ── */}
-      <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{queue.length}</Text>
-          <Text style={styles.statLabel}>In queue</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={[styles.statValue, { color: C.primary }]}>{accepted}</Text>
-          <Text style={styles.statLabel}>Accepted</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={[styles.statValue, { color: C.red }]}>{declined}</Text>
-          <Text style={styles.statLabel}>Declined</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>
-            {accepted + declined === 0
-              ? '—'
-              : `${Math.round((accepted / (accepted + declined)) * 100)}%`}
-          </Text>
-          <Text style={styles.statLabel}>Accept rate</Text>
-        </View>
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={C.green} />
       </View>
+    );
+  }
 
-      {/* ── Queue Cards ── */}
-      {loading && (
-        <ActivityIndicator size="small" color={C.primary} style={{ marginVertical: 8 }} />
-      )}
+  return (
+    <View style={s.root}>
+      <StatusBar barStyle="light-content" backgroundColor="#228948" />
 
-      {queue.length === 0 ? (
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyEmoji}>🛵</Text>
-          <Text style={styles.emptyTitle}>Queue is empty</Text>
-          <Text style={styles.emptyText}>
-            When a vendor auto-assigns, orders will appear here in real-time
-          </Text>
-          <View style={styles.liveBadge}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>LISTENING LIVE</Text>
+      {/* ── Green header ── */}
+      <Animated.View style={[s.hero, { opacity: fadeAnim }]}>
+        <View style={s.heroTop}>
+          <View>
+            <Text style={s.heroTitle}>Order Queue</Text>
+            <Text style={s.heroSub}>
+              {queue.length > 0
+                ? `${queue.length} order${queue.length !== 1 ? 's' : ''} waiting`
+                : 'Listening for incoming orders'}
+            </Text>
+          </View>
+          <View style={s.livePill}>
+            <View style={s.liveDotHero} />
+            <Text style={s.livePillText}>LIVE</Text>
           </View>
         </View>
-      ) : (
-        <>
-          <Text style={styles.sectionTitle}>
-            {queue.length} order{queue.length !== 1 ? 's' : ''} waiting
-          </Text>
-          {queue.map(order => (
+
+        {/* Stats row inside hero */}
+        <View style={s.heroStats}>
+          <View style={s.heroStat}>
+            <Text style={s.heroStatValue}>{queue.length}</Text>
+            <Text style={s.heroStatLabel}>In queue</Text>
+          </View>
+          <View style={s.heroStatDivider} />
+          <View style={s.heroStat}>
+            <Text style={[s.heroStatValue, { color: '#A8F0C0' }]}>{sessionStats.accepted}</Text>
+            <Text style={s.heroStatLabel}>Accepted</Text>
+          </View>
+          <View style={s.heroStatDivider} />
+          <View style={s.heroStat}>
+            <Text style={[s.heroStatValue, { color: '#FCA5A5' }]}>{sessionStats.declined}</Text>
+            <Text style={s.heroStatLabel}>Declined</Text>
+          </View>
+          <View style={s.heroStatDivider} />
+          <View style={s.heroStat}>
+            <Text style={s.heroStatValue}>{acceptRate}</Text>
+            <Text style={s.heroStatLabel}>Accept rate</Text>
+          </View>
+        </View>
+      </Animated.View>
+
+      <ScrollView
+        style={s.scroll}
+        contentContainerStyle={s.content}
+        showsVerticalScrollIndicator={false}
+      >
+
+        {/* ── Queue or empty ── */}
+        {queue.length === 0 ? (
+          <Animated.View style={{ opacity: fadeAnim }}>
+            <View style={s.emptyCard}>
+              <EmptyState />
+            </View>
+          </Animated.View>
+        ) : (
+          queue.map(order => (
             <QueueCard
               key={order.orderId}
               order={order}
               onAccept={handleAccept}
               onDecline={handleDecline}
+              isAccepting={acceptingId === order.orderId}
             />
-          ))}
-        </>
-      )}
-    </ScrollView>
+          ))
+        )}
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    </View>
   );
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  screen:       { flex: 1, backgroundColor: C.bg },
-  content:      { padding: 16, paddingBottom: 40 },
+const s = StyleSheet.create({
+  root:   { flex: 1, backgroundColor: C.bg },
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 100 },
 
-  screenTitle:  { fontSize: 20, fontWeight: '700', color: C.textPrimary, marginBottom: 2 },
-  screenSub:    { fontSize: 12, color: C.textLight, marginBottom: 14 },
+  // Hero header
+  hero: {
+    backgroundColor: '#228948',
+    paddingTop: Platform.OS === 'android' ? 36 : 58,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+  },
+  heroTop: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'flex-start', marginBottom: 24,
+  },
+  heroTitle: {
+    fontSize: 28, fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF', letterSpacing: -0.5,
+  },
+  heroSub: {
+    fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium',
+    color: 'rgba(255,255,255,0.70)', marginTop: 4,
+  },
+  livePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
+  },
+  liveDotHero: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#A8F0C0' },
+  livePillText: {
+    fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF', letterSpacing: 1,
+  },
 
-  // Stats
-  statsRow:     { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  statCard:     { flex: 1, backgroundColor: C.white, borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 0.5, borderColor: C.border },
-  statValue:    { fontSize: 20, fontWeight: '700', color: C.textPrimary },
-  statLabel:    { fontSize: 10, color: C.textSecond, marginTop: 2 },
+  // Stats inside hero
+  heroStats: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    borderRadius: 16, paddingVertical: 14,
+  },
+  heroStat: { flex: 1, alignItems: 'center' },
+  heroStatValue: {
+    fontSize: 22, fontFamily: 'PlusJakartaSans_800ExtraBold',
+    color: '#FFFFFF', marginBottom: 2,
+  },
+  heroStatLabel: {
+    fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium',
+    color: 'rgba(255,255,255,0.60)',
+  },
+  heroStatDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.15)', marginVertical: 4 },
 
-  sectionTitle: { fontSize: 13, fontWeight: '600', color: C.textSecond, marginBottom: 10 },
-
-  // Queue card
-  queueCard:    { backgroundColor: C.white, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 0.5, borderColor: C.border },
-  cardTop:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  orderId:      { fontSize: 13, fontWeight: '700', color: C.textPrimary },
-
-  badge:        { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
-  badgeText:    { fontSize: 11, fontWeight: '600' },
-
-  // Route
-  routeRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  dot:          { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
-  routeText:    { fontSize: 12, color: C.textPrimary, flexShrink: 1, maxWidth: '35%' },
-  routeLine:    { flex: 1, height: 1, backgroundColor: C.border },
-
-  // Info pills
-  infoRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
-  infoPill:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: C.bg, borderWidth: 0.5, borderColor: C.border },
-  infoPillText: { fontSize: 11, color: C.textSecond },
-
-  // Timer
-  timerWrap:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  timerTrack:   { flex: 1, height: 4, backgroundColor: C.border, borderRadius: 4, overflow: 'hidden' },
-  timerFill:    { height: 4, borderRadius: 4 },
-  timerText:    { fontSize: 11, fontWeight: '700', minWidth: 30, textAlign: 'right' },
-
-  // Buttons
-  btnRow:       { flexDirection: 'row', gap: 10 },
-  btnDecline:   { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 0.5, borderColor: C.border, alignItems: 'center', backgroundColor: C.bg },
-  btnDeclineText: { fontSize: 13, fontWeight: '600', color: C.red },
-  btnAccept:    { flex: 1, paddingVertical: 10, borderRadius: 10, backgroundColor: C.primary, alignItems: 'center' },
-  btnAcceptText:{ fontSize: 13, fontWeight: '600', color: C.white },
-
-  // Empty state
-  emptyBox:     { alignItems: 'center', paddingVertical: 60 },
-  emptyEmoji:   { fontSize: 48, marginBottom: 12 },
-  emptyTitle:   { fontSize: 16, fontWeight: '700', color: C.textPrimary, marginBottom: 6 },
-  emptyText:    { fontSize: 13, color: C.textLight, textAlign: 'center', marginBottom: 20, paddingHorizontal: 20 },
-  liveBadge:    { flexDirection: 'row', alignItems: 'center', backgroundColor: C.primaryLight, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
-  liveDot:      { width: 6, height: 6, borderRadius: 3, backgroundColor: C.primary, marginRight: 6 },
-  liveText:     { fontSize: 11, fontWeight: '800', color: C.primaryText, letterSpacing: 1 },
+  emptyCard: {
+    backgroundColor: C.white, borderRadius: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+  },
 });
