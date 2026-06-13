@@ -1,12 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Switch, Alert, Linking, Animated, PanResponder, Dimensions,
-  StatusBar, Platform,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Animated, PanResponder, Dimensions,
+  StatusBar, Platform, ActivityIndicator,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { io } from 'socket.io-client';
 import { useFocusEffect } from '@react-navigation/native';
+import {
+  useFonts,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+} from '@expo-google-fonts/plus-jakarta-sans';
 import useAuthStore from '../../store/authStore';
 import DeliveryMapView from '../../components/DeliveryMapView';
 import IncomingOrderSheet from '../../components/IncomingOrderSheet';
@@ -16,62 +22,64 @@ const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || (API_BASE.includes('/api') ? API_BASE.split('/api')[0] : 'http://localhost:3000');
 
 const C = {
-  bg: '#F5F7F5',
-  white: '#FFFFFF',
-  primary: '#2E7D32',
-  primaryLight: '#EAF3DE',
-  primaryText: '#27500A',
+  // Hero greens — matches DeliveryHomeScreen exactly
+  heroBg:      '#228948',
+  heroSubText: 'rgba(255,255,255,0.70)',
+  heroStatBg:  'rgba(0,0,0,0.15)',
+  white:       '#FFFFFF',
+
+  // App bg
+  bg:          '#F2F2F7',
+
+  // Greens
+  primary:     '#2E7D32',
+  primaryLight:'#E8F8EE',
+  primaryText: '#1A6B38',
   primaryDark: '#1B5E20',
-  blue: '#378ADD',
-  blueLight: '#E6F1FB',
-  blueText: '#0C447C',
-  orange: '#FAEEDA',
-  orangeText: '#633806',
-  red: '#E24B4A',
-  redLight: '#FCEBEB',
-  redText: '#791F1F',
-  textPrimary: '#1A1A1A',
-  textSecond: '#666666',
-  textLight: '#999999',
-  border: '#E8EDE8',
+
+  // Accents
+  blue:        '#3B82F6',
+  blueLight:   '#EFF6FF',
+  blueText:    '#1D4ED8',
+  red:         '#FF3B30',
+
+  // Text
+  textPrimary: '#111827',
+  textSecond:  '#6B7280',
+  textLight:   '#9CA3AF',
+
+  // Borders
+  border:      '#E5E7EB',
 };
 
 // ── Delivery steps ────────────────────────────────────────────────────────────
-// Maps to backend: assigned → picked_up → delivered
 const STEPS = [
-  { key: 'reach_pickup',  label: 'Reach Pickup',  api: null,       btnLabel: 'Reached Pickup Location' },
-  { key: 'pick_order',    label: 'Pick Order',    api: 'picked_up', btnLabel: 'Picked Order' },
-  { key: 'reach_drop',    label: 'Reach Drop',    api: null,        btnLabel: 'Reached Drop Location' },
-  { key: 'drop_order',    label: 'Drop Order',    api: 'delivered', btnLabel: 'Order Delivered' },
+  { key: 'reach_pickup', label: 'Reach Pickup',  api: null,        btnLabel: 'Reached Pickup Location' },
+  { key: 'pick_order',   label: 'Pick Order',    api: 'picked_up', btnLabel: 'Picked Order'            },
+  { key: 'reach_drop',   label: 'Reach Drop',    api: null,        btnLabel: 'Reached Drop Location'   },
+  { key: 'drop_order',   label: 'Drop Order',    api: 'delivered', btnLabel: 'Order Delivered'         },
 ];
 
 // ── Slide-to-Action Button ────────────────────────────────────────────────────
-const THUMB = 56;
-const TRACK_W = SCREEN_W - 48; // 24px padding each side
+const THUMB      = 56;
+const TRACK_W    = SCREEN_W - 32;
 const DRAG_RANGE = TRACK_W - THUMB - 4;
 
 function SlideButton({ label, onComplete, color = C.primary }) {
-  const pan = useRef(new Animated.Value(0)).current;
+  const pan  = useRef(new Animated.Value(0)).current;
   const [done, setDone] = useState(false);
 
-  // Reset when label changes (new step)
-  useEffect(() => {
-    setDone(false);
-    pan.setValue(0);
-  }, [label]);
+  useEffect(() => { setDone(false); pan.setValue(0); }, [label]);
 
   const responder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => !done,
-      onMoveShouldSetPanResponder: () => !done,
-      onPanResponderMove: (_, g) => {
-        pan.setValue(Math.max(0, Math.min(g.dx, DRAG_RANGE)));
-      },
+      onMoveShouldSetPanResponder:  () => !done,
+      onPanResponderMove:    (_, g) => { pan.setValue(Math.max(0, Math.min(g.dx, DRAG_RANGE))); },
       onPanResponderRelease: (_, g) => {
         if (g.dx >= DRAG_RANGE * 0.82) {
           Animated.spring(pan, { toValue: DRAG_RANGE, useNativeDriver: false }).start(() => {
-            setDone(true);
-            onComplete?.();
+            setDone(true); onComplete?.();
           });
         } else {
           Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
@@ -80,7 +88,9 @@ function SlideButton({ label, onComplete, color = C.primary }) {
     })
   ).current;
 
-  const labelOpacity = pan.interpolate({ inputRange: [0, DRAG_RANGE * 0.5], outputRange: [1, 0], extrapolate: 'clamp' });
+  const labelOpacity = pan.interpolate({
+    inputRange: [0, DRAG_RANGE * 0.5], outputRange: [1, 0], extrapolate: 'clamp',
+  });
 
   return (
     <View style={[sb.track, { backgroundColor: done ? color : C.primaryLight, borderColor: color }]}>
@@ -99,46 +109,44 @@ function SlideButton({ label, onComplete, color = C.primary }) {
 }
 
 const sb = StyleSheet.create({
-  track: {
+  track:     {
     width: TRACK_W, height: THUMB + 4, borderRadius: (THUMB + 4) / 2,
     overflow: 'hidden', justifyContent: 'center', alignItems: 'center',
     borderWidth: 1.5, position: 'relative',
   },
-  fill: {
-    position: 'absolute', left: 0, top: 0, bottom: 0,
-    borderRadius: (THUMB + 4) / 2,
-  },
-  label: { fontSize: 14, fontWeight: '700', letterSpacing: 0.3 },
-  thumb: {
+  fill:      { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: (THUMB + 4) / 2 },
+  label:     { fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', letterSpacing: 0.3 },
+  thumb:     {
     position: 'absolute', left: 2,
     width: THUMB, height: THUMB, borderRadius: THUMB / 2,
     alignItems: 'center', justifyContent: 'center', elevation: 4,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18, shadowRadius: 4,
   },
-  thumbIcon: { fontSize: 18, color: C.white, fontWeight: '800' },
+  thumbIcon: { fontSize: 18, color: C.white, fontFamily: 'PlusJakartaSans_800ExtraBold' },
 });
 
 // ── Step Progress Bar ─────────────────────────────────────────────────────────
 function StepBar({ currentStep }) {
   return (
-    <View style={sp.row}>
+    <View style={spb.row}>
       {STEPS.map((s, i) => {
-        const past = i < currentStep;
+        const past   = i < currentStep;
         const active = i === currentStep;
         return (
           <React.Fragment key={s.key}>
-            <View style={sp.stepWrap}>
-              <View style={[sp.dot, past && sp.dotDone, active && sp.dotActive]}>
-                <Text style={[sp.dotNum, (past || active) && { color: C.white }]}>
+            <View style={spb.stepWrap}>
+              <View style={[spb.dot, past && spb.dotDone, active && spb.dotActive]}>
+                <Text style={[spb.dotNum, (past || active) && { color: C.white }]}>
                   {past ? '✓' : i + 1}
                 </Text>
               </View>
-              <Text style={[sp.stepLabel, active && { color: C.primary, fontWeight: '700' }]} numberOfLines={1}>
+              <Text style={[spb.stepLabel, active && { color: C.primary, fontWeight: '700' }]} numberOfLines={1}>
                 {s.label}
               </Text>
             </View>
             {i < STEPS.length - 1 && (
-              <View style={[sp.line, past && { backgroundColor: C.primary }]} />
+              <View style={[spb.line, past && { backgroundColor: C.primary }]} />
             )}
           </React.Fragment>
         );
@@ -147,41 +155,67 @@ function StepBar({ currentStep }) {
   );
 }
 
-const sp = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 8, marginBottom: 16 },
-  stepWrap: { alignItems: 'center', width: 56 },
+const spb = StyleSheet.create({
+  row:       { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, marginBottom: 12, marginTop: 4 },
+  stepWrap:  { alignItems: 'center', width: 56 },
   dot: {
     width: 28, height: 28, borderRadius: 14,
-    backgroundColor: C.border, alignItems: 'center', justifyContent: 'center', marginBottom: 4,
-    borderWidth: 1.5, borderColor: C.border,
+    backgroundColor: C.border, alignItems: 'center', justifyContent: 'center',
+    marginBottom: 4, borderWidth: 1.5, borderColor: C.border,
   },
-  dotDone: { backgroundColor: C.primary, borderColor: C.primary },
+  dotDone:   { backgroundColor: C.primary, borderColor: C.primary },
   dotActive: { backgroundColor: C.primary, borderColor: C.primaryDark },
-  dotNum: { fontSize: 12, fontWeight: '700', color: C.textSecond },
-  stepLabel: { fontSize: 9, color: C.textLight, textAlign: 'center', fontWeight: '600', letterSpacing: 0.2 },
-  line: { flex: 1, height: 2, backgroundColor: C.border, marginTop: 13, marginHorizontal: 2 },
+  dotNum:    { fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: C.textSecond },
+  stepLabel: { fontSize: 9, color: C.textLight, textAlign: 'center', fontFamily: 'PlusJakartaSans_600SemiBold', letterSpacing: 0.2 },
+  line:      { flex: 1, height: 2, backgroundColor: C.border, marginTop: 13, marginHorizontal: 2 },
 });
 
-// ── Info Row (icon + label + value) ──────────────────────────────────────────
-function InfoRow({ icon, label, value, onPress }) {
-  const inner = (
-    <View style={ir.row}>
-      <Text style={ir.icon}>{icon}</Text>
-      <View style={{ flex: 1 }}>
-        <Text style={ir.label}>{label}</Text>
-        <Text style={ir.value}>{value}</Text>
-      </View>
+// ── Action Buttons (Call + Map) ───────────────────────────────────────────────
+function ActionButtons({ onCall, onMap }) {
+  return (
+    <View style={ab.row}>
+      <TouchableOpacity style={ab.btnCall} onPress={onCall} activeOpacity={0.8}>
+        <Text style={ab.callIcon}>📞</Text>
+        <Text style={ab.callText}>Call</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={ab.btnMap} onPress={onMap} activeOpacity={0.8}>
+        <Text style={ab.mapIcon}>🗺️</Text>
+        <Text style={ab.mapText}>Go to map</Text>
+      </TouchableOpacity>
     </View>
   );
-  if (onPress) return <TouchableOpacity onPress={onPress}>{inner}</TouchableOpacity>;
-  return inner;
 }
 
-const ir = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
-  icon: { fontSize: 20, width: 28, textAlign: 'center' },
-  label: { fontSize: 10, color: C.textLight, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  value: { fontSize: 14, color: C.textPrimary, fontWeight: '600', marginTop: 1 },
+const ab = StyleSheet.create({
+  row:     { flexDirection: 'row', gap: 10, marginTop: 14 },
+  btnCall: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 11, borderRadius: 12,
+    borderWidth: 1.5, borderColor: C.border, backgroundColor: C.white,
+  },
+  callIcon: { fontSize: 15 },
+  callText: { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: C.textPrimary },
+  btnMap:  {
+    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 11, borderRadius: 12, backgroundColor: C.blue,
+  },
+  mapIcon: { fontSize: 15 },
+  mapText: { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: C.white },
+});
+
+// ── Meta row (small icon + text) ──────────────────────────────────────────────
+function MetaRow({ icon, text }) {
+  return (
+    <View style={mr.row}>
+      <Text style={mr.icon}>{icon}</Text>
+      <Text style={mr.text}>{text}</Text>
+    </View>
+  );
+}
+const mr = StyleSheet.create({
+  row:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  icon: { fontSize: 14, color: C.textLight },
+  text: { fontSize: 13, color: C.textSecond, fontFamily: 'PlusJakartaSans_500Medium' },
 });
 
 // ── Order Items Accordion ─────────────────────────────────────────────────────
@@ -191,7 +225,7 @@ function ItemsAccordion({ items, vendorName }) {
     <View style={ac.wrap}>
       <TouchableOpacity style={ac.header} onPress={() => setOpen(o => !o)} activeOpacity={0.8}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <Text style={{ fontSize: 18 }}>🧾</Text>
+          <View style={ac.iconWrap}><Text style={{ fontSize: 16 }}>🧾</Text></View>
           <View>
             <Text style={ac.title}>Order details</Text>
             <Text style={ac.sub}>{vendorName}</Text>
@@ -215,24 +249,24 @@ function ItemsAccordion({ items, vendorName }) {
 }
 
 const ac = StyleSheet.create({
-  wrap: { backgroundColor: C.white, borderRadius: 12, borderWidth: 0.5, borderColor: C.border, marginBottom: 10, overflow: 'hidden' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14 },
-  title: { fontSize: 14, fontWeight: '700', color: C.textPrimary },
-  sub: { fontSize: 11, color: C.textSecond, marginTop: 1 },
-  chevron: { fontSize: 16, color: C.textSecond, fontWeight: '600' },
-  body: { paddingHorizontal: 14, paddingBottom: 12, borderTopWidth: 0.5, borderTopColor: C.border },
-  itemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, gap: 8 },
-  itemQty: { fontSize: 12, fontWeight: '700', color: C.primary, width: 28 },
-  itemName: { flex: 1, fontSize: 13, color: C.textPrimary },
-  itemPrice: { fontSize: 12, color: C.textSecond },
+  wrap:     { backgroundColor: C.white, borderRadius: 14, borderWidth: 1, borderColor: C.border, marginBottom: 10, overflow: 'hidden' },
+  header:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14 },
+  iconWrap: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
+  title:    { fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: C.textPrimary },
+  sub:      { fontSize: 11, color: C.textSecond, fontFamily: 'PlusJakartaSans_500Medium', marginTop: 1 },
+  chevron:  { fontSize: 16, color: C.textSecond, fontFamily: 'PlusJakartaSans_600SemiBold' },
+  body:     { paddingHorizontal: 14, paddingBottom: 12, borderTopWidth: 1, borderTopColor: C.border },
+  itemRow:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, gap: 8 },
+  itemQty:  { fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.primary, width: 28 },
+  itemName: { flex: 1, fontSize: 13, color: C.textPrimary, fontFamily: 'PlusJakartaSans_500Medium' },
+  itemPrice:{ fontSize: 12, color: C.textSecond, fontFamily: 'PlusJakartaSans_500Medium' },
 });
 
 // ── Step Content ──────────────────────────────────────────────────────────────
 function StepContent({ step, activeOrder, myLocation }) {
   const vendorLoc = activeOrder?.vendorLoc;
-  const dropLoc = activeOrder?.dropLoc;
+  const dropLoc   = activeOrder?.dropLoc;
 
-  // Map markers per step
   const getMarkers = () => {
     if (!myLocation) return [];
     const me = { coordinate: myLocation, title: 'You' };
@@ -249,7 +283,12 @@ function StepContent({ step, activeOrder, myLocation }) {
     return [me];
   };
 
-  const mapRegion = step <= 1 ? vendorLoc : dropLoc;
+  const targetLoc = step <= 1 ? vendorLoc : dropLoc;
+  const mapRegion = targetLoc?.latitude != null ? targetLoc : null;
+
+  const openMap = (loc) => {
+    if (loc) Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`);
+  };
 
   return (
     <View>
@@ -258,103 +297,101 @@ function StepContent({ step, activeOrder, myLocation }) {
         <DeliveryMapView currentRegion={mapRegion || myLocation} markers={getMarkers()} />
       </View>
 
-      {/* Step 0 – Reach Pickup */}
+      {/* Drag handle pill */}
+      <View style={styles.dragHandle} />
+
+      {/* ── Step 0 – Reach Pickup ── */}
       {step === 0 && (
         <View style={styles.stepCard}>
-          <Text style={styles.stepCardTitle}>📍 Pickup From</Text>
-          <View style={{ height: 0.5, backgroundColor: C.border, marginVertical: 8 }} />
-          <InfoRow icon="🏪" label="Vendor" value={activeOrder?.pickup || '—'} />
-          <View style={{ height: 0.5, backgroundColor: C.border }} />
-          <InfoRow
-            icon="🗺️"
-            label="Open in Maps"
-            value={vendorLoc ? `${vendorLoc.latitude?.toFixed(4)}, ${vendorLoc.longitude?.toFixed(4)}` : 'Location unavailable'}
-            onPress={vendorLoc ? () => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${vendorLoc.latitude},${vendorLoc.longitude}`) : null}
-          />
-          <View style={{ height: 0.5, backgroundColor: C.border }} />
-          <InfoRow icon="📋" label="Order" value={activeOrder?.displayId || '—'} />
-          <View style={{ height: 0.5, backgroundColor: C.border }} />
-          <InfoRow icon="👤" label="Customer" value={activeOrder?.customerName || '—'} />
+          <Text style={styles.locationLabel}>PICKUP FROM</Text>
+          <Text style={styles.locationName}>{activeOrder?.pickup || '—'}</Text>
+          {vendorLoc && (
+            <Text style={styles.locationAddress}>
+              {vendorLoc.latitude?.toFixed(4)}, {vendorLoc.longitude?.toFixed(4)}
+            </Text>
+          )}
+          <ActionButtons onCall={() => {}} onMap={() => openMap(vendorLoc)} />
+          <View style={styles.metaDivider} />
+          <MetaRow icon="📋" text={`Order: ${activeOrder?.displayId || '—'}`} />
+          <MetaRow icon="👤" text={`Customer: ${activeOrder?.customerName || '—'}`} />
         </View>
       )}
 
-      {/* Step 1 – Pick Order */}
+      {/* ── Step 1 – Pick Order ── */}
       {step === 1 && (
         <View>
-          {/* Big Order ID */}
           <View style={styles.orderIdCard}>
             <Text style={styles.orderIdLabel}>ORDER ID</Text>
             <Text style={styles.orderIdValue}>{activeOrder?.displayId || '—'}</Text>
           </View>
-
           <ItemsAccordion items={activeOrder?.items} vendorName={activeOrder?.pickup} />
-
-          {/* Restaurant details accordion */}
           <View style={ac.wrap}>
             <View style={ac.header}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Text style={{ fontSize: 18 }}>🏪</Text>
+                <View style={ac.iconWrap}><Text style={{ fontSize: 16 }}>🏪</Text></View>
                 <View>
                   <Text style={ac.title}>Restaurant details</Text>
                   <Text style={ac.sub}>{activeOrder?.pickup}</Text>
                 </View>
               </View>
               {vendorLoc && (
-                <TouchableOpacity
-                  onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${vendorLoc.latitude},${vendorLoc.longitude}`)}
-                >
-                  <Text style={{ fontSize: 12, color: C.blue, fontWeight: '600' }}>Go to map</Text>
+                <TouchableOpacity onPress={() => openMap(vendorLoc)}>
+                  <Text style={{ fontSize: 12, color: C.blue, fontWeight: '700' }}>Go to map</Text>
                 </TouchableOpacity>
               )}
+            </View>
+          </View>
+          <View style={ac.wrap}>
+            <View style={ac.header}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={ac.iconWrap}><Text style={{ fontSize: 16 }}>👤</Text></View>
+                <View>
+                  <Text style={ac.title}>Customer details</Text>
+                  <Text style={ac.sub}>{activeOrder?.customerName || '—'}</Text>
+                </View>
+              </View>
             </View>
           </View>
         </View>
       )}
 
-      {/* Step 2 – Reach Drop */}
+      {/* ── Step 2 – Reach Drop ── */}
       {step === 2 && (
         <View style={styles.stepCard}>
-          <Text style={styles.stepCardTitle}>📦 Drop To</Text>
-          <View style={{ height: 0.5, backgroundColor: C.border, marginVertical: 8 }} />
-          <InfoRow icon="👤" label="Customer" value={activeOrder?.customerName || '—'} />
-          <View style={{ height: 0.5, backgroundColor: C.border }} />
-          <InfoRow icon="📍" label="Address" value={activeOrder?.drop || '—'} />
-          <View style={{ height: 0.5, backgroundColor: C.border }} />
-          <InfoRow
-            icon="🗺️"
-            label="Open in Maps"
-            value={dropLoc ? `${dropLoc.latitude?.toFixed(4)}, ${dropLoc.longitude?.toFixed(4)}` : 'Location unavailable'}
-            onPress={dropLoc ? () => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${dropLoc.latitude},${dropLoc.longitude}`) : null}
-          />
-          <View style={{ height: 0.5, backgroundColor: C.border }} />
-          <InfoRow icon="📋" label="Order" value={activeOrder?.displayId || '—'} />
-          <View style={{ height: 0.5, backgroundColor: C.border }} />
-          <InfoRow icon="🏪" label="Pickup From" value={activeOrder?.pickup || '—'} />
+          <Text style={styles.locationName}>{activeOrder?.customerName || '—'}</Text>
+          <Text style={styles.locationAddress}>{activeOrder?.drop || '—'}</Text>
+          <ActionButtons onCall={() => {}} onMap={() => openMap(dropLoc)} />
+          <View style={styles.metaDivider} />
+          <MetaRow icon="📋" text={`Order: ${activeOrder?.displayId || '—'}`} />
+          <MetaRow icon="🏪" text={`Pickup: ${activeOrder?.pickup || '—'}`} />
         </View>
       )}
 
-      {/* Step 3 – Drop Order */}
+      {/* ── Step 3 – Drop Order ── */}
       {step === 3 && (
         <View>
           <View style={styles.stepCard}>
-            <Text style={styles.stepCardTitle}>✅ Deliver To</Text>
-            <View style={{ height: 0.5, backgroundColor: C.border, marginVertical: 8 }} />
-            <InfoRow icon="💳" label="Payment" value="Paid online" />
-            <View style={{ height: 0.5, backgroundColor: C.border }} />
-            <InfoRow icon="📋" label="Order" value={activeOrder?.displayId || '—'} />
-            <View style={{ height: 0.5, backgroundColor: C.border }} />
-            <InfoRow icon="👤" label="Customer" value={activeOrder?.customerName || '—'} />
-            <View style={{ height: 0.5, backgroundColor: C.border }} />
-            <InfoRow icon="📍" label="Address" value={activeOrder?.drop || '—'} />
-            <View style={{ height: 0.5, backgroundColor: C.border }} />
-            <InfoRow
-              icon="🗺️"
-              label="Open in Maps"
-              value="Navigate to drop"
-              onPress={dropLoc ? () => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${dropLoc.latitude},${dropLoc.longitude}`) : null}
-            />
+            <View style={styles.paymentRow}>
+              <View style={styles.paymentCheck}>
+                <Text style={{ color: C.white, fontSize: 12, fontWeight: '800' }}>✓</Text>
+              </View>
+              <View>
+                <Text style={styles.paymentTitle}>Paid online</Text>
+                <Text style={styles.paymentSub}>Order: {activeOrder?.displayId || '—'}</Text>
+              </View>
+            </View>
+            <View style={styles.metaDivider} />
+            <View style={styles.customerRow}>
+              <View style={styles.customerIconWrap}>
+                <Text style={{ fontSize: 18 }}>👤</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.customerName}>{activeOrder?.customerName || '—'}</Text>
+                <Text style={styles.customerAddress}>{activeOrder?.drop || '—'}</Text>
+              </View>
+            </View>
+            <ActionButtons onCall={() => {}} onMap={() => openMap(dropLoc)} />
           </View>
-
           <ItemsAccordion items={activeOrder?.items} vendorName={activeOrder?.pickup} />
         </View>
       )}
@@ -362,41 +399,25 @@ function StepContent({ step, activeOrder, myLocation }) {
   );
 }
 
-// ── No active order view ──────────────────────────────────────────────────────
-function Badge({ status }) {
-  const map = {
-    new: { bg: C.blueLight, color: C.blueText, label: 'New' },
-    transit: { bg: C.orange, color: C.orangeText, label: 'Picked Up' },
-    accepted: { bg: C.primaryLight, color: C.primaryText, label: 'Assigned' },
-    delivered: { bg: C.primaryLight, color: C.primaryText, label: 'Delivered' },
-    cancelled: { bg: C.redLight, color: C.redText, label: 'Cancelled' },
-  };
-  const s = map[status] || map.new;
-  return (
-    <View style={[styles.badge, { backgroundColor: s.bg }]}>
-      <Text style={[styles.badgeText, { color: s.color }]}>{s.label}</Text>
-    </View>
-  );
-}
-
+// ── Available Order Card ──────────────────────────────────────────────────────
 function AvailableOrderCard({ order, onAccept }) {
   return (
     <View style={styles.orderCard}>
       <View style={styles.orderTop}>
         <Text style={styles.orderId}>{order.displayId}</Text>
-        <Badge status="new" />
+        <View style={styles.newBadge}><Text style={styles.newBadgeText}>New</Text></View>
       </View>
       <View style={styles.routeRow}>
-        <View style={[styles.dot, { backgroundColor: C.blue }]} />
+        <View style={[styles.routeDot, { backgroundColor: C.blue }]} />
         <Text style={styles.routeText} numberOfLines={1}>{order.pickup}</Text>
         <View style={styles.routeLine} />
-        <View style={[styles.dot, { backgroundColor: C.red }]} />
+        <View style={[styles.routeDot, { backgroundColor: C.red }]} />
         <Text style={styles.routeText} numberOfLines={1}>{order.drop}</Text>
       </View>
       <View style={styles.orderBottom}>
         <Text style={styles.orderMeta}>{order.meta}</Text>
-        <TouchableOpacity style={styles.btnPrimary} onPress={() => onAccept(order.orderIdRaw)}>
-          <Text style={styles.btnPrimaryText}>Accept</Text>
+        <TouchableOpacity style={styles.btnAccept} onPress={() => onAccept(order.orderIdRaw)} activeOpacity={0.85}>
+          <Text style={styles.btnAcceptText}>Accept</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -407,40 +428,36 @@ function AvailableOrderCard({ order, onAccept }) {
 export default function ActiveDeliveryScreen({ navigation }) {
   const { token, user } = useAuthStore();
 
-  const [isOnline, setIsOnline] = useState(true);
-  const [activeOrder, setActiveOrder] = useState(null);   // the assigned delivery
+  const [fontsLoaded] = useFonts({
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+  });
+
+  const [activeOrder, setActiveOrder]         = useState(null);
   const [availableOrders, setAvailableOrders] = useState([]);
-  const [partner, setPartner] = useState({ name: 'Loading...', id: '...', initials: '' });
-  const [myLocation, setMyLocation] = useState(null);
-  const [deliveryCount, setDeliveryCount] = useState(0);
-  const [earnings, setEarnings] = useState(0);
-  const [incomingOrder, setIncomingOrder] = useState(null);
-  // step: 0=reach_pickup 1=pick_order 2=reach_drop 3=drop_order
-  const [step, setStep] = useState(0);
+  const [partner, setPartner]                 = useState({ name: 'Loading...', id: '...', initials: '' });
+  const [myLocation, setMyLocation]           = useState(null);
+  const [deliveryCount, setDeliveryCount]     = useState(0);
+  const [earnings, setEarnings]               = useState(0);
+  const [incomingOrder, setIncomingOrder]     = useState(null);
+  const [step, setStep]                       = useState(0);
   const socketRef = useRef(null);
 
-  // ── Fetch & parse orders ──
+  // ── Fetch & parse orders ──────────────────────────────────────────────────
   const fetchOrders = async () => {
     try {
       const [actRes, avlRes] = await Promise.all([
-        fetch(`${API_BASE}/delivery/active`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE}/delivery/active`,    { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${API_BASE}/delivery/available`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       const actResult = await actRes.json();
       const avlResult = await avlRes.json();
 
-      // Sync online status
-      if (actResult.success && actResult.data.partner) {
-        setIsOnline(actResult.data.partner.is_available ?? true);
-      }
-
-      // Active delivery → drive the stepper
       if (actResult.success && actResult.data.delivery) {
         const d = actResult.data.delivery;
-        const backendStatus = d.status; // 'assigned' | 'picked_up'
-        // Map backend status to stepper step
-        // assigned  → step 0 (reach pickup) or 1 (pick order) — we preserve higher step
-        // picked_up → step 2 (reach drop) or 3 (drop order)
+        const backendStatus = d.status;
         setActiveOrder({
           id: d.id,
           orderIdRaw: d.order_id,
@@ -454,17 +471,15 @@ export default function ActiveDeliveryScreen({ navigation }) {
           customerName: d.order?.customer?.name || null,
           items: d.order?.items || [],
         });
-        // Restore step from backend status without going backwards
         setStep(prev => {
           if (backendStatus === 'picked_up') return Math.max(prev, 2);
-          return prev; // keep user's local progress within 'assigned' phase
+          return prev;
         });
       } else {
         setActiveOrder(null);
         setStep(0);
       }
 
-      // Available orders
       if (avlResult.success && avlResult.data.orders) {
         setAvailableOrders(avlResult.data.orders.map(o => ({
           id: o.id,
@@ -480,9 +495,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
     }
   };
 
-  useFocusEffect(
-    React.useCallback(() => { fetchOrders(); }, [token])
-  );
+  useFocusEffect(React.useCallback(() => { fetchOrders(); }, [token]));
 
   useEffect(() => {
     if (user) {
@@ -495,7 +508,6 @@ export default function ActiveDeliveryScreen({ navigation }) {
     fetchOrders();
   }, [user]);
 
-  // Socket
   useEffect(() => {
     if (!token) return;
     const socket = io(SOCKET_URL, { auth: { token }, transports: ['websocket'] });
@@ -506,44 +518,32 @@ export default function ActiveDeliveryScreen({ navigation }) {
     return () => { socket.disconnect(); socketRef.current = null; };
   }, [token]);
 
-  // Location watch
   useEffect(() => {
-    let sub; let active = true;
-    const start = async () => {
-      if (!isOnline || !token) return;
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted' || !active) return;
-      sub = await Location.watchPositionAsync(
-        { distanceInterval: 10, timeInterval: 5000 },
-        (loc) => {
-          setMyLocation(loc.coords);
-          if (socketRef.current?.connected) {
-            socketRef.current.emit('driver_location', { latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-          }
+  let sub; let active = true;
+  const start = async () => {
+    if (!token) return;
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted' || !active) return;
+    sub = await Location.watchPositionAsync(
+      { distanceInterval: 10, timeInterval: 5000 },
+      (loc) => {
+        setMyLocation(loc.coords);
+        if (socketRef.current?.connected) {
+          socketRef.current.emit('driver_location', { latitude: loc.coords.latitude, longitude: loc.coords.longitude });
         }
-      );
-    };
-    start();
-    return () => {
-      active = false;
-      if (sub?.remove) setTimeout(() => { try { sub.remove(); } catch (_) {} }, 0);
-    };
-  }, [isOnline, token]);
-
-  // ── Actions ──
-  const toggleOnline = async () => {
-    const next = !isOnline;
-    setIsOnline(next);
-    await fetch(`${API_BASE}/delivery/toggle-availability`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ is_available: next }),
-    });
+      }
+    );
   };
+  start();
+  return () => {
+    active = false;
+    if (sub?.remove) setTimeout(() => { try { sub.remove(); } catch (_) {} }, 0);
+  };
+}, [token]);
 
   const handleAccept = async (orderId) => {
     try {
-      const res = await fetch(`${API_BASE}/delivery/accept/${orderId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const res  = await fetch(`${API_BASE}/delivery/accept/${orderId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (data.success) { fetchOrders(); }
       else Alert.alert('Error', data.message);
@@ -553,7 +553,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
   const handleAcceptIncoming = async () => {
     if (!incomingOrder) return;
     try {
-      const res = await fetch(`${API_BASE}/delivery/accept/${incomingOrder.orderId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const res  = await fetch(`${API_BASE}/delivery/accept/${incomingOrder.orderId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       setIncomingOrder(null);
       if (data.success) fetchOrders();
@@ -561,46 +561,42 @@ export default function ActiveDeliveryScreen({ navigation }) {
     } catch (e) { setIncomingOrder(null); }
   };
 
-  // Called by SlideButton when user completes slide gesture for current step
   const handleStepComplete = async () => {
     const currentStepDef = STEPS[step];
-
     if (currentStepDef.api) {
-      // Needs a backend call
       try {
-        const res = await fetch(`${API_BASE}/delivery/${activeOrder.id}/status`, {
+        const res  = await fetch(`${API_BASE}/delivery/${activeOrder.id}/status`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ status: currentStepDef.api }),
         });
         const data = await res.json();
-        if (!data.success) {
-          Alert.alert('Error', data.message);
-          return;
-        }
+        if (!data.success) { Alert.alert('Error', data.message); return; }
         if (currentStepDef.api === 'delivered') {
           setDeliveryCount(c => c + 1);
           setEarnings(e => e + (activeOrder?.deliveryFee || 65));
-          // Delivery done — reset
           setTimeout(() => { setActiveOrder(null); setStep(0); fetchOrders(); }, 800);
           return;
         }
-      } catch (e) {
-        Alert.alert('Error', 'Network error');
-        return;
-      }
+      } catch (e) { Alert.alert('Error', 'Network error'); return; }
     }
-
-    // Advance to next step
     if (step < STEPS.length - 1) {
       setTimeout(() => setStep(s => s + 1), 400);
     }
   };
 
-  // ── Render ──
+  // ── Render ────────────────────────────────────────────────────────────────
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={C.primary} />
+      </View>
+    );
+  }
+
   return (
     <>
-      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      <StatusBar barStyle="light-content" backgroundColor={C.heroBg} />
       <IncomingOrderSheet
         order={incomingOrder}
         onAccept={handleAcceptIncoming}
@@ -609,37 +605,37 @@ export default function ActiveDeliveryScreen({ navigation }) {
 
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Top bar */}
-        <View style={styles.topBar}>
-          <View style={styles.avatarRow}>
-            <View style={styles.avatar}><Text style={styles.avatarText}>{partner.initials}</Text></View>
-            <View>
-              <Text style={styles.partnerName}>{partner.name}</Text>
-              <Text style={styles.partnerId}>{partner.id}</Text>
+        {/* ── Green hero header ── */}
+        <View style={styles.hero}>
+          <View style={styles.heroTop}>
+            <View style={styles.avatarRow}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{partner.initials}</Text>
+              </View>
+              <View>
+                <Text style={styles.partnerName}>{partner.name}</Text>
+                <Text style={styles.partnerId}>{partner.id}</Text>
+              </View>
             </View>
           </View>
-          <View style={styles.statusRow}>
-            <View style={[styles.statusPill, isOnline ? styles.pillOnline : styles.pillOffline]}>
-              <Text style={[styles.pillText, { color: isOnline ? C.primaryText : '#5F5E5A' }]}>
-                ● {isOnline ? 'Online' : 'Offline'}
-              </Text>
-            </View>
-            <Switch value={isOnline} onValueChange={toggleOnline} trackColor={{ false: '#ccc', true: C.primary }} />
-          </View>
-        </View>
 
-        {/* Metrics */}
-        <View style={styles.metricsGrid}>
-          {[
-            { label: "Today's deliveries", value: String(deliveryCount), sub: 'Active session' },
-            { label: 'Earnings today', value: `₹${earnings}`, sub: 'Updating live' },
-          ].map((m, i) => (
-            <View key={i} style={styles.metricCard}>
-              <Text style={styles.metricLabel}>{m.label}</Text>
-              <Text style={styles.metricValue}>{m.value}</Text>
-              <Text style={styles.metricSub}>{m.sub}</Text>
+          {/* Stats bar */}
+          <View style={styles.heroStats}>
+            <View style={styles.heroStat}>
+              <Text style={styles.heroStatValue}>{deliveryCount}</Text>
+              <Text style={styles.heroStatLabel}>Deliveries</Text>
             </View>
-          ))}
+            <View style={styles.heroStatDivider} />
+            <View style={styles.heroStat}>
+              <Text style={styles.heroStatValue}>₹{earnings}</Text>
+              <Text style={styles.heroStatLabel}>Earned today</Text>
+            </View>
+            <View style={styles.heroStatDivider} />
+            <View style={styles.heroStat}>
+  <Text style={styles.heroStatValue}>{partner.id}</Text>
+  <Text style={styles.heroStatLabel}>Partner ID</Text>
+</View>
+          </View>
         </View>
 
         {/* ── Active delivery stepper ── */}
@@ -656,16 +652,16 @@ export default function ActiveDeliveryScreen({ navigation }) {
               </View>
             </View>
 
-            {/* Progress bar */}
-            <StepBar currentStep={step} />
-
-            {/* Step title */}
-            <View style={styles.stepTitleRow}>
-              <Text style={styles.stepTitleChevron}>∨</Text>
-              <Text style={styles.stepTitleText}>{STEPS[step].label}</Text>
+            {/* Step label */}
+            <View style={styles.stepLabelRow}>
+              <Text style={styles.stepChevron}>∨</Text>
+              <Text style={styles.stepLabelText}>{STEPS[step].label}</Text>
             </View>
 
-            {/* Step content (map + info) */}
+            {/* Progress dots */}
+            <StepBar currentStep={step} />
+
+            {/* Step content */}
             <StepContent step={step} activeOrder={activeOrder} myLocation={myLocation} />
 
             {/* Slide button */}
@@ -679,7 +675,6 @@ export default function ActiveDeliveryScreen({ navigation }) {
             </View>
           </View>
         ) : (
-          /* ── No active order ── */
           <>
             <View style={styles.mapBox}>
               <DeliveryMapView
@@ -709,76 +704,95 @@ export default function ActiveDeliveryScreen({ navigation }) {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: C.bg },
-  content: { padding: 16, paddingBottom: 60 },
+  screen:  { flex: 1, backgroundColor: C.bg },
+  content: { paddingBottom: 80 },
 
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.blueLight, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 13, fontWeight: '600', color: C.blueText },
-  partnerName: { fontSize: 14, fontWeight: '600', color: C.textPrimary },
-  partnerId: { fontSize: 11, color: C.textSecond, marginTop: 1 },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  pillOnline: { backgroundColor: C.primaryLight },
-  pillOffline: { backgroundColor: '#F1EFE8' },
-  pillText: { fontSize: 11, fontWeight: '600' },
-
-  metricsGrid: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  metricCard: { flex: 1, backgroundColor: C.white, borderRadius: 10, padding: 12, borderWidth: 0.5, borderColor: C.border },
-  metricLabel: { fontSize: 11, color: C.textSecond, marginBottom: 4 },
-  metricValue: { fontSize: 22, fontWeight: '600', color: C.textPrimary },
-  metricSub: { fontSize: 11, color: C.primary, marginTop: 2 },
-
-  // Stepper wrapper
-  stepperWrap: { backgroundColor: C.white, borderRadius: 16, borderWidth: 0.5, borderColor: C.border, overflow: 'hidden' },
-  stepperHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: 14, borderBottomWidth: 0.5, borderBottomColor: C.border,
+  // Hero
+  hero: {
+    backgroundColor: C.heroBg,
+    paddingTop: Platform.OS === 'android' ? 32 : 56,
+    paddingHorizontal: 20,
+    paddingBottom: 22,
   },
-  stepperTitle: { fontSize: 15, fontWeight: '700', color: C.textPrimary },
-  stepperSub: { fontSize: 11, color: C.textSecond, marginTop: 2 },
-  stepBadge: { backgroundColor: C.primaryLight, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  stepBadgeText: { fontSize: 12, fontWeight: '700', color: C.primaryText },
+  heroTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  avatarRow:       { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatar:          { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.20)', alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.white },
+  partnerName: { fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: C.white },
+  partnerId: { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: C.heroSubText, marginTop: 1 },
+  toggleRow:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statusPill:      { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  statusPillText:  { fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: C.white },
+  heroStats:       { flexDirection: 'row', backgroundColor: C.heroStatBg, borderRadius: 14, paddingVertical: 14 },
+  heroStat:        { flex: 1, alignItems: 'center' },
+  heroStatValue:   { fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.white, marginBottom: 2 },
+  heroStatLabel:   { fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: C.heroSubText },
+  heroStatDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.15)', marginVertical: 4 },
 
-  // Step bar lives inside stepperWrap with padding
-  // (StepBar already has its own paddingHorizontal)
-
-  stepTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingBottom: 10 },
-  stepTitleChevron: { fontSize: 14, color: C.textSecond },
-  stepTitleText: { fontSize: 16, fontWeight: '700', color: C.textPrimary },
-
-  stepMap: { height: 200, backgroundColor: C.border },
-
-  stepCard: { padding: 14 },
-  stepCardTitle: { fontSize: 12, fontWeight: '800', color: C.textSecond, textTransform: 'uppercase', letterSpacing: 0.8 },
-
-  orderIdCard: {
-    margin: 14, padding: 16, backgroundColor: C.bg, borderRadius: 12,
-    alignItems: 'center', borderWidth: 0.5, borderColor: C.border,
+  // Stepper card
+  stepperWrap: {
+    backgroundColor: C.white, marginHorizontal: 16, marginTop: 16,
+    borderRadius: 20, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07, shadowRadius: 10, elevation: 3,
   },
-  orderIdLabel: { fontSize: 10, fontWeight: '800', color: C.textLight, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
-  orderIdValue: { fontSize: 32, fontWeight: '800', color: C.textPrimary, letterSpacing: -1 },
+  stepperHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border },
+  stepperTitle:   { fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: C.textPrimary },
+  stepperSub: { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: C.textSecond, marginTop: 2 },
+  stepBadge:      { backgroundColor: C.primaryLight, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  stepBadgeText:  { fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: C.primaryText },
+  stepLabelRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 2 },
+  stepChevron:    { fontSize: 14, color: C.textSecond },
+  stepLabelText:  { fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.textPrimary },
 
-  slideWrap: { alignItems: 'center', paddingVertical: 16, borderTopWidth: 0.5, borderTopColor: C.border },
+  // Map + drag handle
+  stepMap:    { height: 210, backgroundColor: C.border },
+  dragHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center', marginVertical: 10 },
 
-  // No-active-order views
-  mapBox: { backgroundColor: C.white, borderRadius: 10, height: 180, overflow: 'hidden', borderWidth: 0.5, borderColor: C.border, marginBottom: 14 },
-  sectionTitle: { fontSize: 13, fontWeight: '600', color: C.textSecond, marginBottom: 10 },
-  orderCard: { backgroundColor: C.white, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 0.5, borderColor: C.border },
-  orderTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  orderId: { fontSize: 13, fontWeight: '600', color: C.textPrimary },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
-  badgeText: { fontSize: 11, fontWeight: '600' },
-  routeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  dot: { width: 7, height: 7, borderRadius: 4 },
-  routeText: { fontSize: 12, color: C.textPrimary, flexShrink: 1, maxWidth: '40%' },
-  routeLine: { flex: 1, height: 1, backgroundColor: C.border },
-  orderBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  orderMeta: { fontSize: 11, color: C.textLight, flex: 1 },
-  btnPrimary: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, backgroundColor: C.primary },
-  btnPrimaryText: { fontSize: 12, color: '#fff', fontWeight: '600' },
-  emptyBox: { alignItems: 'center', paddingVertical: 40 },
-  emptyEmoji: { fontSize: 40, marginBottom: 10 },
-  emptyText: { fontSize: 14, color: C.textLight },
+  // Step content
+  stepCard:        { paddingHorizontal: 16, paddingBottom: 6 },
+  locationLabel: { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.textLight, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 },
+  locationName:    { fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.textPrimary, marginBottom: 4 },
+  locationAddress: { fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: C.textSecond, lineHeight: 18 },
+  metaDivider:     { height: 1, backgroundColor: C.border, marginVertical: 12 },
+
+  // Step 3 payment
+  paymentRow:      { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  paymentCheck:    { width: 32, height: 32, borderRadius: 16, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
+  paymentTitle:    { fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: C.textPrimary },
+  paymentSub:      { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: C.textSecond, marginTop: 2 },
+
+  // Step 3 customer
+  customerRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginTop: 4 },
+  customerIconWrap:{ width: 42, height: 42, borderRadius: 21, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
+  customerName:    { fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.textPrimary },
+  customerAddress: { fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: C.textSecond, lineHeight: 18, marginTop: 3 },
+
+  // Order ID (step 1)
+  orderIdCard:  { margin: 16, padding: 16, backgroundColor: C.bg, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: C.border },
+  orderIdLabel: { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.textLight, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
+  orderIdValue: { fontSize: 34, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.textPrimary, letterSpacing: -1 },
+
+  // Slide button
+  slideWrap: { alignItems: 'center', paddingVertical: 16, borderTopWidth: 1, borderTopColor: C.border },
+
+  // No-active-order state
+  mapBox:       { margin: 16, backgroundColor: C.white, borderRadius: 16, height: 180, overflow: 'hidden', borderWidth: 1, borderColor: C.border },
+  sectionTitle: { fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: C.textSecond, marginBottom: 10, paddingHorizontal: 16 },
+  orderCard:    { backgroundColor: C.white, borderRadius: 16, padding: 14, marginHorizontal: 16, marginBottom: 10, borderWidth: 1, borderColor: C.border },
+  orderTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  orderId:      { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: C.textPrimary },
+  newBadge:     { backgroundColor: C.blueLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
+  newBadgeText: { fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: C.blueText },
+  routeRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  routeDot:     { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
+  routeText:    { fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: C.textPrimary, flexShrink: 1, maxWidth: '40%' },
+  routeLine:    { flex: 1, height: 1, backgroundColor: C.border },
+  orderBottom:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  orderMeta:    { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: C.textLight, flex: 1 },
+  btnAccept:    { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, backgroundColor: C.primary },
+  btnAcceptText:{ fontSize: 12, color: C.white, fontFamily: 'PlusJakartaSans_700Bold' },
+  emptyBox:     { alignItems: 'center', paddingVertical: 40 },
+  emptyEmoji:   { fontSize: 40, marginBottom: 10 },
+  emptyText:    { fontSize: 14, fontFamily: 'PlusJakartaSans_500Medium', color: C.textLight },
 });

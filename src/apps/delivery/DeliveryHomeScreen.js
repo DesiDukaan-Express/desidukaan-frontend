@@ -255,8 +255,11 @@ export default function DeliveryHomeScreen({ navigation }) {
       });
       const data = await res.json();
       if (data.success) {
-        setRecentDeliveries(data.data?.deliveries || data.data || []);
-      }
+  const deliveries = Array.isArray(data.data)
+    ? data.data
+    : (data.data?.deliveries || []);
+  setRecentDeliveries(deliveries);
+}
     } catch (e) {
       console.log('History error', e);
     }
