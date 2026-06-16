@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Animated, PanResponder, Dimensions,
   StatusBar, Platform, ActivityIndicator,
@@ -6,13 +6,7 @@ import {
 import * as Location from 'expo-location';
 import { io } from 'socket.io-client';
 import { useFocusEffect } from '@react-navigation/native';
-import {
-  useFonts,
-  PlusJakartaSans_500Medium,
-  PlusJakartaSans_600SemiBold,
-  PlusJakartaSans_700Bold,
-  PlusJakartaSans_800ExtraBold,
-} from '@expo-google-fonts/plus-jakarta-sans';
+
 import useAuthStore from '../../store/authStore';
 import DeliveryMapView from '../../components/DeliveryMapView';
 import IncomingOrderSheet from '../../components/IncomingOrderSheet';
@@ -22,7 +16,7 @@ const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || (API_BASE.includes('/api') ? API_BASE.split('/api')[0] : 'http://localhost:3000');
 
 const C = {
-  // Hero greens — matches DeliveryHomeScreen exactly
+  // Hero greens â€” matches DeliveryHomeScreen exactly
   heroBg:      '#228948',
   heroSubText: 'rgba(255,255,255,0.70)',
   heroStatBg:  'rgba(0,0,0,0.15)',
@@ -52,7 +46,7 @@ const C = {
   border:      '#E5E7EB',
 };
 
-// ── Delivery steps ────────────────────────────────────────────────────────────
+// â”€â”€ Delivery steps â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const STEPS = [
   { key: 'reach_pickup', label: 'Reach Pickup',  api: null,        btnLabel: 'Reached Pickup Location' },
   { key: 'pick_order',   label: 'Pick Order',    api: 'picked_up', btnLabel: 'Picked Order'            },
@@ -60,30 +54,48 @@ const STEPS = [
   { key: 'drop_order',   label: 'Drop Order',    api: 'delivered', btnLabel: 'Order Delivered'         },
 ];
 
-// ── Slide-to-Action Button ────────────────────────────────────────────────────
+// â”€â”€ Slide-to-Action Button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const THUMB      = 56;
 const TRACK_W    = SCREEN_W - 32;
 const DRAG_RANGE = TRACK_W - THUMB - 4;
 
-function SlideButton({ label, onComplete, color = C.primary }) {
+function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDragEnd }) {
   const pan  = useRef(new Animated.Value(0)).current;
   const [done, setDone] = useState(false);
+  const isDragging = useRef(false);
 
   useEffect(() => { setDone(false); pan.setValue(0); }, [label]);
 
   const responder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !done,
-      onMoveShouldSetPanResponder:  () => !done,
-      onPanResponderMove:    (_, g) => { pan.setValue(Math.max(0, Math.min(g.dx, DRAG_RANGE))); },
+      // Capture from the start so ScrollView cannot intercept
+      onStartShouldSetPanResponder:         () => !done,
+      onStartShouldSetPanResponderCapture:  () => !done,
+      onMoveShouldSetPanResponder:          (_, g) => !done && Math.abs(g.dx) > 2,
+      onMoveShouldSetPanResponderCapture:   (_, g) => !done && Math.abs(g.dx) > 2,
+      onPanResponderGrant: () => {
+        isDragging.current = true;
+        onDragStart?.();
+      },
+      onPanResponderMove: (_, g) => {
+        pan.setValue(Math.max(0, Math.min(g.dx, DRAG_RANGE)));
+      },
       onPanResponderRelease: (_, g) => {
-        if (g.dx >= DRAG_RANGE * 0.82) {
+        isDragging.current = false;
+        onDragEnd?.();
+        if (g.dx >= DRAG_RANGE * 0.80) {
           Animated.spring(pan, { toValue: DRAG_RANGE, useNativeDriver: false }).start(() => {
-            setDone(true); onComplete?.();
+            setDone(true);
+            onComplete?.();
           });
         } else {
           Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
         }
+      },
+      onPanResponderTerminate: () => {
+        isDragging.current = false;
+        onDragEnd?.();
+        Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
       },
     })
   ).current;
@@ -96,13 +108,13 @@ function SlideButton({ label, onComplete, color = C.primary }) {
     <View style={[sb.track, { backgroundColor: done ? color : C.primaryLight, borderColor: color }]}>
       <Animated.View style={[sb.fill, { width: Animated.add(pan, THUMB + 4), backgroundColor: color }]} />
       <Animated.Text style={[sb.label, { opacity: labelOpacity, color: done ? C.white : C.primaryText }]}>
-        {done ? '✓  Done' : `>> ${label}`}
+        {done ? 'âœ“  Done' : `>> ${label}`}
       </Animated.Text>
       <Animated.View
         style={[sb.thumb, { transform: [{ translateX: pan }], backgroundColor: color }]}
         {...responder.panHandlers}
       >
-        <Text style={sb.thumbIcon}>{done ? '✓' : '>>'}</Text>
+        <Text style={sb.thumbIcon}>{done ? 'âœ“' : '>>'}</Text>
       </Animated.View>
     </View>
   );
@@ -115,7 +127,7 @@ const sb = StyleSheet.create({
     borderWidth: 1.5, position: 'relative',
   },
   fill:      { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: (THUMB + 4) / 2 },
-  label:     { fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', letterSpacing: 0.3 },
+  label:     { fontSize: 14, fontWeight: '700', letterSpacing: 0.3 },
   thumb:     {
     position: 'absolute', left: 2,
     width: THUMB, height: THUMB, borderRadius: THUMB / 2,
@@ -123,10 +135,10 @@ const sb = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.18, shadowRadius: 4,
   },
-  thumbIcon: { fontSize: 18, color: C.white, fontFamily: 'PlusJakartaSans_800ExtraBold' },
+  thumbIcon: { fontSize: 18, color: C.white, fontWeight: '800' },
 });
 
-// ── Step Progress Bar ─────────────────────────────────────────────────────────
+// â”€â”€ Step Progress Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StepBar({ currentStep }) {
   return (
     <View style={spb.row}>
@@ -138,7 +150,7 @@ function StepBar({ currentStep }) {
             <View style={spb.stepWrap}>
               <View style={[spb.dot, past && spb.dotDone, active && spb.dotActive]}>
                 <Text style={[spb.dotNum, (past || active) && { color: C.white }]}>
-                  {past ? '✓' : i + 1}
+                  {past ? 'âœ“' : i + 1}
                 </Text>
               </View>
               <Text style={[spb.stepLabel, active && { color: C.primary, fontWeight: '700' }]} numberOfLines={1}>
@@ -165,21 +177,33 @@ const spb = StyleSheet.create({
   },
   dotDone:   { backgroundColor: C.primary, borderColor: C.primary },
   dotActive: { backgroundColor: C.primary, borderColor: C.primaryDark },
-  dotNum:    { fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: C.textSecond },
-  stepLabel: { fontSize: 9, color: C.textLight, textAlign: 'center', fontFamily: 'PlusJakartaSans_600SemiBold', letterSpacing: 0.2 },
+  dotNum:    { fontSize: 12, fontWeight: '700', color: C.textSecond },
+  stepLabel: { fontSize: 9, color: C.textLight, textAlign: 'center', fontWeight: '600', letterSpacing: 0.2 },
   line:      { flex: 1, height: 2, backgroundColor: C.border, marginTop: 13, marginHorizontal: 2 },
 });
 
-// ── Action Buttons (Call + Map) ───────────────────────────────────────────────
-function ActionButtons({ onCall, onMap }) {
+// â”€â”€ Action Buttons (Call + Map) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function ActionButtons({ onCall, onMap, phone }) {
+  const handleCall = () => {
+    if (phone) {
+      Linking.openURL(`tel:${phone}`).catch(() =>
+        Alert.alert('Cannot Call', 'Unable to open the dialer. Please check the phone number.')
+      );
+    } else if (onCall) {
+      onCall();
+    } else {
+      Alert.alert('No Phone Number', 'Phone number is not available for this contact.');
+    }
+  };
+
   return (
     <View style={ab.row}>
-      <TouchableOpacity style={ab.btnCall} onPress={onCall} activeOpacity={0.8}>
-        <Text style={ab.callIcon}>📞</Text>
+      <TouchableOpacity style={ab.btnCall} onPress={handleCall} activeOpacity={0.8}>
+        <Text style={ab.callIcon}>ðŸ“ž</Text>
         <Text style={ab.callText}>Call</Text>
       </TouchableOpacity>
       <TouchableOpacity style={ab.btnMap} onPress={onMap} activeOpacity={0.8}>
-        <Text style={ab.mapIcon}>🗺️</Text>
+        <Text style={ab.mapIcon}>ðŸ—ºï¸</Text>
         <Text style={ab.mapText}>Go to map</Text>
       </TouchableOpacity>
     </View>
@@ -194,16 +218,16 @@ const ab = StyleSheet.create({
     borderWidth: 1.5, borderColor: C.border, backgroundColor: C.white,
   },
   callIcon: { fontSize: 15 },
-  callText: { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: C.textPrimary },
+  callText: { fontSize: 13, fontWeight: '700', color: C.textPrimary },
   btnMap:  {
     flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     paddingVertical: 11, borderRadius: 12, backgroundColor: C.blue,
   },
   mapIcon: { fontSize: 15 },
-  mapText: { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: C.white },
+  mapText: { fontSize: 13, fontWeight: '700', color: C.white },
 });
 
-// ── Meta row (small icon + text) ──────────────────────────────────────────────
+// â”€â”€ Meta row (small icon + text) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function MetaRow({ icon, text }) {
   return (
     <View style={mr.row}>
@@ -215,23 +239,23 @@ function MetaRow({ icon, text }) {
 const mr = StyleSheet.create({
   row:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   icon: { fontSize: 14, color: C.textLight },
-  text: { fontSize: 13, color: C.textSecond, fontFamily: 'PlusJakartaSans_500Medium' },
+  text: { fontSize: 13, color: C.textSecond, fontWeight: '500' },
 });
 
-// ── Order Items Accordion ─────────────────────────────────────────────────────
+// â”€â”€ Order Items Accordion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ItemsAccordion({ items, vendorName }) {
   const [open, setOpen] = useState(false);
   return (
     <View style={ac.wrap}>
       <TouchableOpacity style={ac.header} onPress={() => setOpen(o => !o)} activeOpacity={0.8}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={ac.iconWrap}><Text style={{ fontSize: 16 }}>🧾</Text></View>
+          <View style={ac.iconWrap}><Text style={{ fontSize: 16 }}>ðŸ§¾</Text></View>
           <View>
             <Text style={ac.title}>Order details</Text>
             <Text style={ac.sub}>{vendorName}</Text>
           </View>
         </View>
-        <Text style={ac.chevron}>{open ? '∧' : '∨'}</Text>
+        <Text style={ac.chevron}>{open ? 'âˆ§' : 'âˆ¨'}</Text>
       </TouchableOpacity>
       {open && (
         <View style={ac.body}>
@@ -239,7 +263,7 @@ function ItemsAccordion({ items, vendorName }) {
             <View key={i} style={ac.itemRow}>
               <Text style={ac.itemQty}>{item.quantity}x</Text>
               <Text style={ac.itemName}>{item.product_name}</Text>
-              <Text style={ac.itemPrice}>₹{item.subtotal}</Text>
+              <Text style={ac.itemPrice}>â‚¹{item.subtotal}</Text>
             </View>
           ))}
         </View>
@@ -252,17 +276,17 @@ const ac = StyleSheet.create({
   wrap:     { backgroundColor: C.white, borderRadius: 14, borderWidth: 1, borderColor: C.border, marginBottom: 10, overflow: 'hidden' },
   header:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14 },
   iconWrap: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
-  title:    { fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: C.textPrimary },
-  sub:      { fontSize: 11, color: C.textSecond, fontFamily: 'PlusJakartaSans_500Medium', marginTop: 1 },
-  chevron:  { fontSize: 16, color: C.textSecond, fontFamily: 'PlusJakartaSans_600SemiBold' },
+  title:    { fontSize: 14, fontWeight: '700', color: C.textPrimary },
+  sub:      { fontSize: 11, color: C.textSecond, fontWeight: '500', marginTop: 1 },
+  chevron:  { fontSize: 16, color: C.textSecond, fontWeight: '600' },
   body:     { paddingHorizontal: 14, paddingBottom: 12, borderTopWidth: 1, borderTopColor: C.border },
   itemRow:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, gap: 8 },
-  itemQty:  { fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.primary, width: 28 },
-  itemName: { flex: 1, fontSize: 13, color: C.textPrimary, fontFamily: 'PlusJakartaSans_500Medium' },
-  itemPrice:{ fontSize: 12, color: C.textSecond, fontFamily: 'PlusJakartaSans_500Medium' },
+  itemQty:  { fontSize: 12, fontWeight: '800', color: C.primary, width: 28 },
+  itemName: { flex: 1, fontSize: 13, color: C.textPrimary, fontWeight: '500' },
+  itemPrice:{ fontSize: 12, color: C.textSecond, fontWeight: '500' },
 });
 
-// ── Step Content ──────────────────────────────────────────────────────────────
+// â”€â”€ Step Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StepContent({ step, activeOrder, myLocation }) {
   const vendorLoc = activeOrder?.vendorLoc;
   const dropLoc   = activeOrder?.dropLoc;
@@ -300,35 +324,38 @@ function StepContent({ step, activeOrder, myLocation }) {
       {/* Drag handle pill */}
       <View style={styles.dragHandle} />
 
-      {/* ── Step 0 – Reach Pickup ── */}
+      {/* â”€â”€ Step 0 â€“ Reach Pickup â”€â”€ */}
       {step === 0 && (
         <View style={styles.stepCard}>
           <Text style={styles.locationLabel}>PICKUP FROM</Text>
-          <Text style={styles.locationName}>{activeOrder?.pickup || '—'}</Text>
+          <Text style={styles.locationName}>{activeOrder?.pickup || 'â€”'}</Text>
           {vendorLoc && (
             <Text style={styles.locationAddress}>
               {vendorLoc.latitude?.toFixed(4)}, {vendorLoc.longitude?.toFixed(4)}
             </Text>
           )}
-          <ActionButtons onCall={() => {}} onMap={() => openMap(vendorLoc)} />
+          <ActionButtons
+            phone={activeOrder?.vendorPhone}
+            onMap={() => openMap(vendorLoc)}
+          />
           <View style={styles.metaDivider} />
-          <MetaRow icon="📋" text={`Order: ${activeOrder?.displayId || '—'}`} />
-          <MetaRow icon="👤" text={`Customer: ${activeOrder?.customerName || '—'}`} />
+          <MetaRow icon="ðŸ“‹" text={`Order: ${activeOrder?.displayId || 'â€”'}`} />
+          <MetaRow icon="ðŸ‘¤" text={`Customer: ${activeOrder?.customerName || 'â€”'}`} />
         </View>
       )}
 
-      {/* ── Step 1 – Pick Order ── */}
+      {/* â”€â”€ Step 1 â€“ Pick Order â”€â”€ */}
       {step === 1 && (
         <View>
           <View style={styles.orderIdCard}>
             <Text style={styles.orderIdLabel}>ORDER ID</Text>
-            <Text style={styles.orderIdValue}>{activeOrder?.displayId || '—'}</Text>
+            <Text style={styles.orderIdValue}>{activeOrder?.displayId || 'â€”'}</Text>
           </View>
           <ItemsAccordion items={activeOrder?.items} vendorName={activeOrder?.pickup} />
           <View style={ac.wrap}>
             <View style={ac.header}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={ac.iconWrap}><Text style={{ fontSize: 16 }}>🏪</Text></View>
+                <View style={ac.iconWrap}><Text style={{ fontSize: 16 }}>ðŸª</Text></View>
                 <View>
                   <Text style={ac.title}>Restaurant details</Text>
                   <Text style={ac.sub}>{activeOrder?.pickup}</Text>
@@ -344,53 +371,64 @@ function StepContent({ step, activeOrder, myLocation }) {
           <View style={ac.wrap}>
             <View style={ac.header}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={ac.iconWrap}><Text style={{ fontSize: 16 }}>👤</Text></View>
+                <View style={ac.iconWrap}><Text style={{ fontSize: 16 }}>ðŸ‘¤</Text></View>
                 <View>
                   <Text style={ac.title}>Customer details</Text>
-                  <Text style={ac.sub}>{activeOrder?.customerName || '—'}</Text>
+                  <Text style={ac.sub}>{activeOrder?.customerName || 'â€”'}</Text>
                 </View>
               </View>
+              {activeOrder?.customerPhone && (
+                <TouchableOpacity onPress={() => Linking.openURL(`tel:${activeOrder.customerPhone}`)}>
+                  <Text style={{ fontSize: 12, color: C.blue, fontWeight: '700' }}>ðŸ“ž Call</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
       )}
 
-      {/* ── Step 2 – Reach Drop ── */}
+      {/* â”€â”€ Step 2 â€“ Reach Drop â”€â”€ */}
       {step === 2 && (
         <View style={styles.stepCard}>
-          <Text style={styles.locationName}>{activeOrder?.customerName || '—'}</Text>
-          <Text style={styles.locationAddress}>{activeOrder?.drop || '—'}</Text>
-          <ActionButtons onCall={() => {}} onMap={() => openMap(dropLoc)} />
+          <Text style={styles.locationName}>{activeOrder?.customerName || 'â€”'}</Text>
+          <Text style={styles.locationAddress}>{activeOrder?.drop || 'â€”'}</Text>
+          <ActionButtons
+            phone={activeOrder?.customerPhone}
+            onMap={() => openMap(dropLoc)}
+          />
           <View style={styles.metaDivider} />
-          <MetaRow icon="📋" text={`Order: ${activeOrder?.displayId || '—'}`} />
-          <MetaRow icon="🏪" text={`Pickup: ${activeOrder?.pickup || '—'}`} />
+          <MetaRow icon="ðŸ“‹" text={`Order: ${activeOrder?.displayId || 'â€”'}`} />
+          <MetaRow icon="ðŸª" text={`Pickup: ${activeOrder?.pickup || 'â€”'}`} />
         </View>
       )}
 
-      {/* ── Step 3 – Drop Order ── */}
+      {/* â”€â”€ Step 3 â€“ Drop Order â”€â”€ */}
       {step === 3 && (
         <View>
           <View style={styles.stepCard}>
             <View style={styles.paymentRow}>
               <View style={styles.paymentCheck}>
-                <Text style={{ color: C.white, fontSize: 12, fontWeight: '800' }}>✓</Text>
+                <Text style={{ color: C.white, fontSize: 12, fontWeight: '800' }}>âœ“</Text>
               </View>
               <View>
                 <Text style={styles.paymentTitle}>Paid online</Text>
-                <Text style={styles.paymentSub}>Order: {activeOrder?.displayId || '—'}</Text>
+                <Text style={styles.paymentSub}>Order: {activeOrder?.displayId || 'â€”'}</Text>
               </View>
             </View>
             <View style={styles.metaDivider} />
             <View style={styles.customerRow}>
               <View style={styles.customerIconWrap}>
-                <Text style={{ fontSize: 18 }}>👤</Text>
+                <Text style={{ fontSize: 18 }}>ðŸ‘¤</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.customerName}>{activeOrder?.customerName || '—'}</Text>
-                <Text style={styles.customerAddress}>{activeOrder?.drop || '—'}</Text>
+                <Text style={styles.customerName}>{activeOrder?.customerName || 'â€”'}</Text>
+                <Text style={styles.customerAddress}>{activeOrder?.drop || 'â€”'}</Text>
               </View>
             </View>
-            <ActionButtons onCall={() => {}} onMap={() => openMap(dropLoc)} />
+            <ActionButtons
+              phone={activeOrder?.customerPhone}
+              onMap={() => openMap(dropLoc)}
+            />
           </View>
           <ItemsAccordion items={activeOrder?.items} vendorName={activeOrder?.pickup} />
         </View>
@@ -399,7 +437,7 @@ function StepContent({ step, activeOrder, myLocation }) {
   );
 }
 
-// ── Available Order Card ──────────────────────────────────────────────────────
+// â”€â”€ Available Order Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function AvailableOrderCard({ order, onAccept }) {
   return (
     <View style={styles.orderCard}>
@@ -424,16 +462,11 @@ function AvailableOrderCard({ order, onAccept }) {
   );
 }
 
-// ════════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 export default function ActiveDeliveryScreen({ navigation }) {
   const { token, user } = useAuthStore();
 
-  const [fontsLoaded] = useFonts({
-    PlusJakartaSans_500Medium,
-    PlusJakartaSans_600SemiBold,
-    PlusJakartaSans_700Bold,
-    PlusJakartaSans_800ExtraBold,
-  });
+
 
   const [activeOrder, setActiveOrder]         = useState(null);
   const [availableOrders, setAvailableOrders] = useState([]);
@@ -445,7 +478,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
   const [step, setStep]                       = useState(0);
   const socketRef = useRef(null);
 
-  // ── Fetch & parse orders ──────────────────────────────────────────────────
+  // â”€â”€ Fetch & parse orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchOrders = async () => {
     try {
       const [actRes, avlRes] = await Promise.all([
@@ -465,10 +498,12 @@ export default function ActiveDeliveryScreen({ navigation }) {
           backendStatus,
           pickup: d.order?.vendor?.shop_name,
           drop: d.order?.delivery_address?.address_line || d.order?.delivery_address?.city || 'Local',
-          meta: `₹${d.order?.total} · ${d.order?.items?.length || 0} items`,
+          meta: `â‚¹${d.order?.total} Â· ${d.order?.items?.length || 0} items`,
           vendorLoc: d.order?.vendor ? { latitude: d.order.vendor.latitude, longitude: d.order.vendor.longitude } : null,
           dropLoc: d.order?.delivery_address ? { latitude: d.order.delivery_address.latitude, longitude: d.order.delivery_address.longitude } : null,
           customerName: d.order?.customer?.name || null,
+          customerPhone: d.order?.customer?.phone || d.order?.customer?.mobile || null,
+          vendorPhone: d.order?.vendor?.phone || d.order?.vendor?.mobile || null,
           items: d.order?.items || [],
         });
         setStep(prev => {
@@ -487,7 +522,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
           displayId: o.order_number,
           pickup: o.vendor.shop_name,
           drop: o.delivery_address?.address_line || o.delivery_address?.city || 'Local',
-          meta: `₹${o.total} · ${o._count?.items || 0} items`,
+          meta: `â‚¹${o.total} Â· ${o._count?.items || 0} items`,
         })));
       }
     } catch (err) {
@@ -585,7 +620,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (!fontsLoaded) {
     return (
       <View style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' }}>
@@ -593,6 +628,8 @@ export default function ActiveDeliveryScreen({ navigation }) {
       </View>
     );
   }
+
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   return (
     <>
@@ -603,9 +640,14 @@ export default function ActiveDeliveryScreen({ navigation }) {
         onDecline={() => setIncomingOrder(null)}
       />
 
-      <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={scrollEnabled}
+      >
 
-        {/* ── Green hero header ── */}
+        {/* â”€â”€ Green hero header â”€â”€ */}
         <View style={styles.hero}>
           <View style={styles.heroTop}>
             <View style={styles.avatarRow}>
@@ -627,7 +669,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
             </View>
             <View style={styles.heroStatDivider} />
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>₹{earnings}</Text>
+              <Text style={styles.heroStatValue}>â‚¹{earnings}</Text>
               <Text style={styles.heroStatLabel}>Earned today</Text>
             </View>
             <View style={styles.heroStatDivider} />
@@ -638,14 +680,14 @@ export default function ActiveDeliveryScreen({ navigation }) {
           </View>
         </View>
 
-        {/* ── Active delivery stepper ── */}
+        {/* â”€â”€ Active delivery stepper â”€â”€ */}
         {activeOrder ? (
           <View style={styles.stepperWrap}>
             {/* Header */}
             <View style={styles.stepperHeader}>
               <View>
                 <Text style={styles.stepperTitle}>Active Delivery</Text>
-                <Text style={styles.stepperSub}>{activeOrder.displayId} · {activeOrder.meta}</Text>
+                <Text style={styles.stepperSub}>{activeOrder.displayId} Â· {activeOrder.meta}</Text>
               </View>
               <View style={styles.stepBadge}>
                 <Text style={styles.stepBadgeText}>{step + 1}/4</Text>
@@ -654,7 +696,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
 
             {/* Step label */}
             <View style={styles.stepLabelRow}>
-              <Text style={styles.stepChevron}>∨</Text>
+              <Text style={styles.stepChevron}>âˆ¨</Text>
               <Text style={styles.stepLabelText}>{STEPS[step].label}</Text>
             </View>
 
@@ -671,6 +713,8 @@ export default function ActiveDeliveryScreen({ navigation }) {
                 label={STEPS[step].btnLabel}
                 onComplete={handleStepComplete}
                 color={step === 3 ? '#1B5E20' : C.primary}
+                onDragStart={() => setScrollEnabled(false)}
+                onDragEnd={() => setScrollEnabled(true)}
               />
             </View>
           </View>
@@ -687,7 +731,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
 
             {availableOrders.length === 0 ? (
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyEmoji}>🛵</Text>
+                <Text style={styles.emptyEmoji}>ðŸ›µ</Text>
                 <Text style={styles.emptyText}>No orders right now</Text>
               </View>
             ) : (
@@ -702,7 +746,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+// â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const styles = StyleSheet.create({
   screen:  { flex: 1, backgroundColor: C.bg },
   content: { paddingBottom: 80 },
@@ -717,16 +761,16 @@ const styles = StyleSheet.create({
   heroTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   avatarRow:       { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatar:          { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.20)', alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.white },
-  partnerName: { fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: C.white },
-  partnerId: { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: C.heroSubText, marginTop: 1 },
+  avatarText: { fontSize: 14, fontWeight: '800', color: C.white },
+  partnerName: { fontSize: 15, fontWeight: '700', color: C.white },
+  partnerId: { fontSize: 11, fontWeight: '500', color: C.heroSubText, marginTop: 1 },
   toggleRow:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statusPill:      { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  statusPillText:  { fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: C.white },
+  statusPillText:  { fontSize: 11, fontWeight: '700', color: C.white },
   heroStats:       { flexDirection: 'row', backgroundColor: C.heroStatBg, borderRadius: 14, paddingVertical: 14 },
   heroStat:        { flex: 1, alignItems: 'center' },
-  heroStatValue:   { fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.white, marginBottom: 2 },
-  heroStatLabel:   { fontSize: 10, fontFamily: 'PlusJakartaSans_500Medium', color: C.heroSubText },
+  heroStatValue:   { fontSize: 20, fontWeight: '800', color: C.white, marginBottom: 2 },
+  heroStatLabel:   { fontSize: 10, fontWeight: '500', color: C.heroSubText },
   heroStatDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.15)', marginVertical: 4 },
 
   // Stepper card
@@ -737,13 +781,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.07, shadowRadius: 10, elevation: 3,
   },
   stepperHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border },
-  stepperTitle:   { fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: C.textPrimary },
-  stepperSub: { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: C.textSecond, marginTop: 2 },
+  stepperTitle:   { fontSize: 15, fontWeight: '700', color: C.textPrimary },
+  stepperSub: { fontSize: 11, fontWeight: '500', color: C.textSecond, marginTop: 2 },
   stepBadge:      { backgroundColor: C.primaryLight, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  stepBadgeText:  { fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: C.primaryText },
+  stepBadgeText:  { fontSize: 12, fontWeight: '700', color: C.primaryText },
   stepLabelRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 2 },
   stepChevron:    { fontSize: 14, color: C.textSecond },
-  stepLabelText:  { fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.textPrimary },
+  stepLabelText:  { fontSize: 17, fontWeight: '800', color: C.textPrimary },
 
   // Map + drag handle
   stepMap:    { height: 210, backgroundColor: C.border },
@@ -751,48 +795,48 @@ const styles = StyleSheet.create({
 
   // Step content
   stepCard:        { paddingHorizontal: 16, paddingBottom: 6 },
-  locationLabel: { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.textLight, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 },
-  locationName:    { fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.textPrimary, marginBottom: 4 },
-  locationAddress: { fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: C.textSecond, lineHeight: 18 },
+  locationLabel: { fontSize: 10, fontWeight: '800', color: C.textLight, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 },
+  locationName:    { fontSize: 20, fontWeight: '800', color: C.textPrimary, marginBottom: 4 },
+  locationAddress: { fontSize: 13, fontWeight: '500', color: C.textSecond, lineHeight: 18 },
   metaDivider:     { height: 1, backgroundColor: C.border, marginVertical: 12 },
 
   // Step 3 payment
   paymentRow:      { flexDirection: 'row', alignItems: 'center', gap: 12 },
   paymentCheck:    { width: 32, height: 32, borderRadius: 16, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
-  paymentTitle:    { fontSize: 15, fontFamily: 'PlusJakartaSans_700Bold', color: C.textPrimary },
-  paymentSub:      { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: C.textSecond, marginTop: 2 },
+  paymentTitle:    { fontSize: 15, fontWeight: '700', color: C.textPrimary },
+  paymentSub:      { fontSize: 11, fontWeight: '500', color: C.textSecond, marginTop: 2 },
 
   // Step 3 customer
   customerRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginTop: 4 },
   customerIconWrap:{ width: 42, height: 42, borderRadius: 21, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
-  customerName:    { fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.textPrimary },
-  customerAddress: { fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: C.textSecond, lineHeight: 18, marginTop: 3 },
+  customerName:    { fontSize: 16, fontWeight: '800', color: C.textPrimary },
+  customerAddress: { fontSize: 13, fontWeight: '500', color: C.textSecond, lineHeight: 18, marginTop: 3 },
 
   // Order ID (step 1)
   orderIdCard:  { margin: 16, padding: 16, backgroundColor: C.bg, borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: C.border },
-  orderIdLabel: { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.textLight, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
-  orderIdValue: { fontSize: 34, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.textPrimary, letterSpacing: -1 },
+  orderIdLabel: { fontSize: 10, fontWeight: '800', color: C.textLight, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
+  orderIdValue: { fontSize: 34, fontWeight: '800', color: C.textPrimary, letterSpacing: -1 },
 
   // Slide button
   slideWrap: { alignItems: 'center', paddingVertical: 16, borderTopWidth: 1, borderTopColor: C.border },
 
   // No-active-order state
   mapBox:       { margin: 16, backgroundColor: C.white, borderRadius: 16, height: 180, overflow: 'hidden', borderWidth: 1, borderColor: C.border },
-  sectionTitle: { fontSize: 13, fontFamily: 'PlusJakartaSans_600SemiBold', color: C.textSecond, marginBottom: 10, paddingHorizontal: 16 },
+  sectionTitle: { fontSize: 13, fontWeight: '600', color: C.textSecond, marginBottom: 10, paddingHorizontal: 16 },
   orderCard:    { backgroundColor: C.white, borderRadius: 16, padding: 14, marginHorizontal: 16, marginBottom: 10, borderWidth: 1, borderColor: C.border },
   orderTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  orderId:      { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: C.textPrimary },
+  orderId:      { fontSize: 13, fontWeight: '700', color: C.textPrimary },
   newBadge:     { backgroundColor: C.blueLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
-  newBadgeText: { fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: C.blueText },
+  newBadgeText: { fontSize: 11, fontWeight: '700', color: C.blueText },
   routeRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   routeDot:     { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
-  routeText:    { fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: C.textPrimary, flexShrink: 1, maxWidth: '40%' },
+  routeText:    { fontSize: 12, fontWeight: '500', color: C.textPrimary, flexShrink: 1, maxWidth: '40%' },
   routeLine:    { flex: 1, height: 1, backgroundColor: C.border },
   orderBottom:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  orderMeta:    { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: C.textLight, flex: 1 },
+  orderMeta:    { fontSize: 11, fontWeight: '500', color: C.textLight, flex: 1 },
   btnAccept:    { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, backgroundColor: C.primary },
-  btnAcceptText:{ fontSize: 12, color: C.white, fontFamily: 'PlusJakartaSans_700Bold' },
+  btnAcceptText:{ fontSize: 12, color: C.white, fontWeight: '700' },
   emptyBox:     { alignItems: 'center', paddingVertical: 40 },
   emptyEmoji:   { fontSize: 40, marginBottom: 10 },
-  emptyText:    { fontSize: 14, fontFamily: 'PlusJakartaSans_500Medium', color: C.textLight },
+  emptyText:    { fontSize: 14, fontWeight: '500', color: C.textLight },
 });

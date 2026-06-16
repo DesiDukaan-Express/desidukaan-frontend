@@ -9,24 +9,24 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
-import useAuthStore    from "../../store/authStore";
-import useCartStore    from "../../store/cartStore";
+import useAuthStore from "../../store/authStore";
+import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 const C = {
-  orange:     "#F97316", orangeDark: "#EA580C",
-  green:      "#16A34A", greenDark:  "#15803D",
-  greenLight: "#F0FDF4", greenBorder:"#BBF7D0",
-  greenMid:   "#DCFCE7",
-  white:      "#FFFFFF", bg:         "#F8FAFC",
-  gray100:    "#F3F4F6", gray200:    "#E5E7EB",
-  gray300:    "#D1D5DB", gray400:    "#9CA3AF",
-  gray500:    "#6B7280", gray600:    "#4B5563",
-  gray700:    "#374151", gray900:    "#111827",
-  red:        "#EF4444", redLight:   "#FEF2F2",
+  orange: "#F97316", orangeDark: "#EA580C",
+  green: "#16A34A", greenDark: "#15803D",
+  greenLight: "#F0FDF4", greenBorder: "#BBF7D0",
+  greenMid: "#DCFCE7",
+  white: "#FFFFFF", bg: "#F8FAFC",
+  gray100: "#F3F4F6", gray200: "#E5E7EB",
+  gray300: "#D1D5DB", gray400: "#9CA3AF",
+  gray500: "#6B7280", gray600: "#4B5563",
+  gray700: "#374151", gray900: "#111827",
+  red: "#EF4444", redLight: "#FEF2F2",
 };
 
 // ─── Avatar initials ──────────────────────────────────────────────────────
@@ -55,7 +55,7 @@ function EditModal({ visible, field, label, value, keyboardType = "default", onS
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={em.backdrop} onPress={onClose}>
-        <Pressable style={em.sheet} onPress={() => {}}>
+        <Pressable style={em.sheet} onPress={() => { }}>
           <View style={em.handle} />
           <Text style={em.title}>Edit {label}</Text>
           <View style={em.inputBox}>
@@ -92,18 +92,18 @@ function EditModal({ visible, field, label, value, keyboardType = "default", onS
   );
 }
 const em = StyleSheet.create({
-  backdrop:  { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
-  sheet:     { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
-  handle:    { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
-  title:     { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 16 },
-  inputBox:  { backgroundColor: C.gray100, borderRadius: 14, borderWidth: 1.5, borderColor: C.greenBorder, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 20 },
-  input:     { fontSize: 16, color: C.gray900, fontWeight: "600", ...Platform.select({ web: { outlineStyle: "none" } }) },
-  btns:      { flexDirection: "row", gap: 12 },
-  cancel:    { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: C.gray100, alignItems: "center" },
-  cancelText:{ fontSize: 15, fontWeight: "700", color: C.gray600 },
-  save:      { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: C.green, alignItems: "center" },
-  saveOff:   { backgroundColor: C.greenMid },
-  saveText:  { fontSize: 15, fontWeight: "800", color: C.white },
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
+  title: { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 16 },
+  inputBox: { backgroundColor: C.gray100, borderRadius: 14, borderWidth: 1.5, borderColor: C.greenBorder, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 20 },
+  input: { fontSize: 16, color: C.gray900, fontWeight: "600", ...Platform.select({ web: { outlineStyle: "none" } }) },
+  btns: { flexDirection: "row", gap: 12 },
+  cancel: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: C.gray100, alignItems: "center" },
+  cancelText: { fontSize: 15, fontWeight: "700", color: C.gray600 },
+  save: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: C.green, alignItems: "center" },
+  saveOff: { backgroundColor: C.greenMid },
+  saveText: { fontSize: 15, fontWeight: "800", color: C.white },
 });
 
 // ─── Info row (tappable field) ────────────────────────────────────────────
@@ -130,13 +130,13 @@ function InfoRow({ label, value, onEdit, editable = true, icon }) {
   );
 }
 const ir = StyleSheet.create({
-  row:              { flexDirection: "row", alignItems: "center", paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  left:             { flex: 1 },
-  label:            { fontSize: 11, fontWeight: "700", color: C.gray400, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 5 },
-  value:            { fontSize: 16, fontWeight: "600", color: C.gray900 },
+  row: { flexDirection: "row", alignItems: "center", paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  left: { flex: 1 },
+  label: { fontSize: 11, fontWeight: "700", color: C.gray400, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 5 },
+  value: { fontSize: 16, fontWeight: "600", color: C.gray900 },
   valuePlaceholder: { color: C.gray400, fontWeight: "400", fontStyle: "italic" },
-  editBtn:          { width: 34, height: 34, borderRadius: 10, backgroundColor: C.greenMid, alignItems: "center", justifyContent: "center" },
-  lockWrap:         { width: 34, height: 34, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
+  editBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: C.greenMid, alignItems: "center", justifyContent: "center" },
+  lockWrap: { width: 34, height: 34, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
 });
 
 // ─── Address card ─────────────────────────────────────────────────────────
@@ -153,21 +153,21 @@ function AddressCard({ addr, isSelected, onSelect, onRemove }) {
       <Text style={[adc.text, isSelected && adc.textActive]} numberOfLines={2}>{text}</Text>
       {isSelected
         ? <View style={adc.tick}><Feather name="check" size={11} color={C.white} /></View>
-        : <TouchableOpacity onPress={() => onRemove(addr)} hitSlop={{ top:8,bottom:8,left:8,right:8 }}>
-            <Feather name="x" size={15} color={C.gray300} />
-          </TouchableOpacity>
+        : <TouchableOpacity onPress={() => onRemove(addr)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Feather name="x" size={15} color={C.gray300} />
+        </TouchableOpacity>
       }
     </TouchableOpacity>
   );
 }
 const adc = StyleSheet.create({
-  card:       { flexDirection: "row", alignItems: "center", gap: 12, padding: 13, borderRadius: 14, borderWidth: 1.5, borderColor: C.gray200, backgroundColor: C.white, marginBottom: 8 },
+  card: { flexDirection: "row", alignItems: "center", gap: 12, padding: 13, borderRadius: 14, borderWidth: 1.5, borderColor: C.gray200, backgroundColor: C.white, marginBottom: 8 },
   cardActive: { borderColor: C.green, backgroundColor: C.greenLight },
-  icon:       { width: 30, height: 30, borderRadius: 9, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  icon: { width: 30, height: 30, borderRadius: 9, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   iconActive: { backgroundColor: C.green },
-  text:       { flex: 1, fontSize: 13, color: C.gray700, fontWeight: "500", lineHeight: 18 },
+  text: { flex: 1, fontSize: 13, color: C.gray700, fontWeight: "500", lineHeight: 18 },
   textActive: { color: C.greenDark, fontWeight: "700" },
-  tick:       { width: 22, height: 22, borderRadius: 7, backgroundColor: C.green, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  tick: { width: 22, height: 22, borderRadius: 7, backgroundColor: C.green, alignItems: "center", justifyContent: "center", flexShrink: 0 },
 });
 
 // ─── Row menu item ────────────────────────────────────────────────────────
@@ -189,13 +189,13 @@ function MenuItem({ icon, label, onPress, danger, right, sub }) {
   );
 }
 const mi = StyleSheet.create({
-  row:        { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 15, paddingHorizontal: 16, backgroundColor: C.white, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: C.gray200 },
-  rowDanger:  { borderColor: "#FECACA", backgroundColor: C.redLight },
-  iconWrap:   { width: 38, height: 38, borderRadius: 12, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
+  row: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 15, paddingHorizontal: 16, backgroundColor: C.white, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: C.gray200 },
+  rowDanger: { borderColor: "#FECACA", backgroundColor: C.redLight },
+  iconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
   iconDanger: { backgroundColor: "#FEE2E2" },
-  label:      { fontSize: 15, color: C.gray800, fontWeight: "600" },
-  labelDanger:{ color: C.red },
-  sub:        { fontSize: 12, color: C.gray400, marginTop: 2 },
+  label: { fontSize: 15, color: C.gray800, fontWeight: "600" },
+  labelDanger: { color: C.red },
+  sub: { fontSize: 12, color: C.gray400, marginTop: 2 },
 });
 
 // ─── Address Detail Modal ─────────────────────────────────────────────────
@@ -223,7 +223,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
   return (
     <Modal visible={!!addr} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={adm.backdrop} onPress={onClose}>
-        <Pressable style={adm.sheet} onPress={() => {}}>
+        <Pressable style={adm.sheet} onPress={() => { }}>
           <View style={adm.handle} />
           <Text style={adm.title}>Address details</Text>
 
@@ -291,24 +291,24 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
   );
 }
 const adm = StyleSheet.create({
-  backdrop:        { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
-  sheet:           { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
-  handle:          { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
-  title:           { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 20 },
-  mapWrapper:      { height: 160, borderRadius: 16, overflow: "hidden", marginBottom: 16, borderWidth: 1, borderColor: C.gray200 },
-  addrBox:         { flexDirection: "row", alignItems: "flex-start", gap: 14, backgroundColor: C.gray100, borderRadius: 14, padding: 16, marginBottom: 12 },
-  addrIcon:        { width: 38, height: 38, borderRadius: 11, backgroundColor: C.gray200, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  addrIconActive:  { backgroundColor: C.green },
-  addrText:        { flex: 1, fontSize: 15, color: C.gray800, fontWeight: "500", lineHeight: 22 },
-  coordRow:        { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, marginBottom: 12 },
-  coordText:       { fontSize: 12, color: C.gray400, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
-  activeBadge:     { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.greenLight, borderRadius: 12, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: C.greenBorder },
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
+  title: { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 20 },
+  mapWrapper: { height: 160, borderRadius: 16, overflow: "hidden", marginBottom: 16, borderWidth: 1, borderColor: C.gray200 },
+  addrBox: { flexDirection: "row", alignItems: "flex-start", gap: 14, backgroundColor: C.gray100, borderRadius: 14, padding: 16, marginBottom: 12 },
+  addrIcon: { width: 38, height: 38, borderRadius: 11, backgroundColor: C.gray200, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  addrIconActive: { backgroundColor: C.green },
+  addrText: { flex: 1, fontSize: 15, color: C.gray800, fontWeight: "500", lineHeight: 22 },
+  coordRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, marginBottom: 12 },
+  coordText: { fontSize: 12, color: C.gray400, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
+  activeBadge: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.greenLight, borderRadius: 12, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: C.greenBorder },
   activeBadgeText: { fontSize: 13, color: C.green, fontWeight: "600", flex: 1 },
-  actions:         { gap: 10 },
-  selectBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.green, paddingVertical: 15, borderRadius: 14 },
-  selectBtnText:   { fontSize: 15, fontWeight: "800", color: C.white },
-  removeBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.redLight, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: "#FECACA" },
-  removeBtnText:   { fontSize: 14, fontWeight: "700", color: C.red },
+  actions: { gap: 10 },
+  selectBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.green, paddingVertical: 15, borderRadius: 14 },
+  selectBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
+  removeBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.redLight, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: "#FECACA" },
+  removeBtnText: { fontSize: 14, fontWeight: "700", color: C.red },
 });
 
 // ─── Section header ───────────────────────────────────────────────────────
@@ -321,7 +321,7 @@ function LogoutModal({ visible, onConfirm, onCancel }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable style={lm.backdrop} onPress={onCancel}>
-        <Pressable style={lm.card} onPress={() => {}}>
+        <Pressable style={lm.card} onPress={() => { }}>
           <LinearGradient colors={["#FEF2F2", "#FFF"]} style={lm.iconWrap}>
             <Feather name="log-out" size={26} color={C.red} />
           </LinearGradient>
@@ -341,15 +341,15 @@ function LogoutModal({ visible, onConfirm, onCancel }) {
   );
 }
 const lm = StyleSheet.create({
-  backdrop:    { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },
-  card:        { backgroundColor: C.white, borderRadius: 24, padding: 28, width: "82%", alignItems: "center", gap: 8 },
-  iconWrap:    { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center", marginBottom: 4 },
-  title:       { fontSize: 20, fontWeight: "900", color: C.gray900 },
-  sub:         { fontSize: 13, color: C.gray400, textAlign: "center", lineHeight: 20 },
-  btns:        { flexDirection: "row", gap: 10, marginTop: 12, width: "100%" },
-  cancel:      { flex: 1, paddingVertical: 14, borderRadius: 13, backgroundColor: C.gray100, alignItems: "center" },
-  cancelText:  { fontSize: 15, fontWeight: "700", color: C.gray700 },
-  confirm:     { flex: 1, paddingVertical: 14, borderRadius: 13, backgroundColor: C.red, alignItems: "center" },
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },
+  card: { backgroundColor: C.white, borderRadius: 24, padding: 28, width: "82%", alignItems: "center", gap: 8 },
+  iconWrap: { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  title: { fontSize: 20, fontWeight: "900", color: C.gray900 },
+  sub: { fontSize: 13, color: C.gray400, textAlign: "center", lineHeight: 20 },
+  btns: { flexDirection: "row", gap: 10, marginTop: 12, width: "100%" },
+  cancel: { flex: 1, paddingVertical: 14, borderRadius: 13, backgroundColor: C.gray100, alignItems: "center" },
+  cancelText: { fontSize: 15, fontWeight: "700", color: C.gray700 },
+  confirm: { flex: 1, paddingVertical: 14, borderRadius: 13, backgroundColor: C.red, alignItems: "center" },
   confirmText: { fontSize: 15, fontWeight: "700", color: C.white },
 });
 
@@ -358,7 +358,7 @@ function PaymentModal({ visible, onClose }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={pm2.backdrop} onPress={onClose}>
-        <Pressable style={pm2.sheet} onPress={() => {}}>
+        <Pressable style={pm2.sheet} onPress={() => { }}>
           <View style={pm2.handle} />
           <Text style={pm2.title}>Payment Methods</Text>
           <View style={pm2.placeholder}>
@@ -375,49 +375,49 @@ function PaymentModal({ visible, onClose }) {
   );
 }
 const pm2 = StyleSheet.create({
-  backdrop:         { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
-  sheet:            { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
-  handle:           { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
-  title:            { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 20 },
-  placeholder:      { alignItems: "center", paddingVertical: 32, gap: 10, backgroundColor: C.gray100, borderRadius: 16, marginBottom: 20 },
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
+  title: { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 20 },
+  placeholder: { alignItems: "center", paddingVertical: 32, gap: 10, backgroundColor: C.gray100, borderRadius: 16, marginBottom: 20 },
   placeholderTitle: { fontSize: 16, fontWeight: "800", color: C.gray500 },
-  placeholderSub:   { fontSize: 13, color: C.gray400, textAlign: "center", paddingHorizontal: 24 },
-  closeBtn:         { backgroundColor: C.gray100, paddingVertical: 14, borderRadius: 14, alignItems: "center" },
-  closeBtnText:     { fontSize: 15, fontWeight: "700", color: C.gray600 },
+  placeholderSub: { fontSize: 13, color: C.gray400, textAlign: "center", paddingHorizontal: 24 },
+  closeBtn: { backgroundColor: C.gray100, paddingVertical: 14, borderRadius: 14, alignItems: "center" },
+  closeBtnText: { fontSize: 15, fontWeight: "700", color: C.gray600 },
 });
 
 // ═════════════════════════════════════════════════════════════════════════
 export default function ProfileScreen() {
-  const navigation   = useNavigation();
+  const navigation = useNavigation();
   const { user, token, logout, updateUser } = useAuthStore();
-  const { clearCart }  = useCartStore();
-  const addressStore   = useAddressStore();
+  const { clearCart } = useCartStore();
+  const addressStore = useAddressStore();
   const { width: winW } = useWindowDimensions();
-  const isWide      = winW > 600;
+  const isWide = winW > 600;
   const contentMaxW = Math.min(winW, 640);
-  const hPad        = isWide ? Math.max(24, Math.floor((winW - contentMaxW) / 2)) : 20;
+  const hPad = isWide ? Math.max(24, Math.floor((winW - contentMaxW) / 2)) : 20;
 
-  const [showLogout,   setShowLogout]   = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
-  const [editField,    setEditField]    = useState(null);
-  const [saving,       setSaving]       = useState(false);
+  const [editField, setEditField] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
-  const [detailAddr,   setDetailAddr]   = useState(null);
+  const [detailAddr, setDetailAddr] = useState(null);
 
   // Load notification preference from AsyncStorage
   useEffect(() => {
     AsyncStorage.getItem("notif_enabled")
       .then(v => { if (v !== null) setNotifEnabled(v === "true" || v === true); })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Animations
-  const fadeO  = useRef(new Animated.Value(0)).current;
+  const fadeO = useRef(new Animated.Value(0)).current;
   const slideY = useRef(new Animated.Value(18)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeO,  { toValue: 1, duration: 350, useNativeDriver: true }),
+      Animated.timing(fadeO, { toValue: 1, duration: 350, useNativeDriver: true }),
       Animated.spring(slideY, { toValue: 0, tension: 70, friction: 10, useNativeDriver: true }),
     ]).start();
   }, []);
@@ -427,10 +427,10 @@ export default function ProfileScreen() {
     if (!value || !editField) return;
     setSaving(true);
     try {
-      const res  = await fetch(`${BASE_URL}/auth/me`, {
-        method:  "PUT",
+      const res = await fetch(`${BASE_URL}/auth/me`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body:    JSON.stringify({ [editField.field]: value }),
+        body: JSON.stringify({ [editField.field]: value }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -458,7 +458,7 @@ export default function ProfileScreen() {
       await Share.share({
         message: "🛒 DesiDukaan — order groceries from nearby kirana stores!\n\nJoin with my invite and get ₹150 credit:\nhttps://desidukaan.app/invite",
       });
-    } catch {}
+    } catch { }
   };
 
   // ── Logout ─────────────────────────────────────────────────────────────
@@ -688,9 +688,9 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
 
   // Hero — more vertical breathing room
-  hero:     { paddingTop: Platform.OS === "android" ? 28 : 20, paddingBottom: 0 },
-  heroTop:  { marginBottom: 24 },
-  heroLabel:{ fontSize: 13, fontWeight: "800", color: "rgba(255,255,255,0.7)", letterSpacing: 1, textTransform: "uppercase" },
+  hero: { paddingTop: Platform.OS === "android" ? 28 : 20, paddingBottom: 0 },
+  heroTop: { marginBottom: 24 },
+  heroLabel: { fontSize: 13, fontWeight: "800", color: "rgba(255,255,255,0.7)", letterSpacing: 1, textTransform: "uppercase" },
   heroMain: { flexDirection: "row", alignItems: "center", gap: 18, marginBottom: 28 },
 
   avatarOuter: { position: "relative" },
@@ -701,24 +701,24 @@ const s = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
 
-  heroInfo:    { flex: 1 },
-  heroName:    { fontSize: 24, fontWeight: "900", color: C.white, letterSpacing: -0.3, flexWrap: "wrap" },
-  heroPill:    { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.white, alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, marginTop: 8 },
-  heroPillText:{ fontSize: 13, fontWeight: "700", color: C.green },
-  heroSince:   { fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 6 },
+  heroInfo: { flex: 1 },
+  heroName: { fontSize: 24, fontWeight: "900", color: C.white, letterSpacing: -0.3, flexWrap: "wrap" },
+  heroPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.white, alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, marginTop: 8 },
+  heroPillText: { fontSize: 13, fontWeight: "700", color: C.green },
+  heroSince: { fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 6 },
 
   // Stats — more vertical padding so numbers have room
-  stats:     { flexDirection: "row", backgroundColor: C.white, borderRadius: 20, paddingVertical: 20, marginBottom: -22, zIndex: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4, borderWidth: 1, borderColor: C.gray100 },
-  statItem:  { flex: 1, alignItems: "center", gap: 4 },
-  statNum:   { fontSize: 20, fontWeight: "900", color: C.gray900 },
+  stats: { flexDirection: "row", backgroundColor: C.white, borderRadius: 20, paddingVertical: 20, marginBottom: -22, zIndex: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4, borderWidth: 1, borderColor: C.gray100 },
+  statItem: { flex: 1, alignItems: "center", gap: 4 },
+  statNum: { fontSize: 20, fontWeight: "900", color: C.gray900 },
   statLabel: { fontSize: 12, color: C.gray400, fontWeight: "600" },
-  statSep:   { width: 1, backgroundColor: C.gray200 },
+  statSep: { width: 1, backgroundColor: C.gray200 },
 
   // Cards — more top margin to clear the stats overlap
   card: { backgroundColor: C.white, borderRadius: 16, paddingHorizontal: 16, borderWidth: 1, borderColor: C.gray200, marginTop: 42 },
 
   // Empty address
-  emptyBox:  { alignItems: "center", paddingVertical: 32, gap: 8, backgroundColor: C.white, borderRadius: 16, borderWidth: 1.5, borderColor: C.gray200, ...Platform.select({ web: { borderStyle: "dashed" }, default: { borderStyle: "solid" } }) },
-  emptyTitle:{ fontSize: 15, fontWeight: "700", color: C.gray500 },
-  emptySub:  { fontSize: 13, color: C.gray400, textAlign: "center", paddingHorizontal: 24, lineHeight: 19 },
+  emptyBox: { alignItems: "center", paddingVertical: 32, gap: 8, backgroundColor: C.white, borderRadius: 16, borderWidth: 1.5, borderColor: C.gray200, ...Platform.select({ web: { borderStyle: "dashed" }, default: { borderStyle: "solid" } }) },
+  emptyTitle: { fontSize: 15, fontWeight: "700", color: C.gray500 },
+  emptySub: { fontSize: 13, color: C.gray400, textAlign: "center", paddingHorizontal: 24, lineHeight: 19 },
 });
