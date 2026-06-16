@@ -1,7 +1,7 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Animated, PanResponder, Dimensions,
-  StatusBar, Platform, ActivityIndicator,
+  StatusBar, Platform,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { io } from 'socket.io-client';
@@ -621,14 +621,6 @@ export default function ActiveDeliveryScreen({ navigation }) {
   };
 
   // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  if (!fontsLoaded) {
-    return (
-      <View style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={C.primary} />
-      </View>
-    );
-  }
-
   const [scrollEnabled, setScrollEnabled] = useState(true);
 
   return (
