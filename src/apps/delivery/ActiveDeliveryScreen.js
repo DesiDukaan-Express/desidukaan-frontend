@@ -8,6 +8,24 @@ import { io } from 'socket.io-client';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 
+// Helper to open telephone dialer on both Native (Expo/React Native) and Web
+const openPhoneCall = (phone) => {
+  if (!phone) {
+    Alert.alert('No Phone Number', 'Phone number is not available.');
+    return;
+  }
+  const cleanPhone = phone.toString().replace(/[^0-9+]/g, '');
+  const url = `tel:${cleanPhone}`;
+  if (Platform.OS === 'web') {
+    window.location.href = url;
+  } else {
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Cannot Call', 'Unable to open the dialer app. Please call manually.');
+    });
+  }
+};
+
+
 import useAuthStore from '../../store/authStore';
 import DeliveryMapView from '../../components/DeliveryMapView';
 import IncomingOrderSheet from '../../components/IncomingOrderSheet';
@@ -56,79 +74,118 @@ const STEPS = [
 ];
 
 // ──────────────────────────────────────────────────────────────────────────────────────────────────
-const THUMB      = 56;
-const TRACK_W    = SCREEN_W - 32;
-const DRAG_RANGE = TRACK_W - THUMB - 4;
+const THUMB = 56;
 
 function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDragEnd }) {
-  const pan  = useRef(new Animated.Value(0)).current;
+  const pan             = useRef(new Animated.Value(0)).current;
   const [done, setDone] = useState(false);
-  const isDragging = useRef(false);
+  const isDragging      = useRef(false);
+  const dragRange       = useRef(0);
+  const startXRef       = useRef(0);
 
-  useEffect(() => { setDone(false); pan.setValue(0); }, [label]);
+  // Reset when the step changes
+  useEffect(() => {
+    setDone(false);
+    pan.setValue(0);
+  }, [label]);
 
+  const onLayout = (e) => {
+    const w = e.nativeEvent.layout.width;
+    const newRange = Math.max(w - THUMB - 4, 0);
+    dragRange.current = newRange;
+    if (done) {
+      pan.setValue(newRange);
+    } else {
+      // Clamp current pan value to avoid it flying out of boundaries
+      const cur = pan.__getValue ? pan.__getValue() : 0;
+      if (cur > newRange) {
+        pan.setValue(newRange);
+      }
+    }
+  };
+
+  // ── Native touch (mobile) ──────────────────────────────────────────
   const responder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder:         () => !done,
-      onStartShouldSetPanResponderCapture:  () => !done,
-      onMoveShouldSetPanResponder:          (_, g) => !done && Math.abs(g.dx) > 2,
-      onMoveShouldSetPanResponderCapture:   (_, g) => !done && Math.abs(g.dx) > 2,
-      onPanResponderGrant: () => { isDragging.current = true; onDragStart?.(); },
-      onPanResponderMove: (_, g) => { pan.setValue(Math.max(0, Math.min(g.dx, DRAG_RANGE))); },
+      onStartShouldSetPanResponder:        () => !done,
+      onStartShouldSetPanResponderCapture: () => !done,
+      onMoveShouldSetPanResponder:         (_, g) => !done && Math.abs(g.dx) > 2,
+      onMoveShouldSetPanResponderCapture:  (_, g) => !done && Math.abs(g.dx) > 2,
+      onPanResponderGrant: () => {
+        isDragging.current = true;
+        onDragStart?.();
+      },
+      onPanResponderMove: (_, g) => {
+        pan.setValue(Math.max(0, Math.min(g.dx, dragRange.current)));
+      },
       onPanResponderRelease: (_, g) => {
-        isDragging.current = false; onDragEnd?.();
-        if (g.dx >= DRAG_RANGE * 0.80) {
-          Animated.spring(pan, { toValue: DRAG_RANGE, useNativeDriver: false }).start(() => { setDone(true); onComplete?.(); });
+        isDragging.current = false;
+        onDragEnd?.();
+        if (g.dx >= dragRange.current * 0.80) {
+          Animated.spring(pan, { toValue: dragRange.current, useNativeDriver: false })
+            .start(() => { setDone(true); onComplete?.(); });
         } else {
           Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
         }
       },
       onPanResponderTerminate: () => {
-        isDragging.current = false; onDragEnd?.();
+        isDragging.current = false;
+        onDragEnd?.();
         Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
       },
     })
   ).current;
 
   const labelOpacity = pan.interpolate({
-    inputRange: [0, DRAG_RANGE * 0.5], outputRange: [1, 0], extrapolate: 'clamp',
+    inputRange:  [0, 80],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
   });
 
-  // ── Web / PC mouse support ──────────────────────────────────────────────
-  const startXRef = useRef(null);
+  // ── Web / PC mouse support (Delta based - extremely smooth, no snapping) ──
   const webMouseDown = (e) => {
     if (done) return;
+    e.preventDefault();
     startXRef.current = e.clientX;
     isDragging.current = true;
     onDragStart?.();
+
     const onMove = (mv) => {
       if (!isDragging.current) return;
-      pan.setValue(Math.max(0, Math.min(mv.clientX - startXRef.current, DRAG_RANGE)));
+      const dx = mv.clientX - startXRef.current;
+      pan.setValue(Math.max(0, Math.min(dx, dragRange.current)));
     };
+
     const onUp = (mu) => {
-      isDragging.current = false; onDragEnd?.();
+      isDragging.current = false;
+      onDragEnd?.();
       window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('mouseup',   onUp);
       const dx = mu.clientX - startXRef.current;
-      if (dx >= DRAG_RANGE * 0.80) {
-        Animated.spring(pan, { toValue: DRAG_RANGE, useNativeDriver: false }).start(() => { setDone(true); onComplete?.(); });
+      if (dx >= dragRange.current * 0.80) {
+        Animated.spring(pan, { toValue: dragRange.current, useNativeDriver: false })
+          .start(() => { setDone(true); onComplete?.(); });
       } else {
         Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
       }
     };
+
     window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    window.addEventListener('mouseup',   onUp);
   };
 
   const thumbWebProps = Platform.OS === 'web'
-    ? { onMouseDown: webMouseDown, style: { cursor: done ? 'default' : 'grab' } }
+    ? { onMouseDown: webMouseDown, style: { cursor: done ? 'default' : 'grab', userSelect: 'none' } }
     : {};
 
   return (
-    <View style={[sb.track, { backgroundColor: done ? color : C.primaryLight, borderColor: color }]}>
+    <View
+      onLayout={onLayout}
+      style={[sb.track, { backgroundColor: done ? color : C.primaryLight, borderColor: color }]}
+    >
       <Animated.View style={[sb.fill, { width: Animated.add(pan, THUMB + 4), backgroundColor: color }]} />
       <Animated.Text style={[sb.label, { opacity: labelOpacity, color: done ? C.white : C.primaryText }]}>
-        {done ? 'Done' : label}
+        {done ? 'Done ✓' : label}
       </Animated.Text>
       <Animated.View
         style={[sb.thumb, { transform: [{ translateX: pan }], backgroundColor: color }]}
@@ -136,7 +193,7 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
         {...thumbWebProps}
       >
         {done
-          ? <MaterialIcons name="check" size={22} color={C.white} />
+          ? <MaterialIcons name="check"         size={22} color={C.white} />
           : <MaterialIcons name="chevron-right" size={22} color={C.white} />}
       </Animated.View>
     </View>
@@ -144,21 +201,33 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
 }
 
 const sb = StyleSheet.create({
-  track:     {
-    width: TRACK_W, height: THUMB + 4, borderRadius: (THUMB + 4) / 2,
-    overflow: 'hidden', justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1.5, position: 'relative',
+  track: {
+    alignSelf: 'stretch',
+    height: THUMB + 4,
+    borderRadius: (THUMB + 4) / 2,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    position: 'relative',
   },
-  fill:      { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: (THUMB + 4) / 2 },
-  label:     { fontSize: 14, fontWeight: '700', letterSpacing: 0.3 },
-  thumb:     {
-    position: 'absolute', left: 2,
-    width: THUMB, height: THUMB, borderRadius: THUMB / 2,
-    alignItems: 'center', justifyContent: 'center', elevation: 4,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18, shadowRadius: 4,
+  fill:  { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: (THUMB + 4) / 2 },
+  label: { fontSize: 14, fontWeight: '700', letterSpacing: 0.3, zIndex: 1 },
+  thumb: {
+    position: 'absolute',
+    left: 2,
+    width: THUMB,
+    height: THUMB,
+    borderRadius: THUMB / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    zIndex: 2,
   },
-  thumbIcon: { color: C.white },
 });
 
 // â”€â”€ Step Progress Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -209,9 +278,7 @@ const spb = StyleSheet.create({
 function ActionButtons({ onCall, onMap, phone }) {
   const handleCall = () => {
     if (phone) {
-      Linking.openURL(`tel:${phone}`).catch(() =>
-        Alert.alert('Cannot Call', 'Unable to open the dialer. Please check the phone number.')
-      );
+      openPhoneCall(phone);
     } else if (onCall) {
       onCall();
     } else {
@@ -381,11 +448,22 @@ function StepContent({ step, activeOrder, myLocation }) {
                   <Text style={ac.sub}>{activeOrder?.pickup}</Text>
                 </View>
               </View>
-              {vendorLoc && (
-                <TouchableOpacity onPress={() => openMap(vendorLoc)}>
-                  <Text style={{ fontSize: 12, color: C.blue, fontWeight: '700' }}>Go to map</Text>
-                </TouchableOpacity>
-              )}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                {activeOrder?.vendorPhone && (
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                    onPress={() => openPhoneCall(activeOrder.vendorPhone)}
+                  >
+                    <MaterialIcons name="call" size={14} color={C.blue} />
+                    <Text style={{ fontSize: 12, color: C.blue, fontWeight: '700' }}>Call</Text>
+                  </TouchableOpacity>
+                )}
+                {vendorLoc && (
+                  <TouchableOpacity onPress={() => openMap(vendorLoc)}>
+                    <Text style={{ fontSize: 12, color: C.blue, fontWeight: '700' }}>Go to map</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </View>
           <View style={ac.wrap}>
@@ -398,8 +476,12 @@ function StepContent({ step, activeOrder, myLocation }) {
                 </View>
               </View>
               {activeOrder?.customerPhone && (
-                <TouchableOpacity onPress={() => Linking.openURL(`tel:${activeOrder.customerPhone}`)}>
-                  <><MaterialIcons name="call" size={14} color={C.blue} /><Text style={{ fontSize: 12, color: C.blue, fontWeight: '700' }}>Call</Text></>
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                  onPress={() => openPhoneCall(activeOrder.customerPhone)}
+                >
+                  <MaterialIcons name="call" size={14} color={C.blue} />
+                  <Text style={{ fontSize: 12, color: C.blue, fontWeight: '700' }}>Call</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -829,7 +911,13 @@ const styles = StyleSheet.create({
   orderIdValue: { fontSize: 34, fontWeight: '800', color: C.textPrimary, letterSpacing: -1 },
 
   // Slide button
-  slideWrap: { alignItems: 'center', paddingVertical: 16, borderTopWidth: 1, borderTopColor: C.border },
+  slideWrap: {
+    alignItems: 'stretch',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: C.border
+  },
 
   // No-active-order state
   mapBox:       { margin: 16, backgroundColor: C.white, borderRadius: 16, height: 180, overflow: 'hidden', borderWidth: 1, borderColor: C.border },
