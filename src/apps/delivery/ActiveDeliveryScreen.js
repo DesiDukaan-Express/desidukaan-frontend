@@ -299,18 +299,16 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
         onTouchStart: webStartDrag,
         onMouseEnter: () => setHovered(true),
         onMouseLeave: () => { setHovered(false); setPressed(false); },
-        style: { 
-          cursor: done ? 'default' : 'grab', 
-          userSelect: 'none',
-          transition: 'transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.15s ease',
-        } 
       }
     : {};
 
-  // Custom colors based on state
-  const trackBgColor = done ? color : 'rgba(232, 248, 238, 0.45)';
-  const trackBorderColor = done ? color : 'rgba(46, 125, 50, 0.18)';
-  const labelColor = done ? C.white : '#1A6B38';
+  const webStyle = Platform.OS === 'web'
+    ? { 
+        cursor: done ? 'default' : 'grab', 
+        userSelect: 'none',
+        transition: 'transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.15s ease',
+      }
+    : {};
 
   return (
     <View
@@ -349,7 +347,8 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
               { scale: scaleAnim }
             ],
             shadowColor: color,
-          }
+          },
+          webStyle
         ]}
         {...responder.panHandlers}
         {...thumbWebProps}
