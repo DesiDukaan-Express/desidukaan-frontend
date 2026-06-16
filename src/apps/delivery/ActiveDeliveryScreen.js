@@ -6,6 +6,7 @@ import {
 import * as Location from 'expo-location';
 import { io } from 'socket.io-client';
 import { useFocusEffect } from '@react-navigation/native';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import useAuthStore from '../../store/authStore';
 import DeliveryMapView from '../../components/DeliveryMapView';
@@ -46,7 +47,7 @@ const C = {
   border:      '#E5E7EB',
 };
 
-// â”€â”€ Delivery steps â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────────────────────────
 const STEPS = [
   { key: 'reach_pickup', label: 'Reach Pickup',  api: null,        btnLabel: 'Reached Pickup Location' },
   { key: 'pick_order',   label: 'Pick Order',    api: 'picked_up', btnLabel: 'Picked Order'            },
@@ -54,7 +55,7 @@ const STEPS = [
   { key: 'drop_order',   label: 'Drop Order',    api: 'delivered', btnLabel: 'Order Delivered'         },
 ];
 
-// â”€â”€ Slide-to-Action Button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────────────────────────
 const THUMB      = 56;
 const TRACK_W    = SCREEN_W - 32;
 const DRAG_RANGE = TRACK_W - THUMB - 4;
@@ -68,33 +69,22 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
 
   const responder = useRef(
     PanResponder.create({
-      // Capture from the start so ScrollView cannot intercept
       onStartShouldSetPanResponder:         () => !done,
       onStartShouldSetPanResponderCapture:  () => !done,
       onMoveShouldSetPanResponder:          (_, g) => !done && Math.abs(g.dx) > 2,
       onMoveShouldSetPanResponderCapture:   (_, g) => !done && Math.abs(g.dx) > 2,
-      onPanResponderGrant: () => {
-        isDragging.current = true;
-        onDragStart?.();
-      },
-      onPanResponderMove: (_, g) => {
-        pan.setValue(Math.max(0, Math.min(g.dx, DRAG_RANGE)));
-      },
+      onPanResponderGrant: () => { isDragging.current = true; onDragStart?.(); },
+      onPanResponderMove: (_, g) => { pan.setValue(Math.max(0, Math.min(g.dx, DRAG_RANGE))); },
       onPanResponderRelease: (_, g) => {
-        isDragging.current = false;
-        onDragEnd?.();
+        isDragging.current = false; onDragEnd?.();
         if (g.dx >= DRAG_RANGE * 0.80) {
-          Animated.spring(pan, { toValue: DRAG_RANGE, useNativeDriver: false }).start(() => {
-            setDone(true);
-            onComplete?.();
-          });
+          Animated.spring(pan, { toValue: DRAG_RANGE, useNativeDriver: false }).start(() => { setDone(true); onComplete?.(); });
         } else {
           Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
         }
       },
       onPanResponderTerminate: () => {
-        isDragging.current = false;
-        onDragEnd?.();
+        isDragging.current = false; onDragEnd?.();
         Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
       },
     })
@@ -104,17 +94,50 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
     inputRange: [0, DRAG_RANGE * 0.5], outputRange: [1, 0], extrapolate: 'clamp',
   });
 
+  // ── Web / PC mouse support ──────────────────────────────────────────────
+  const startXRef = useRef(null);
+  const webMouseDown = (e) => {
+    if (done) return;
+    startXRef.current = e.clientX;
+    isDragging.current = true;
+    onDragStart?.();
+    const onMove = (mv) => {
+      if (!isDragging.current) return;
+      pan.setValue(Math.max(0, Math.min(mv.clientX - startXRef.current, DRAG_RANGE)));
+    };
+    const onUp = (mu) => {
+      isDragging.current = false; onDragEnd?.();
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      const dx = mu.clientX - startXRef.current;
+      if (dx >= DRAG_RANGE * 0.80) {
+        Animated.spring(pan, { toValue: DRAG_RANGE, useNativeDriver: false }).start(() => { setDone(true); onComplete?.(); });
+      } else {
+        Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const thumbWebProps = Platform.OS === 'web'
+    ? { onMouseDown: webMouseDown, style: { cursor: done ? 'default' : 'grab' } }
+    : {};
+
   return (
     <View style={[sb.track, { backgroundColor: done ? color : C.primaryLight, borderColor: color }]}>
       <Animated.View style={[sb.fill, { width: Animated.add(pan, THUMB + 4), backgroundColor: color }]} />
       <Animated.Text style={[sb.label, { opacity: labelOpacity, color: done ? C.white : C.primaryText }]}>
-        {done ? 'âœ“  Done' : `>> ${label}`}
+        {done ? 'Done' : label}
       </Animated.Text>
       <Animated.View
         style={[sb.thumb, { transform: [{ translateX: pan }], backgroundColor: color }]}
         {...responder.panHandlers}
+        {...thumbWebProps}
       >
-        <Text style={sb.thumbIcon}>{done ? 'âœ“' : '>>'}</Text>
+        {done
+          ? <MaterialIcons name="check" size={22} color={C.white} />
+          : <MaterialIcons name="chevron-right" size={22} color={C.white} />}
       </Animated.View>
     </View>
   );
@@ -135,7 +158,7 @@ const sb = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.18, shadowRadius: 4,
   },
-  thumbIcon: { fontSize: 18, color: C.white, fontWeight: '800' },
+  thumbIcon: { color: C.white },
 });
 
 // â”€â”€ Step Progress Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -149,9 +172,9 @@ function StepBar({ currentStep }) {
           <React.Fragment key={s.key}>
             <View style={spb.stepWrap}>
               <View style={[spb.dot, past && spb.dotDone, active && spb.dotActive]}>
-                <Text style={[spb.dotNum, (past || active) && { color: C.white }]}>
-                  {past ? 'âœ“' : i + 1}
-                </Text>
+                {past
+                  ? <MaterialIcons name="check" size={14} color={C.white} />
+                  : <Text style={[spb.dotNum, active && { color: C.white }]}>{i + 1}</Text>}
               </View>
               <Text style={[spb.stepLabel, active && { color: C.primary, fontWeight: '700' }]} numberOfLines={1}>
                 {s.label}
@@ -199,11 +222,11 @@ function ActionButtons({ onCall, onMap, phone }) {
   return (
     <View style={ab.row}>
       <TouchableOpacity style={ab.btnCall} onPress={handleCall} activeOpacity={0.8}>
-        <Text style={ab.callIcon}>ðŸ“ž</Text>
+        <MaterialIcons name="call" size={16} color={C.textPrimary} />
         <Text style={ab.callText}>Call</Text>
       </TouchableOpacity>
       <TouchableOpacity style={ab.btnMap} onPress={onMap} activeOpacity={0.8}>
-        <Text style={ab.mapIcon}>ðŸ—ºï¸</Text>
+        <MaterialIcons name="map" size={16} color={C.white} />
         <Text style={ab.mapText}>Go to map</Text>
       </TouchableOpacity>
     </View>
@@ -217,13 +240,11 @@ const ab = StyleSheet.create({
     paddingVertical: 11, borderRadius: 12,
     borderWidth: 1.5, borderColor: C.border, backgroundColor: C.white,
   },
-  callIcon: { fontSize: 15 },
   callText: { fontSize: 13, fontWeight: '700', color: C.textPrimary },
   btnMap:  {
     flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     paddingVertical: 11, borderRadius: 12, backgroundColor: C.blue,
   },
-  mapIcon: { fontSize: 15 },
   mapText: { fontSize: 13, fontWeight: '700', color: C.white },
 });
 
@@ -231,14 +252,13 @@ const ab = StyleSheet.create({
 function MetaRow({ icon, text }) {
   return (
     <View style={mr.row}>
-      <Text style={mr.icon}>{icon}</Text>
+      <MaterialIcons name={icon} size={15} color={C.textLight} />
       <Text style={mr.text}>{text}</Text>
     </View>
   );
 }
 const mr = StyleSheet.create({
   row:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
-  icon: { fontSize: 14, color: C.textLight },
   text: { fontSize: 13, color: C.textSecond, fontWeight: '500' },
 });
 
@@ -249,13 +269,13 @@ function ItemsAccordion({ items, vendorName }) {
     <View style={ac.wrap}>
       <TouchableOpacity style={ac.header} onPress={() => setOpen(o => !o)} activeOpacity={0.8}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={ac.iconWrap}><Text style={{ fontSize: 16 }}>ðŸ§¾</Text></View>
+          <View style={ac.iconWrap}><MaterialIcons name="receipt" size={18} color={C.textSecond} /></View>
           <View>
             <Text style={ac.title}>Order details</Text>
             <Text style={ac.sub}>{vendorName}</Text>
           </View>
         </View>
-        <Text style={ac.chevron}>{open ? 'âˆ§' : 'âˆ¨'}</Text>
+        <MaterialIcons name={open ? 'expand-less' : 'expand-more'} size={22} color={C.textSecond} />
       </TouchableOpacity>
       {open && (
         <View style={ac.body}>
@@ -263,7 +283,7 @@ function ItemsAccordion({ items, vendorName }) {
             <View key={i} style={ac.itemRow}>
               <Text style={ac.itemQty}>{item.quantity}x</Text>
               <Text style={ac.itemName}>{item.product_name}</Text>
-              <Text style={ac.itemPrice}>â‚¹{item.subtotal}</Text>
+              <Text style={ac.itemPrice}>Rs.{item.subtotal}</Text>
             </View>
           ))}
         </View>
@@ -339,8 +359,8 @@ function StepContent({ step, activeOrder, myLocation }) {
             onMap={() => openMap(vendorLoc)}
           />
           <View style={styles.metaDivider} />
-          <MetaRow icon="ðŸ“‹" text={`Order: ${activeOrder?.displayId || 'â€”'}`} />
-          <MetaRow icon="ðŸ‘¤" text={`Customer: ${activeOrder?.customerName || 'â€”'}`} />
+          <MetaRow icon="assignment" text={`Order: ${activeOrder?.displayId || '—'}`} />
+          <MetaRow icon="person" text={`Customer: ${activeOrder?.customerName || '—'}`} />
         </View>
       )}
 
@@ -355,7 +375,7 @@ function StepContent({ step, activeOrder, myLocation }) {
           <View style={ac.wrap}>
             <View style={ac.header}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={ac.iconWrap}><Text style={{ fontSize: 16 }}>ðŸª</Text></View>
+                <View style={ac.iconWrap}><MaterialIcons name="store" size={18} color={C.textSecond} /></View>
                 <View>
                   <Text style={ac.title}>Restaurant details</Text>
                   <Text style={ac.sub}>{activeOrder?.pickup}</Text>
@@ -371,7 +391,7 @@ function StepContent({ step, activeOrder, myLocation }) {
           <View style={ac.wrap}>
             <View style={ac.header}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={ac.iconWrap}><Text style={{ fontSize: 16 }}>ðŸ‘¤</Text></View>
+                <View style={ac.iconWrap}><MaterialIcons name="person" size={18} color={C.textSecond} /></View>
                 <View>
                   <Text style={ac.title}>Customer details</Text>
                   <Text style={ac.sub}>{activeOrder?.customerName || 'â€”'}</Text>
@@ -379,7 +399,7 @@ function StepContent({ step, activeOrder, myLocation }) {
               </View>
               {activeOrder?.customerPhone && (
                 <TouchableOpacity onPress={() => Linking.openURL(`tel:${activeOrder.customerPhone}`)}>
-                  <Text style={{ fontSize: 12, color: C.blue, fontWeight: '700' }}>ðŸ“ž Call</Text>
+                  <><MaterialIcons name="call" size={14} color={C.blue} /><Text style={{ fontSize: 12, color: C.blue, fontWeight: '700' }}>Call</Text></>
                 </TouchableOpacity>
               )}
             </View>
@@ -397,8 +417,8 @@ function StepContent({ step, activeOrder, myLocation }) {
             onMap={() => openMap(dropLoc)}
           />
           <View style={styles.metaDivider} />
-          <MetaRow icon="ðŸ“‹" text={`Order: ${activeOrder?.displayId || 'â€”'}`} />
-          <MetaRow icon="ðŸª" text={`Pickup: ${activeOrder?.pickup || 'â€”'}`} />
+          <MetaRow icon="assignment" text={`Order: ${activeOrder?.displayId || '—'}`} />
+          <MetaRow icon="store" text={`Pickup: ${activeOrder?.pickup || '—'}`} />
         </View>
       )}
 
@@ -408,7 +428,7 @@ function StepContent({ step, activeOrder, myLocation }) {
           <View style={styles.stepCard}>
             <View style={styles.paymentRow}>
               <View style={styles.paymentCheck}>
-                <Text style={{ color: C.white, fontSize: 12, fontWeight: '800' }}>âœ“</Text>
+                <MaterialIcons name="check" size={16} color={C.white} />
               </View>
               <View>
                 <Text style={styles.paymentTitle}>Paid online</Text>
@@ -418,7 +438,7 @@ function StepContent({ step, activeOrder, myLocation }) {
             <View style={styles.metaDivider} />
             <View style={styles.customerRow}>
               <View style={styles.customerIconWrap}>
-                <Text style={{ fontSize: 18 }}>ðŸ‘¤</Text>
+                <MaterialIcons name="person" size={22} color={C.textSecond} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.customerName}>{activeOrder?.customerName || 'â€”'}</Text>
@@ -688,7 +708,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
 
             {/* Step label */}
             <View style={styles.stepLabelRow}>
-              <Text style={styles.stepChevron}>âˆ¨</Text>
+              <MaterialIcons name="expand-more" size={22} color={C.textSecond} />
               <Text style={styles.stepLabelText}>{STEPS[step].label}</Text>
             </View>
 
@@ -723,7 +743,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
 
             {availableOrders.length === 0 ? (
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyEmoji}>ðŸ›µ</Text>
+                <MaterialIcons name="delivery-dining" size={48} color={C.textLight} />
                 <Text style={styles.emptyText}>No orders right now</Text>
               </View>
             ) : (
@@ -778,7 +798,6 @@ const styles = StyleSheet.create({
   stepBadge:      { backgroundColor: C.primaryLight, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   stepBadgeText:  { fontSize: 12, fontWeight: '700', color: C.primaryText },
   stepLabelRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 2 },
-  stepChevron:    { fontSize: 14, color: C.textSecond },
   stepLabelText:  { fontSize: 17, fontWeight: '800', color: C.textPrimary },
 
   // Map + drag handle
