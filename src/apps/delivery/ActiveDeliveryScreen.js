@@ -310,6 +310,10 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
       }
     : {};
 
+  const trackBgColor = done ? color : 'rgba(232, 248, 238, 0.45)';
+  const trackBorderColor = done ? color : 'rgba(46, 125, 50, 0.18)';
+  const labelColor = done ? C.white : '#1A6B38';
+
   return (
     <View
       ref={trackRef}
