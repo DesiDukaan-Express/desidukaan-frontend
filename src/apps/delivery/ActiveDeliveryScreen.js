@@ -900,7 +900,10 @@ export default function ActiveDeliveryScreen({ navigation }) {
   };
 
   const handleStepComplete = async () => {
-    const currentStepDef = STEPS[step];
+    const displayStep = Math.min(Math.max(step, 0), STEPS.length - 1);
+    const currentStepDef = STEPS[displayStep];
+    if (!currentStepDef) return;
+
     if (currentStepDef.api) {
       try {
         const res  = await fetch(`${API_BASE}/delivery/${activeOrder.id}/status`, {
@@ -918,12 +921,12 @@ export default function ActiveDeliveryScreen({ navigation }) {
         }
       } catch (e) { Alert.alert('Error', 'Network error'); return; }
     }
-    if (step < STEPS.length - 1) {
-      setTimeout(() => setStep(s => s + 1), 400);
+    if (displayStep < STEPS.length - 1) {
+      setTimeout(() => setStep(s => Math.min(s + 1, STEPS.length - 1)), 400);
     }
   };
 
-  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Render ──
   const [scrollEnabled, setScrollEnabled] = useState(true);
 
   return (
@@ -992,7 +995,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
             {/* Step label */}
             <View style={styles.stepLabelRow}>
               <MaterialIcons name="expand-more" size={22} color={C.textSecond} />
-              <Text style={styles.stepLabelText}>{STEPS[step].label}</Text>
+              <Text style={styles.stepLabelText}>{STEPS[Math.min(Math.max(step, 0), STEPS.length - 1)]?.label}</Text>
             </View>
 
             {/* Progress dots */}
@@ -1004,10 +1007,10 @@ export default function ActiveDeliveryScreen({ navigation }) {
             {/* Slide button */}
             <View style={styles.slideWrap}>
               <SlideButton
-                key={`slide-${step}`}
-                label={STEPS[step].btnLabel}
+                key={`slide-${Math.min(Math.max(step, 0), STEPS.length - 1)}`}
+                label={STEPS[Math.min(Math.max(step, 0), STEPS.length - 1)]?.btnLabel}
                 onComplete={handleStepComplete}
-                color={step === 3 ? '#1B5E20' : C.primary}
+                color={Math.min(Math.max(step, 0), STEPS.length - 1) === 3 ? '#1B5E20' : C.primary}
                 onDragStart={() => setScrollEnabled(false)}
                 onDragEnd={() => setScrollEnabled(true)}
               />
