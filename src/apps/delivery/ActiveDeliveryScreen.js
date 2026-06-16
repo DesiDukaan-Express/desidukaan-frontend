@@ -17,7 +17,21 @@ const openPhoneCall = (phone) => {
   const cleanPhone = phone.toString().replace(/[^0-9+]/g, '');
   const url = `tel:${cleanPhone}`;
   if (Platform.OS === 'web') {
-    window.location.href = url;
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        try {
+          document.body.removeChild(a);
+        } catch (e) {}
+      }, 100);
+    } catch (e) {
+      console.error('Call failed', e);
+      window.location.href = url;
+    }
   } else {
     Linking.openURL(url).catch(() => {
       Alert.alert('Cannot Call', 'Unable to open the dialer app. Please call manually.');
@@ -216,6 +230,7 @@ const sb = StyleSheet.create({
   thumb: {
     position: 'absolute',
     left: 2,
+    top: 2,
     width: THUMB,
     height: THUMB,
     borderRadius: THUMB / 2,
