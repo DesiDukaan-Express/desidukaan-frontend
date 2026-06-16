@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Animated, PanResponder, Dimensions,
   StatusBar, Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { io } from 'socket.io-client';
 import { useFocusEffect } from '@react-navigation/native';
@@ -99,7 +100,7 @@ const getClientX = (e) => {
 };
 
 // ──────────────────────────────────────────────────────────────────────────────────────────────────
-const THUMB = 56;
+const THUMB = 54;
 
 function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDragEnd }) {
   const pan             = useRef(new Animated.Value(0)).current;
@@ -109,20 +110,80 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
   const startXRef       = useRef(0);
   const trackRef        = useRef(null);
 
+  // Remake states for premium interactions
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+
+  // Animated values for micro-interactions
+  const scaleAnim     = useRef(new Animated.Value(1)).current;
+  const chevronAnim   = useRef(new Animated.Value(0)).current;
+  const pulseAnim     = useRef(new Animated.Value(1)).current;
+  const donePopAnim   = useRef(new Animated.Value(0)).current;
+
   // Reset when the step changes
   useEffect(() => {
     setDone(false);
     pan.setValue(0);
+    donePopAnim.setValue(0);
   }, [label]);
+
+  // Spring animations for Hover & Press states
+  useEffect(() => {
+    Animated.spring(scaleAnim, {
+      toValue: pressed ? 0.93 : hovered ? 1.05 : 1,
+      friction: 5,
+      tension: 140,
+      useNativeDriver: false,
+    }).start();
+  }, [hovered, pressed]);
+
+  // Loop chevron micro-movement (visual cue to slide)
+  useEffect(() => {
+    if (done) return;
+    const chevron = Animated.loop(
+      Animated.sequence([
+        Animated.timing(chevronAnim, { toValue: 5, duration: 800, useNativeDriver: false }),
+        Animated.timing(chevronAnim, { toValue: 0, duration: 800, useNativeDriver: false }),
+      ])
+    );
+    chevron.start();
+    return () => chevron.stop();
+  }, [done]);
+
+  // Gentle pulse on label text to indicate interactivity
+  useEffect(() => {
+    if (done) return;
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.65, duration: 1200, useNativeDriver: false }),
+        Animated.timing(pulseAnim, { toValue: 1.0, duration: 1200, useNativeDriver: false }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [done]);
+
+  // Pop animation when done is triggered
+  useEffect(() => {
+    if (done) {
+      Animated.spring(donePopAnim, {
+        toValue: 1,
+        friction: 4,
+        tension: 120,
+        useNativeDriver: false,
+      }).start();
+    } else {
+      donePopAnim.setValue(0);
+    }
+  }, [done]);
 
   const onLayout = (e) => {
     const w = e.nativeEvent.layout.width;
-    const newRange = Math.max(w - THUMB - 4, 0);
+    const newRange = Math.max(w - THUMB - 10, 0); // track height 64, thumb 54, padding 5 => w - THUMB - 10
     dragRange.current = newRange;
     if (done) {
       pan.setValue(newRange);
     } else {
-      // Clamp current pan value to avoid it flying out of boundaries
       const cur = pan.__getValue ? pan.__getValue() : 0;
       if (cur > newRange) {
         pan.setValue(newRange);
@@ -139,6 +200,7 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
       onMoveShouldSetPanResponderCapture:  (_, g) => !done && Math.abs(g.dx) > 2,
       onPanResponderGrant: () => {
         isDragging.current = true;
+        setPressed(true);
         onDragStart?.();
       },
       onPanResponderMove: (_, g) => {
@@ -146,6 +208,7 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
       },
       onPanResponderRelease: (_, g) => {
         isDragging.current = false;
+        setPressed(false);
         onDragEnd?.();
         if (g.dx >= dragRange.current * 0.80) {
           Animated.spring(pan, { toValue: dragRange.current, useNativeDriver: false })
@@ -156,17 +219,22 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
       },
       onPanResponderTerminate: () => {
         isDragging.current = false;
+        setPressed(false);
         onDragEnd?.();
         Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
       },
     })
   ).current;
 
-  const labelOpacity = pan.interpolate({
-    inputRange:  [0, 80],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
+  // Multiply fade out logic with general pulsing animation
+  const labelOpacity = Animated.multiply(
+    pulseAnim,
+    pan.interpolate({
+      inputRange:  [0, 80],
+      outputRange: [1, 0],
+      extrapolate: 'clamp',
+    })
+  );
 
   // ── Web / PC mouse & touch support (Delta based - extremely smooth, no snapping) ──
   const webStartDrag = (e) => {
@@ -175,21 +243,21 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
       e.preventDefault();
     }
     
-    // Get the actual width of the track to compute the drag range dynamically
     let currentDragRange = dragRange.current;
     if (trackRef.current) {
       const rect = trackRef.current.getBoundingClientRect?.();
       if (rect && rect.width > 0) {
-        currentDragRange = Math.max(rect.width - THUMB - 4, 0);
+        currentDragRange = Math.max(rect.width - THUMB - 10, 0);
         dragRange.current = currentDragRange;
       }
     }
     if (currentDragRange <= 0) {
-      currentDragRange = 300; // fallback
+      currentDragRange = 300;
     }
 
     const startX = getClientX(e);
     isDragging.current = true;
+    setPressed(true);
     onDragStart?.();
 
     const onMove = (mv) => {
@@ -201,6 +269,7 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
 
     const onUp = (mu) => {
       isDragging.current = false;
+      setPressed(false);
       onDragEnd?.();
       
       window.removeEventListener('mousemove', onMove);
@@ -228,28 +297,80 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
     ? { 
         onMouseDown: webStartDrag, 
         onTouchStart: webStartDrag,
-        style: { cursor: done ? 'default' : 'grab', userSelect: 'none' } 
+        onMouseEnter: () => setHovered(true),
+        onMouseLeave: () => { setHovered(false); setPressed(false); },
+        style: { 
+          cursor: done ? 'default' : 'grab', 
+          userSelect: 'none',
+          transition: 'transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.15s ease',
+        } 
       }
     : {};
+
+  // Custom colors based on state
+  const trackBgColor = done ? color : 'rgba(232, 248, 238, 0.45)';
+  const trackBorderColor = done ? color : 'rgba(46, 125, 50, 0.18)';
+  const labelColor = done ? C.white : '#1A6B38';
 
   return (
     <View
       ref={trackRef}
       onLayout={onLayout}
-      style={[sb.track, { backgroundColor: done ? color : C.primaryLight, borderColor: color }]}
+      style={[
+        sb.track,
+        {
+          backgroundColor: trackBgColor,
+          borderColor: trackBorderColor,
+        }
+      ]}
     >
-      <Animated.View style={[sb.fill, { width: Animated.add(pan, THUMB + 4), backgroundColor: color }]} />
-      <Animated.Text style={[sb.label, { opacity: labelOpacity, color: done ? C.white : C.primaryText }]}>
+      {/* Dynamic expanding gradient fill */}
+      <Animated.View style={[sb.fillContainer, { width: Animated.add(pan, THUMB + 10) }]}>
+        <LinearGradient
+          colors={['#1B5E20', '#2E7D32', '#4CAF50']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={sb.fillGradient}
+        />
+      </Animated.View>
+
+      {/* Label Text */}
+      <Animated.Text style={[sb.label, { opacity: labelOpacity, color: labelColor }]}>
         {done ? 'Done ✓' : label}
       </Animated.Text>
+
+      {/* Slide Thumb */}
       <Animated.View
-        style={[sb.thumb, { transform: [{ translateX: pan }], backgroundColor: color }]}
+        style={[
+          sb.thumb,
+          {
+            transform: [
+              { translateX: pan },
+              { scale: scaleAnim }
+            ],
+            shadowColor: color,
+          }
+        ]}
         {...responder.panHandlers}
         {...thumbWebProps}
       >
-        {done
-          ? <MaterialIcons name="check"         size={22} color={C.white} />
-          : <MaterialIcons name="chevron-right" size={22} color={C.white} />}
+        <LinearGradient
+          colors={done ? ['#388E3C', '#1B5E20'] : [color === '#1B5E20' ? '#2E7D32' : '#81C784', color]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={sb.thumbGradient}
+        >
+          {done ? (
+            <Animated.View style={{ transform: [{ scale: donePopAnim }] }}>
+              <MaterialIcons name="check" size={24} color={C.white} />
+            </Animated.View>
+          ) : (
+            <Animated.View style={{ flexDirection: 'row', alignItems: 'center', transform: [{ translateX: chevronAnim }] }}>
+              <MaterialIcons name="keyboard-arrow-right" size={22} color={C.white} style={{ marginRight: -10 }} />
+              <MaterialIcons name="keyboard-arrow-right" size={22} color={C.white} />
+            </Animated.View>
+          )}
+        </LinearGradient>
       </Animated.View>
     </View>
   );
@@ -258,34 +379,55 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
 const sb = StyleSheet.create({
   track: {
     alignSelf: 'stretch',
-    height: THUMB + 4,
-    borderRadius: (THUMB + 4) / 2,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 1.5,
+    position: 'relative',
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
-    position: 'relative',
+    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(12px)' } : {}),
   },
-  fill:  { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: (THUMB + 4) / 2 },
-  label: { fontSize: 14, fontWeight: '700', letterSpacing: 0.3, zIndex: 1 },
+  fillContainer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    overflow: 'hidden',
+    borderTopLeftRadius: 32,
+    borderBottomLeftRadius: 32,
+  },
+  fillGradient: {
+    width: SCREEN_W,
+    height: '100%',
+  },
+  label: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    zIndex: 1,
+    textTransform: 'uppercase',
+  },
   thumb: {
     position: 'absolute',
-    left: 2,
-    top: 2,
+    left: 5,
+    top: 5,
     width: THUMB,
     height: THUMB,
     borderRadius: THUMB / 2,
+    zIndex: 2,
+    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+  },
+  thumbGradient: {
+    flex: 1,
+    borderRadius: THUMB / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    zIndex: 2,
   },
 });
-
 // â”€â”€ Step Progress Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StepBar({ currentStep }) {
   return (
