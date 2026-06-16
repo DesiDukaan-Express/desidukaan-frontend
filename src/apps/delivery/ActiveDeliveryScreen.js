@@ -87,6 +87,17 @@ const STEPS = [
   { key: 'drop_order',   label: 'Drop Order',    api: 'delivered', btnLabel: 'Order Delivered'         },
 ];
 
+// Helper to get clientX for mouse/touch events on web
+const getClientX = (e) => {
+  if (e.touches && e.touches.length > 0) {
+    return e.touches[0].clientX;
+  }
+  if (e.changedTouches && e.changedTouches.length > 0) {
+    return e.changedTouches[0].clientX;
+  }
+  return e.clientX;
+};
+
 // ──────────────────────────────────────────────────────────────────────────────────────────────────
 const THUMB = 56;
 
@@ -96,6 +107,7 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
   const isDragging      = useRef(false);
   const dragRange       = useRef(0);
   const startXRef       = useRef(0);
+  const trackRef        = useRef(null);
 
   // Reset when the step changes
   useEffect(() => {
@@ -156,28 +168,50 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
     extrapolate: 'clamp',
   });
 
-  // ── Web / PC mouse support (Delta based - extremely smooth, no snapping) ──
-  const webMouseDown = (e) => {
+  // ── Web / PC mouse & touch support (Delta based - extremely smooth, no snapping) ──
+  const webStartDrag = (e) => {
     if (done) return;
-    e.preventDefault();
-    startXRef.current = e.clientX;
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+    
+    // Get the actual width of the track to compute the drag range dynamically
+    let currentDragRange = dragRange.current;
+    if (trackRef.current) {
+      const rect = trackRef.current.getBoundingClientRect?.();
+      if (rect && rect.width > 0) {
+        currentDragRange = Math.max(rect.width - THUMB - 4, 0);
+        dragRange.current = currentDragRange;
+      }
+    }
+    if (currentDragRange <= 0) {
+      currentDragRange = 300; // fallback
+    }
+
+    const startX = getClientX(e);
     isDragging.current = true;
     onDragStart?.();
 
     const onMove = (mv) => {
       if (!isDragging.current) return;
-      const dx = mv.clientX - startXRef.current;
-      pan.setValue(Math.max(0, Math.min(dx, dragRange.current)));
+      const currentX = getClientX(mv);
+      const dx = currentX - startX;
+      pan.setValue(Math.max(0, Math.min(dx, currentDragRange)));
     };
 
     const onUp = (mu) => {
       isDragging.current = false;
       onDragEnd?.();
+      
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup',   onUp);
-      const dx = mu.clientX - startXRef.current;
-      if (dx >= dragRange.current * 0.80) {
-        Animated.spring(pan, { toValue: dragRange.current, useNativeDriver: false })
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend',  onUp);
+
+      const currentX = getClientX(mu);
+      const dx = currentX - startX;
+      if (dx >= currentDragRange * 0.80) {
+        Animated.spring(pan, { toValue: currentDragRange, useNativeDriver: false })
           .start(() => { setDone(true); onComplete?.(); });
       } else {
         Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
@@ -186,14 +220,21 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
 
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup',   onUp);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend',  onUp);
   };
 
   const thumbWebProps = Platform.OS === 'web'
-    ? { onMouseDown: webMouseDown, style: { cursor: done ? 'default' : 'grab', userSelect: 'none' } }
+    ? { 
+        onMouseDown: webStartDrag, 
+        onTouchStart: webStartDrag,
+        style: { cursor: done ? 'default' : 'grab', userSelect: 'none' } 
+      }
     : {};
 
   return (
     <View
+      ref={trackRef}
       onLayout={onLayout}
       style={[sb.track, { backgroundColor: done ? color : C.primaryLight, borderColor: color }]}
     >
