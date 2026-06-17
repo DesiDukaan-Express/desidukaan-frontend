@@ -640,6 +640,10 @@ export default function CheckoutScreen() {
   const vendorId = cart?.vendorId;
   const vendorName = items[0]?.vendorName || "Store";
 
+  // ── Snapshot of cart items/subtotal taken before cart is cleared on order submit ──
+  const [snapshotItems, setSnapshotItems] = useState(null);
+  const [snapshotSubtotal, setSnapshotSubtotal] = useState(null);
+
   // ── Order state ────────────────────────────────────────────────────────────
   const [placing, setPlacing] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -669,16 +673,22 @@ export default function CheckoutScreen() {
   };
 
   // ── Computed totals ────────────────────────────────────────────────────────
-  const subtotal = items.reduce(
+  // Use snapshot once order has been placed (cart is cleared at that point)
+  const displayItems = snapshotItems ?? items;
+  const liveSubtotal = items.reduce(
     (s, i) => s + i.price * (i.qty ?? i.quantity ?? 0),
     0,
   );
+  const subtotal = snapshotSubtotal ?? liveSubtotal;
   const baseFee = confirmedFee ?? 30; // No free delivery threshold
   const activeFee = proposedFee !== null ? proposedFee : baseFee;
   const gstAmount = parseFloat((subtotal * 0.05).toFixed(2));
   const cartTotal = subtotal + activeFee + gstAmount;
+  // counterData.total takes priority when countered or accepted-after-counter
   const total =
-    orderStatus === "accepted" && counterData ? counterData.total : cartTotal;
+    counterData?.total != null && ["countered", "accepted"].includes(orderStatus)
+      ? counterData.total
+      : cartTotal;
 
   // ── Address state ──────────────────────────────────────────────────────────
   const savedAddresses = (addressStore?.addresses || []).filter(a => a.label !== "Current Location");
@@ -948,6 +958,9 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
       });
       const data = await res.json();
       if (res.ok) {
+        // Snapshot current cart before clearing so order summary stays accurate
+        setSnapshotItems(items.slice());
+        setSnapshotSubtotal(liveSubtotal);
         cart?.clearCart?.();
         const newOrderId = data.data?.order?.id || data.order?.id || data.id;
         setOrderId(newOrderId);
@@ -1855,7 +1868,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             <View style={[sec.wrap, { borderRadius: cardR, marginHorizontal: px }]}>
               <Text style={[sec.title, { marginBottom: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.gray100 }]}>Order Summary</Text>
               <OrderSummaryCard
-                items={items}
+                items={displayItems}
                 subtotal={subtotal}
                 deliveryFee={activeFee}
                 baseFee={baseFee}
@@ -1897,7 +1910,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             <View style={s.sideCard}>
               <Text style={s.sideCardTitle}>Order Summary</Text>
               <OrderSummaryCard
-                items={items}
+                items={displayItems}
                 subtotal={subtotal}
                 deliveryFee={activeFee}
                 baseFee={baseFee}
