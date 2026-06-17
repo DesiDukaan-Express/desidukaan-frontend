@@ -284,7 +284,7 @@ const cp = StyleSheet.create({
 });
 
 // ─── Order Summary card ───────────────────────────────────────────────────────
-function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNegotiate, fs = 1 }) {
+function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, gstAmount, onNegotiate, fs = 1 }) {
   return (
     <View style={osc.wrap}>
       {items.map((item, i) => (
@@ -324,8 +324,8 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNego
         <Text style={[osc.label, { fontSize: Math.round(13 * fs) }]}>
           Taxes (GST 5%)
         </Text>
-        <Text style={[osc.value, { color: C.green, fontSize: Math.round(13 * fs) }]}>
-          Included
+        <Text style={[osc.value, { fontSize: Math.round(13 * fs) }]}>
+          ₹{gstAmount ?? parseFloat((subtotal * 0.05).toFixed(2))}
         </Text>
       </View>
       <View style={osc.row}>
@@ -1870,6 +1870,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
               <OrderSummaryCard
                 items={displayItems}
                 subtotal={subtotal}
+                gstAmount={gstAmount}
                 deliveryFee={activeFee}
                 baseFee={baseFee}
                 total={total}
@@ -1912,6 +1913,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
               <OrderSummaryCard
                 items={displayItems}
                 subtotal={subtotal}
+                gstAmount={gstAmount}
                 deliveryFee={activeFee}
                 baseFee={baseFee}
                 total={total}
