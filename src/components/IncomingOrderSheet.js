@@ -2,14 +2,16 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
-import {View,
+import {
+  View,
   Text,
   StyleSheet,
   Modal,
   Animated,
   PanResponder,
   TouchableOpacity,
-  Dimensions,, Platform} from 'react-native';
+  Dimensions, Platform
+} from 'react-native';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const SLIDER_TRACK_W = SCREEN_W - 80; // 40px padding each side
@@ -17,22 +19,22 @@ const THUMB_SIZE = 56;
 const SLIDER_INNER_W = SLIDER_TRACK_W - THUMB_SIZE - 4; // draggable range
 
 const C = {
-  primary:     '#1B6B28',
-  primaryMid:  '#2E7D32',
-  primaryLight:'#EAF3DE',
+  primary: '#1B6B28',
+  primaryMid: '#2E7D32',
+  primaryLight: '#EAF3DE',
   primaryText: '#27500A',
-  red:         '#E24B4A',
-  redLight:    '#FCEBEB',
-  redText:     '#791F1F',
-  blue:        '#378ADD',
-  blueLight:   '#E6F1FB',
-  blueText:    '#0C447C',
-  bg:          '#F5F7F5',
-  border:      '#E8EDE8',
+  red: '#E24B4A',
+  redLight: '#FCEBEB',
+  redText: '#791F1F',
+  blue: '#378ADD',
+  blueLight: '#E6F1FB',
+  blueText: '#0C447C',
+  bg: '#F5F7F5',
+  border: '#E8EDE8',
   textPrimary: '#1A1A1A',
-  textSecond:  '#666666',
-  textLight:   '#999999',
-  white:       '#FFFFFF',
+  textSecond: '#666666',
+  textLight: '#999999',
+  white: '#FFFFFF',
 };
 
 function CountdownRing({ seconds, onExpire }) {
@@ -60,28 +62,28 @@ function CountdownRing({ seconds, onExpire }) {
 }
 
 const ring = StyleSheet.create({
-  wrap:  { width: 52, height: 52, borderRadius: 26, backgroundColor: C.bg, borderWidth: 2, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
-  num:   { fontSize: 16, fontWeight: '800', lineHeight: 18 },
+  wrap: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.bg, borderWidth: 2, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  num: { fontSize: 16, fontWeight: '800', lineHeight: 18 },
   label: { fontSize: 9, color: C.textLight, fontWeight: '600' },
 });
 
 // ── Slide-to-Accept Slider ────────────────────────────────────────────────────
 function SlideToAccept({ onAccept }) {
-  const pan             = useRef(new Animated.Value(0)).current;
+  const pan = useRef(new Animated.Value(0)).current;
   const [accepted, setAccepted] = useState(false);
-  const isDragging      = useRef(false);
-  const dragRange       = useRef(0);
-  const trackRef        = useRef(null);
+  const isDragging = useRef(false);
+  const dragRange = useRef(0);
+  const trackRef = useRef(null);
 
   // Remake states for premium interactions
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
 
   // Animated values for micro-interactions
-  const scaleAnim     = useRef(new Animated.Value(1)).current;
-  const chevronAnim   = useRef(new Animated.Value(0)).current;
-  const pulseAnim     = useRef(new Animated.Value(1)).current;
-  const donePopAnim   = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const chevronAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const donePopAnim = useRef(new Animated.Value(0)).current;
 
   // Spring animations for Hover & Press states
   useEffect(() => {
@@ -157,10 +159,10 @@ function SlideToAccept({ onAccept }) {
   // ── Native touch (mobile) ──────────────────────────────────────────
   const responder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder:        () => !accepted,
+      onStartShouldSetPanResponder: () => !accepted,
       onStartShouldSetPanResponderCapture: () => !accepted,
-      onMoveShouldSetPanResponder:         (_, g) => !accepted && Math.abs(g.dx) > 2,
-      onMoveShouldSetPanResponderCapture:  (_, g) => !accepted && Math.abs(g.dx) > 2,
+      onMoveShouldSetPanResponder: (_, g) => !accepted && Math.abs(g.dx) > 2,
+      onMoveShouldSetPanResponderCapture: (_, g) => !accepted && Math.abs(g.dx) > 2,
       onPanResponderGrant: () => {
         isDragging.current = true;
         setPressed(true);
@@ -190,7 +192,7 @@ function SlideToAccept({ onAccept }) {
   const labelOpacity = Animated.multiply(
     pulseAnim,
     pan.interpolate({
-      inputRange:  [0, 80],
+      inputRange: [0, 80],
       outputRange: [1, 0],
       extrapolate: 'clamp',
     })
@@ -200,7 +202,7 @@ function SlideToAccept({ onAccept }) {
   const webStartDrag = (e) => {
     if (accepted) return;
     if (e.cancelable) e.preventDefault();
-    
+
     let currentDragRange = dragRange.current;
     if (trackRef.current) {
       const rect = trackRef.current.getBoundingClientRect?.();
@@ -227,11 +229,11 @@ function SlideToAccept({ onAccept }) {
     const onUp = (mu) => {
       isDragging.current = false;
       setPressed(false);
-      
+
       window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup',   onUp);
+      window.removeEventListener('mouseup', onUp);
       window.removeEventListener('touchmove', onMove);
-      window.removeEventListener('touchend',  onUp);
+      window.removeEventListener('touchend', onUp);
 
       const currentX = getClientX(mu);
       const dx = currentX - startX;
@@ -244,26 +246,26 @@ function SlideToAccept({ onAccept }) {
     };
 
     window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup',   onUp);
+    window.addEventListener('mouseup', onUp);
     window.addEventListener('touchmove', onMove, { passive: false });
-    window.addEventListener('touchend',  onUp);
+    window.addEventListener('touchend', onUp);
   };
 
   const thumbWebProps = Platform.OS === 'web'
-    ? { 
-        onMouseDown: webStartDrag, 
-        onTouchStart: webStartDrag,
-        onMouseEnter: () => setHovered(true),
-        onMouseLeave: () => { setHovered(false); setPressed(false); },
-      }
+    ? {
+      onMouseDown: webStartDrag,
+      onTouchStart: webStartDrag,
+      onMouseEnter: () => setHovered(true),
+      onMouseLeave: () => { setHovered(false); setPressed(false); },
+    }
     : {};
 
   const webStyle = Platform.OS === 'web'
-    ? { 
-        cursor: accepted ? 'default' : 'grab', 
-        userSelect: 'none',
-        transition: 'transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.15s ease',
-      }
+    ? {
+      cursor: accepted ? 'default' : 'grab',
+      userSelect: 'none',
+      transition: 'transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.15s ease',
+    }
     : {};
 
   const trackBgColor = accepted ? C.primaryMid : 'rgba(234, 243, 222, 0.6)';
@@ -489,32 +491,32 @@ export default function IncomingOrderSheet({ order, onAccept, onDecline }) {
 }
 
 const s = StyleSheet.create({
-  overlay:      { flex: 1, justifyContent: 'flex-end' },
-  backdrop:     { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet:        { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingBottom: 36, paddingTop: 12 },
-  handle:       { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center', marginBottom: 16 },
+  overlay: { flex: 1, justifyContent: 'flex-end' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  sheet: { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingBottom: 36, paddingTop: 12 },
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center', marginBottom: 16 },
 
-  headerRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  headerTitle:  { fontSize: 18, fontWeight: '700', color: C.textPrimary },
-  headerSub:    { fontSize: 12, color: C.textLight, marginTop: 2 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: C.textPrimary },
+  headerSub: { fontSize: 12, color: C.textLight, marginTop: 2 },
 
-  routeCard:    { backgroundColor: C.bg, borderRadius: 14, padding: 14, marginBottom: 14 },
-  routeItem:    { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  routeDot:     { width: 10, height: 10, borderRadius: 5, marginTop: 4, flexShrink: 0 },
-  routeInfo:    { flex: 1 },
+  routeCard: { backgroundColor: C.bg, borderRadius: 14, padding: 14, marginBottom: 14 },
+  routeItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  routeDot: { width: 10, height: 10, borderRadius: 5, marginTop: 4, flexShrink: 0 },
+  routeInfo: { flex: 1 },
   routeTagText: { fontSize: 9, fontWeight: '800', color: C.textLight, letterSpacing: 1, marginBottom: 1 },
-  routeName:    { fontSize: 13, fontWeight: '600', color: C.textPrimary },
-  routeAddr:    { fontSize: 11, color: C.textSecond, marginTop: 1 },
+  routeName: { fontSize: 13, fontWeight: '600', color: C.textPrimary },
+  routeAddr: { fontSize: 11, color: C.textSecond, marginTop: 1 },
 
-  connector:    { paddingLeft: 4, marginVertical: 6 },
-  connectorLine:{ width: 2, height: 14, backgroundColor: C.border, marginLeft: 3 },
+  connector: { paddingLeft: 4, marginVertical: 6 },
+  connectorLine: { width: 2, height: 14, backgroundColor: C.border, marginLeft: 3 },
 
-  pillRow:      { flexDirection: 'row', gap: 8, marginBottom: 20, flexWrap: 'wrap' },
-  pill:         { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: C.bg, borderWidth: 0.5, borderColor: C.border },
-  pillText:     { fontSize: 12, color: C.textSecond },
+  pillRow: { flexDirection: 'row', gap: 8, marginBottom: 20, flexWrap: 'wrap' },
+  pill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: C.bg, borderWidth: 0.5, borderColor: C.border },
+  pillText: { fontSize: 12, color: C.textSecond },
 
-  sliderWrap:   { alignItems: 'stretch', marginBottom: 14, alignSelf: 'stretch' },
+  sliderWrap: { alignItems: 'stretch', marginBottom: 14, alignSelf: 'stretch' },
 
-  declineBtn:   { alignItems: 'center', paddingVertical: 12 },
-  declineText:  { fontSize: 14, fontWeight: '600', color: C.red },
+  declineBtn: { alignItems: 'center', paddingVertical: 12 },
+  declineText: { fontSize: 14, fontWeight: '600', color: C.red },
 });
