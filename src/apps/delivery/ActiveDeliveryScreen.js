@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Animated, PanResponder, Dimensions,
   StatusBar, Platform,
@@ -477,7 +477,7 @@ const spb = StyleSheet.create({
 });
 
 // â”€â”€ Action Buttons (Call + Map) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function ActionButtons({ onCall, onMap, phone }) {
+function ActionButtons({ onCall, onMap, phone, hideCall = false }) {
   const handleCall = () => {
     if (phone) {
       openPhoneCall(phone);
@@ -490,11 +490,13 @@ function ActionButtons({ onCall, onMap, phone }) {
 
   return (
     <View style={ab.row}>
-      <TouchableOpacity style={ab.btnCall} onPress={handleCall} activeOpacity={0.8}>
-        <MaterialIcons name="call" size={16} color={C.textPrimary} />
-        <Text style={ab.callText}>Call</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={ab.btnMap} onPress={onMap} activeOpacity={0.8}>
+      {!hideCall && (
+        <TouchableOpacity style={ab.btnCall} onPress={handleCall} activeOpacity={0.8}>
+          <MaterialIcons name="call" size={16} color={C.textPrimary} />
+          <Text style={ab.callText}>Call</Text>
+        </TouchableOpacity>
+      )}
+      <TouchableOpacity style={[ab.btnMap, hideCall && { flex: 1 }]} onPress={onMap} activeOpacity={0.8}>
         <MaterialIcons name="map" size={16} color={C.white} />
         <Text style={ab.mapText}>Go to map</Text>
       </TouchableOpacity>
@@ -624,7 +626,7 @@ function StepContent({ step, activeOrder, myLocation }) {
             </Text>
           )}
           <ActionButtons
-            phone={activeOrder?.vendorPhone}
+            hideCall
             onMap={() => openMap(vendorLoc)}
           />
           <View style={styles.metaDivider} />
