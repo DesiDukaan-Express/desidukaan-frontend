@@ -1720,7 +1720,7 @@ export default function VendorOrdersScreen() {
                         {item.quantity} × ₹{item.product_price}
                       </Text>
                     </View>
-                    <Text style={omStyles.itemTotal}>₹{item.subtotal}</Text>
+                    <Text style={omStyles.itemTotal}>₹{(item.quantity * parseFloat(item.product_price)).toFixed(2).replace(/\.00$/, '')}</Text>
                   </View>
                 ))}
               </View>
