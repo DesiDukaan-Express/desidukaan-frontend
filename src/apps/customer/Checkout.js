@@ -524,13 +524,13 @@ function CounterOfferReview({ data, onAccept, onReject, placing, fs = 1 }) {
               </Text>
             </View>
             <Text
-              style={[
-                cor.itemPrice,
-                !it.available && { textDecorationLine: "line-through", opacity: 0.5 },
-              ]}
-            >
-              ₹{it.subtotal || it.product_price * it.new_quantity}
-            </Text>
+  style={[
+    cor.itemPrice,
+    !it.available && { textDecorationLine: "line-through", opacity: 0.5 },
+  ]}
+>
+  ₹{it.available !== false ? (it.new_quantity * it.product_price) : 0}
+</Text>
           </View>
         ))}
       </View>
@@ -990,6 +990,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
   // ── Slot actions ───────────────────────────────────────────────────────────
   const handleRequestSlot = async ({ slot_start, slot_end }) => {
     setConfirmedSlot({ start: slot_start, end: slot_end });
+    setSlotId(null); // clear any previously confirmed DB slot ID
     setSlotModalVisible(false);
   };
 
@@ -2271,8 +2272,16 @@ const fm = StyleSheet.create({
 // ─── Slot picker modal ────────────────────────────────────────────────────────
 function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
   const [day, setDay] = useState("today");
-  const [startHour, setStartHour] = useState(10); // decimal format (e.g. 10.75 = 10:45)
+  const [startHour, setStartHour] = useState(10);
   const [duration, setDuration] = useState(2);
+
+  useEffect(() => {
+    if (visible) {
+      setDay("today");
+      setStartHour(10);
+      setDuration(2);
+    }
+  }, [visible]);
   
   const endHour = startHour + duration;
   
@@ -2305,11 +2314,10 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
   const validation = useMemo(() => {
     const now = new Date();
     const nowDec = now.getHours() + (now.getMinutes() / 60);
-    const buffer = 0.5; // 30 min buffer
 
-    // 1. Past check
-    if (day === "today" && startHour < nowDec + buffer) {
-      return { valid: false, reason: "Store needs at least 30 mins to prepare." };
+    // 1. Past check — only block if slot is actually in the past
+    if (day === "today" && startHour < nowDec) {
+      return { valid: false, reason: "Please select a future time slot." };
     }
 
     // 2. Store Hours check
@@ -2340,7 +2348,12 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
       <Pressable style={sm.backdrop} onPress={onClose}>
         <Pressable style={sm.sheet} onPress={(e) => e.stopPropagation()}>
           <View style={sm.handle} />
-          <Text style={sm.title}>Choose delivery window</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <Text style={sm.title}>Choose delivery window</Text>
+            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+              <Feather name="x" size={22} color={C.gray500} />
+            </TouchableOpacity>
+          </View>
           <Text style={sm.sub}>Schedule your delivery using the sliders below</Text>
 
           <View style={{ marginBottom: 20 }}>
@@ -2372,7 +2385,7 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
               style={{ width: '100%', height: 40 }}
               minimumValue={8}
               maximumValue={22}
-              step={0.25}
+              step={0.083}
               value={startHour}
               onValueChange={setStartHour}
               minimumTrackTintColor={C.green}
@@ -2390,7 +2403,7 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
               style={{ width: '100%', height: 40 }}
               minimumValue={1}
               maximumValue={4}
-              step={0.5}
+              step={0.25}
               value={duration}
               onValueChange={setDuration}
               minimumTrackTintColor={C.green}
@@ -2399,20 +2412,27 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
             />
           </View>
 
-          <View style={[sm.preview, validation.valid ? sm.previewValid : sm.previewInvalid]}>
-            <Feather 
-              name={validation.valid ? "check-circle" : "alert-circle"} 
-              size={16} 
-              color={validation.valid ? C.green : C.red} 
-            />
-            {validation.valid ? (
-              <Text style={sm.previewText}>
-                Delivery between <Text style={sm.previewBold}>{formatTime(startHour)}</Text> and <Text style={sm.previewBold}>{formatTime(endHour)}</Text>
-              </Text>
-            ) : (
+          {!validation.valid ? (
+            <View style={[sm.preview, sm.previewInvalid]}>
+              <Feather name="alert-circle" size={16} color={C.red} />
               <Text style={sm.previewTextErr}>{validation.reason}</Text>
-            )}
-          </View>
+            </View>
+          ) : (
+            <View style={{ gap: 8 }}>
+              <View style={[sm.preview, sm.previewValid]}>
+                <Feather name="check-circle" size={16} color={C.green} />
+                <Text style={sm.previewText}>
+                  Delivery between <Text style={sm.previewBold}>{formatTime(startHour)}</Text> and <Text style={sm.previewBold}>{formatTime(endHour)}</Text>
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 7, backgroundColor: '#FFFBEB', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#FDE68A' }}>
+                <Feather name="info" size={13} color={C.amber} style={{ marginTop: 1 }} />
+                <Text style={{ flex: 1, fontSize: 12, color: '#92400E', lineHeight: 17 }}>
+                  Store needs at least 30 mins to prepare. Your slot may take 30 mins extra including preparation time.
+                </Text>
+              </View>
+            </View>
+          )}
 
           <TouchableOpacity
             style={[sm.confirmBtn, (!validation.valid || loading) && sm.confirmBtnDisabled]}
