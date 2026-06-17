@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Animated, PanResponder, Dimensions,
   StatusBar, Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { io } from 'socket.io-client';
@@ -781,6 +782,21 @@ export default function ActiveDeliveryScreen({ navigation }) {
   const [step, setStep]                       = useState(0);
   const socketRef = useRef(null);
 
+
+  // -- AsyncStorage helpers: persist the local UI step per delivery --
+  const STEP_KEY = (id) => `delivery_step_${id}`;
+  const saveStep = async (id, s) => {
+    try { await AsyncStorage.setItem(STEP_KEY(id), String(s)); } catch (_) {}
+  };
+  const loadStep = async (id) => {
+    try {
+      const v = await AsyncStorage.getItem(STEP_KEY(id));
+      return v !== null ? parseInt(v, 10) : null;
+    } catch (_) { return null; }
+  };
+  const clearStep = async (id) => {
+    try { await AsyncStorage.removeItem(STEP_KEY(id)); } catch (_) {}
+  };
   // â”€â”€ Fetch & parse orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchOrders = async () => {
     try {
@@ -809,10 +825,10 @@ export default function ActiveDeliveryScreen({ navigation }) {
           vendorPhone: d.order?.vendor?.phone || d.order?.vendor?.mobile || null,
           items: d.order?.items || [],
         });
-        setStep(prev => {
-          if (backendStatus === 'picked_up') return Math.max(prev, 2);
-          return prev;
-        });
+        // Restore persisted step, always respecting backend status as minimum floor
+        const backendFloor = backendStatus === 'picked_up' ? 2 : 0;
+        const cached = await loadStep(d.id);
+        setStep(Math.max(cached ?? backendFloor, backendFloor));
       } else {
         setActiveOrder(null);
         setStep(0);
@@ -914,6 +930,8 @@ export default function ActiveDeliveryScreen({ navigation }) {
         const data = await res.json();
         if (!data.success) { Alert.alert('Error', data.message); return; }
         if (currentStepDef.api === 'delivered') {
+          // Clear persisted step for this delivery
+          if (activeOrder?.id) await clearStep(activeOrder.id);
           setDeliveryCount(c => c + 1);
           setEarnings(e => e + (activeOrder?.deliveryFee || 65));
           setTimeout(() => { setActiveOrder(null); setStep(0); fetchOrders(); }, 800);
@@ -921,8 +939,11 @@ export default function ActiveDeliveryScreen({ navigation }) {
         }
       } catch (e) { Alert.alert('Error', 'Network error'); return; }
     }
+    // Advance to next step and persist it
     if (displayStep < STEPS.length - 1) {
-      setTimeout(() => setStep(s => Math.min(s + 1, STEPS.length - 1)), 400);
+      const nextStep = displayStep + 1;
+      if (activeOrder?.id) await saveStep(activeOrder.id, nextStep);
+      setTimeout(() => setStep(nextStep), 400);
     }
   };
 
