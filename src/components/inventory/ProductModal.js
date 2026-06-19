@@ -573,22 +573,26 @@ const cp = StyleSheet.create({
 export default function ProductModal({ editing, onClose, onSave, saving }) {
   const init = editing
     ? {
-        name:          editing.name,
-        description:   editing.description || "",
-        categoryName:  editing.category    || "",
-        subcategoryId: editing.category_id || null,
+        name:           editing.name,
+        description:    editing.description  || "",
+        categoryName:   editing.category     || "",
+        subcategoryId:  editing.category_id  || null,
         subcategoryName: editing.subcategory || "",
-        barcode:       editing.barcode    || "",
-        stock:         String(editing.rawStock || 0),
-        price:         String(editing.price    || 0),
-        unit:          editing.unit  || "kg",
-        type:          editing.type  || "packed",
+        barcode:        editing.barcode      || "",
+        brand:          editing.brand        || "",
+        stock:          String(editing.rawStock || 0),
+        price:          String(editing.price    || 0),
+        mrp:            String(editing.mrp     || ""),
+        selling_price:  String(editing.selling_price || ""),
+        unit:           editing.unit  || "kg",
+        type:           editing.type  || "packed",
         weight_options: editing.weight_options || [],
-        image_url:     editing.image_url || "",
+        image_url:      editing.image_url || "",
       }
     : {
         name: "", description: "", categoryName: "", subcategoryId: null,
-        subcategoryName: "", barcode: "", unit: "kg", stock: "", price: "",
+        subcategoryName: "", barcode: "", brand: "", unit: "kg",
+        stock: "", price: "", mrp: "", selling_price: "",
         type: "packed", weight_options: [], image_url: "",
       };
 
@@ -714,6 +718,9 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
       subcategory_id:  form.subcategoryId || null,
       category_id:     form.subcategoryId || null,
       category:        form.categoryName  || "Other",
+      brand:           form.brand.trim()  || null,
+      mrp:             form.mrp ? parseFloat(form.mrp) : null,
+      selling_price:   form.selling_price ? parseFloat(form.selling_price) : null,
     });
   };
 
@@ -778,7 +785,7 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
 
             <View style={s.divider} />
 
-            {/* Name & Description */}
+            {/* Name, Brand & Description */}
             <View style={s.section}>
               <Field
                 label="Product Name"
@@ -786,6 +793,13 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
                 value={form.name}
                 onChangeText={(v) => set("name", v)}
                 placeholder="e.g. Amul Full Cream Milk 500ml"
+              />
+              <Field
+                label="Brand (Optional)"
+                style={{ marginTop: 14 }}
+                value={form.brand}
+                onChangeText={(v) => set("brand", v)}
+                placeholder="e.g. Amul, Nestle, Tata…"
               />
               <Field
                 label="Description"
@@ -863,7 +877,7 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
 
             <View style={s.divider} />
 
-            {/* Stock & Price */}
+            {/* Stock & Pricing */}
             <View style={s.section}>
               <View style={s.row}>
                 <Field
@@ -876,7 +890,7 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
                   keyboardType="numeric"
                 />
                 <Field
-                  label="Price (₹)"
+                  label="Selling Price (₹)"
                   required
                   style={{ flex: 1 }}
                   value={form.price}
@@ -885,6 +899,31 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
                   keyboardType="numeric"
                 />
               </View>
+              <View style={[s.row, { marginTop: 12 }]}>
+                <Field
+                  label="MRP (₹)"
+                  style={{ flex: 1 }}
+                  value={form.mrp}
+                  onChangeText={(v) => set("mrp", v)}
+                  placeholder="e.g. 50"
+                  keyboardType="numeric"
+                />
+                <Field
+                  label="Discounted Price (₹)"
+                  style={{ flex: 1 }}
+                  value={form.selling_price}
+                  onChangeText={(v) => set("selling_price", v)}
+                  placeholder="Your selling price"
+                  keyboardType="numeric"
+                />
+              </View>
+              {form.mrp && form.selling_price && parseFloat(form.mrp) > parseFloat(form.selling_price) && (
+                <View style={{ backgroundColor: "#F0FDF4", borderRadius: 10, padding: 10, marginTop: 8, borderWidth: 1, borderColor: "#BBF7D0" }}>
+                  <Text style={{ fontSize: 12, color: "#15803D", fontWeight: "700" }}>
+                    💰 {Math.round(((parseFloat(form.mrp) - parseFloat(form.selling_price)) / parseFloat(form.mrp)) * 100)}% discount off MRP
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Barcode */}

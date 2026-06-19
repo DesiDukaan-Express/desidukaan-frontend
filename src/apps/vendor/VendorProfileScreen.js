@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -64,11 +64,12 @@ export default function VendorProfileScreen() {
   const [uploading, setUploading] = useState(false);
 
   // Modals
-  const [imageModal, setImageModal] = useState(false);
-  const [timeModal, setTimeModal] = useState(false);
+  const [imageModal, setImageModal]     = useState(false);
+  const [timeModal, setTimeModal]       = useState(false);
   const [deliveryModal, setDeliveryModal] = useState(false);
-  const [editModal, setEditModal] = useState(false);
-  const [logoutModal, setLogoutModal] = useState(false);
+  const [editModal, setEditModal]       = useState(false);
+  const [logoutModal, setLogoutModal]   = useState(false);
+  const [categoryModal, setCategoryModal] = useState(false);
 
   // Edit fields
   const [activeField, setActiveField] = useState("");
@@ -400,7 +401,7 @@ export default function VendorProfileScreen() {
                 rs={rs}
                 isWide={isWide}
               />
-              <StoreInfoCard vendor={vendor} onEdit={openEdit} rs={rs} isWide={isWide} />
+              <StoreInfoCard vendor={vendor} onEdit={openEdit} onCategoryPress={() => setCategoryModal(true)} rs={rs} isWide={isWide} />
             </View>
             <View style={{ flex: 1, gap: 16 }}>
               <StoreSettingsCard
@@ -425,7 +426,7 @@ export default function VendorProfileScreen() {
               rs={rs}
               isWide={isWide}
             />
-            <StoreInfoCard vendor={vendor} onEdit={openEdit} rs={rs} isWide={isWide} />
+            <StoreInfoCard vendor={vendor} onEdit={openEdit} onCategoryPress={() => setCategoryModal(true)} rs={rs} isWide={isWide} />
             <StoreSettingsCard
               vendor={vendor}
               storeOpen={storeOpen}
@@ -644,6 +645,62 @@ export default function VendorProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ── STORE CATEGORY MODAL ─────────────────────────── */}
+      <Modal
+        transparent
+        visible={categoryModal}
+        animationType="slide"
+        onRequestClose={() => setCategoryModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={() => setCategoryModal(false)}
+        />
+        <View style={[styles.sheet, { paddingBottom: Platform.OS === "ios" ? 34 : 20 }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Store Category</Text>
+            <TouchableOpacity onPress={() => setCategoryModal(false)} style={styles.modalClose}>
+              <MaterialIcons name="close" size={20} color={C.text} />
+            </TouchableOpacity>
+          </View>
+          {[
+            { value: "grocery",   label: "Grocery Store",     icon: "local-grocery-store", sub: "Daily essentials, FMCG" },
+            { value: "medical",   label: "Medical / Pharmacy", icon: "local-pharmacy",       sub: "Medicines, health products" },
+            { value: "bakery",    label: "Bakery",             icon: "cake",                 sub: "Bread, cakes, snacks" },
+            { value: "dairy",     label: "Dairy & Eggs",       icon: "egg",                  sub: "Milk, paneer, eggs" },
+            { value: "electronics", label: "Electronics",     icon: "devices",              sub: "Gadgets, accessories" },
+            { value: "stationery", label: "Stationery",        icon: "edit",                 sub: "Books, pens, office" },
+            { value: "restaurant", label: "Restaurant / Food", icon: "restaurant",           sub: "Cooked food, meals" },
+            { value: "general",   label: "General Store",      icon: "store",                sub: "Multi-category" },
+          ].map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[
+                styles.sheetOption,
+                vendor.store_category === opt.value && { backgroundColor: C.greenDim },
+              ]}
+              onPress={() => {
+                handleUpdateField("store_category", opt.value);
+                setCategoryModal(false);
+              }}
+            >
+              <View style={[styles.sheetOptionIcon, { backgroundColor: C.greenDim }]}>
+                <MaterialIcons name={opt.icon} size={20} color={C.green} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sheetOptionTitle}>{opt.label}</Text>
+                <Text style={styles.sheetOptionSub}>{opt.sub}</Text>
+              </View>
+              {vendor.store_category === opt.value && (
+                <MaterialIcons name="check-circle" size={20} color={C.green} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -757,13 +814,26 @@ function PersonalInfoCard({ vendor, onEdit, rs, isWide }) {
   );
 }
 
-function StoreInfoCard({ vendor, onEdit, rs, isWide }) {
+function StoreInfoCard({ vendor, onEdit, onCategoryPress, rs, isWide }) {
+  const CATEGORY_LABELS = {
+    grocery: "Grocery Store", medical: "Medical / Pharmacy",
+    bakery: "Bakery", dairy: "Dairy & Eggs",
+    electronics: "Electronics", stationery: "Stationery",
+    restaurant: "Restaurant / Food", general: "General Store",
+  };
   return (
     <SectionCard title="Store Info" overline="DETAILS" rs={rs} isWide={isWide}>
       <InfoRow
         label="Address"
         value={`${vendor.address_line}${vendor.pincode ? ", " + vendor.pincode : ""}`}
         onEdit={() => onEdit("address_line", "Address", vendor.address_line)}
+        rs={rs}
+        isWide={isWide}
+      />
+      <InfoRow
+        label="Store Category"
+        value={CATEGORY_LABELS[vendor.store_category] || "Not set"}
+        onEdit={onCategoryPress}
         rs={rs}
         isWide={isWide}
       />
