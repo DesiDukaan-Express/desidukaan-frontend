@@ -795,7 +795,7 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
                 placeholder="e.g. Amul Full Cream Milk 500ml"
               />
               <Field
-                label="Brand (Optional)"
+                label="Brand"
                 style={{ marginTop: 14 }}
                 value={form.brand}
                 onChangeText={(v) => set("brand", v)}
@@ -899,31 +899,14 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
                   keyboardType="numeric"
                 />
               </View>
-              <View style={[s.row, { marginTop: 12 }]}>
-                <Field
-                  label="MRP (₹)"
-                  style={{ flex: 1 }}
-                  value={form.mrp}
-                  onChangeText={(v) => set("mrp", v)}
-                  placeholder="e.g. 50"
-                  keyboardType="numeric"
-                />
-                <Field
-                  label="Discounted Price (₹)"
-                  style={{ flex: 1 }}
-                  value={form.selling_price}
-                  onChangeText={(v) => set("selling_price", v)}
-                  placeholder="Your selling price"
-                  keyboardType="numeric"
-                />
-              </View>
-              {form.mrp && form.selling_price && parseFloat(form.mrp) > parseFloat(form.selling_price) && (
-                <View style={{ backgroundColor: "#F0FDF4", borderRadius: 10, padding: 10, marginTop: 8, borderWidth: 1, borderColor: "#BBF7D0" }}>
-                  <Text style={{ fontSize: 12, color: "#15803D", fontWeight: "700" }}>
-                    💰 {Math.round(((parseFloat(form.mrp) - parseFloat(form.selling_price)) / parseFloat(form.mrp)) * 100)}% discount off MRP
-                  </Text>
-                </View>
-              )}
+              <Field
+                label="MRP (₹)"
+                style={{ marginTop: 12 }}
+                value={form.mrp}
+                onChangeText={(v) => set("mrp", v)}
+                placeholder="e.g. 50"
+                keyboardType="numeric"
+              />
             </View>
 
             {/* Barcode */}
