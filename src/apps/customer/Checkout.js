@@ -22,7 +22,6 @@ import useCartStore from "../../store/cartStore";
 import useAuthStore from "../../store/authStore";
 import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
-import Slider from '@react-native-community/slider';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const SOCKET_URL =
@@ -284,7 +283,7 @@ const cp = StyleSheet.create({
 });
 
 // ─── Order Summary card ───────────────────────────────────────────────────────
-function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, gstAmount, onNegotiate, fs = 1 }) {
+function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNegotiate, fs = 1 }) {
   return (
     <View style={osc.wrap}>
       {items.map((item, i) => (
@@ -320,14 +319,7 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, gstAmo
           ₹{subtotal}
         </Text>
       </View>
-      <View style={osc.row}>
-        <Text style={[osc.label, { fontSize: Math.round(13 * fs) }]}>
-          Taxes (GST 5%)
-        </Text>
-        <Text style={[osc.value, { fontSize: Math.round(13 * fs) }]}>
-          ₹{gstAmount ?? parseFloat((subtotal * 0.05).toFixed(2))}
-        </Text>
-      </View>
+
       <View style={osc.row}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <Text style={[osc.label, { fontSize: Math.round(13 * fs) }]}>
@@ -663,6 +655,16 @@ export default function CheckoutScreen() {
   const [proposedFee,     setProposedFee]     = useState(null);
   const isAccepted = orderStatus === "accepted";
 
+  // ── Negotiation modal visibility ───────────────────────────────────────────
+  const [negotiationModalVisible, setNegotiationModalVisible] = useState(false);
+
+  // Show modal automatically when status changes to pending/countered/accepted/rejected/expired
+  useEffect(() => {
+    if (orderStatus !== "idle") {
+      setNegotiationModalVisible(true);
+    }
+  }, [orderStatus]);
+
   // ── Toast notification state ───────────────────────────────────────────────
   const [toast, setToast] = useState({ visible: false, message: "", type: "info" }); // type: 'success' | 'error' | 'info'
   const toastTimer = useRef(null);
@@ -682,8 +684,7 @@ export default function CheckoutScreen() {
   const subtotal = snapshotSubtotal ?? liveSubtotal;
   const baseFee = confirmedFee ?? 30; // No free delivery threshold
   const activeFee = proposedFee !== null ? proposedFee : baseFee;
-  const gstAmount = parseFloat((subtotal * 0.05).toFixed(2));
-  const cartTotal = subtotal + activeFee + gstAmount;
+  const cartTotal = subtotal + activeFee;
   // counterData.total takes priority when countered or accepted-after-counter
   const total =
     counterData?.total != null && ["countered", "accepted"].includes(orderStatus)
@@ -1150,33 +1151,6 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
           {confirmedSlot && (
             <View style={{ marginHorizontal: px, marginBottom: 12 }}>
               <SlotBanner slot={confirmedSlot} />
-            </View>
-          )}
-
-          {/* Negotiation Banner */}
-          {orderStatus !== "idle" && (
-            <View style={{ marginHorizontal: px }}>
-              <NegotiationBanner
-                status={orderStatus}
-                countdown={countdown}
-                vendorName={vendorName}
-                onDismiss={
-                  orderStatus === "rejected" || orderStatus === "expired"
-                    ? () => setOrderStatus("idle")
-                    : null
-                }
-              />
-            </View>
-          )}
-
-          {orderStatus === "countered" && (
-            <View style={{ marginHorizontal: px }}>
-              <CounterOfferReview
-                data={counterData}
-                onAccept={() => handleRespondCounter("accept")}
-                onReject={() => handleRespondCounter("reject")}
-                placing={placing}
-              />
             </View>
           )}
 
@@ -1870,7 +1844,6 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
               <OrderSummaryCard
                 items={displayItems}
                 subtotal={subtotal}
-                gstAmount={gstAmount}
                 deliveryFee={activeFee}
                 baseFee={baseFee}
                 total={total}
@@ -1913,7 +1886,6 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
               <OrderSummaryCard
                 items={displayItems}
                 subtotal={subtotal}
-                gstAmount={gstAmount}
                 deliveryFee={activeFee}
                 baseFee={baseFee}
                 total={total}
@@ -1989,6 +1961,104 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             </Pressable>
           </Pressable>
         </Modal>
+      )}
+
+
+      {/* ── Negotiation / Wait for Store Modal ────────────────────────── */}
+      <Modal
+        visible={negotiationModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (["rejected", "expired", "accepted"].includes(orderStatus)) {
+            setNegotiationModalVisible(false);
+          }
+        }}
+      >
+        <Pressable
+          style={negModal.backdrop}
+          onPress={() => {
+            if (["rejected", "expired", "accepted"].includes(orderStatus)) {
+              setNegotiationModalVisible(false);
+            }
+          }}
+        >
+          <Pressable style={negModal.card} onPress={(e) => e.stopPropagation()}>
+            {/* Close button — only when dismissible */}
+            {["rejected", "expired", "accepted"].includes(orderStatus) && (
+              <TouchableOpacity
+                style={negModal.closeBtn}
+                onPress={() => {
+                  setNegotiationModalVisible(false);
+                  if (orderStatus === "rejected" || orderStatus === "expired") {
+                    setOrderStatus("idle");
+                  }
+                }}
+              >
+                <Feather name="x" size={16} color={C.gray600} />
+              </TouchableOpacity>
+            )}
+
+            <NegotiationBanner
+              status={orderStatus}
+              countdown={countdown}
+              vendorName={vendorName}
+              onDismiss={null}
+            />
+
+            {orderStatus === "countered" && (
+              <CounterOfferReview
+                data={counterData}
+                onAccept={() => { handleRespondCounter("accept"); }}
+                onReject={() => { handleRespondCounter("reject"); setNegotiationModalVisible(false); }}
+                placing={placing}
+              />
+            )}
+
+            {orderStatus === "accepted" && (
+              <TouchableOpacity
+                style={negModal.proceedBtn}
+                onPress={() => { setNegotiationModalVisible(false); }}
+                activeOpacity={0.85}
+              >
+                <Feather name="credit-card" size={16} color={C.white} />
+                <Text style={negModal.proceedBtnText}>Proceed to Payment</Text>
+              </TouchableOpacity>
+            )}
+
+            {orderStatus === "pending" && (
+              <View style={negModal.pendingNote}>
+                <Feather name="info" size={13} color={C.amber} />
+                <Text style={negModal.pendingNoteText}>
+                  Please keep this screen open. The store will respond shortly.
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── Show negotiation status chip on main screen when modal closed ── */}
+      {orderStatus !== "idle" && !negotiationModalVisible && (
+        <TouchableOpacity
+          style={negModal.statusChip}
+          onPress={() => setNegotiationModalVisible(true)}
+          activeOpacity={0.85}
+        >
+          <View style={[negModal.chipDot, {
+            backgroundColor:
+              orderStatus === "accepted" ? C.green :
+              orderStatus === "pending" ? C.orange :
+              orderStatus === "countered" ? "#7C3AED" : C.red
+          }]} />
+          <Text style={negModal.chipText}>
+            {orderStatus === "accepted" ? "Order Accepted — Tap to pay" :
+             orderStatus === "pending" ? `Waiting for store... ${countdown}s` :
+             orderStatus === "countered" ? "Store sent adjustments — Tap to review" :
+             orderStatus === "rejected" ? "Order Declined" : "Request Expired"}
+          </Text>
+          <Feather name="chevron-up" size={14} color={C.gray600} />
+        </TouchableOpacity>
       )}
 
       <SlotModal
@@ -2285,72 +2355,60 @@ const fm = StyleSheet.create({
 });
 
 // ─── Slot picker modal ────────────────────────────────────────────────────────
+const SLOT_OPTIONS = [
+  { label: "7 – 9 AM",   start: 7,  end: 9  },
+  { label: "9 – 11 AM",  start: 9,  end: 11 },
+  { label: "11 AM – 1 PM", start: 11, end: 13 },
+  { label: "1 – 3 PM",   start: 13, end: 15 },
+  { label: "3 – 5 PM",   start: 15, end: 17 },
+  { label: "5 – 7 PM",   start: 17, end: 19 },
+  { label: "7 – 9 PM",   start: 19, end: 21 },
+];
+
 function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
   const [day, setDay] = useState("today");
-  const [startHour, setStartHour] = useState(10);
-  const [duration, setDuration] = useState(2);
+  const [selectedSlot, setSelectedSlot] = useState(null);
 
   useEffect(() => {
     if (visible) {
       setDay("today");
-      setStartHour(10);
-      setDuration(2);
+      setSelectedSlot(null);
     }
   }, [visible]);
-  
-  const endHour = startHour + duration;
-  
-  // Helper: HH:MM string to decimal hour
+
   const timeToDec = (timeStr) => {
     if (!timeStr) return null;
     const [h, m] = timeStr.split(":").map(Number);
     return h + m / 60;
   };
 
-  const formatTime = (decimalHour) => {
-    const h = Math.floor(decimalHour);
-    const m = Math.round((decimalHour - h) * 60);
-    const ampm = h >= 12 && h < 24 ? "pm" : "am";
-    const displayH = (h % 12) || 12;
-    const displayM = m.toString().padStart(2, "0");
-    return `${displayH}:${displayM} ${ampm}`;
+  const getISODate = (hour) => {
+    const d = new Date();
+    if (day === "tomorrow") d.setDate(d.getDate() + 1);
+    d.setHours(hour, 0, 0, 0);
+    return d.toISOString();
   };
 
-  const getISODate = (decimalHour) => {
-  const d = new Date();
-  if (day === "tomorrow") d.setDate(d.getDate() + 1);
-  const h = Math.floor(decimalHour);
-  const m = Math.round((decimalHour - h) * 60);
-  d.setHours(h, m, 0, 0);
-  return d.toISOString();
-};
+  const now = new Date();
+  const nowHour = now.getHours() + now.getMinutes() / 60;
 
-  // Validation Logic
-  const validation = useMemo(() => {
-    const now = new Date();
-    const nowDec = now.getHours() + (now.getMinutes() / 60);
+  const isSlotDisabled = (slot) => {
+    if (day === "tomorrow") return false;
+    // Disable if slot start is within 1 hour from now
+    return slot.start <= nowHour + 1;
+  };
 
-    // 1. Past check — only block if slot is actually in the past
-    if (day === "today" && startHour < nowDec) {
-      return { valid: false, reason: "Please select a future time slot." };
-    }
-
-    // 2. Store Hours check
-    if (vendor) {
-      const open = timeToDec(vendor.opening_time);
-      const close = timeToDec(vendor.closing_time);
-      if (open !== null && close !== null) {
-        if (startHour < open) return { valid: false, reason: `Store opens at ${formatTime(open)}.` };
-        if (endHour > close) return { valid: false, reason: `Store closes at ${formatTime(close)}.` };
-      }
-    }
-
-    return { valid: true };
-  }, [day, startHour, duration, vendor]);
+  const isSlotOutsideHours = (slot) => {
+    if (!vendor) return false;
+    const open = timeToDec(vendor.opening_time);
+    const close = timeToDec(vendor.closing_time);
+    if (open === null || close === null) return false;
+    return slot.start < open || slot.end > close;
+  };
 
   const handleConfirm = () => {
-    if (!validation.valid) return;
-    onConfirm({ slot_start: getISODate(startHour), slot_end: getISODate(endHour) });
+    if (!selectedSlot) return;
+    onConfirm({ slot_start: getISODate(selectedSlot.start), slot_end: getISODate(selectedSlot.end) });
   };
 
   return (
@@ -2369,9 +2427,9 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
               <Feather name="x" size={22} color={C.gray500} />
             </TouchableOpacity>
           </View>
-          <Text style={sm.sub}>Schedule your delivery using the sliders below</Text>
+          <Text style={sm.sub}>Pick a time slot for your delivery</Text>
 
-          <View style={{ marginBottom: 20 }}>
+          <View style={{ marginBottom: 18 }}>
             <Text style={{ fontWeight: '700', marginBottom: 10, color: C.gray700 }}>Select Day</Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               {['today', 'tomorrow'].map((d) => (
@@ -2381,7 +2439,7 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
                     sm.hintChip,
                     day === d && { borderColor: C.green, backgroundColor: C.greenLight }
                   ]}
-                  onPress={() => setDay(d)}
+                  onPress={() => { setDay(d); setSelectedSlot(null); }}
                 >
                   <Text style={[sm.hintText, day === d && { color: C.green }]}>
                     {d.charAt(0).toUpperCase() + d.slice(1)}
@@ -2391,75 +2449,59 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
             </View>
           </View>
 
-          <View style={{ marginBottom: 20 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-              <Text style={{ fontWeight: '700', color: C.gray700 }}>Start Time</Text>
-              <Text style={{ fontWeight: '800', color: C.greenDark }}>{formatTime(startHour)}</Text>
-            </View>
-            <Slider
-              style={{ width: '100%', height: 40 }}
-              minimumValue={8}
-              maximumValue={22}
-              step={0.083}
-              value={startHour}
-              onValueChange={setStartHour}
-              minimumTrackTintColor={C.green}
-              maximumTrackTintColor={C.gray200}
-              thumbTintColor={C.greenDark}
-            />
+          <Text style={{ fontWeight: '700', marginBottom: 10, color: C.gray700 }}>Available Slots</Text>
+          <View style={sm.slotGrid}>
+            {SLOT_OPTIONS.map((slot) => {
+              const disabled = isSlotDisabled(slot);
+              const outsideHours = isSlotOutsideHours(slot);
+              const unavailable = disabled || outsideHours;
+              const active = selectedSlot?.label === slot.label;
+              return (
+                <TouchableOpacity
+                  key={slot.label}
+                  style={[
+                    sm.slotChip,
+                    active && sm.slotChipActive,
+                    unavailable && sm.slotChipDisabled,
+                  ]}
+                  onPress={() => !unavailable && setSelectedSlot(slot)}
+                  activeOpacity={unavailable ? 1 : 0.75}
+                >
+                  <Feather
+                    name="clock"
+                    size={12}
+                    color={active ? C.white : unavailable ? C.gray300 : C.green}
+                  />
+                  <Text style={[
+                    sm.slotChipText,
+                    active && sm.slotChipTextActive,
+                    unavailable && sm.slotChipTextDisabled,
+                  ]}>{slot.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          <View style={{ marginBottom: 20 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-              <Text style={{ fontWeight: '700', color: C.gray700 }}>Duration</Text>
-              <Text style={{ fontWeight: '800', color: C.greenDark }}>{duration} hour{duration > 1 ? 's' : ''}</Text>
-            </View>
-            <Slider
-              style={{ width: '100%', height: 40 }}
-              minimumValue={1}
-              maximumValue={4}
-              step={0.25}
-              value={duration}
-              onValueChange={setDuration}
-              minimumTrackTintColor={C.green}
-              maximumTrackTintColor={C.gray200}
-              thumbTintColor={C.greenDark}
-            />
-          </View>
-
-          {!validation.valid ? (
-            <View style={[sm.preview, sm.previewInvalid]}>
-              <Feather name="alert-circle" size={16} color={C.red} />
-              <Text style={sm.previewTextErr}>{validation.reason}</Text>
-            </View>
-          ) : (
-            <View style={{ gap: 8 }}>
-              <View style={[sm.preview, sm.previewValid]}>
-                <Feather name="check-circle" size={16} color={C.green} />
-                <Text style={sm.previewText}>
-                  Delivery between <Text style={sm.previewBold}>{formatTime(startHour)}</Text> and <Text style={sm.previewBold}>{formatTime(endHour)}</Text>
-                </Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 7, backgroundColor: '#FFFBEB', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#FDE68A' }}>
-                <Feather name="info" size={13} color={C.amber} style={{ marginTop: 1 }} />
-                <Text style={{ flex: 1, fontSize: 12, color: '#92400E', lineHeight: 17 }}>
-                  Store needs at least 30 mins to prepare. Your slot may take 30 mins extra including preparation time.
-                </Text>
-              </View>
+          {selectedSlot && (
+            <View style={[sm.preview, sm.previewValid]}>
+              <Feather name="check-circle" size={16} color={C.green} />
+              <Text style={sm.previewText}>
+                Delivery on <Text style={sm.previewBold}>{day === 'today' ? 'Today' : 'Tomorrow'}</Text>, window: <Text style={sm.previewBold}>{selectedSlot.label}</Text>
+              </Text>
             </View>
           )}
 
           <TouchableOpacity
-            style={[sm.confirmBtn, (!validation.valid || loading) && sm.confirmBtnDisabled]}
+            style={[sm.confirmBtn, (!selectedSlot || loading) && sm.confirmBtnDisabled]}
             onPress={handleConfirm}
-            disabled={!validation.valid || loading}
+            disabled={!selectedSlot || loading}
             activeOpacity={0.85}
           >
             {loading ? (
               <ActivityIndicator size="small" color={C.white} />
             ) : (
               <Text style={sm.confirmBtnText}>
-                {validation.valid ? "Request this window →" : "Invalid Selection"}
+                {selectedSlot ? "Confirm this slot →" : "Select a slot"}
               </Text>
             )}
           </TouchableOpacity>
@@ -2550,6 +2592,34 @@ const sm = StyleSheet.create({
   },
   confirmBtnDisabled: { backgroundColor: C.greenMid },
   confirmBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
+  slotGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 16,
+  },
+  slotChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: C.greenBorder,
+    backgroundColor: C.greenLight,
+  },
+  slotChipActive: {
+    backgroundColor: C.green,
+    borderColor: C.greenDark,
+  },
+  slotChipDisabled: {
+    backgroundColor: C.gray100,
+    borderColor: C.gray200,
+  },
+  slotChipText: { fontSize: 13, fontWeight: "700", color: C.green },
+  slotChipTextActive: { color: C.white },
+  slotChipTextDisabled: { color: C.gray300 },
 });
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -2965,4 +3035,81 @@ const toastStyle = StyleSheet.create({
   success: { backgroundColor: C.green },
   error: { backgroundColor: "#DC2626" },
   text: { color: C.white, fontSize: 14, fontWeight: "700", lineHeight: 20 },
+});
+
+// ─── Negotiation Modal Styles ─────────────────────────────────────────────────
+const negModal = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.52)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  card: {
+    backgroundColor: C.white,
+    borderRadius: 24,
+    padding: 20,
+    width: "100%",
+    maxWidth: 440,
+    shadowColor: "#000",
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 12,
+  },
+  closeBtn: {
+    alignSelf: "flex-end",
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: C.gray100,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
+  proceedBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: C.green,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginTop: 12,
+  },
+  proceedBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
+  pendingNote: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: C.amberLight,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+  },
+  pendingNoteText: { flex: 1, fontSize: 12, color: C.amber, fontWeight: "600", lineHeight: 17 },
+  // Status chip shown at bottom of screen when modal is dismissed
+  statusChip: {
+    position: "absolute",
+    bottom: 90,
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: C.white,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  chipDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  chipText: { flex: 1, fontSize: 13, fontWeight: "700", color: C.gray700 },
 });
