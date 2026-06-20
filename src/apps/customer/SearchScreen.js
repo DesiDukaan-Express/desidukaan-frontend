@@ -12,7 +12,7 @@ import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
-import { categoriesAPI, searchAPI } from "../../services/api";
+import { categoriesAPI, searchAPI, vendorsAPI } from "../../services/api";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const NEARBY_RADIUS = 10;   // km — stores within this are shown normally
@@ -73,6 +73,19 @@ const CAT_ACCENT = {
   "Milk": { bg: "#F0F9FF", accent: "#0EA5E9", icon: "🥛" },
   "Rice": { bg: "#FEFCE8", accent: "#EAB308", icon: "🌾" },
   _default: { bg: "#F3F4F6", accent: "#6B7280", icon: "📦" },
+};
+
+// ─── Store category metadata ───────────────────────────────────────────────────
+const STORE_CAT_META = {
+  grocery:     { icon: "🛒", label: "Grocery",    color: "#16A34A", bg: "#F0FDF4" },
+  medical:     { icon: "💊", label: "Medical",    color: "#2563EB", bg: "#EFF6FF" },
+  restaurant:  { icon: "🍽️", label: "Restaurant", color: "#EA580C", bg: "#FFF7ED" },
+  bakery:      { icon: "🥖", label: "Bakery",     color: "#D97706", bg: "#FFFBEB" },
+  dairy:       { icon: "🥛", label: "Dairy",      color: "#0EA5E9", bg: "#F0F9FF" },
+  electronics: { icon: "📱", label: "Electronics",color: "#7C3AED", bg: "#FAF5FF" },
+  stationery:  { icon: "✏️", label: "Stationery", color: "#475569", bg: "#F8FAFC" },
+  general:     { icon: "🏪", label: "General",    color: "#6B7280", bg: "#F3F4F6" },
+  _default:    { icon: "🏪", label: "Store",      color: "#6B7280", bg: "#F3F4F6" },
 };
 
 // ─── Haversine distance ───────────────────────────────────────────────────────
@@ -448,6 +461,30 @@ export default function SearchScreen() {
       .then(res => setApiCategories(res.data?.categories || []))
       .catch(() => setApiCategories([]));
   }, []);
+
+  // Store category filter
+  const [storeCategories, setStoreCategories] = useState([]);
+  const [selectedStoreCategory, setSelectedStoreCategory] = useState(null);
+  const [storeCatVendors, setStoreCatVendors] = useState([]);
+  const [loadingStoreCat, setLoadingStoreCat] = useState(false);
+
+  useEffect(() => {
+    vendorsAPI.getStoreCategories()
+      .then(res => setStoreCategories(res.data?.categories || []))
+      .catch(() => setStoreCategories([]));
+  }, []);
+
+  const handleStoreCatSelect = async (cat) => {
+    const newCat = selectedStoreCategory === cat ? null : cat;
+    setSelectedStoreCategory(newCat);
+    if (!newCat || !userCoords) { setStoreCatVendors([]); return; }
+    setLoadingStoreCat(true);
+    try {
+      const res = await vendorsAPI.getNearby(userCoords.lat, userCoords.lng, 10, newCat);
+      setStoreCatVendors(res.data || []);
+    } catch { setStoreCatVendors([]); }
+    finally { setLoadingStoreCat(false); }
+  };
 
   const dbCategories = useMemo(() => {
     const seen = new Set();
@@ -996,7 +1033,74 @@ export default function SearchScreen() {
               </View>
             )}
 
-            {/* ── LOADING ──────────────────────────────────────────── */}
+            {/* ── Browse Stores by Type ─────────────────────────────── */}
+            {isIdle && storeCategories.length > 0 && (
+              <View style={{ paddingHorizontal: px, paddingTop: 20 }}>
+                <Text style={s.sectionTitle}>Browse Stores by Type</Text>
+                <ScrollView
+                  horizontal showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingRight: 8, paddingBottom: 8, gap: 10 }}
+                >
+                  {storeCategories.map(cat => {
+                    const meta = STORE_CAT_META[cat] || STORE_CAT_META._default;
+                    const isActive = selectedStoreCategory === cat;
+                    return (
+                      <TouchableOpacity
+                        key={cat}
+                        style={[
+                          s.storeCatBrowseChip,
+                          isActive && { backgroundColor: meta.bg, borderColor: meta.color },
+                        ]}
+                        onPress={() => handleStoreCatSelect(cat)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={s.storeCatBrowseIcon}>{meta.icon}</Text>
+                        <Text style={[
+                          s.storeCatBrowseLabel,
+                          isActive && { color: meta.color, fontWeight: '700' },
+                        ]}>
+                          {meta.label || cat.charAt(0).toUpperCase() + cat.slice(1)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+
+                {/* Category vendor results */}
+                {loadingStoreCat && (
+                  <View style={s.loadingWrap}>
+                    <ActivityIndicator size="small" color={C.green} />
+                    <Text style={s.loadingText}>Finding stores…</Text>
+                  </View>
+                )}
+                {!loadingStoreCat && selectedStoreCategory && storeCatVendors.length === 0 && (
+                  <View style={s.emptyWrap}>
+                    <Feather name="shopping-bag" size={28} color={C.gray300} />
+                    <Text style={s.emptyTitle}>No stores found</Text>
+                    <Text style={s.emptySub}>
+                      No {selectedStoreCategory} stores found near you.
+                    </Text>
+                  </View>
+                )}
+                {!loadingStoreCat && storeCatVendors.length > 0 && (
+                  <View style={{ marginTop: 12 }}>
+                    {storeCatVendors.map(v => (
+                      <VendorCard
+                        key={v.id}
+                        vendor={v}
+                        distKm={userCoords && v.latitude && v.longitude
+                          ? distKm(userCoords.lat, userCoords.lng, v.latitude, v.longitude)
+                          : null}
+                        matchCount={0}
+                        onPress={() => goToStore(v)}
+                        tooFar={false}
+                      />
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+
             {loading && (
               <View style={s.loadingWrap}>
                 <ActivityIndicator size="large" color={C.green} />
@@ -1235,4 +1339,28 @@ const dym = StyleSheet.create({
   suggestion: { fontSize: 17, fontWeight: "800", color: C.gray900, fontFamily: "PlusJakartaSans_800ExtraBold", marginTop: 1 },
   ctaChip: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.orange, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
   ctaText: { fontSize: 13, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
+
+  // Store category browse chips
+  storeCatBrowseChip: {
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: C.gray100,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    minWidth: 76,
+    gap: 6,
+  },
+  storeCatBrowseIcon: { fontSize: 22 },
+  storeCatBrowseLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: C.gray600,
+    textAlign: "center",
+    fontFamily: "PlusJakartaSans_600SemiBold",
+  },
 });
+

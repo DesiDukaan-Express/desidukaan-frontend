@@ -143,8 +143,13 @@ export const adminCategoriesAPI = {
 
 // ─── Vendors ──────────────────────────────────────────────────────────────────
 export const vendorsAPI = {
-  getNearby: (latitude, longitude, radius_km = 2) =>
-    request("GET", `/vendors?latitude=${latitude}&longitude=${longitude}&radius_km=${radius_km}`),
+  getNearby: (latitude, longitude, radius_km = 2, store_category = null) => {
+    let url = `/vendors?latitude=${latitude}&longitude=${longitude}&radius_km=${radius_km}`;
+    if (store_category) url += `&store_category=${encodeURIComponent(store_category)}`;
+    return request("GET", url);
+  },
+
+  getStoreCategories: () => request("GET", "/vendors/store-categories"),
 
   getById:      (id)         => request("GET",   `/vendors/${id}`),
   getMyProfile: (token)      => request("GET",   "/vendors/me/profile", null, token),

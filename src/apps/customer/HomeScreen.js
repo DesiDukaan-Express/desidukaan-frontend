@@ -812,6 +812,24 @@ const CAT_ACCENT = {
   _default: { bg: "#F3F4F6", accent: "#6B7280", icon: "📦" },
 };
 
+// ─── Store category metadata (for filter chips on Nearby Stores) ───────────────
+const STORE_CATEGORY_META = {
+  grocery:     { icon: "🛒", color: "#16A34A", bg: "#F0FDF4" },
+  medical:     { icon: "💊", color: "#2563EB", bg: "#EFF6FF" },
+  restaurant:  { icon: "🍽️", color: "#EA580C", bg: "#FFF7ED" },
+  bakery:      { icon: "🥖", color: "#D97706", bg: "#FFFBEB" },
+  dairy:       { icon: "🥛", color: "#0EA5E9", bg: "#F0F9FF" },
+  electronics: { icon: "📱", color: "#7C3AED", bg: "#FAF5FF" },
+  stationery:  { icon: "✏️", color: "#475569", bg: "#F8FAFC" },
+  general:     { icon: "🏪", color: "#6B7280", bg: "#F3F4F6" },
+  _default:    { icon: "🏪", color: "#6B7280", bg: "#F3F4F6" },
+};
+
+
+
+
+
+
 // ─── Build 3-level hierarchy from flat inventory ───────────────────────────────
 // Returns: { [topCatName]: { [subCatName]: inventoryItem[] } }
 // We use the category NAME only (no parent_id from API categories since inventory
@@ -1764,6 +1782,10 @@ export default function HomeScreen() {
   const [loadingVendors, setLoadingVendors] = useState(false);
   const [loadingInventory, setLoadingInventory] = useState(false);
 
+  // Store category filter
+  const [selectedStoreCategory, setSelectedStoreCategory] = useState(null);
+  const [storeCategories, setStoreCategories] = useState([]);
+
   // Category hierarchy from API
   const [apiCategories, setApiCategories] = useState([]);
 
@@ -1867,6 +1889,13 @@ export default function HomeScreen() {
       .catch(() => setApiCategories([]));
   }, []);
 
+  // Fetch store categories for filter chips
+  useEffect(() => {
+    vendorsAPI.getStoreCategories()
+      .then(res => setStoreCategories(res.data?.categories || []))
+      .catch(() => setStoreCategories([]));
+  }, []);
+
   // ── Handled by addressStore ──────────────────────────────────────────────────
 
 
@@ -1900,10 +1929,10 @@ export default function HomeScreen() {
   // ── Fetch vendors then inventory — FIXED stale closure ───────────────────────
   // We pass the fresh vendor list directly to fetchInventoryForVendors
   // instead of reading from state (which hasn't updated yet)
-  const fetchNearbyVendors = async (lat, lng) => {
+  const fetchNearbyVendors = async (lat, lng, storeCategory = null) => {
     setLoadingVendors(true);
     try {
-      const res = await vendorsAPI.getNearby(lat, lng, 10);
+      const res = await vendorsAPI.getNearby(lat, lng, 10, storeCategory);
       const list = res.data || [];
       // ── TEMP DEBUG — remove after checking terminal ──
       setVendors(list);
@@ -2538,6 +2567,56 @@ export default function HomeScreen() {
             <Text style={s.viewAll}>Explore</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Store Category Filter Chips */}
+        {storeCategories.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: hPad, paddingBottom: 8, gap: 8 }}
+            style={{ marginBottom: 8 }}
+          >
+            {/* All chip */}
+            <TouchableOpacity
+              style={[
+                s.storeCatChip,
+                selectedStoreCategory === null && s.storeCatChipActive,
+              ]}
+              onPress={() => {
+                setSelectedStoreCategory(null);
+                if (locationCoords) fetchNearbyVendors(locationCoords.lat, locationCoords.lng, null);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={[
+                s.storeCatChipText,
+                selectedStoreCategory === null && s.storeCatChipTextActive,
+              ]}>
+                🏪 All
+              </Text>
+            </TouchableOpacity>
+            {storeCategories.map(cat => {
+              const isActive = selectedStoreCategory === cat;
+              const catMeta = STORE_CATEGORY_META[cat] || STORE_CATEGORY_META._default;
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  style={[s.storeCatChip, isActive && s.storeCatChipActive]}
+                  onPress={() => {
+                    const newCat = isActive ? null : cat;
+                    setSelectedStoreCategory(newCat);
+                    if (locationCoords) fetchNearbyVendors(locationCoords.lat, locationCoords.lng, newCat);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.storeCatChipText, isActive && s.storeCatChipTextActive]}>
+                    {catMeta.icon} {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
 
         {loadingVendors ? (
           <View style={[s.loadingRow, { paddingHorizontal: hPad }]}>
@@ -3619,4 +3698,30 @@ const s = StyleSheet.create({
     borderRadius: 11,
   },
   floatingCTAText: { fontSize: 14, fontWeight: "800", color: C.white },
+
+  // Store category filter chips
+  storeCatChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: C.gray100,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+  },
+  storeCatChipActive: {
+    backgroundColor: C.greenLight,
+    borderColor: C.green,
+  },
+  storeCatChipText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.gray700,
+  },
+  storeCatChipTextActive: {
+    color: C.green,
+  },
 });
+
+
