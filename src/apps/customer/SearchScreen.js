@@ -1039,7 +1039,7 @@ export default function SearchScreen() {
                 <Text style={s.sectionTitle}>Browse Stores by Type</Text>
                 <ScrollView
                   horizontal showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingRight: 8, paddingBottom: 8, gap: 10 }}
+                  contentContainerStyle={{ paddingRight: 8, paddingBottom: 12, gap: 12 }}
                 >
                   {storeCategories.map(cat => {
                     const meta = STORE_CAT_META[cat] || STORE_CAT_META._default;
@@ -1049,15 +1049,22 @@ export default function SearchScreen() {
                         key={cat}
                         style={[
                           s.storeCatBrowseChip,
-                          isActive && { backgroundColor: meta.bg, borderColor: meta.color },
+                          isActive 
+                            ? [s.storeCatBrowseChipActive, { backgroundColor: meta.color, borderColor: "transparent", shadowColor: meta.color }] 
+                            : { backgroundColor: C.white, borderColor: C.gray200 }
                         ]}
                         onPress={() => handleStoreCatSelect(cat)}
-                        activeOpacity={0.8}
+                        activeOpacity={0.85}
                       >
-                        <Text style={s.storeCatBrowseIcon}>{meta.icon}</Text>
+                        <View style={[
+                          s.storeCatIconWrap,
+                          { backgroundColor: isActive ? "rgba(255, 255, 255, 0.25)" : meta.bg }
+                        ]}>
+                          <Text style={s.storeCatBrowseIcon}>{meta.icon}</Text>
+                        </View>
                         <Text style={[
                           s.storeCatBrowseLabel,
-                          isActive && { color: meta.color, fontWeight: '700' },
+                          isActive ? { color: C.white, fontFamily: 'PlusJakartaSans_800ExtraBold' } : { color: C.gray700 }
                         ]}>
                           {meta.label || cat.charAt(0).toUpperCase() + cat.slice(1)}
                         </Text>
@@ -1345,22 +1352,42 @@ const dym = StyleSheet.create({
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: C.gray100,
+    width: 90,
+    height: 108,
+    borderRadius: 18,
     borderWidth: 1.5,
-    borderColor: C.gray200,
-    minWidth: 76,
-    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+    marginVertical: 4,
   },
-  storeCatBrowseIcon: { fontSize: 22 },
+  storeCatBrowseChipActive: {
+    borderWidth: 1.5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  storeCatIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  storeCatBrowseIcon: {
+    fontSize: 22,
+    lineHeight: 28,
+  },
   storeCatBrowseLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: C.gray600,
+    fontSize: 12,
+    fontWeight: "700",
     textAlign: "center",
-    fontFamily: "PlusJakartaSans_600SemiBold",
+    fontFamily: "PlusJakartaSans_700Bold",
   },
 });
 
