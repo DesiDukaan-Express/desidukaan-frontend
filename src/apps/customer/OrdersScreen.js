@@ -140,6 +140,25 @@ const formatDateShort = (iso) => {
 // Shown inside the OrderDetailModal for active delivery statuses.
 const MAP_ACTIVE_STATUSES = ["accepted", "preparing", "ready", "picked_up"];
 
+// ─── ETA helpers ──────────────────────────────────────────────────────────────
+const ACTIVE_ETA_STATUSES = ["pending", "accepted", "preparing", "ready", "picked_up"];
+
+const formatETA = (mins) => {
+  if (mins == null) return null;
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+};
+
+const getETALabel = (status, mins) => {
+  if (mins == null) return null;
+  const t = formatETA(mins);
+  if (status === "picked_up") return `Arriving in ~${t}`;
+  if (status === "ready")     return `Pickup ready · ~${t} away`;
+  return `Est. delivery in ~${t}`;
+};
+
 function DriverLocationMap({ order, token }) {
   const hasDriver = !!(
     order?.delivery_partner_id ||
@@ -463,6 +482,34 @@ function OrderDetailModal({ order, onClose }) {
               {showMap && (
                 <DriverLocationMap order={displayOrder} token={token} />
               )}
+
+              {/* ── ETA Banner — shown for all active orders ── */}
+              {(() => {
+                const etaMins = order.delivery_estimate_mins ?? null;
+                const distKm  = order.delivery_distance_km  ?? null;
+                const showBanner = ACTIVE_ETA_STATUSES.includes(order.status) && etaMins != null;
+                if (!showBanner) return null;
+                const label = getETALabel(order.status, etaMins);
+                return (
+                  <View style={od.etaBanner}>
+                    <View style={od.etaBannerLeft}>
+                      <View style={od.etaIconBg}>
+                        <Feather name="clock" size={16} color={C.orange} />
+                      </View>
+                      <View>
+                        <Text style={od.etaBannerTitle}>Estimated Delivery</Text>
+                        <Text style={od.etaBannerLabel}>{label}</Text>
+                      </View>
+                    </View>
+                    {distKm != null && (
+                      <View style={od.etaBadge}>
+                        <Feather name="map-pin" size={11} color={C.gray500} />
+                        <Text style={od.etaBadgeText}>{distKm} km</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
 
               {/* ── Order Tracking steps ── */}
               {!isFailed ? (
@@ -978,9 +1025,64 @@ const od = StyleSheet.create({
     fontWeight: "700",
     color: C.green,
   },
+
+  // ETA Banner (inside detail modal)
+  etaBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  etaBannerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  etaIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#FFEDD5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  etaBannerTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.orange,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  etaBannerLabel: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: C.orangeDark,
+  },
+  etaBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: C.white,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: C.gray200,
+  },
+  etaBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.gray600,
+  },
 });
 
-// ─── Order Card ───────────────────────────────────────────────────────────────
 // ─── Order Card ───────────────────────────────────────────────────────────────
 const formatCardDate = (iso) => {
   if (!iso) return "";
@@ -999,6 +1101,7 @@ const formatCardDate = (iso) => {
   
   return `${datePart}, ${hours}:${minutesStr} ${ampm}`;
 };
+
 
 function OrderCard({ order, onPress, onRate, alreadyRated, onReorder, onDownloadInvoice, isFirstDelivered }) {
   const st = getStatus(order.status);
@@ -1051,6 +1154,12 @@ function OrderCard({ order, onPress, onRate, alreadyRated, onReorder, onDownload
 
   const showDownloadInvoice = order.status === "delivered" && isFirstDelivered;
 
+  // ETA chip data
+  const etaMins = order.delivery_estimate_mins ?? null;
+  const showETA = ACTIVE_ETA_STATUSES.includes(order.status) && etaMins != null;
+  const etaLabel = showETA ? getETALabel(order.status, etaMins) : null;
+  const distKm   = order.delivery_distance_km ?? null;
+
   return (
     <View style={oc.card}>
       {/* Top row */}
@@ -1066,6 +1175,19 @@ function OrderCard({ order, onPress, onRate, alreadyRated, onReorder, onDownload
           <Feather name="more-vertical" size={20} color={C.gray500} />
         </TouchableOpacity>
       </TouchableOpacity>
+
+      {/* ETA Chip — only for active orders */}
+      {showETA && (
+        <View style={oc.etaChipRow}>
+          <View style={oc.etaChip}>
+            <Feather name="clock" size={12} color={C.orange} />
+            <Text style={oc.etaChipText}>{etaLabel}</Text>
+            {distKm != null && (
+              <Text style={oc.etaDistText}>· {distKm} km</Text>
+            )}
+          </View>
+        </View>
+      )}
 
       {/* Divider */}
       <View style={oc.cardDivider} />
@@ -1255,6 +1377,35 @@ const oc = StyleSheet.create({
     width: 1,
     height: "100%",
     backgroundColor: C.gray100,
+  },
+
+  // ETA chip
+  etaChipRow: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    paddingTop: 2,
+  },
+  etaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  etaChipText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: C.orangeDark,
+  },
+  etaDistText: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: C.gray500,
   },
 });
 
