@@ -485,10 +485,20 @@ function OrderDetailModal({ order, onClose }) {
 
               {/* ── ETA Banner — shown for all active orders ── */}
               {(() => {
-                const etaMins = order.delivery_estimate_mins ?? null;
+                // Server-supplied estimate (requires backend restart)
+                let etaMins = order.delivery_estimate_mins ?? null;
                 const distKm  = order.delivery_distance_km  ?? null;
+
+                // Client-side fallback when backend field is absent
+                if (etaMins == null && ACTIVE_ETA_STATUSES.includes(order.status)) {
+                  if (order.status === 'picked_up') etaMins = 15;
+                  else if (order.status === 'ready') etaMins = 20;
+                  else etaMins = 30; // pending / accepted / preparing
+                }
+
                 const showBanner = ACTIVE_ETA_STATUSES.includes(order.status) && etaMins != null;
                 if (!showBanner) return null;
+
                 const label = getETALabel(order.status, etaMins);
                 return (
                   <View style={od.etaBanner}>
@@ -1154,11 +1164,17 @@ function OrderCard({ order, onPress, onRate, alreadyRated, onReorder, onDownload
 
   const showDownloadInvoice = order.status === "delivered" && isFirstDelivered;
 
-  // ETA chip data
-  const etaMins = order.delivery_estimate_mins ?? null;
-  const showETA = ACTIVE_ETA_STATUSES.includes(order.status) && etaMins != null;
+  // ETA chip data — prefer server value, fall back to stage-based defaults
+  let etaMins = order.delivery_estimate_mins ?? null;
+  if (etaMins == null && ACTIVE_ETA_STATUSES.includes(order.status)) {
+    if (order.status === 'picked_up') etaMins = 15;
+    else if (order.status === 'ready') etaMins = 20;
+    else etaMins = 30; // pending / accepted / preparing
+  }
+  const showETA  = ACTIVE_ETA_STATUSES.includes(order.status) && etaMins != null;
   const etaLabel = showETA ? getETALabel(order.status, etaMins) : null;
   const distKm   = order.delivery_distance_km ?? null;
+
 
   return (
     <View style={oc.card}>
