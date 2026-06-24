@@ -573,10 +573,12 @@ const cp = StyleSheet.create({
 export default function ProductModal({ editing, onClose, onSave, saving }) {
   const init = editing
     ? {
-        name:          editing.name,
-        description:   editing.description || "",
-        categoryName:  editing.category    || "",
-        subcategoryId: editing.category_id || null,
+        name:           editing.name,
+        description:    editing.description  || "",
+        categoryName: typeof editing.category === "object" 
+  ? (editing.category?.name || "") 
+  : (editing.category || ""),
+        subcategoryId:  editing.category_id  || null,
         subcategoryName: editing.subcategory || "",
         barcode:       editing.barcode    || "",
         stock:         String(editing.rawStock || 0),

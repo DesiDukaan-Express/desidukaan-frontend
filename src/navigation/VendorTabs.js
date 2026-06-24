@@ -22,7 +22,8 @@ const TABS = [
 export default function VendorTabs() {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => {
+  lazy={false}
+  screenOptions={({ route }) => {
         const tab = TABS.find((t) => t.name === route.name);
         return {
           headerShown: false,

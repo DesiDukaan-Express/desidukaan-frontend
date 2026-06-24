@@ -56,6 +56,11 @@ export default function Navigation() {
       setVendorOnboarded(
         !!(vendor?.shop_name && vendor?.onboarding_status === "approved"),
       );
+      console.log("Vendor check:", {
+  shop_name: vendor?.shop_name,
+  onboarding_status: vendor?.onboarding_status,
+  vendorOnboarded: !!(vendor?.shop_name && vendor?.onboarding_status === "approved"),
+});
       setVendorStatus(vendor?.onboarding_status || null);
       setVendorMissingDocs(vendor?.missing_docs || []);
     } catch (err) {
