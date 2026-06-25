@@ -575,7 +575,9 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
     ? {
         name:           editing.name,
         description:    editing.description  || "",
-        categoryName:   editing.category     || "",
+        categoryName: typeof editing.category === "object" 
+  ? (editing.category?.name || "") 
+  : (editing.category || ""),
         subcategoryId:  editing.category_id  || null,
         subcategoryName: editing.subcategory || "",
         barcode:        editing.barcode      || "",

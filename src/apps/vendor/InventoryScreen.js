@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+﻿﻿import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   StatusBar,
   Image,
   Platform,
+  Animated,
 } from "react-native";
 
 // ── Hooks & Services ──────────────────────────────────────────────────────────
@@ -99,16 +100,46 @@ function StatCard({ icon, label, value, accentColor, badge }) {
 // PRODUCT CARD  (replaces old ProductRow)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ProductCard({ product, selected, onSelect, onEdit, onDelete }) {
+function ProductCard({
+  product,
+  selected,
+  onSelect,
+  onEdit,
+  onDelete,
+  onToggleAvailability,
+}) {
+  const isAvailable =
+    (product.inventory?.stock_qty ?? product.stock_qty ?? 0) > 0;
+  const toggleAnim = useRef(new Animated.Value(isAvailable ? 1 : 0)).current;
+
   const [menuOpen, setMenuOpen] = useState(false);
-  const status = stockStatus(product);
-  const qty = stockQty(product);
-  const max = stockMax(product);
-  const color = stockColor(status);
-  const progress = Math.min(1, qty / max);
+
+  useEffect(() => {
+    Animated.spring(toggleAnim, {
+      toValue: isAvailable ? 1 : 0,
+      useNativeDriver: false,
+      tension: 80,
+      friction: 10,
+    }).start();
+  }, [isAvailable]);
+
+  const thumbLeft = toggleAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [3, 23],
+  });
+  const trackColor = toggleAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [BORDER, GREEN],
+  });
 
   return (
-    <View style={[s.card, selected && s.cardSelected]}>
+    <View
+      style={[
+        s.card,
+        selected && s.cardSelected,
+        !isAvailable && s.cardUnavailable,
+      ]}
+    >
       <View style={s.cardRow}>
         {/* Checkbox */}
         <TouchableOpacity
@@ -122,99 +153,105 @@ function ProductCard({ product, selected, onSelect, onEdit, onDelete }) {
         </TouchableOpacity>
 
         {/* Product Image */}
-        <View style={s.productImageWrap}>
+        <View
+          style={[s.productImageWrap, !isAvailable && s.productImageWrapDim]}
+        >
           {product.image_url ? (
             <Image
               source={{ uri: product.image_url }}
-              style={s.productImage}
+              style={[s.productImage, !isAvailable && { opacity: 0.5 }]}
               resizeMode="cover"
             />
           ) : (
-            <Text style={s.productImagePlaceholder}>🛒</Text>
+            <Text
+              style={[
+                s.productImagePlaceholder,
+                !isAvailable && { opacity: 0.4 },
+              ]}
+            >
+              🛒
+            </Text>
           )}
         </View>
 
         {/* Info */}
         <View style={s.productInfo}>
-          <Text style={s.productName} numberOfLines={1}>
+          <Text
+            style={[s.productName, !isAvailable && s.productNameDim]}
+            numberOfLines={1}
+          >
             {product.name}
           </Text>
-          <Text style={s.productCategory} numberOfLines={1}>
-            {product.category?.name ?? "Uncategorized"}
-          </Text>
-          <View style={s.productMeta}>
-            <Text style={s.productPrice}>
-              ₹{product.price} / {product.unit}
+          {product.brand ? (
+            <Text style={s.productBrand} numberOfLines={1}>
+              {product.brand}
             </Text>
-            <View style={[s.statusPill, { backgroundColor: color + "18" }]}>
-              <Text style={[s.statusPillText, { color }]}>
-                {stockLabel(status)}
-              </Text>
-            </View>
-          </View>
+          ) : null}
+          <Text
+            style={[s.productPrice, !isAvailable && { color: TEXT_XLIGHT }]}
+          >
+            ₹{product.price} / {product.unit}
+          </Text>
         </View>
 
-        {/* Edit + Menu */}
-        <View style={s.cardActions}>
+        {/* Animated Toggle */}
+        <View style={s.toggleSection}>
           <TouchableOpacity
-            onPress={() => onEdit(product)}
-            style={s.editBtn}
-            activeOpacity={0.8}
+            onPress={() => onToggleAvailability(product)}
+            activeOpacity={0.9}
           >
-            <Text style={s.editBtnText}>✎ Edit</Text>
+            <Animated.View
+              style={[s.toggleTrack, { backgroundColor: trackColor }]}
+            >
+              <Animated.View style={[s.toggleThumb, { left: thumbLeft }]} />
+            </Animated.View>
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setMenuOpen((v) => !v)}
-            style={s.menuBtn}
+          <Text
+            style={[
+              s.toggleLabel,
+              { color: isAvailable ? GREEN : TEXT_XLIGHT },
+            ]}
+          >
+            {isAvailable ? "Available" : "Unavailable"}
+          </Text>
+        </View>
+
+        {/* Menu */}
+<View style={{ position: "relative" }}>
+  <TouchableOpacity
+    onPress={() => setMenuOpen(v => !v)}
+    style={s.menuBtn}
             activeOpacity={0.7}
           >
             <Text style={s.menuDots}>•••</Text>
           </TouchableOpacity>
+          {menuOpen && (
+            <View style={s.dropdownMenu}>
+              <TouchableOpacity
+                style={s.dropdownItem}
+                onPress={() => {
+                  setMenuOpen(false);
+                  onEdit(product);
+                }}
+              >
+                <Text style={s.dropdownItemText}>✎ Edit Product</Text>
+              </TouchableOpacity>
+              <View style={{ height: 1, backgroundColor: BORDER }} />
+              <TouchableOpacity
+                style={s.dropdownItem}
+                onPress={() => {
+                  setMenuOpen(false);
+                  onDelete(product.id);
+                }}
+              >
+                <Text style={[s.dropdownItemText, { color: RED }]}>
+                  🗑 Delete
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </View>
-
-      {/* Progress Bar + Stock Label */}
-      <View style={s.progressSection}>
-        <View style={s.progressBar}>
-          <View
-            style={[
-              s.progressFill,
-              {
-                width: `${Math.round(progress * 100)}%`,
-                backgroundColor: color,
-              },
-            ]}
-          />
-        </View>
-        <Text style={[s.stockQtyText, { color: TEXT_LIGHT }]}>
-          {qty} units remaining
-        </Text>
-      </View>
-
-      {/* Dropdown menu */}
-      {menuOpen && (
-        <View style={s.dropdownMenu}>
-          <TouchableOpacity
-            style={s.dropdownItem}
-            onPress={() => {
-              setMenuOpen(false);
-              onEdit(product);
-            }}
-          >
-            <Text style={s.dropdownItemText}>✎ Edit Product</Text>
-          </TouchableOpacity>
-          <View style={s.dropdownDivider} />
-          <TouchableOpacity
-            style={s.dropdownItem}
-            onPress={() => {
-              setMenuOpen(false);
-              onDelete(product.id);
-            }}
-          >
-            <Text style={[s.dropdownItemText, { color: RED }]}>🗑 Delete</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   );
 }
@@ -229,6 +266,8 @@ export default function InventoryScreen() {
   const [modal, setModal] = useState(null); // null | 'add' | product object
   const [toast, setToast] = useState({ msg: "", show: false, type: "success" });
   const [bulkDel, setBulkDel] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState("all");
+const [confirmSheet, setConfirmSheet] = useState(null); // { product, makingAvailable }
 
   // Clear selection on page change
   const productIdStr = inv.products.map((p) => p.id).join(",");
@@ -277,6 +316,29 @@ export default function InventoryScreen() {
     );
   };
 
+  const handleToggleAvailability = (product) => {
+  const currentQty = product.inventory?.stock_qty ?? product.stock_qty ?? 0;
+  const isCurrentlyAvailable = currentQty > 0;
+  setConfirmSheet({ product, makingAvailable: !isCurrentlyAvailable });
+};
+
+const confirmToggle = async () => {
+  if (!confirmSheet) return;
+  const { product, makingAvailable } = confirmSheet;
+  setConfirmSheet(null);
+  try {
+    await inv.toggleAvailability(product.id, makingAvailable);
+    showToast(
+      makingAvailable
+        ? `"${product.name}" is now available`
+        : `"${product.name}" marked unavailable`,
+      makingAvailable ? "success" : "error"
+    );
+  } catch (e) {
+    showToast("Failed to update availability", "error");
+  }
+};
+
   const handleBulkDelete = async () => {
     const ids = [...selected];
     await inv.deleteProducts(ids);
@@ -285,28 +347,23 @@ export default function InventoryScreen() {
     showToast(`${ids.length} product${ids.length !== 1 ? "s" : ""} deleted`);
   };
 
-  const filterTabs = [
-    { key: "all", label: "All", count: inv.stats?.totalProducts ?? 0 },
-    {
-      key: "instock",
-      label: "In Stock",
-      count: inv.stats
-        ? inv.stats.totalProducts -
-          inv.stats.lowStockItems -
-          inv.stats.outOfStockItems
-        : 0,
-    },
-    {
-      key: "lowstock",
-      label: "Low Stock",
-      count: inv.stats?.lowStockItems ?? 0,
-    },
-    {
-      key: "outofstock",
-      label: "Out of Stock",
-      count: inv.stats?.outOfStockItems ?? 0,
-    },
-  ];
+  // Build category tabs from loaded products
+  const allProducts = inv.allProducts ?? inv.products;
+  const categoryTabs = useMemo(() => {
+    const cats = {};
+    allProducts.forEach((p) => {
+      const cat = p.category?.name ?? "Uncategorized";
+      cats[cat] = (cats[cat] || 0) + 1;
+    });
+    return [
+      { key: "all", label: "All", count: allProducts.length },
+      ...Object.entries(cats).map(([name, count]) => ({
+        key: name,
+        label: name,
+        count,
+      })),
+    ];
+  }, [allProducts]);
 
   const totalItems = inv.stats?.totalProducts ?? inv.products.length;
 
@@ -318,7 +375,9 @@ export default function InventoryScreen() {
       <View style={s.header}>
         <View>
           <Text style={s.heading}>Inventory</Text>
-          <Text style={s.subheading}>Manage your products & stock</Text>
+          <Text style={s.subheading}>
+            Toggle availability · manage products
+          </Text>
         </View>
         <TouchableOpacity
           onPress={() => setModal("add")}
@@ -345,32 +404,28 @@ export default function InventoryScreen() {
             />
             <StatCard
               icon="✅"
-              label="In Stock"
+              label="Available"
               value={
-                inv.stats.totalProducts -
-                inv.stats.lowStockItems -
-                inv.stats.outOfStockItems
+                (inv.allProducts ?? []).filter(
+                  (p) => (p.inventory?.stock_qty ?? p.stock_qty ?? 0) > 0,
+                ).length
               }
               accentColor={GREEN}
             />
             <StatCard
-              icon="⚠️"
-              label="Low Stock"
-              value={inv.stats.lowStockItems}
-              badge={inv.stats.lowStockItems}
-              accentColor={ORANGE}
-            />
-            <StatCard
-              icon="❌"
-              label="Out of Stock"
-              value={inv.stats.outOfStockItems}
-              badge={inv.stats.outOfStockItems}
+              icon="🚫"
+              label="Unavailable"
+              value={
+                (inv.allProducts ?? []).filter(
+                  (p) => (p.inventory?.stock_qty ?? p.stock_qty ?? 0) === 0,
+                ).length
+              }
               accentColor={RED}
             />
           </View>
         )}
 
-        {/* ── Alert Banner ── */}
+        {/* ── Alert Banner ──
         {inv.stats &&
           (inv.stats.lowStockItems > 0 || inv.stats.outOfStockItems > 0) && (
             <TouchableOpacity
@@ -396,7 +451,7 @@ export default function InventoryScreen() {
                 <Text style={s.alertViewBtnText}>View</Text>
               </TouchableOpacity>
             </TouchableOpacity>
-          )}
+          )} */}
 
         {/* ── Search ── */}
         <View style={s.searchWrap}>
@@ -425,12 +480,12 @@ export default function InventoryScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={s.filterRow}
         >
-          {filterTabs.map((tab) => {
-            const active = inv.statusFilter === tab.key;
+          {categoryTabs.map((tab) => {
+            const active = categoryFilter === tab.key;
             return (
               <TouchableOpacity
                 key={tab.key}
-                onPress={() => inv.setStatus(tab.key)}
+                onPress={() => setCategoryFilter(tab.key)}
                 style={[s.chip, active && s.chipActive]}
                 activeOpacity={0.75}
               >
@@ -476,18 +531,50 @@ export default function InventoryScreen() {
                 ? "Try adjusting your search or filter."
                 : "Add your first product to get started."}
             </Text>
+            {inv.search.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setModal("add")}
+                style={s.addFromSearchBtn}
+                activeOpacity={0.85}
+              >
+                <Text style={s.addFromSearchBtnText}>
+                  + Add "{inv.search}" as new product
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
-          inv.products.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              selected={selected.has(product.id)}
-              onSelect={toggleOne}
-              onEdit={(p) => setModal(p)}
-              onDelete={handleDelete}
-            />
-          ))
+          (() => {
+            // Group products by category
+            const grouped = {};
+            inv.products.forEach((p) => {
+              const cat = p.category?.name ?? "Uncategorized";
+              if (!grouped[cat]) grouped[cat] = [];
+              grouped[cat].push(p);
+            });
+            return Object.entries(grouped).map(([catName, catProducts]) => (
+              <View key={catName}>
+                <View style={s.categoryHeader}>
+                  <Text style={s.categoryHeaderText}>📂 {catName}</Text>
+                  <Text style={s.categoryHeaderCount}>
+                    {catProducts.length}
+                  </Text>
+                </View>
+                <View style={s.categoryDivider} />
+                {catProducts.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    selected={selected.has(product.id)}
+                    onSelect={toggleOne}
+                    onEdit={(p) => setModal(p)}
+                    onDelete={handleDelete}
+                    onToggleAvailability={handleToggleAvailability}
+                  />
+                ))}
+              </View>
+            ));
+          })()
         )}
 
         {/* ── Pagination ── */}
@@ -519,7 +606,60 @@ export default function InventoryScreen() {
         />
       )}
 
-      <ToastBanner message={toast.msg} visible={toast.show} type={toast.type} />
+      {/* ── Confirm Sheet ── */}
+{confirmSheet && (
+  <View style={s.sheetOverlay}>
+    <TouchableOpacity
+      style={{ flex: 1 }}
+      activeOpacity={1}
+      onPress={() => setConfirmSheet(null)}
+    />
+    <View style={s.sheetCard}>
+      {/* Icon */}
+      <View style={[s.sheetIconBox, {
+        backgroundColor: confirmSheet.makingAvailable ? GREEN_LIGHT : RED_LIGHT
+      }]}>
+        <Text style={{ fontSize: 28 }}>
+          {confirmSheet.makingAvailable ? "✅" : "🚫"}
+        </Text>
+      </View>
+
+      {/* Text */}
+      <Text style={s.sheetTitle}>
+        {confirmSheet.makingAvailable ? "Mark as Available?" : "Mark as Unavailable?"}
+      </Text>
+      <Text style={s.sheetSub}>
+        {confirmSheet.makingAvailable
+          ? `"${confirmSheet.product.name}" will be visible to customers and available for ordering.`
+          : `"${confirmSheet.product.name}" will be hidden from customers until you mark it available again.`}
+      </Text>
+
+      {/* Buttons */}
+      <View style={s.sheetBtnRow}>
+        <TouchableOpacity
+          onPress={() => setConfirmSheet(null)}
+          style={s.sheetCancelBtn}
+          activeOpacity={0.8}
+        >
+          <Text style={s.sheetCancelText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={confirmToggle}
+          style={[s.sheetConfirmBtn, {
+            backgroundColor: confirmSheet.makingAvailable ? GREEN : RED
+          }]}
+          activeOpacity={0.85}
+        >
+          <Text style={s.sheetConfirmText}>
+            {confirmSheet.makingAvailable ? "Yes, Make Available" : "Yes, Mark Unavailable"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+)}
+
+<ToastBanner message={toast.msg} visible={toast.show} type={toast.type} />
     </SafeAreaView>
   );
 }
@@ -534,9 +674,22 @@ const s = StyleSheet.create({
     backgroundColor: GRAY_BG,
   },
 
+  addFromSearchBtn: {
+    marginTop: 12,
+    backgroundColor: GREEN,
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+  },
+  addFromSearchBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
   // ── Header ──
   header: {
-    paddingTop: Platform.OS === "ios" ? 52 : 40,
+    paddingTop: Platform.OS === "ios" ? 8 : 12,
     paddingHorizontal: 16,
     paddingBottom: 12,
 
@@ -551,7 +704,9 @@ const s = StyleSheet.create({
   },
   heading: {
     fontSize: 24,
-    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#FFFFFF",
+    fontWeight: "900",
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+    color: "#FFFFFF",
   },
   subheading: {
     fontSize: 13,
@@ -574,7 +729,9 @@ const s = StyleSheet.create({
   addBtnText: {
     color: "#147538",
     fontSize: 13,
-    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
+    fontWeight: "800",
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+  },
 
   // ── Scroll ──
   scroll: { flex: 1 },
@@ -607,7 +764,9 @@ const s = StyleSheet.create({
   statLabel: {
     fontSize: 11,
     color: TEXT_LIGHT,
-    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium", marginTop: 2,
+    fontWeight: "500",
+    fontFamily: "PlusJakartaSans_500Medium",
+    marginTop: 2,
   },
   statValueRow: {
     flexDirection: "row",
@@ -617,7 +776,9 @@ const s = StyleSheet.create({
   },
   statValue: {
     fontSize: 28,
-    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: TEXT,
+    fontWeight: "800",
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+    color: TEXT,
     letterSpacing: -0.5,
   },
   statBadge: {
@@ -627,7 +788,12 @@ const s = StyleSheet.create({
     minWidth: 22,
     alignItems: "center",
   },
-  statBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
+  statBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+  },
 
   // ── Alert Banner ──
   alertBanner: {
@@ -648,7 +814,12 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   alertText: { flex: 1 },
-  alertTitle: { fontSize: 14, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#fff" },
+  alertTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+    color: "#fff",
+  },
   alertSub: { fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 2 },
   alertViewBtn: {
     backgroundColor: "#fff",
@@ -656,7 +827,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
   },
-  alertViewBtnText: { fontSize: 13, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#1C2331" },
+  alertViewBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+    color: "#1C2331",
+  },
 
   // ── Search ──
   searchWrap: {
@@ -698,7 +874,9 @@ const s = StyleSheet.create({
   },
   chipText: {
     fontSize: 13,
-    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: TEXT_LIGHT,
+    fontWeight: "600",
+    fontFamily: "PlusJakartaSans_600SemiBold",
+    color: TEXT_LIGHT,
   },
   chipTextActive: {
     color: "#fff",
@@ -716,14 +894,24 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#BFDBFE",
   },
-  bulkCount: { fontSize: 14, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#1D4ED8" },
+  bulkCount: {
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+    color: "#1D4ED8",
+  },
   bulkDeleteBtn: {
     backgroundColor: RED,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  bulkDeleteBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
+  bulkDeleteBtnText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+  },
 
   // ── List Header ──
   listHeader: {
@@ -732,25 +920,32 @@ const s = StyleSheet.create({
     alignItems: "center",
     marginBottom: 2,
   },
-  listTitle: { fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: TEXT },
+  listTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+    color: TEXT,
+  },
   listCount: { fontSize: 12, color: TEXT_LIGHT },
 
   // ── Product Card ──
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: BORDER,
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 12,
-    gap: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
-  },
+  backgroundColor: "#fff",
+  borderRadius: 14,
+  borderWidth: 1.5,
+  borderColor: BORDER,
+  paddingHorizontal: 14,
+  paddingTop: 14,
+  paddingBottom: 12,
+  gap: 10,
+  shadowColor: "#000",
+  shadowOpacity: 0.04,
+  shadowRadius: 4,
+  shadowOffset: { width: 0, height: 1 },
+  elevation: 1,
+  overflow: "visible",
+  zIndex: 1,
+},
   cardSelected: {
     borderColor: GREEN,
     backgroundColor: GREEN_LIGHT,
@@ -780,7 +975,9 @@ const s = StyleSheet.create({
   checkboxTick: {
     color: "#fff",
     fontSize: 13,
-    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", lineHeight: 15,
+    fontWeight: "800",
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+    lineHeight: 15,
   },
 
   // Image
@@ -800,7 +997,9 @@ const s = StyleSheet.create({
   productInfo: { flex: 1, gap: 2 },
   productName: {
     fontSize: 15,
-    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: TEXT,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+    color: TEXT,
     letterSpacing: -0.2,
   },
   productCategory: { fontSize: 12, color: TEXT_LIGHT },
@@ -840,35 +1039,126 @@ const s = StyleSheet.create({
   menuDots: { fontSize: 11, color: TEXT_LIGHT, letterSpacing: 1 },
 
   // Progress
-  progressSection: { gap: 4 },
-  progressBar: {
-    height: 5,
-    backgroundColor: GRAY_BG,
-    borderRadius: 3,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: 5,
-    borderRadius: 3,
-  },
-  stockQtyText: { fontSize: 11, color: TEXT_LIGHT },
+  // progressSection: { gap: 4 },
+  // progressBar: {
+  //   height: 5,
+  //   backgroundColor: GRAY_BG,
+  //   borderRadius: 3,
+  //   overflow: "hidden",
+  // },
+  // progressFill: {
+  //   height: 5,
+  //   borderRadius: 3,
+  // },
+  // stockQtyText: { fontSize: 11, color: TEXT_LIGHT },
 
   // Dropdown
   dropdownMenu: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: BORDER,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-    overflow: "hidden",
-  },
+  position: "absolute",
+  right: 0,
+  top: 30,
+  backgroundColor: "#fff",
+  borderRadius: 10,
+  borderWidth: 1,
+  borderColor: BORDER,
+  shadowColor: "#000",
+  shadowOpacity: 0.12,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 8,
+  zIndex: 999,
+  minWidth: 140,
+},
   dropdownItem: {
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  dropdownItemText: { fontSize: 14, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: TEXT },
+  // dropdownDivider: { height: 1, backgroundColor: BORDER },
+
+  // ── Availability Toggle ──
+  toggleSection: {
+    alignItems: "center",
+    gap: 4,
+    marginRight: 4,
+  },
+  toggleTrack: {
+    width: 46,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: "center",
+    position: "relative",
+  },
+  toggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    position: "absolute",
+    top: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 3,
+  },
+  toggleLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  productBrand: {
+    fontSize: 11,
+    color: TEXT_XLIGHT,
+    marginBottom: 1,
+  },
+  // ── Category Group Header ──
+  categoryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+    backgroundColor: GREEN_LIGHT,
+    borderRadius: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: GREEN,
+  },
+  categoryHeaderText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: GREEN,
+    flex: 1,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  categoryHeaderCount: {
+    fontSize: 11,
+    color: GREEN,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    fontWeight: "700",
+    overflow: "hidden",
+  },
+  categoryDivider: {
+    height: 1,
+    backgroundColor: BORDER,
+    marginBottom: 8,
+  },
+
+  cardUnavailable: {
+    opacity: 0.75,
+    borderColor: "#F0F0F0",
+  },
+  productImageWrapDim: {
+    backgroundColor: "#EFEFEF",
+  },
+  productNameDim: {
+    color: TEXT_LIGHT,
   },
   dropdownItemText: { fontSize: 14, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: TEXT },
   dropdownDivider: { height: 1, backgroundColor: BORDER },
@@ -884,11 +1174,90 @@ const s = StyleSheet.create({
     borderColor: BORDER,
   },
   loadingText: { fontSize: 14, color: TEXT_LIGHT, marginTop: 8 },
-  emptyText: { fontSize: 16, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: TEXT },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+    color: TEXT,
+  },
   emptySubText: {
     fontSize: 13,
     color: TEXT_LIGHT,
     textAlign: "center",
     paddingHorizontal: 32,
+  },
+  // ── Confirm Sheet ──
+  sheetOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+    zIndex: 1000,
+  },
+  sheetCard: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: Platform.OS === "ios" ? 44 : 28,
+    alignItems: "center",
+    gap: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 16,
+  },
+  sheetIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: TEXT,
+    textAlign: "center",
+  },
+  sheetSub: {
+    fontSize: 13,
+    color: TEXT_LIGHT,
+    textAlign: "center",
+    lineHeight: 20,
+    paddingHorizontal: 8,
+  },
+  sheetBtnRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 8,
+    width: "100%",
+  },
+  sheetCancelBtn: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  sheetCancelText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: TEXT_LIGHT,
+  },
+  sheetConfirmBtn: {
+    flex: 2,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  sheetConfirmText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#fff",
   },
 });
