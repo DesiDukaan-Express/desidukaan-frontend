@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+﻿import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -283,7 +283,7 @@ const cp = StyleSheet.create({
 });
 
 // ─── Order Summary card ───────────────────────────────────────────────────────
-function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNegotiate, fs = 1 }) {
+function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNegotiate, deliveryTypePref = "standard", fs = 1 }) {
   return (
     <View style={osc.wrap}>
       {items.map((item, i) => (
@@ -323,7 +323,7 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNego
       <View style={osc.row}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <Text style={[osc.label, { fontSize: Math.round(13 * fs) }]}>
-            Delivery fee
+            Delivery ({deliveryTypePref === "quick" ? "Quick ⚡" : "Standard"})
           </Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -400,6 +400,43 @@ const osc = StyleSheet.create({
   negotiateBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FFF7ED", borderWidth: 1, borderColor: "#FDBA74", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   negotiateBtnText: { fontSize: 10, fontWeight: "700", color: C.orange },
 });
+// ─── Delivery Type Selector styles ───────────────────────────────────────────
+const dts = StyleSheet.create({
+  row: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  pill: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12,
+    padding: 12, backgroundColor: '#FAFAFA',
+  },
+  pillActive: { backgroundColor: '#16A34A', borderColor: '#16A34A' },
+  pillQuick: { borderColor: '#FDE68A' },
+  pillQuickActive: { backgroundColor: '#D97706', borderColor: '#D97706' },
+  pillIconWrap: { width: 32, height: 32, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  pillBody: { flex: 1 },
+  pillTitle: { fontSize: 13, fontWeight: '800', color: '#374151' },
+  pillTitleActive: { color: '#FFFFFF' },
+  pillTitleQuickActive: { color: '#FFFFFF' },
+  pillSub: { fontSize: 11, color: '#9CA3AF', marginTop: 1 },
+  pillSubActive: { color: 'rgba(255,255,255,0.85)' },
+  pillSubQuickActive: { color: 'rgba(255,255,255,0.85)' },
+  pillFee: { fontSize: 14, fontWeight: '900', color: '#111827' },
+  pillFeeActive: { color: '#FFFFFF' },
+  pillFeeQuickActive: { color: '#FFFFFF' },
+  breakdown: {
+    backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12, gap: 8,
+    borderWidth: 1, borderColor: '#E5E7EB', marginTop: 4,
+  },
+  bRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  bLabel: { flex: 1, fontSize: 12, color: '#6B7280' },
+  bVal: { fontSize: 12, fontWeight: '700', color: '#374151' },
+  negotiatedNote: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#F0FDF4', borderRadius: 10, padding: 10, marginTop: 10,
+    borderWidth: 1, borderColor: '#BBF7D0',
+  },
+  negotiatedNoteText: { flex: 1, fontSize: 12, color: '#15803D', fontWeight: '600' },
+});
+
 
 // ─── Negotiation Banner (Shown while waiting or after response) ──────────────
 function NegotiationBanner({ status, countdown, vendorName, onDismiss }) {
@@ -655,6 +692,14 @@ export default function CheckoutScreen() {
   const [proposedFee,     setProposedFee]     = useState(null);
   const isAccepted = orderStatus === "accepted";
 
+  // ── Delivery type preference ──────────────────────────────────────────────
+  // 'standard' = normal delivery, 'quick' = faster but pricier
+  const [deliveryTypePref, setDeliveryTypePref] = useState('standard');
+
+  // ── Live delivery fee info from backend ──────────────────────────────────
+  const [deliveryInfo, setDeliveryInfo] = useState(null);  // {fees, eta_minutes, quick_eta_minutes, ...}
+  const [fetchingDeliveryInfo, setFetchingDeliveryInfo] = useState(false);
+
   // ── Negotiation modal visibility ───────────────────────────────────────────
   const [negotiationModalVisible, setNegotiationModalVisible] = useState(false);
 
@@ -682,8 +727,15 @@ export default function CheckoutScreen() {
     0,
   );
   const subtotal = snapshotSubtotal ?? liveSubtotal;
-  const baseFee = confirmedFee ?? 30; // No free delivery threshold
-  const activeFee = proposedFee !== null ? proposedFee : baseFee;
+
+  // Fee priority: negotiated (proposedFee) > live delivery-info > confirmed from cart > fallback 20
+  const liveFees = deliveryInfo?.fees;
+  const liveStandardFee = liveFees?.standard_fee ?? null;
+  const liveQuickFee    = liveFees?.quick_fee    ?? null;
+  const liveActiveFee   = deliveryTypePref === 'quick' ? (liveQuickFee ?? liveStandardFee) : liveStandardFee;
+
+  const baseFee = confirmedFee ?? liveStandardFee ?? 20;
+  const activeFee = proposedFee !== null ? proposedFee : (liveActiveFee !== null ? liveActiveFee : baseFee);
   const cartTotal = subtotal + activeFee;
   // counterData.total takes priority when countered or accepted-after-counter
   const total =
@@ -716,6 +768,52 @@ export default function CheckoutScreen() {
       }
     })();
   }, [vendorId, token]);
+
+  // ── Fetch live delivery fee info ─────────────────────────────────────────
+  // Triggers whenever address selection, coordinates, or subtotal changes
+  useEffect(() => {
+    if (!vendorId) return;
+
+    // Resolve customer lat/lng from current selection
+    let customerLat = null;
+    let customerLng = null;
+
+    if (selectedAddrId === 'detected' && detectedCoords?.lat) {
+      customerLat = detectedCoords.lat;
+      customerLng = detectedCoords.lng;
+    } else if (selectedAddrId && selectedAddrId !== 'manual') {
+      const saved = (addressStore?.addresses || []).find(a => a.id === selectedAddrId);
+      if (saved?.latitude) { customerLat = saved.latitude; customerLng = saved.longitude; }
+    }
+
+    if (!customerLat || !customerLng) return; // can't compute without coords
+
+    const ctrl = new AbortController();
+    setFetchingDeliveryInfo(true);
+    (async () => {
+      try {
+        const params = new URLSearchParams({
+          vendor_id: vendorId,
+          customer_lat: customerLat,
+          customer_lng: customerLng,
+          subtotal: liveSubtotal,
+        });
+        const res = await fetch(`${BASE_URL}/slots/delivery-info?${params}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          signal: ctrl.signal,
+        });
+        const json = await res.json();
+        if (res.ok) setDeliveryInfo(json.data || null);
+      } catch (e) {
+        if (e.name !== 'AbortError') console.error('delivery-info fetch failed:', e.message);
+      } finally {
+        setFetchingDeliveryInfo(false);
+      }
+    })();
+
+    return () => ctrl.abort();
+  }, [vendorId, selectedAddrId, detectedCoords, liveSubtotal, token]);
+
   const [addrLine, setAddrLine] = useState("");
   const [addrCity, setAddrCity] = useState("");
   const [addrState, setAddrState] = useState("");
@@ -937,6 +1035,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
         delivery_address_id: addrId,
         payment_method: selectedPay || "cod", // fallback so it's never null
         delivery_slot_id: null,
+        delivery_type_pref: deliveryTypePref || 'standard',
         proposed_delivery_fee: proposedFee !== null ? proposedFee : (confirmedFee !== null ? confirmedFee : null),
         proposed_slot: confirmedSlot ? { start: confirmedSlot.start, end: confirmedSlot.end } : null,
         items: items.map((i) => ({
@@ -947,6 +1046,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
         })),
         special_instructions: "",
       };
+
       console.log("PLACING ORDER PAYLOAD:", JSON.stringify(payload, null, 2)); // LOG PAYLOAD
 
       const res = await fetch(`${BASE_URL}/orders`, {
@@ -1171,9 +1271,116 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
           )}
 
 
-          {/* ── SECTION 2: DELIVERY SLOT ─────────────────────────────── */}
+          {/* ── SECTION 2: DELIVERY TYPE ──────────────────────────────── */}
           <Section
             num="2"
+            title="Delivery Type"
+            icon="truck"
+            cardR={cardR}
+            px={px}
+          >
+            {/* Standard / Quick toggle pills */}
+            <View style={dts.row}>
+              <TouchableOpacity
+                style={[dts.pill, deliveryTypePref === 'standard' && dts.pillActive]}
+                onPress={() => { if (proposedFee === null) setDeliveryTypePref('standard'); }}
+                activeOpacity={0.85}
+              >
+                <View style={dts.pillIconWrap}>
+                  <Feather name="package" size={18} color={deliveryTypePref === 'standard' ? C.white : C.gray500} />
+                </View>
+                <View style={dts.pillBody}>
+                  <Text style={[dts.pillTitle, deliveryTypePref === 'standard' && dts.pillTitleActive]}>Standard</Text>
+                  <Text style={[dts.pillSub, deliveryTypePref === 'standard' && dts.pillSubActive]}>
+                    {deliveryInfo ? `~${deliveryInfo.eta_minutes} min` : 'Regular speed'}
+                  </Text>
+                </View>
+                <Text style={[dts.pillFee, deliveryTypePref === 'standard' && dts.pillFeeActive]}>
+                  {fetchingDeliveryInfo ? '...' :
+                    liveStandardFee === 0 ? 'FREE' :
+                    liveStandardFee != null ? `₹${liveStandardFee}` : `₹${baseFee}`
+                  }
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[dts.pill, dts.pillQuick, deliveryTypePref === 'quick' && dts.pillQuickActive]}
+                onPress={() => { if (proposedFee === null) setDeliveryTypePref('quick'); }}
+                activeOpacity={0.85}
+              >
+                <View style={dts.pillIconWrap}>
+                  <Feather name="zap" size={18} color={deliveryTypePref === 'quick' ? C.white : '#D97706'} />
+                </View>
+                <View style={dts.pillBody}>
+                  <Text style={[dts.pillTitle, deliveryTypePref === 'quick' && dts.pillTitleQuickActive]}>Quick</Text>
+                  <Text style={[dts.pillSub, deliveryTypePref === 'quick' && dts.pillSubQuickActive]}>
+                    {deliveryInfo ? `~${deliveryInfo.quick_eta_minutes} min` : 'Faster delivery'}
+                  </Text>
+                </View>
+                <Text style={[dts.pillFee, deliveryTypePref === 'quick' && dts.pillFeeQuickActive]}>
+                  {fetchingDeliveryInfo ? '...' :
+                    liveQuickFee != null ? `₹${liveQuickFee}` : '—'
+                  }
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Transparent fee breakdown */}
+            {deliveryInfo?.fees && (
+              <View style={dts.breakdown}>
+                <View style={dts.bRow}>
+                  <Feather name="map-pin" size={12} color={C.gray400} />
+                  <Text style={dts.bLabel}>Distance charge</Text>
+                  <Text style={dts.bVal}>₹{deliveryInfo.fees.distance_based_fee}</Text>
+                </View>
+                <View style={dts.bRow}>
+                  <Feather name="shield" size={12} color={C.gray400} />
+                  <Text style={dts.bLabel}>Min floor (₹20 or 2% of order)</Text>
+                  <Text style={dts.bVal}>₹{deliveryInfo.fees.floor_used}</Text>
+                </View>
+                {deliveryInfo.fees.demand_surcharge_pct > 0 && (
+                  <View style={dts.bRow}>
+                    <Feather name="cloud-rain" size={12} color={C.amber} />
+                    <Text style={[dts.bLabel, { color: C.amber }]}>Demand surcharge ({deliveryInfo.fees.demand_surcharge_pct}%)</Text>
+                    <Text style={[dts.bVal, { color: C.amber }]}>+{deliveryInfo.fees.demand_surcharge_pct}%</Text>
+                  </View>
+                )}
+                {deliveryTypePref === 'quick' && (
+                  <View style={dts.bRow}>
+                    <Feather name="zap" size={12} color={C.orange} />
+                    <Text style={[dts.bLabel, { color: C.orange }]}>Quick surcharge ({deliveryInfo.fees.quick_delivery_pct}%)</Text>
+                    <Text style={[dts.bVal, { color: C.orange }]}>+{deliveryInfo.fees.quick_delivery_pct}%</Text>
+                  </View>
+                )}
+                {deliveryInfo.fees.is_free_delivery && deliveryTypePref === 'standard' && (
+                  <View style={dts.bRow}>
+                    <Feather name="gift" size={12} color={C.green} />
+                    <Text style={[dts.bLabel, { color: C.green }]}>Free delivery threshold reached!</Text>
+                    <Text style={[dts.bVal, { color: C.green }]}>FREE</Text>
+                  </View>
+                )}
+                {deliveryInfo.fees.free_delivery_threshold != null && !deliveryInfo.fees.is_free_delivery && (
+                  <View style={[dts.bRow, { backgroundColor: C.greenLight, borderRadius: 8, padding: 6, marginTop: 4 }]}>
+                    <Feather name="info" size={12} color={C.green} />
+                    <Text style={[dts.bLabel, { color: C.green, flex: 1 }]}>
+                      Add ₹{Math.round(deliveryInfo.fees.free_delivery_threshold - liveSubtotal)} more for FREE standard delivery
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {proposedFee !== null && (
+              <View style={dts.negotiatedNote}>
+                <Feather name="check-circle" size={13} color={C.green} />
+                <Text style={dts.negotiatedNoteText}>Using negotiated fee ₹{proposedFee} — delivery type locked</Text>
+              </View>
+            )}
+          </Section>
+
+          {/* ── SECTION 3: DELIVERY SLOT ──────────────────────────────── */}
+          <Section
+            num="3"
             title="Delivery Slot"
             icon="clock"
             cardR={cardR}
@@ -1210,9 +1417,9 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             )}
           </Section>
 
-          {/* ── SECTION 3: VENDOR CONTACT ────────────────────────────── */}
+          {/* ── SECTION 4: VENDOR CONTACT ────────────────────────────── */}
           <Section
-            num="3"
+            num="4"
             title="Vendor Contact"
             icon="phone"
             cardR={cardR}
@@ -1255,10 +1462,10 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             )}
           </Section>
 
-          {/* ── SECTION 4: PAYMENT METHOD (Only shown after acceptance) ── */}
+          {/* ── SECTION 5: PAYMENT METHOD (Only shown after acceptance) ── */}
           {orderStatus === "accepted" && (
             <Section
-              num="4"
+              num="5"
               title="Payment Method"
               icon="credit-card"
               cardR={cardR}
@@ -1618,6 +1825,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                 baseFee={baseFee}
                 total={total}
                 onNegotiate={() => setFeeModalVisible(true)}
+                deliveryTypePref={deliveryTypePref}
                 fs={fs}
               />
             </View>
@@ -1660,6 +1868,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                 baseFee={baseFee}
                 total={total}
                 onNegotiate={() => setFeeModalVisible(true)}
+                deliveryTypePref={deliveryTypePref}
                 fs={fs}
               />
             </View>
