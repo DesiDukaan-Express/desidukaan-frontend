@@ -792,12 +792,16 @@ export default function CheckoutScreen() {
     setFetchingDeliveryInfo(true);
     (async () => {
       try {
-        const params = new URLSearchParams({
+        const queryParamsObj = {
           vendor_id: vendorId,
           customer_lat: customerLat,
           customer_lng: customerLng,
           subtotal: liveSubtotal,
-        });
+        };
+        if (confirmedSlot?.start) {
+          queryParamsObj.slot_start = confirmedSlot.start;
+        }
+        const params = new URLSearchParams(queryParamsObj);
         const res = await fetch(`${BASE_URL}/slots/delivery-info?${params}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           signal: ctrl.signal,
@@ -812,7 +816,7 @@ export default function CheckoutScreen() {
     })();
 
     return () => ctrl.abort();
-  }, [vendorId, selectedAddrId, detectedCoords, liveSubtotal, token]);
+  }, [vendorId, selectedAddrId, detectedCoords, liveSubtotal, confirmedSlot, token]);
 
   const [addrLine, setAddrLine] = useState("");
   const [addrCity, setAddrCity] = useState("");
@@ -1003,6 +1007,11 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
   // ── Place order ────────────────────────────────────────────────────────────
   const placeOrder = async () => {
     console.log("placeOrder function INVOKED"); // START LOG
+    if (!confirmedSlot) {
+      setErrorMsg("Please select a delivery slot before placing your order.");
+      Alert.alert("Delivery Slot Required", "Please select a delivery slot before placing your order.");
+      return;
+    }
     setErrorMsg(null);
     setPlacing(true);
     try {

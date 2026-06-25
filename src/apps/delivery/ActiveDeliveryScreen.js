@@ -917,8 +917,106 @@ export default function ActiveDeliveryScreen({ navigation }) {
     } catch (e) { setIncomingOrder(null); }
   };
 
+
+
+const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
+  if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return Infinity;
+  const R = 6371e3; // Earth radius in meters
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in meters
+};
+
+
+  const handleDeclineActiveOrder = () => {
+    Alert.alert(
+      "Decline Delivery",
+      "Are you sure you want to decline this delivery request? It will be unassigned from you.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Decline",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const res = await fetch(`${API_BASE}/delivery/decline/${activeOrder.orderIdRaw}`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              const data = await res.json();
+              if (data.success) {
+                Alert.alert("Declined", "You have successfully declined this delivery.");
+                if (activeOrder?.id) {
+                  await clearStep(activeOrder.id);
+                }
+                setActiveOrder(null);
+                setStep(0);
+                fetchOrders();
+              } else {
+                Alert.alert("Error", data.message || "Failed to decline delivery.");
+              }
+            } catch (e) {
+              Alert.alert("Error", "Network error.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleStepComplete = async () => {
     const displayStep = Math.min(Math.max(step, 0), STEPS.length - 1);
+    
+    // Distance check for Reach Pickup (0) and Reach Drop (2)
+    if (displayStep === 0 || displayStep === 2) {
+      const targetLoc = displayStep === 0 ? activeOrder?.vendorLoc : activeOrder?.dropLoc;
+      if (targetLoc && targetLoc.latitude && targetLoc.longitude) {
+        if (!myLocation) {
+          Alert.alert("Location Error", "Unable to determine your current location. Please ensure location services are enabled.");
+          return;
+        }
+        const distMeters = calculateDistanceMeters(
+          myLocation.latitude,
+          myLocation.longitude,
+          targetLoc.latitude,
+          targetLoc.longitude
+        );
+        
+        if (distMeters > 200) {
+          Alert.alert(
+            "Too Far Away",
+            `You must be within 200 meters of the location to slide. (Current distance: ${Math.round(distMeters)} meters)`,
+            [
+              { text: "OK", style: "cancel" },
+              {
+                text: "Mock Arrival (Test)",
+                onPress: () => {
+                  setMyLocation({
+                    latitude: targetLoc.latitude,
+                    longitude: targetLoc.longitude,
+                  });
+                  proceedStepComplete(displayStep);
+                }
+              }
+            ]
+          );
+          return;
+        }
+      }
+    }
+
+    await proceedStepComplete(displayStep);
+  };
+
+  const proceedStepComplete = async (displayStep) => {
     const currentStepDef = STEPS[displayStep];
     if (!currentStepDef) return;
 
@@ -932,7 +1030,6 @@ export default function ActiveDeliveryScreen({ navigation }) {
         const data = await res.json();
         if (!data.success) { Alert.alert('Error', data.message); return; }
         if (currentStepDef.api === 'delivered') {
-          // Clear persisted step for this delivery
           if (activeOrder?.id) await clearStep(activeOrder.id);
           setDeliveryCount(c => c + 1);
           setEarnings(e => e + (activeOrder?.deliveryFee || 65));
@@ -941,13 +1038,13 @@ export default function ActiveDeliveryScreen({ navigation }) {
         }
       } catch (e) { Alert.alert('Error', 'Network error'); return; }
     }
-    // Advance to next step and persist it
     if (displayStep < STEPS.length - 1) {
       const nextStep = displayStep + 1;
       if (activeOrder?.id) await saveStep(activeOrder.id, nextStep);
       setTimeout(() => setStep(nextStep), 400);
     }
   };
+
 
   // ── Render ──
   const [scrollEnabled, setScrollEnabled] = useState(true);
@@ -1006,12 +1103,29 @@ export default function ActiveDeliveryScreen({ navigation }) {
           <View style={styles.stepperWrap}>
             {/* Header */}
             <View style={styles.stepperHeader}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={styles.stepperTitle}>Active Delivery</Text>
-                <Text style={styles.stepperSub}>{activeOrder.displayId} Â· {activeOrder.meta}</Text>
+                <Text style={styles.stepperSub}>{activeOrder.displayId} · {activeOrder.meta}</Text>
               </View>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>{step + 1}/4</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {step < 2 && (
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#FEF2F2',
+                      borderColor: '#FCA5A5',
+                      borderWidth: 1,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                    }}
+                    onPress={handleDeclineActiveOrder}
+                  >
+                    <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>Decline</Text>
+                  </TouchableOpacity>
+                )}
+                <View style={styles.stepBadge}>
+                  <Text style={styles.stepBadgeText}>{step + 1}/4</Text>
+                </View>
               </View>
             </View>
 

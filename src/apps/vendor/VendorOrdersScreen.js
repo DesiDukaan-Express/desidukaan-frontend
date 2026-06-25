@@ -15,6 +15,7 @@ import {
   Alert,
   Platform,
 } from "react-native";
+import { Linking } from "react-native";
 
 import VendorMapView from "../../components/VendorMapView";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -457,6 +458,28 @@ export default function VendorOrdersScreen() {
       transports: ["websocket"],
     });
 
+    socket.on("delivery:declined", (data) => {
+      console.log("Delivery declined:", data);
+      fetchOrdersRef.current?.();
+      Alert.alert(
+        "Delivery Request Declined",
+        `${data.partner_name} (${data.partner_phone}) has declined. You can move on to another delivery partner of that area or deliver it yourself.`,
+        [
+          {
+            text: `Call ${data.partner_name}`,
+            onPress: () => {
+              if (data.partner_phone && data.partner_phone !== 'N/A') {
+                Linking.openURL(`tel:${data.partner_phone}`);
+              } else {
+                Alert.alert("Error", "No phone number available for this partner.");
+              }
+            }
+          },
+          { text: "Dismiss", style: "cancel" }
+        ],
+        { cancelable: true }
+      );
+    });
     socket.on("connect", () => console.log("Vendor Socket Connected"));
 
     // Real-time order notifications
@@ -1999,6 +2022,48 @@ export default function VendorOrdersScreen() {
                       <Text style={omStyles.acceptBtnText}>Mark as Ready</Text>
                     </TouchableOpacity>
                   )}
+                  {selectedOrder?.status === "ready" && (
+                    <TouchableOpacity
+                      style={[
+                        omStyles.acceptBtn,
+                        { backgroundColor: "#D97706", marginTop: 8 },
+                      ]}
+                      onPress={() => {
+                        updateOrderStatus(selectedOrder.id, "picked_up");
+                        setModalVisible(false);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <MaterialIcons
+                        name="directions-run"
+                        size={20}
+                        color="#fff"
+                      />
+                      <Text style={omStyles.acceptBtnText}>Deliver It Yourself (Self Delivery)</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {selectedOrder?.status === "picked_up" && (
+                    <TouchableOpacity
+                      style={[
+                        omStyles.acceptBtn,
+                        { backgroundColor: "#16A34A", marginTop: 8 },
+                      ]}
+                      onPress={() => {
+                        updateOrderStatus(selectedOrder.id, "delivered");
+                        setModalVisible(false);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <MaterialIcons
+                        name="done-all"
+                        size={20}
+                        color="#fff"
+                      />
+                      <Text style={omStyles.acceptBtnText}>Mark as Delivered</Text>
+                    </TouchableOpacity>
+                  )}
+
                 </View>
               )}
 
