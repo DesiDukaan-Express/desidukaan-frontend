@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -15,9 +15,10 @@ import {
   Alert,
   Platform,
 } from "react-native";
+import { Linking } from "react-native";
 
 import VendorMapView from "../../components/VendorMapView";
-import { Ionicons, MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { io } from "socket.io-client";
 import useOrderSound from "../../hooks/useOrderSound";
 import { useRoute } from "@react-navigation/native";
@@ -64,6 +65,49 @@ export default function VendorOrdersScreen() {
   const [acceptedModalVisible, setAcceptedModalVisible] = useState(false);
   const [expandedCustomers, setExpandedCustomers] = useState({});
 
+  // ── Demand Surcharge (vendor can set surge % for rain/peak hours) ─────────
+  const [demandSurcharge, setDemandSurcharge] = useState(0);   // current %
+  const [surchargeInput, setSurchargeInput] = useState('0');
+  const [surchargeLoading, setSurchargeLoading] = useState(false);
+  const [showSurchargeEdit, setShowSurchargeEdit] = useState(false);
+  const [vendorId, setVendorId] = useState(null);
+
+  // Fetch vendor profile to read current demand_surcharge_pct
+  useEffect(() => {
+    if (!token) return;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/vendors/me`, { headers: { Authorization: `Bearer ${token}` } });
+        const json = await res.json();
+        const v = json.data?.vendor || json.vendor;
+        if (v) {
+          setVendorId(v.id);
+          const pct = v.demand_surcharge_pct ?? 0;
+          setDemandSurcharge(pct);
+          setSurchargeInput(String(pct));
+        }
+      } catch (e) { console.warn('vendor profile fetch:', e.message); }
+    })();
+  }, [token]);
+
+  const saveDemandSurcharge = async (pct) => {
+    if (!vendorId) return;
+    setSurchargeLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/vendors/${vendorId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ demand_surcharge_pct: parseFloat(pct) || 0 }),
+      });
+      if (res.ok) {
+        setDemandSurcharge(parseFloat(pct) || 0);
+        setShowSurchargeEdit(false);
+        setVendorToast({ visible: true, message: `Demand surcharge set to ${pct}%`, type: 'success' });
+      }
+    } catch (e) { console.warn('save surcharge:', e.message); }
+    finally { setSurchargeLoading(false); }
+  };
+
   const toggleCustomer = (name) => {
     setExpandedCustomers((prev) => ({ ...prev, [name]: !prev[name] }));
   };
@@ -99,9 +143,14 @@ export default function VendorOrdersScreen() {
   const fetchNearbyRiders = async () => {
     try {
       const res = await fetch(
-        `${API_BASE}/delivery/nearby?latitude=${storeLocation.latitude}&longitude=${storeLocation.longitude}&radius_km=10`,
+        `${API_BASE}/delivery/nearby?latitude=${storeLocation.latitude}&longitude=${storeLocation.longitude}&radius_km=10&_t=${Date.now()}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
         },
       );
       const result = await res.json();
@@ -298,13 +347,23 @@ export default function VendorOrdersScreen() {
     }
   };
 
-  const fetchOrders = async () => {
+  // Always-current ref so socket handlers (which close over stale state)
+  // can call the latest fetchOrders without going stale.
+  const fetchOrdersRef = useRef(null);
+
+  const fetchOrders = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/orders/vendor/active`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`${API_BASE}/orders/vendor/active?_t=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
       });
 
       const result = await res.json();
+      console.log('[fetchOrders] result.success:', result.success, '| orders count:', result.data?.orders?.length);
 
       if (result.success) {
         const fetchedOrders = result.data.orders || [];
@@ -318,18 +377,28 @@ export default function VendorOrdersScreen() {
         setExpandedCustomers(expanded);
       }
     } catch (err) {
-      console.log(err);
+      console.log('[fetchOrders] error:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [token]);
+
+  // Keep ref always pointing to the latest fetchOrders
+  useEffect(() => {
+    fetchOrdersRef.current = fetchOrders;
+  }, [fetchOrders]);
 
   const fetchRequests = async () => {
     setLoadingRequests(true);
     try {
-      const res = await fetch(`${API_BASE}/slots/vendor/requests`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`${API_BASE}/slots/vendor/requests?_t=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
       });
       const result = await res.json();
       if (result.data) {
@@ -346,9 +415,14 @@ export default function VendorOrdersScreen() {
     setLoadingHistory(true);
     try {
       const res = await fetch(
-        `${API_BASE}/orders/vendor/history?page=${page}&limit=30`,
+        `${API_BASE}/orders/vendor/history?page=${page}&limit=30&_t=${Date.now()}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
         },
       );
       const result = await res.json();
@@ -384,25 +458,61 @@ export default function VendorOrdersScreen() {
       transports: ["websocket"],
     });
 
+    socket.on("delivery:declined", (data) => {
+      console.log("Delivery declined:", data);
+      fetchOrdersRef.current?.();
+      Alert.alert(
+        "Delivery Request Declined",
+        `${data.partner_name} (${data.partner_phone}) has declined. You can move on to another delivery partner of that area or deliver it yourself.`,
+        [
+          {
+            text: `Call ${data.partner_name}`,
+            onPress: () => {
+              if (data.partner_phone && data.partner_phone !== 'N/A') {
+                Linking.openURL(`tel:${data.partner_phone}`);
+              } else {
+                Alert.alert("Error", "No phone number available for this partner.");
+              }
+            }
+          },
+          { text: "Dismiss", style: "cancel" }
+        ],
+        { cancelable: true }
+      );
+    });
     socket.on("connect", () => console.log("Vendor Socket Connected"));
 
     // Real-time order notifications
     socket.on("order:new", (data) => {
       console.log("New Order:", data);
       playOrderSound();
-      fetchOrders();
-      // Optional: Add local notification/alert
-      if (data.has_loose_items) {
-        // Alert.alert("New Negotiation", `Order ${data.order_number} needs weight confirmation.`);
+      // Use ref so we always call the latest fetchOrders, not a stale one
+      fetchOrdersRef.current?.();
+      showVendorToast(
+        `🛒 New order ${data.order_number || "#" + data.order_id} — ₹${data.total || ""}`,
+        "info",
+      );
+    });
+
+    // Real-time order status updates (customer accepted/rejected counter, etc.)
+    socket.on("order:update", (data) => {
+      console.log("Order update:", data);
+      fetchOrdersRef.current?.();
+      if (data.status) {
+        showVendorToast(
+          `Order ${data.order_number || "#" + data.order_id} updated: ${data.status}`,
+          data.status === "accepted" ? "success" : "info",
+        );
       }
     });
 
     // Slot & Fee Negotiation updates
     socket.on("slot:request", () => {
-      fetchOrders();
+      fetchOrdersRef.current?.();
       fetchRequests();
+      showVendorToast("📅 New delivery slot request from a customer!", "info");
     });
-    socket.on("fee:request", () => fetchOrders());
+    socket.on("fee:request", () => fetchOrdersRef.current?.());
     socket.on("phone:request", () => {
       playOrderSound();
       fetchRequests();
@@ -410,12 +520,15 @@ export default function VendorOrdersScreen() {
     });
 
     // Customer responses
-    socket.on("slot:confirmed", () => fetchOrders());
-    socket.on("fee:confirmed", () => fetchOrders());
+    socket.on("slot:confirmed", () => {
+      fetchOrdersRef.current?.();
+      showVendorToast("✅ Customer confirmed the delivery slot.", "success");
+    });
+    socket.on("fee:confirmed", () => fetchOrdersRef.current?.());
 
     // Delivery Updates
-    socket.on("order_assigned_to_delivery", () => fetchOrders());
-    socket.on("delivery_status_update", () => fetchOrders());
+    socket.on("order_assigned_to_delivery", () => fetchOrdersRef.current?.());
+    socket.on("delivery_status_update", () => fetchOrdersRef.current?.());
     socket.on("delivery_location_update", (data) => {
       if (data.deliveryId) {
         setLiveRiderLocations((prev) => ({
@@ -437,6 +550,7 @@ export default function VendorOrdersScreen() {
   };
 
   const updateOrderStatus = async (id, status, reason = null) => {
+    console.log('[updateOrderStatus] called with id:', id, 'status:', status);
     try {
       const body = { status };
       if (reason) body.reason = reason;
@@ -450,19 +564,49 @@ export default function VendorOrdersScreen() {
         body: JSON.stringify(body),
       });
       const result = await res.json();
+      console.log('[updateOrderStatus] response:', res.status, result.success, result.message);
+
       if (res.ok && result.success) {
-        showVendorToast(`Order marked as ${status} ✓`, "success");
-        await fetchOrders();
+        // ── 1. Instantly update the orders LIST so the card re-renders NOW ──
+        if (status === "rejected" || status === "cancelled") {
+          // Remove from active list immediately — these go to history
+          setOrders((prev) => {
+            console.log('[updateOrderStatus] removing order from list, prev length:', prev.length);
+            return prev.filter((o) => Number(o.id) !== Number(id));
+          });
+        } else {
+          // Update the status badge on the card
+          setOrders((prev) => {
+            console.log('[updateOrderStatus] updating order status in list, prev length:', prev.length);
+            return prev.map((o) => (Number(o.id) === Number(id) ? { ...o, status } : o));
+          });
+        }
+
+        // ── 2. Update the modal's selectedOrder so button set changes ──
         setSelectedOrder((prev) =>
-          prev && prev.id === id ? { ...prev, status } : prev,
+          prev && Number(prev.id) === Number(id) ? { ...prev, status } : prev,
         );
-        // Auto-expand the customer group so the updated order is visible
+
+        // Auto-expand the customer group
         if (selectedOrder) {
           const customerName =
             selectedOrder.customer?.name ||
             `Customer #${selectedOrder.customer_id}`;
           setExpandedCustomers((prev) => ({ ...prev, [customerName]: true }));
         }
+
+        // ── 3. Feedback ──
+        if (status === "preparing" || status === "ready") {
+          Alert.alert(
+            "✓ Success",
+            `Order marked as ${status === "preparing" ? "Preparing" : "Ready"}!`,
+          );
+        } else {
+          showVendorToast(`Order ${status} ✓`, "success");
+        }
+
+        // ── 4. Background refresh to sync with server (after slight delay to avoid overwriting optimistic state) ──
+        setTimeout(() => fetchOrdersRef.current?.(), 800);
       } else {
         Alert.alert(
           "Error",
@@ -470,7 +614,7 @@ export default function VendorOrdersScreen() {
         );
       }
     } catch (err) {
-      console.log(err);
+      console.log('[updateOrderStatus] catch error:', err);
       Alert.alert("Error", "Something went wrong while updating status.");
     }
   };
@@ -542,6 +686,12 @@ export default function VendorOrdersScreen() {
         }
       }
 
+      // Guard against NaN delivery fee
+      const deliveryFeeValue = parseFloat(counterDeliveryFee);
+      const safeDeliveryFee = isNaN(deliveryFeeValue)
+        ? selectedOrder?.delivery_fee || 0
+        : deliveryFeeValue;
+
       const res = await fetch(
         `${API_BASE}/orders/${selectedOrder.id}/counter`,
         {
@@ -552,7 +702,7 @@ export default function VendorOrdersScreen() {
           },
           body: JSON.stringify({
             items: counterItems,
-            delivery_fee: parseFloat(counterDeliveryFee),
+            delivery_fee: safeDeliveryFee,
             note: counterNote,
             slot_start,
             slot_end,
@@ -562,20 +712,24 @@ export default function VendorOrdersScreen() {
 
       const result = await res.json();
 
-      if (result.success) {
-        Alert.alert("Success", "Counter offer sent to customer");
+      if (res.ok && result.success) {
+        showVendorToast("Counter offer sent to customer ✓", "success");
 
         // Update selectedOrder with the full response to prevent loss of details
         setSelectedOrder(result.data.order);
         setCounterModalVisible(false);
-        // We keep the modal open so they can see the 'Countered' status
-        // or we close it as per current flow:
         setModalVisible(false);
 
         fetchOrders();
+      } else {
+        Alert.alert(
+          "Error",
+          result.message || result.msg || "Failed to send counter offer",
+        );
       }
     } catch (err) {
-      console.log(err);
+      console.error("sendCounterOffer error:", err);
+      Alert.alert("Error", "Something went wrong while sending counter offer.");
     }
   };
 
@@ -696,6 +850,52 @@ export default function VendorOrdersScreen() {
         </View>
       </View>
 
+      {/* ── DEMAND SURCHARGE BANNER ── */}
+      <View style={{ marginHorizontal: 16, marginBottom: 8 }}>
+        {showSurchargeEdit ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF3C7', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#FDE68A' }}>
+            <Text style={{ fontSize: 12, color: '#92400E', fontWeight: '700', flex: 1 }}>Set surge %</Text>
+            <TextInput
+              style={{ borderWidth: 1, borderColor: '#FDE68A', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, fontSize: 14, fontWeight: '700', width: 64, textAlign: 'center', backgroundColor: '#FFF' }}
+              keyboardType="numeric"
+              value={surchargeInput}
+              onChangeText={setSurchargeInput}
+              maxLength={3}
+            />
+            <TouchableOpacity
+              style={{ backgroundColor: '#D97706', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
+              onPress={() => saveDemandSurcharge(surchargeInput)}
+              disabled={surchargeLoading}
+            >
+              <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 12 }}>{surchargeLoading ? '...' : 'Save'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowSurchargeEdit(false)}>
+              <Text style={{ color: '#92400E', fontSize: 18, fontWeight: '700' }}>×</Text>
+            </TouchableOpacity>
+          </View>
+        ) : demandSurcharge > 0 ? (
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF3C7', borderRadius: 12, padding: 10, borderWidth: 1.5, borderColor: '#F59E0B' }}
+            onPress={() => setShowSurchargeEdit(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={{ fontSize: 16 }}>🌧️</Text>
+            <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: '#92400E' }}>Demand surcharge ACTIVE: +{demandSurcharge}% on delivery</Text>
+            <Text style={{ fontSize: 11, color: '#B45309', fontWeight: '600' }}>Edit</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F9FAFB', borderRadius: 10, padding: 8, borderWidth: 1, borderColor: '#E5E7EB' }}
+            onPress={() => setShowSurchargeEdit(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={{ fontSize: 13 }}>⚡</Text>
+            <Text style={{ fontSize: 12, color: '#9CA3AF', flex: 1 }}>Set demand surcharge (rain, peak hours...)</Text>
+            <Text style={{ fontSize: 11, color: '#D97706', fontWeight: '700' }}>+ Add</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[styles.tab, activeTab === "orders" && styles.activeTab]}
@@ -760,6 +960,7 @@ export default function VendorOrdersScreen() {
       </View>
 
       <FlatList
+        extraData={orders}
         data={
           activeTab === "orders"
             ? groupByCustomer(orders)
@@ -800,22 +1001,21 @@ export default function VendorOrdersScreen() {
         ListEmptyComponent={
           activeTab === "requests" ? (
             <View style={{ padding: 40, alignItems: "center" }}>
-              <Ionicons
-                name="notifications-off-outline"
+              <MaterialIcons name="notifications-off"
                 size={48}
                 color="#D1D5DB"
               />
               <Text
-                style={{ marginTop: 12, color: "#6B7280", fontWeight: "600" }}
+                style={{ marginTop: 12, color: "#6B7280", fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}
               >
                 No pending requests
               </Text>
             </View>
           ) : activeTab === "history" ? (
             <View style={{ padding: 40, alignItems: "center" }}>
-              <Ionicons name="time-outline" size={48} color="#D1D5DB" />
+              <MaterialIcons name="access-time" size={48} color="#D1D5DB" />
               <Text
-                style={{ marginTop: 12, color: "#6B7280", fontWeight: "600" }}
+                style={{ marginTop: 12, color: "#6B7280", fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}
               >
                 No order history yet
               </Text>
@@ -1165,7 +1365,7 @@ export default function VendorOrdersScreen() {
             <View style={styles.requestCard}>
               <View style={styles.requestHeader}>
                 <View style={styles.requestIcon}>
-                  <Ionicons name="alarm-outline" size={20} color="#1F2937" />
+                  <MaterialIcons name="alarm" size={20} color="#1F2937" />
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={styles.requestTitle}>
@@ -1243,7 +1443,7 @@ export default function VendorOrdersScreen() {
               style={dmStyles.backBtn}
               onPress={() => setIsDeliveryModalVisible(false)}
             >
-              <Ionicons name="arrow-back" size={20} color="#fff" />
+              <MaterialIcons name="arrow-back" size={20} color="#fff" />
             </TouchableOpacity>
             <View style={{ flex: 1 }}>
               <Text style={dmStyles.headerTitle}>Assign Rider</Text>
@@ -1452,8 +1652,7 @@ export default function VendorOrdersScreen() {
                           Alert.alert("Call", `Calling ${rider.name}...`)
                         }
                       >
-                        <Ionicons
-                          name="call-outline"
+                        <MaterialIcons name="phone"
                           size={16}
                           color="#147538"
                         />
@@ -1633,7 +1832,7 @@ export default function VendorOrdersScreen() {
                         {item.quantity} × ₹{item.product_price}
                       </Text>
                     </View>
-                    <Text style={omStyles.itemTotal}>₹{item.subtotal}</Text>
+                    <Text style={omStyles.itemTotal}>₹{(item.quantity * parseFloat(item.product_price)).toFixed(2).replace(/\.00$/, '')}</Text>
                   </View>
                 ))}
               </View>
@@ -1750,8 +1949,7 @@ export default function VendorOrdersScreen() {
                       style={{
                         color: "#64748B",
                         fontSize: 14,
-                        fontWeight: "600",
-                      }}
+                        fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}
                     >
                       I'll assign later
                     </Text>
@@ -1824,6 +2022,48 @@ export default function VendorOrdersScreen() {
                       <Text style={omStyles.acceptBtnText}>Mark as Ready</Text>
                     </TouchableOpacity>
                   )}
+                  {selectedOrder?.status === "ready" && (
+                    <TouchableOpacity
+                      style={[
+                        omStyles.acceptBtn,
+                        { backgroundColor: "#D97706", marginTop: 8 },
+                      ]}
+                      onPress={() => {
+                        updateOrderStatus(selectedOrder.id, "picked_up");
+                        setModalVisible(false);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <MaterialIcons
+                        name="directions-run"
+                        size={20}
+                        color="#fff"
+                      />
+                      <Text style={omStyles.acceptBtnText}>Deliver It Yourself (Self Delivery)</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {selectedOrder?.status === "picked_up" && (
+                    <TouchableOpacity
+                      style={[
+                        omStyles.acceptBtn,
+                        { backgroundColor: "#16A34A", marginTop: 8 },
+                      ]}
+                      onPress={() => {
+                        updateOrderStatus(selectedOrder.id, "delivered");
+                        setModalVisible(false);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <MaterialIcons
+                        name="done-all"
+                        size={20}
+                        color="#fff"
+                      />
+                      <Text style={omStyles.acceptBtnText}>Mark as Delivered</Text>
+                    </TouchableOpacity>
+                  )}
+
                 </View>
               )}
 
@@ -2107,8 +2347,7 @@ export default function VendorOrdersScreen() {
                 <Text
                   style={{
                     fontSize: 18,
-                    fontWeight: "900",
-                    color: "#0F172A",
+                    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#0F172A",
                     letterSpacing: -0.3,
                   }}
                 >
@@ -2154,8 +2393,7 @@ export default function VendorOrdersScreen() {
                     style={{
                       fontSize: 11,
                       color: "rgba(255,255,255,0.5)",
-                      fontWeight: "700",
-                      letterSpacing: 0.8,
+                      fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", letterSpacing: 0.8,
                       textTransform: "uppercase",
                     }}
                   >
@@ -2164,8 +2402,7 @@ export default function VendorOrdersScreen() {
                   <Text
                     style={{
                       fontSize: 28,
-                      fontWeight: "900",
-                      color: "#fff",
+                      fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff",
                       letterSpacing: -1,
                       marginTop: 2,
                     }}
@@ -2229,8 +2466,7 @@ export default function VendorOrdersScreen() {
                 <Text
                   style={{
                     fontSize: 11,
-                    fontWeight: "700",
-                    color: "#94A3B8",
+                    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#94A3B8",
                     letterSpacing: 0.8,
                     textTransform: "uppercase",
                     marginBottom: 10,
@@ -2285,8 +2521,7 @@ export default function VendorOrdersScreen() {
                           style={[
                             {
                               fontSize: 14,
-                              fontWeight: "700",
-                              color: "#1F2937",
+                              fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#1F2937",
                             },
                             item.new_quantity === 0 && {
                               textDecorationLine: "line-through",
@@ -2324,8 +2559,7 @@ export default function VendorOrdersScreen() {
                           <Text
                             style={{
                               fontSize: 11,
-                              fontWeight: "700",
-                              color: "#059669",
+                              fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#059669",
                               marginTop: 2,
                             }}
                           >
@@ -2353,8 +2587,7 @@ export default function VendorOrdersScreen() {
                               style={{
                                 fontSize: 11,
                                 color: "#EF4444",
-                                fontWeight: "600",
-                              }}
+                                fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}
                             >
                               Removed from order
                             </Text>
@@ -2420,8 +2653,7 @@ export default function VendorOrdersScreen() {
                           <Text
                             style={{
                               fontSize: 16,
-                              fontWeight: "800",
-                              color: "#1F2937",
+                              fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#1F2937",
                             }}
                           >
                             {item.new_quantity}
@@ -2465,8 +2697,7 @@ export default function VendorOrdersScreen() {
                             style={{
                               fontSize: 11,
                               color: "#64748B",
-                              fontWeight: "600",
-                            }}
+                              fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}
                           >
                             Reset
                           </Text>
@@ -2482,8 +2713,7 @@ export default function VendorOrdersScreen() {
                 <Text
                   style={{
                     fontSize: 11,
-                    fontWeight: "700",
-                    color: "#94A3B8",
+                    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#94A3B8",
                     letterSpacing: 0.8,
                     textTransform: "uppercase",
                     marginBottom: 10,
@@ -2512,8 +2742,7 @@ export default function VendorOrdersScreen() {
                   <Text
                     style={{
                       fontSize: 16,
-                      fontWeight: "700",
-                      color: "#374151",
+                      fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#374151",
                     }}
                   >
                     ₹
@@ -2522,8 +2751,7 @@ export default function VendorOrdersScreen() {
                     style={{
                       flex: 1,
                       fontSize: 18,
-                      fontWeight: "800",
-                      color: "#1F2937",
+                      fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#1F2937",
                       paddingVertical: 14,
                     }}
                     value={counterDeliveryFee}
@@ -2548,8 +2776,7 @@ export default function VendorOrdersScreen() {
                           style={{
                             fontSize: 10,
                             color: "#D97706",
-                            fontWeight: "700",
-                          }}
+                            fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"}}
                         >
                           Was ₹{selectedOrder?.delivery_fee}
                         </Text>
@@ -2563,8 +2790,7 @@ export default function VendorOrdersScreen() {
                 <Text
                   style={{
                     fontSize: 11,
-                    fontWeight: "700",
-                    color: "#94A3B8",
+                    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#94A3B8",
                     letterSpacing: 0.8,
                     textTransform: "uppercase",
                     marginBottom: 6,
@@ -2592,12 +2818,11 @@ export default function VendorOrdersScreen() {
                       style={{
                         fontSize: 12,
                         color: "#92400E",
-                        fontWeight: "600",
-                        flex: 1,
+                        fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", flex: 1,
                       }}
                     >
                       Customer requested:{" "}
-                      <Text style={{ fontWeight: "800" }}>
+                      <Text style={{ fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"}}>
                         {new Date(
                           selectedOrder.delivery_slot.slot_start,
                         ).toLocaleTimeString([], {
@@ -2675,8 +2900,7 @@ export default function VendorOrdersScreen() {
                         style={{
                           fontSize: 10,
                           color: "#94A3B8",
-                          fontWeight: "600",
-                          marginBottom: 6,
+                          fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", marginBottom: 6,
                           textTransform: "uppercase",
                           letterSpacing: 0.5,
                         }}
@@ -2704,8 +2928,7 @@ export default function VendorOrdersScreen() {
                           style={{
                             flex: 1,
                             fontSize: 16,
-                            fontWeight: "700",
-                            color: "#1F2937",
+                            fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#1F2937",
                             paddingVertical: 10,
                           }}
                           value={counterSlotStart}
@@ -2728,8 +2951,7 @@ export default function VendorOrdersScreen() {
                         style={{
                           fontSize: 10,
                           color: "#94A3B8",
-                          fontWeight: "600",
-                          marginBottom: 6,
+                          fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", marginBottom: 6,
                           textTransform: "uppercase",
                           letterSpacing: 0.5,
                         }}
@@ -2757,8 +2979,7 @@ export default function VendorOrdersScreen() {
                           style={{
                             flex: 1,
                             fontSize: 16,
-                            fontWeight: "700",
-                            color: "#1F2937",
+                            fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#1F2937",
                             paddingVertical: 10,
                           }}
                           value={counterSlotEnd}
@@ -2813,8 +3034,7 @@ export default function VendorOrdersScreen() {
                         <Text
                           style={{
                             fontSize: 11,
-                            fontWeight: "700",
-                            color: "#059669",
+                            fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#059669",
                           }}
                         >
                           {slot.label}
@@ -2839,8 +3059,7 @@ export default function VendorOrdersScreen() {
                       <Text
                         style={{
                           fontSize: 11,
-                          fontWeight: "700",
-                          color: "#6B7280",
+                          fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#6B7280",
                         }}
                       >
                         Clear
@@ -2855,8 +3074,7 @@ export default function VendorOrdersScreen() {
                 <Text
                   style={{
                     fontSize: 11,
-                    fontWeight: "700",
-                    color: "#94A3B8",
+                    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#94A3B8",
                     letterSpacing: 0.8,
                     textTransform: "uppercase",
                     marginBottom: 10,
@@ -2907,7 +3125,7 @@ export default function VendorOrdersScreen() {
                 >
                   <MaterialIcons name="swap-horiz" size={20} color="#fff" />
                   <Text
-                    style={{ color: "#fff", fontSize: 16, fontWeight: "800" }}
+                    style={{ color: "#fff", fontSize: 16, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"}}
                   >
                     Send Counter Offer
                   </Text>
@@ -2958,9 +3176,11 @@ export default function VendorOrdersScreen() {
                   );
                   return;
                 }
+                // Use 'rejected' (not 'cancelled') — backend VALID_TRANSITIONS
+                // for 'pending' only allows: accepted, rejected, countered
                 updateOrderStatus(
                   selectedOrder.id,
-                  "cancelled",
+                  "rejected",
                   rejectReason.trim(),
                 );
                 setRejectModalVisible(false);
@@ -3007,8 +3227,7 @@ const styles = StyleSheet.create({
 
   header: {
     fontSize: 26,
-    fontWeight: "800",
-    padding: 20,
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", padding: 20,
   },
 
   orderCard: {
@@ -3051,8 +3270,7 @@ const styles = StyleSheet.create({
   },
 
   orderId: {
-    fontWeight: "800",
-    fontSize: 15,
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", fontSize: 15,
     color: "#1F2937",
   },
 
@@ -3063,8 +3281,7 @@ const styles = StyleSheet.create({
   orderTime: {
     color: "#9CA3AF",
     fontSize: 12,
-    fontWeight: "600",
-  },
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"},
 
   customer: {
     marginTop: 6,
@@ -3096,8 +3313,7 @@ const styles = StyleSheet.create({
   },
 
   total: {
-    fontWeight: "900",
-    fontSize: 18,
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", fontSize: 18,
     color: "#1F2937",
   },
 
@@ -3130,8 +3346,7 @@ const styles = StyleSheet.create({
   },
 
   statusText: {
-    fontWeight: "700",
-    fontSize: 12,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", fontSize: 12,
     color: "#6B7280",
   },
   negotiationBadge: {
@@ -3147,8 +3362,7 @@ const styles = StyleSheet.create({
   },
   negotiationText: {
     fontSize: 10,
-    fontWeight: "800",
-    color: "#D97706",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#D97706",
     letterSpacing: 0.5,
   },
 
@@ -3190,12 +3404,10 @@ const styles = StyleSheet.create({
 
   modalTitle: {
     fontSize: 20,
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
 
   sectionTitle: {
-    fontWeight: "700",
-    marginTop: 12,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", marginTop: 12,
     marginBottom: 6,
   },
 
@@ -3214,8 +3426,7 @@ const styles = StyleSheet.create({
 
   modalTotal: {
     fontSize: 24,
-    fontWeight: "900",
-  },
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold"},
 
   modalActions: {
     flexDirection: "row",
@@ -3233,8 +3444,7 @@ const styles = StyleSheet.create({
 
   btnText: {
     color: "#fff",
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
 
   rejectBtn: {
     flex: 1,
@@ -3246,8 +3456,7 @@ const styles = StyleSheet.create({
 
   rejectText: {
     color: "#E74C3C",
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
 
   counterBtn: {
     flex: 1,
@@ -3259,8 +3468,7 @@ const styles = StyleSheet.create({
 
   counterText: {
     color: "#2563EB",
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
 
   // ── Auto Assign ──
   autoAssignSection: {
@@ -3278,8 +3486,7 @@ const styles = StyleSheet.create({
   },
   autoAssignBtnText: {
     color: "#fff",
-    fontWeight: "800",
-    fontSize: 14,
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", fontSize: 14,
     letterSpacing: 0.3,
   },
   broadcastStatus: {
@@ -3301,8 +3508,7 @@ const styles = StyleSheet.create({
   broadcastText: {
     fontSize: 12,
     color: "#166534",
-    fontWeight: "600",
-    flex: 1,
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", flex: 1,
   },
 
   counterItem: {
@@ -3338,8 +3544,7 @@ const styles = StyleSheet.create({
   },
 
   qtyText: {
-    fontWeight: "700",
-    fontSize: 16,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", fontSize: 16,
   },
 
   availabilityBtn: {
@@ -3371,8 +3576,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#6B7280",
     marginBottom: 4,
-    fontWeight: "600",
-  },
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"},
 
   slotDayContainer: {
     flexDirection: "row",
@@ -3400,14 +3604,12 @@ const styles = StyleSheet.create({
 
   slotDayTabText: {
     fontSize: 13,
-    fontWeight: "600",
-    color: "#6B7280",
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: "#6B7280",
   },
 
   slotDayTabActiveText: {
     color: "#111827",
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
 
   slotTimeContainer: {
     flexDirection: "row",
@@ -3432,8 +3634,7 @@ const styles = StyleSheet.create({
 
   quickSlotText: {
     fontSize: 12,
-    fontWeight: "700",
-    color: "#059669",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#059669",
   },
 
   note: {
@@ -3465,8 +3666,7 @@ const styles = StyleSheet.create({
   },
 
   counterItemName: {
-    fontWeight: "700",
-    fontSize: 14,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", fontSize: 14,
     marginBottom: 4,
   },
 
@@ -3507,8 +3707,7 @@ const styles = StyleSheet.create({
 
   qtyBtnText: {
     fontSize: 18,
-    fontWeight: "600",
-    color: "#374151",
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: "#374151",
   },
 
   availableBtn: {
@@ -3525,14 +3724,12 @@ const styles = StyleSheet.create({
 
   availableText: {
     color: "#059669",
-    fontWeight: "700",
-    fontSize: 11,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", fontSize: 11,
   },
 
   unavailableText: {
     color: "#DC2626",
-    fontWeight: "700",
-    fontSize: 11,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", fontSize: 11,
   },
 
   counterItemUnavailable: {
@@ -3556,8 +3753,7 @@ const styles = StyleSheet.create({
 
   summaryAmount: {
     fontSize: 28,
-    fontWeight: "900",
-    color: "#1F2937",
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#1F2937",
   },
 
   summaryDetails: {
@@ -3579,8 +3775,7 @@ const styles = StyleSheet.create({
   },
 
   summaryDetailValue: {
-    fontWeight: "600",
-    fontSize: 13,
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", fontSize: 13,
   },
 
   sendCounterBtn: {
@@ -3609,8 +3804,7 @@ const styles = StyleSheet.create({
 
   assignTitle: {
     fontSize: 22,
-    fontWeight: "800",
-    color: "#1F2937",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#1F2937",
   },
 
   callRiderBtn: {
@@ -3628,7 +3822,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#0F172A",
   },
-  assignBtnTextSmall: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  assignBtnTextSmall: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -3659,8 +3853,7 @@ const styles = StyleSheet.create({
   },
   partnersCount: {
     fontSize: 11,
-    fontWeight: "700",
-    color: "#6B7280",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#6B7280",
     letterSpacing: 0.5,
   },
   activeIndicator: {
@@ -3680,8 +3873,7 @@ const styles = StyleSheet.create({
   },
   activeTextStatus: {
     fontSize: 10,
-    fontWeight: "700",
-    color: "#16A34A",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#16A34A",
   },
 
   // NEW STYLES
@@ -3712,13 +3904,11 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#64748B",
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: "#64748B",
   },
   activeTabText: {
     color: "#0F172A",
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
   badge: {
     backgroundColor: "#1D4ED8",
     paddingHorizontal: 6,
@@ -3730,8 +3920,7 @@ const styles = StyleSheet.create({
   badgeText: {
     color: "#fff",
     fontSize: 10,
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
   slotBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -3745,8 +3934,7 @@ const styles = StyleSheet.create({
   },
   slotBadgeText: {
     fontSize: 12,
-    fontWeight: "700",
-    color: "#059669",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#059669",
   },
   requestCard: {
     backgroundColor: "#fff",
@@ -3775,8 +3963,7 @@ const styles = StyleSheet.create({
   },
   requestTitle: {
     fontSize: 15,
-    fontWeight: "800",
-    color: "#1F2937",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#1F2937",
   },
   requestCustomer: {
     fontSize: 13,
@@ -3794,13 +3981,11 @@ const styles = StyleSheet.create({
   },
   slotRange: {
     fontSize: 14,
-    fontWeight: "700",
-    color: "#0F172A",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#0F172A",
   },
   slotDay: {
     fontSize: 12,
-    fontWeight: "600",
-    color: "#64748B",
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: "#64748B",
   },
   requestActions: {
     flexDirection: "row",
@@ -3821,16 +4006,14 @@ const styles = StyleSheet.create({
   },
   rejectBtnText: {
     color: "#E11D48",
-    fontWeight: "700",
-    fontSize: 14,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", fontSize: 14,
   },
   approveBtn: {
     backgroundColor: "#0F172A",
   },
   approveBtnText: {
     color: "#fff",
-    fontWeight: "700",
-    fontSize: 14,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", fontSize: 14,
   },
 
   riderListContainer: {
@@ -3845,13 +4028,11 @@ const styles = StyleSheet.create({
   },
   riderListTitle: {
     fontSize: 18,
-    fontWeight: "800",
-    color: "#0F172A",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#0F172A",
   },
   liveUpdatesText: {
     fontSize: 10,
-    fontWeight: "800",
-    color: "#16A34A",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#16A34A",
     letterSpacing: 1,
   },
   riderCard: {
@@ -3888,8 +4069,7 @@ const styles = StyleSheet.create({
   },
   riderName: {
     fontSize: 15,
-    fontWeight: "700",
-    color: "#1F2937",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#1F2937",
   },
 
   riderStatus: {
@@ -3903,8 +4083,7 @@ const styles = StyleSheet.create({
   },
   fastestText: {
     color: "#16A34A",
-    fontWeight: "700",
-  },
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
   callRiderBtn: {
     width: 44,
     height: 44,
@@ -3923,8 +4102,7 @@ const styles = StyleSheet.create({
 
   assignBtnText: {
     color: "#fff",
-    fontWeight: "800",
-    fontSize: 14,
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", fontSize: 14,
   },
 
   screenHeader: {
@@ -3938,16 +4116,14 @@ const styles = StyleSheet.create({
   },
   screenTitle: {
     fontSize: 26,
-    fontWeight: "900",
-    color: "#FFFFFF",
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#FFFFFF",
     letterSpacing: -0.5,
   },
   screenSubtitle: {
     fontSize: 12,
     color: "rgba(255,255,255,0.65)",
     marginTop: 2,
-    fontWeight: "500",
-  },
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
   headerBadgeWrap: {
     alignItems: "flex-end",
   },
@@ -3969,8 +4145,7 @@ const styles = StyleSheet.create({
   headerPendingText: {
     color: "#fff",
     fontSize: 12,
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
   orderCardAccepted: {
     borderColor: "#BFDBFE",
     backgroundColor: "#EFF6FF",
@@ -4005,12 +4180,10 @@ const styles = StyleSheet.create({
   customerAvatarText: {
     color: "#fff",
     fontSize: 14,
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
   customerName: {
     fontSize: 14,
-    fontWeight: "700",
-    color: "#1F2937",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#1F2937",
   },
   totalPill: {
     backgroundColor: "#F0FDF4",
@@ -4022,8 +4195,7 @@ const styles = StyleSheet.create({
   },
   totalPillText: {
     fontSize: 15,
-    fontWeight: "900",
-    color: "#15803D",
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#15803D",
   },
   itemsPreview: {
     backgroundColor: "#F8FAFC",
@@ -4035,8 +4207,7 @@ const styles = StyleSheet.create({
   itemsPreviewText: {
     fontSize: 12,
     color: "#64748B",
-    fontWeight: "500",
-  },
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
   actionHint: {
     flexDirection: "row",
     alignItems: "center",
@@ -4049,8 +4220,7 @@ const styles = StyleSheet.create({
   },
   actionHintText: {
     fontSize: 12,
-    fontWeight: "700",
-    color: "#D97706",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#D97706",
   },
   customerGroupCard: {
     backgroundColor: "#fff",
@@ -4085,19 +4255,16 @@ const styles = StyleSheet.create({
   customerGroupAvatarText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
   customerGroupName: {
     fontSize: 15,
-    fontWeight: "800",
-    color: "#1F2937",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#1F2937",
   },
   customerGroupMeta: {
     fontSize: 12,
     color: "#64748B",
     marginTop: 2,
-    fontWeight: "500",
-  },
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
   customerGroupBadge: {
     width: 28,
     height: 28,
@@ -4109,8 +4276,7 @@ const styles = StyleSheet.create({
   customerGroupBadgeText: {
     color: "#fff",
     fontSize: 12,
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
   historyOrderRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -4123,8 +4289,7 @@ const styles = StyleSheet.create({
   },
   historyOrderNumber: {
     fontSize: 13,
-    fontWeight: "700",
-    color: "#1F2937",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#1F2937",
   },
   historyStatusPill: {
     backgroundColor: "#F1F5F9",
@@ -4134,25 +4299,21 @@ const styles = StyleSheet.create({
   },
   historyStatusText: {
     fontSize: 10,
-    fontWeight: "700",
-    color: "#64748B",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#64748B",
   },
   historyOrderItems: {
     fontSize: 11,
     color: "#94A3B8",
     marginTop: 3,
-    fontWeight: "500",
-  },
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
   historyOrderTime: {
     fontSize: 11,
     color: "#CBD5E1",
     marginTop: 2,
-    fontWeight: "500",
-  },
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
   historyOrderTotal: {
     fontSize: 15,
-    fontWeight: "800",
-    color: "#1F2937",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#1F2937",
   },
   activeOrderRow: {
     flexDirection: "row",
@@ -4347,7 +4508,7 @@ const vendorToastStyles = StyleSheet.create({
   success: { backgroundColor: "#16A34A" },
   error: { backgroundColor: "#DC2626" },
   info: { backgroundColor: "#1D4ED8" },
-  text: { color: "#fff", fontSize: 14, fontWeight: "700", lineHeight: 20 },
+  text: { color: "#fff", fontSize: 14, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", lineHeight: 20 },
 });
 
 const dmStyles = StyleSheet.create({
@@ -4374,16 +4535,14 @@ const dmStyles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "900",
-    color: "#fff",
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff",
     letterSpacing: -0.3,
   },
   headerSub: {
     fontSize: 12,
     color: "rgba(255,255,255,0.7)",
     marginTop: 1,
-    fontWeight: "500",
-  },
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
   headerBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -4401,8 +4560,7 @@ const dmStyles = StyleSheet.create({
   },
   headerBadgeText: {
     fontSize: 11,
-    fontWeight: "800",
-    color: "#fff",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff",
     letterSpacing: 0.8,
   },
   orderStrip: {
@@ -4431,28 +4589,24 @@ const dmStyles = StyleSheet.create({
   },
   orderStripAvatarText: {
     color: "#fff",
-    fontWeight: "800",
-    fontSize: 15,
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", fontSize: 15,
   },
   orderStripName: {
     fontSize: 14,
-    fontWeight: "700",
-    color: "#1F2937",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#1F2937",
   },
   orderStripItems: {
     fontSize: 11,
     color: "#9CA3AF",
     marginTop: 1,
-    fontWeight: "500",
-    maxWidth: 220,
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium", maxWidth: 220,
   },
   orderStripRight: {
     alignItems: "flex-end",
   },
   orderStripTotal: {
     fontSize: 17,
-    fontWeight: "900",
-    color: "#147538",
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#147538",
   },
   mapCard: {
     margin: 16,
@@ -4486,8 +4640,7 @@ const dmStyles = StyleSheet.create({
   },
   mapOverlayText: {
     fontSize: 12,
-    fontWeight: "700",
-    color: "#147538",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#147538",
   },
   section: {
     paddingHorizontal: 16,
@@ -4501,8 +4654,7 @@ const dmStyles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 17,
-    fontWeight: "900",
-    color: "#0F172A",
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#0F172A",
   },
   liveChip: {
     flexDirection: "row",
@@ -4521,8 +4673,7 @@ const dmStyles = StyleSheet.create({
   },
   liveText: {
     fontSize: 10,
-    fontWeight: "800",
-    color: "#16A34A",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#16A34A",
     letterSpacing: 0.8,
   },
   slotBannerLocked: {
@@ -4538,15 +4689,13 @@ const dmStyles = StyleSheet.create({
   },
   slotBannerTitle: {
     fontSize: 13,
-    fontWeight: "700",
-    color: "#92400E",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#92400E",
   },
   slotBannerSub: {
     fontSize: 11,
     color: "#B45309",
     marginTop: 2,
-    fontWeight: "500",
-  },
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
   slotBannerActive: {
     flexDirection: "row",
     alignItems: "center",
@@ -4566,8 +4715,7 @@ const dmStyles = StyleSheet.create({
   },
   slotBannerActiveText: {
     fontSize: 13,
-    fontWeight: "700",
-    color: "#166534",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#166534",
   },
   autoBtn: {
     flexDirection: "row",
@@ -4602,8 +4750,7 @@ const dmStyles = StyleSheet.create({
   autoBtnText: {
     flex: 1,
     fontSize: 14,
-    fontWeight: "800",
-    color: "#147538",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#147538",
   },
   broadcastBanner: {
     flexDirection: "row",
@@ -4625,8 +4772,7 @@ const dmStyles = StyleSheet.create({
   broadcastText: {
     fontSize: 12,
     color: "#166534",
-    fontWeight: "600",
-    flex: 1,
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", flex: 1,
   },
   riderCard: {
     backgroundColor: "#fff",
@@ -4661,8 +4807,7 @@ const dmStyles = StyleSheet.create({
   },
   riderTopBadgeText: {
     fontSize: 9,
-    fontWeight: "800",
-    color: "#fff",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff",
     letterSpacing: 0.5,
   },
   riderRow: {
@@ -4678,8 +4823,7 @@ const dmStyles = StyleSheet.create({
   },
   riderName: {
     fontSize: 15,
-    fontWeight: "700",
-    color: "#1F2937",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#1F2937",
   },
   riderMeta: {
     flexDirection: "row",
@@ -4689,14 +4833,12 @@ const dmStyles = StyleSheet.create({
   riderDist: {
     fontSize: 12,
     color: "#147538",
-    fontWeight: "700",
-    marginLeft: 2,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", marginLeft: 2,
   },
   riderStatus: {
     fontSize: 12,
     color: "#9CA3AF",
-    fontWeight: "500",
-  },
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
   callBtn: {
     width: 36,
     height: 36,
@@ -4726,8 +4868,7 @@ const dmStyles = StyleSheet.create({
   assignBtnText: {
     color: "#fff",
     fontSize: 13,
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
   emptyRiders: {
     alignItems: "center",
     paddingVertical: 32,
@@ -4735,16 +4876,14 @@ const dmStyles = StyleSheet.create({
   },
   emptyRidersText: {
     fontSize: 15,
-    fontWeight: "700",
-    color: "#374151",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#374151",
   },
   emptyRidersSub: {
     fontSize: 12,
     color: "#9CA3AF",
     textAlign: "center",
     paddingHorizontal: 24,
-    fontWeight: "500",
-  },
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
   markReadyBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -4759,8 +4898,7 @@ const dmStyles = StyleSheet.create({
   },
   markReadyText: {
     fontSize: 14,
-    fontWeight: "700",
-    color: "#147538",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#147538",
   },
 });
 
@@ -4790,8 +4928,7 @@ const omStyles = StyleSheet.create({
   },
   orderNum: {
     fontSize: 18,
-    fontWeight: "900",
-    color: "#0F172A",
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#0F172A",
     letterSpacing: -0.3,
   },
   statusChip: {
@@ -4801,8 +4938,7 @@ const omStyles = StyleSheet.create({
   },
   statusChipText: {
     fontSize: 11,
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
   closeBtn: {
     width: 32,
     height: 32,
@@ -4833,12 +4969,10 @@ const omStyles = StyleSheet.create({
   customerAvatarText: {
     color: "#fff",
     fontSize: 18,
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
   customerName: {
     fontSize: 15,
-    fontWeight: "800",
-    color: "#1F2937",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#1F2937",
   },
   customerPhone: {
     fontSize: 13,
@@ -4848,16 +4982,14 @@ const omStyles = StyleSheet.create({
   orderTimeText: {
     fontSize: 11,
     color: "#94A3B8",
-    fontWeight: "600",
-  },
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"},
   section: {
     marginHorizontal: 16,
     marginBottom: 12,
   },
   sectionLabel: {
     fontSize: 11,
-    fontWeight: "700",
-    color: "#94A3B8",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#94A3B8",
     letterSpacing: 0.8,
     textTransform: "uppercase",
     marginBottom: 10,
@@ -4878,8 +5010,7 @@ const omStyles = StyleSheet.create({
   },
   itemName: {
     fontSize: 14,
-    fontWeight: "700",
-    color: "#1F2937",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#1F2937",
   },
   itemQty: {
     fontSize: 12,
@@ -4888,8 +5019,7 @@ const omStyles = StyleSheet.create({
   },
   itemTotal: {
     fontSize: 15,
-    fontWeight: "800",
-    color: "#1F2937",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#1F2937",
   },
   priceCard: {
     marginHorizontal: 16,
@@ -4908,13 +5038,11 @@ const omStyles = StyleSheet.create({
   priceLabel: {
     fontSize: 13,
     color: "#64748B",
-    fontWeight: "500",
-  },
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
   priceValue: {
     fontSize: 13,
     color: "#1F2937",
-    fontWeight: "600",
-  },
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"},
   priceDivider: {
     height: 1,
     backgroundColor: "#E2E8F0",
@@ -4922,13 +5050,11 @@ const omStyles = StyleSheet.create({
   },
   priceTotalLabel: {
     fontSize: 15,
-    fontWeight: "800",
-    color: "#0F172A",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#0F172A",
   },
   priceTotalValue: {
     fontSize: 18,
-    fontWeight: "900",
-    color: "#147538",
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#147538",
   },
   slotCard: {
     flexDirection: "row",
@@ -4945,12 +5071,10 @@ const omStyles = StyleSheet.create({
   slotLabel: {
     fontSize: 11,
     color: "#059669",
-    fontWeight: "600",
-  },
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"},
   slotTime: {
     fontSize: 14,
-    fontWeight: "800",
-    color: "#065F46",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#065F46",
     marginTop: 2,
   },
   noteCard: {
@@ -4968,8 +5092,7 @@ const omStyles = StyleSheet.create({
   noteText: {
     fontSize: 13,
     color: "#92400E",
-    fontWeight: "500",
-    flex: 1,
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium", flex: 1,
     lineHeight: 20,
   },
   actionsWrap: {
@@ -4978,8 +5101,7 @@ const omStyles = StyleSheet.create({
   },
   actionsLabel: {
     fontSize: 11,
-    fontWeight: "700",
-    color: "#94A3B8",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#94A3B8",
     letterSpacing: 0.8,
     textTransform: "uppercase",
     marginBottom: 12,
@@ -5003,8 +5125,7 @@ const omStyles = StyleSheet.create({
   acceptBtnText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "800",
-    flexShrink: 1,
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", flexShrink: 1,
   },
   secondaryActions: {
     flexDirection: "row",
@@ -5028,8 +5149,7 @@ const omStyles = StyleSheet.create({
   counterBtnText: {
     color: "#2563EB",
     fontSize: 13,
-    fontWeight: "700",
-    flexShrink: 1,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", flexShrink: 1,
     textAlign: "center",
   },
   declineBtn: {
@@ -5049,8 +5169,7 @@ const omStyles = StyleSheet.create({
   declineBtnText: {
     color: "#E11D48",
     fontSize: 13,
-    fontWeight: "700",
-    flexShrink: 1,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", flexShrink: 1,
     textAlign: "center",
   },
 });
@@ -5083,8 +5202,7 @@ const amStyles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: "900",
-    color: "#0F172A",
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#0F172A",
     textAlign: "center",
     letterSpacing: -0.5,
   },
@@ -5119,22 +5237,19 @@ const amStyles = StyleSheet.create({
   },
   slotCardLabel: {
     fontSize: 11,
-    fontWeight: "700",
-    color: "#059669",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#059669",
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   slotCardTime: {
     fontSize: 16,
-    fontWeight: "900",
-    color: "#065F46",
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#065F46",
     marginTop: 2,
   },
   slotCardDate: {
     fontSize: 12,
     color: "#059669",
-    fontWeight: "600",
-    marginTop: 2,
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", marginTop: 2,
   },
   slotLockBadge: {
     flexDirection: "row",
@@ -5147,8 +5262,7 @@ const amStyles = StyleSheet.create({
   },
   slotLockText: {
     fontSize: 11,
-    fontWeight: "700",
-    color: "#D97706",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#D97706",
   },
   slotActiveBadge: {
     flexDirection: "row",
@@ -5167,8 +5281,7 @@ const amStyles = StyleSheet.create({
   },
   slotActiveText: {
     fontSize: 11,
-    fontWeight: "700",
-    color: "#16A34A",
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#16A34A",
   },
   nextStepsCard: {
     marginHorizontal: 16,
@@ -5182,8 +5295,7 @@ const amStyles = StyleSheet.create({
   },
   nextStepsTitle: {
     fontSize: 12,
-    fontWeight: "800",
-    color: "#64748B",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#64748B",
     textTransform: "uppercase",
     letterSpacing: 0.8,
     marginBottom: 4,
@@ -5202,8 +5314,7 @@ const amStyles = StyleSheet.create({
   nextStepText: {
     fontSize: 13,
     color: "#374151",
-    fontWeight: "600",
-    flex: 1,
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", flex: 1,
   },
   primaryBtn: {
     flexDirection: "row",
@@ -5224,8 +5335,7 @@ const amStyles = StyleSheet.create({
   primaryBtnText: {
     color: "#fff",
     fontSize: 15,
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
   secondaryBtn: {
     alignItems: "center",
     paddingVertical: 12,
@@ -5234,6 +5344,5 @@ const amStyles = StyleSheet.create({
   secondaryBtnText: {
     color: "#64748B",
     fontSize: 14,
-    fontWeight: "600",
-  },
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"},
 });

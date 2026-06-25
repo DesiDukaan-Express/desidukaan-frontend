@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   View,
   Text,
@@ -694,7 +694,7 @@ function BreakdownRow({ label, value, pct, color, rs, bold }) {
             style={[
               styles.breakLabel,
               { fontSize: rs(12, 13, 13) },
-              bold && { fontWeight: "800", color: C.text },
+              bold && { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text },
             ]}
           >
             {label}
@@ -703,7 +703,7 @@ function BreakdownRow({ label, value, pct, color, rs, bold }) {
             style={[
               styles.breakValue,
               { fontSize: rs(12, 13, 13), color },
-              bold && { fontWeight: "800" },
+              bold && { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
             ]}
           >
             {value}
@@ -890,7 +890,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 12,
   },
-  loadingText: { color: C.textSub, fontSize: 14, fontWeight: "500" },
+  loadingText: { color: C.textSub, fontSize: 14, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
 
   // Header
   header: {
@@ -905,13 +905,11 @@ const styles = StyleSheet.create({
   },
   headerOverline: {
     color: C.textLight,
-    fontWeight: "700",
-    letterSpacing: 1,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", letterSpacing: 1,
     marginBottom: 2,
   },
   headerTitle: {
-    fontWeight: "900",
-    color: C.text,
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text,
     letterSpacing: -0.5,
   },
   headerBadge: {
@@ -927,7 +925,7 @@ const styles = StyleSheet.create({
     borderRadius: 3.5,
     backgroundColor: C.primary,
   },
-  headerBadgeText: { color: C.primaryDark, fontWeight: "700" },
+  headerBadgeText: { color: C.primaryDark, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
 
   // Period tabs
   periodRow: {
@@ -948,7 +946,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   periodPillActive: { backgroundColor: C.accent },
-  periodPillText: { fontWeight: "600", color: C.textSub },
+  periodPillText: { fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: C.textSub },
   periodPillTextActive: { color: "#fff" },
 
   // Hero card
@@ -972,13 +970,11 @@ shadowOpacity: 0.15,
   },
   heroLabel: {
     color: C.textLight,
-    fontWeight: "700",
-    letterSpacing: 1,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", letterSpacing: 1,
     marginBottom: 6,
   },
   heroAmount: {
-    fontWeight: "900",
-    color: C.text,
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text,
     letterSpacing: -1,
   },
   heroMeta: { flexDirection: "row", alignItems: "center", marginTop: 6 },
@@ -991,7 +987,7 @@ shadowOpacity: 0.15,
     paddingVertical: 4,
     borderRadius: 999,
   },
-  heroChangeText: { color: C.primaryDark, fontWeight: "700" },
+  heroChangeText: { color: C.primaryDark, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
   heroStrip: { flexDirection: "row" },
   heroStatPill: {
     alignItems: "center",
@@ -1001,8 +997,8 @@ shadowOpacity: 0.15,
     borderWidth: 1,
 borderColor: "rgba(0,0,0,0.06)",
   },
-  heroStatVal: { fontWeight: "800" },
-  heroStatLabel: { color: C.textSub, fontWeight: "500" },
+  heroStatVal: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
+  heroStatLabel: { color: C.textSub, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
 
   // Card
   card: {
@@ -1022,11 +1018,10 @@ borderColor: "rgba(0,0,0,0.06)",
   },
   cardOverline: {
     color: C.textLight,
-    fontWeight: "700",
-    letterSpacing: 1,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", letterSpacing: 1,
     marginBottom: 2,
   },
-  cardTitle: { fontWeight: "800", color: C.text, letterSpacing: -0.3 },
+  cardTitle: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text, letterSpacing: -0.3 },
   miniStatBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -1035,7 +1030,7 @@ borderColor: "rgba(0,0,0,0.06)",
     paddingVertical: 5,
     borderRadius: 999,
   },
-  miniStatBadgeText: { fontWeight: "700" },
+  miniStatBadgeText: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
 
   // Chart empty
   emptyChart: {
@@ -1043,7 +1038,7 @@ borderColor: "rgba(0,0,0,0.06)",
     paddingVertical: 28,
     gap: 8,
   },
-  emptyText: { color: C.textLight, fontSize: 13, fontWeight: "500" },
+  emptyText: { color: C.textLight, fontSize: 13, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
 
   // Bar mini chart
   barRow: {
@@ -1062,7 +1057,7 @@ borderColor: "rgba(0,0,0,0.06)",
     overflow: "hidden",
   },
   barFill: { width: "100%", borderRadius: 4 },
-  barLabel: { color: C.textLight, fontWeight: "500", marginTop: 3 },
+  barLabel: { color: C.textLight, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium", marginTop: 3 },
 
   // Two col
   twoCol: { flexDirection: "row" },
@@ -1077,16 +1072,15 @@ borderColor: "rgba(0,0,0,0.06)",
   summaryIcon: { alignItems: "center", justifyContent: "center" },
   summaryLabel: {
     color: C.textSub,
-    fontWeight: "600",
-    letterSpacing: 0.2,
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", letterSpacing: 0.2,
   },
-  summaryValue: { fontWeight: "800", letterSpacing: -0.3 },
-  summarySub: { color: C.textLight, fontWeight: "500", marginTop: 2 },
+  summaryValue: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", letterSpacing: -0.3 },
+  summarySub: { color: C.textLight, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium", marginTop: 2 },
 
   // Breakdown
   breakRow: {},
-  breakLabel: { color: C.textSub, fontWeight: "600" },
-  breakValue: { fontWeight: "700" },
+  breakLabel: { color: C.textSub, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"},
+  breakValue: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
   progressTrack: {
     height: 6,
     backgroundColor: C.border,
@@ -1104,10 +1098,10 @@ borderColor: "rgba(0,0,0,0.06)",
     borderTopWidth: 1,
     borderTopColor: C.border,
   },
-  topRank: { fontWeight: "700", color: C.textLight, width: 22 },
-  topName: { fontWeight: "700", color: C.text, flex: 1 },
-  topRevenue: { fontWeight: "800", color: C.text },
-  topSold: { color: C.textSub, fontWeight: "500", flexShrink: 0 },
+  topRank: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.textLight, width: 22 },
+  topName: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text, flex: 1 },
+  topRevenue: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text },
+  topSold: { color: C.textSub, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium", flexShrink: 0 },
 
   // Payout card
   payoutCard: {
@@ -1135,14 +1129,13 @@ shadowOpacity: 0.15,
   },
   payoutLabel: {
     color: C.textLight,
-    fontWeight: "700",
-    letterSpacing: 0.8,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", letterSpacing: 0.8,
     marginBottom: 4,
   },
-  payoutAmount: { fontWeight: "900", color: C.text, letterSpacing: -0.5 },
+  payoutAmount: { fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text, letterSpacing: -0.5 },
   payoutRight: { alignItems: "flex-end" },
   payoutScheduledRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  payoutScheduled: { color: C.primaryDark, fontWeight: "700" },
+  payoutScheduled: { color: C.primaryDark, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
   withdrawBtn: {
     backgroundColor: C.primary,
     borderRadius: 14,
@@ -1151,11 +1144,10 @@ shadowOpacity: 0.15,
     justifyContent: "center",
     gap: 8,
   },
-  withdrawText: { color: "#000", fontWeight: "800" },
+  withdrawText: { color: "#000", fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
   payoutNote: {
     color: C.textSub,
-    fontWeight: "500",
-    textAlign: "center",
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium", textAlign: "center",
   },
 
   // Transactions
@@ -1169,13 +1161,13 @@ shadowOpacity: 0.15,
     borderBottomColor: C.border,
   },
   txnIcon: { alignItems: "center", justifyContent: "center" },
-  txnOrder: { fontWeight: "700", color: C.text },
+  txnOrder: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text },
   txnDate: { color: C.textSub, marginTop: 2 },
-  txnAmount: { fontWeight: "800", color: C.primaryDark },
+  txnAmount: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.primaryDark },
   txnStatusPill: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 999,
   },
-  txnStatusText: { fontWeight: "700" },
+  txnStatusText: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
 });

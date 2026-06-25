@@ -128,6 +128,34 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
   const vendorName = user?.name || "Vendor";
   const greeting = getGreetingConfig();
 
+  // ─── Banner Handlers (defined before early-returns so socket effect can use them) ───
+  const showNewOrderBanner = (data) => {
+    if (bannerTimer.current) clearTimeout(bannerTimer.current);
+    setNewOrderBanner(data);
+    Animated.spring(bannerAnim, {
+      toValue: 0,
+      friction: 8,
+      tension: 60,
+      useNativeDriver: true,
+    }).start();
+    bannerTimer.current = setTimeout(() => {
+      Animated.timing(bannerAnim, {
+        toValue: -120,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => setNewOrderBanner(null));
+    }, 6000);
+  };
+
+  const dismissBanner = () => {
+    if (bannerTimer.current) clearTimeout(bannerTimer.current);
+    Animated.timing(bannerAnim, {
+      toValue: -120,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => setNewOrderBanner(null));
+  };
+
   // ─── Animations start ───────────────────────────────────────
   useEffect(() => {
     Animated.parallel([
@@ -553,38 +581,6 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
     }
   };
 
-  const showNewOrderBanner = (data) => {
-    // Clear any existing timer
-    if (bannerTimer.current) clearTimeout(bannerTimer.current);
-
-    setNewOrderBanner(data);
-
-    // Slide down
-    Animated.spring(bannerAnim, {
-      toValue: 0,
-      friction: 8,
-      tension: 60,
-      useNativeDriver: true,
-    }).start();
-
-    // Auto-dismiss after 6 seconds
-    bannerTimer.current = setTimeout(() => {
-      Animated.timing(bannerAnim, {
-        toValue: -120,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => setNewOrderBanner(null));
-    }, 6000);
-  };
-
-  const dismissBanner = () => {
-    if (bannerTimer.current) clearTimeout(bannerTimer.current);
-    Animated.timing(bannerAnim, {
-      toValue: -120,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => setNewOrderBanner(null));
-  };
 
   return (
     <View style={[styles.root, { backgroundColor: C.bg }]}>
@@ -705,12 +701,12 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                   justifyContent: "center",
                 }}
               >
-                <Text style={{ fontSize: 10, fontWeight: "800", color: "#000" }}>
+                <Text style={{ fontSize: 10, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#000" }}>
                   {vendorName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
                 </Text>
               </View>
               <Text
-                style={{ fontSize: 13, fontWeight: "700", color: C.text, maxWidth: 70 }}
+                style={{ fontSize: 13, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text, maxWidth: 70 }}
                 numberOfLines={1}
               >
                 {vendorName.split(" ")[0]}
@@ -753,8 +749,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                     style={{
                       fontSize: rs(8, 9, 10),
                       color: C.textSub,
-                      fontWeight: "500",
-                    }}
+                      fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"}}
                   >
                     Welcome back
                   </Text> */}
@@ -842,8 +837,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                     <Text
                       style={{
                         fontSize: rs(9, 10, 11),
-                        fontWeight: "800",
-                        color: "#000",
+                        fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#000",
                       }}
                     >
                       {vendorName
@@ -857,8 +851,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                   <Text
                     style={{
                       fontSize: rs(11, 12, 13),
-                      fontWeight: "700",
-                      color: C.text,
+                      fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text,
                       maxWidth: rs(48, 60, 70),
                     }}
                     numberOfLines={1}
@@ -1781,7 +1774,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 }}
               >
                 <Text
-                  style={{ color: C.primary, fontWeight: "700", fontSize: 14 }}
+                  style={{ color: C.primary, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", fontSize: 14 }}
                 >
                   Cancel
                 </Text>
@@ -1961,8 +1954,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                           <Text
                             style={{
                               fontSize: 14,
-                              fontWeight: "700",
-                              color: C.text,
+                              fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text,
                               flexShrink: 1,
                             }}
                             numberOfLines={1}
@@ -1980,8 +1972,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                             <Text
                               style={{
                                 fontSize: 9,
-                                fontWeight: "800",
-                                color: cfg.badgeColor,
+                                fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: cfg.badgeColor,
                               }}
                             >
                               {cfg.badgeLabel}
@@ -2013,8 +2004,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                         <Text
                           style={{
                             fontSize: 14,
-                            fontWeight: "800",
-                            color: cfg.rightTopColor,
+                            fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: cfg.rightTopColor,
                           }}
                         >
                           {cfg.rightTop}
@@ -2031,8 +2021,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                             <Text
                               style={{
                                 fontSize: 9,
-                                fontWeight: "700",
-                                color: cfg.rightBottomColor,
+                                fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: cfg.rightBottomColor,
                               }}
                             >
                               {cfg.rightBottom}
@@ -2091,8 +2080,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             <Text
               style={{
                 fontSize: 15,
-                fontWeight: "700",
-                color: C.text,
+                fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text,
                 flex: 1,
               }}
             >
@@ -2601,7 +2589,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 4,
   },
-  loadingText: { color: C.textSub, fontSize: 14, fontWeight: "500" },
+  loadingText: { color: C.textSub, fontSize: 14, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
 
   // ── Header ──
   header: {
@@ -2620,7 +2608,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.primary,
   },
   logoImg: { width: "100%", height: "100%" },
-  logoText: { fontWeight: "900", color: C.text, letterSpacing: -0.5 },
+  logoText: { fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text, letterSpacing: -0.5 },
 
   locationChip: {
     flexDirection: "row",
@@ -2632,7 +2620,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     maxWidth: 120,
   },
-  locationChipText: { color: C.text, fontWeight: "600", flexShrink: 1 },
+  locationChipText: { color: C.text, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", flexShrink: 1 },
 
   searchBar: {
     flexDirection: "row",
@@ -2668,14 +2656,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 2,
   },
-  notifBadgeText: { fontSize: 9, fontWeight: "800", color: "#fff" },
+  notifBadgeText: { fontSize: 9, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff" },
 
   avatarBtn: {
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: C.primaryDim,
   },
-  avatarInitials: { fontWeight: "800", color: C.primaryDark },
+  avatarInitials: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.primaryDark },
 
   // ── Banner ──
   banner: {
@@ -2685,7 +2673,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderLeftWidth: 4,
   },
-  bannerTitle: { fontWeight: "700", fontSize: 13, marginBottom: 4 },
+  bannerTitle: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", fontSize: 13, marginBottom: 4 },
   bannerMsg: { fontSize: 12, lineHeight: 18 },
   bannerDoc: { fontSize: 12, marginTop: 2 },
 
@@ -2719,15 +2707,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#3B82F608",
   },
   greetingEmojiBubble: { alignItems: "center", justifyContent: "center" },
-  greetingTimeText: { fontWeight: "500" },
+  greetingTimeText: { fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
   greetingBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 999,
   },
-  greetingBadgeText: { fontWeight: "700", letterSpacing: 0.3 },
-  greetingName: { fontWeight: "800", color: C.text, letterSpacing: -0.5 },
-  greetingSub: { fontWeight: "600", marginTop: 2 },
+  greetingBadgeText: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", letterSpacing: 0.3 },
+  greetingName: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text, letterSpacing: -0.5 },
+  greetingSub: { fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", marginTop: 2 },
 
   greetingStrip: {
     flexDirection: "row",
@@ -2742,13 +2730,12 @@ const styles = StyleSheet.create({
     backgroundColor: C.border,
     marginHorizontal: 8,
   },
-  greetingStripVal: { fontSize: 16, fontWeight: "800", letterSpacing: -0.3 },
+  greetingStripVal: { fontSize: 16, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", letterSpacing: -0.3 },
   greetingStripLabel: {
     fontSize: 10,
     color: C.textSub,
     marginTop: 2,
-    fontWeight: "500",
-  },
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
 
   // ── Hero ──
   heroCard: {
@@ -2777,10 +2764,9 @@ const styles = StyleSheet.create({
   },
   heroTopLabel: {
     color: "rgba(255,255,255,0.5)",
-    fontWeight: "700",
-    letterSpacing: 0.8,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", letterSpacing: 0.8,
   },
-  heroValue: { fontWeight: "900", color: "#fff", letterSpacing: -1 },
+  heroValue: { fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff", letterSpacing: -1 },
   heroChangeBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -2790,8 +2776,8 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 999,
   },
-  heroChangeTxt: { color: C.primary, fontWeight: "700" },
-  heroSubTxt: { color: "rgba(255,255,255,0.4)", fontWeight: "500" },
+  heroChangeTxt: { color: C.primary, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
+  heroSubTxt: { color: "rgba(255,255,255,0.4)", fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
   heroDivider: {
     height: 1,
     backgroundColor: "rgba(255,255,255,0.08)",
@@ -2799,10 +2785,9 @@ const styles = StyleSheet.create({
   },
   heroSmallLabel: {
     color: "rgba(255,255,255,0.4)",
-    fontWeight: "600",
-    marginBottom: 2,
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", marginBottom: 2,
   },
-  heroSmallVal: { color: "#fff", fontWeight: "700" },
+  heroSmallVal: { color: "#fff", fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
 
   miniCard: {
     backgroundColor: C.surface,
@@ -2813,8 +2798,8 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   miniIcon: { alignItems: "center", justifyContent: "center" },
-  miniLabel: { color: C.textSub, fontWeight: "500", marginBottom: 1 },
-  miniValue: { fontWeight: "800" },
+  miniLabel: { color: C.textSub, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium", marginBottom: 1 },
+  miniValue: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
 
   // ── Chart ──
   chartStatRow: {
@@ -2825,8 +2810,8 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   chartStatItem: { flex: 1, alignItems: "center" },
-  chartStatVal: { fontWeight: "800", letterSpacing: -0.3 },
-  chartStatLabel: { color: C.textSub, marginTop: 2, fontWeight: "500" },
+  chartStatVal: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", letterSpacing: -0.3 },
+  chartStatLabel: { color: C.textSub, marginTop: 2, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
 
   tabRow: { flexDirection: "row", gap: 4 },
   tabPill: {
@@ -2836,7 +2821,7 @@ const styles = StyleSheet.create({
     borderColor: C.border,
   },
   tabPillActive: { backgroundColor: C.accent, borderColor: C.accent },
-  tabText: { fontWeight: "600", color: C.textSub },
+  tabText: { fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: C.textSub },
   tabTextActive: { color: "#fff" },
 
   // ── Two Col ──
@@ -2861,12 +2846,11 @@ const styles = StyleSheet.create({
   },
   cardOverline: {
     color: C.textLight,
-    fontWeight: "700",
-    letterSpacing: 1,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", letterSpacing: 1,
     textTransform: "uppercase",
     marginBottom: 2,
   },
-  cardTitle: { fontWeight: "800", color: C.text, letterSpacing: -0.3 },
+  cardTitle: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text, letterSpacing: -0.3 },
 
   badgePill: {
     flexDirection: "row",
@@ -2876,7 +2860,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 999,
   },
-  badgePillText: { fontWeight: "700" },
+  badgePillText: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
 
   viewMoreBtn: {
     flexDirection: "row",
@@ -2887,7 +2871,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
   },
-  viewMoreText: { color: C.primaryDark, fontWeight: "700" },
+  viewMoreText: { color: C.primaryDark, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
 
   // ── Goal ──
   goalRingWrap: { alignItems: "center", marginTop: 8 },
@@ -2896,7 +2880,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  goalPct: { fontWeight: "900", color: C.text },
+  goalPct: { fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text },
   goalRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2904,14 +2888,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   goalDot: { width: 8, height: 8, borderRadius: 4 },
-  goalLabel: { flex: 1, color: C.textSub, fontWeight: "500" },
-  goalNum: { fontWeight: "700", color: C.text },
+  goalLabel: { flex: 1, color: C.textSub, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
+  goalNum: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text },
 
   // ── Efficiency ──
   effBlock: { alignItems: "center", gap: 4 },
   effIcon: { alignItems: "center", justifyContent: "center" },
-  effLabel: { color: C.textSub, fontWeight: "500" },
-  effVal: { fontWeight: "800" },
+  effLabel: { color: C.textSub, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
+  effVal: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
   effDivider: {
     width: "80%",
     alignSelf: "center",
@@ -2929,13 +2913,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: C.border,
   },
-  productRank: { fontWeight: "700", color: C.textLight, width: 20 },
+  productRank: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.textLight, width: 20 },
   productImg: { resizeMode: "cover" },
-  productName: { fontWeight: "700", color: C.text },
+  productName: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text },
   productSold: { color: C.textSub, marginTop: 2 },
-  productRevenue: { fontWeight: "800", color: C.text },
+  productRevenue: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text },
   tagPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
-  tagText: { fontWeight: "700" },
+  tagText: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
 
   // ── Reviews ──
   reviewRow: {
@@ -2947,8 +2931,8 @@ const styles = StyleSheet.create({
     borderTopColor: C.border,
   },
   reviewAvatar: { alignItems: "center", justifyContent: "center" },
-  reviewInitials: { fontWeight: "800" },
-  reviewName: { fontWeight: "700", color: C.text },
+  reviewInitials: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
+  reviewName: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text },
   reviewQuote: { color: C.textSub, marginTop: 2 },
   ratingBadge: {
     flexDirection: "row",
@@ -2958,7 +2942,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 999,
   },
-  ratingText: { fontWeight: "700" },
+  ratingText: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
 
   // ── Delivery ──
   deliveryRow: {
@@ -2969,15 +2953,15 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: C.border,
   },
-  deliveryRank: { fontWeight: "700", color: C.textLight, width: 14 },
+  deliveryRank: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.textLight, width: 14 },
   deliveryAvatar: {
     backgroundColor: C.purpleDim,
     alignItems: "center",
     justifyContent: "center",
   },
-  deliveryInitials: { fontWeight: "800", color: C.purple },
+  deliveryInitials: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.purple },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
-  deliveryName: { fontWeight: "700", color: C.text },
+  deliveryName: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text },
   deliverySub: { color: C.textSub, marginTop: 2 },
   scoreBadge: {
     flexDirection: "row",
@@ -2987,7 +2971,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 999,
   },
-  scoreText: { fontWeight: "700" },
+  scoreText: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
 
   // ── Notification item ──
   notifItem: {
@@ -3006,7 +2990,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  notifTitle: { fontSize: 14, fontWeight: "700", color: C.text },
+  notifTitle: { fontSize: 14, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text },
   notifBody: { fontSize: 12, color: C.textSub, marginTop: 2, lineHeight: 17 },
   notifTime: { fontSize: 11, color: C.textLight, marginTop: 4 },
   unreadDot: {
@@ -3047,7 +3031,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: C.border,
   },
-  sheetTitle: { fontSize: 18, fontWeight: "800", color: C.text },
+  sheetTitle: { fontSize: 18, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text },
   closeIconBtn: {
     width: 34,
     height: 34,
@@ -3059,7 +3043,7 @@ const styles = StyleSheet.create({
 
   // ── Empty ──
   empty: { alignItems: "center", paddingVertical: 36, gap: 10 },
-  emptyText: { color: C.textLight, fontSize: 13, fontWeight: "500" },
+  emptyText: { color: C.textLight, fontSize: 13, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
 
   // ── No Profile ──
   emptyIconWrap: {
@@ -3073,8 +3057,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 22,
-    fontWeight: "900",
-    color: C.text,
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text,
     textAlign: "center",
     marginBottom: 10,
   },
@@ -3095,7 +3078,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     borderRadius: 999,
   },
-  ctaBtnText: { color: "#000", fontWeight: "800", fontSize: 15 },
+  ctaBtnText: { color: "#000", fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", fontSize: 15 },
   headerRow1: {
     flexDirection: "row",
     alignItems: "center",
@@ -3174,7 +3157,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  searchResultName: { fontSize: 14, fontWeight: "700", color: C.text },
+  searchResultName: { fontSize: 14, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text },
   searchResultSub: { fontSize: 12, color: C.textSub, marginTop: 2 },
   searchResultTypeBadge: {
     paddingHorizontal: 8,
@@ -3236,15 +3219,13 @@ const bannerStyles = StyleSheet.create({
   },
   title: {
     fontSize: 15,
-    fontWeight: "800",
-    color: "#1F2937",
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#1F2937",
   },
   sub: {
     fontSize: 12,
     color: "#64748B",
     marginTop: 2,
-    fontWeight: "500",
-  },
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
   actionBtn: {
     backgroundColor: "#147538",
     paddingHorizontal: 14,
@@ -3254,8 +3235,7 @@ const bannerStyles = StyleSheet.create({
   actionText: {
     color: "#fff",
     fontSize: 13,
-    fontWeight: "800",
-  },
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
   closeBtn: {
     width: 28,
     height: 28,

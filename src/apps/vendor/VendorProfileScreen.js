@@ -64,11 +64,12 @@ export default function VendorProfileScreen() {
   const [uploading, setUploading] = useState(false);
 
   // Modals
-  const [imageModal, setImageModal] = useState(false);
-  const [timeModal, setTimeModal] = useState(false);
+  const [imageModal, setImageModal]     = useState(false);
+  const [timeModal, setTimeModal]       = useState(false);
   const [deliveryModal, setDeliveryModal] = useState(false);
-  const [editModal, setEditModal] = useState(false);
-  const [logoutModal, setLogoutModal] = useState(false);
+  const [editModal, setEditModal]       = useState(false);
+  const [logoutModal, setLogoutModal]   = useState(false);
+  const [categoryModal, setCategoryModal] = useState(false);
 
   // Edit fields
   const [activeField, setActiveField] = useState("");
@@ -400,7 +401,7 @@ export default function VendorProfileScreen() {
                 rs={rs}
                 isWide={isWide}
               />
-              <StoreInfoCard vendor={vendor} onEdit={openEdit} rs={rs} isWide={isWide} />
+              <StoreInfoCard vendor={vendor} onEdit={openEdit} onCategoryPress={() => setCategoryModal(true)} rs={rs} isWide={isWide} />
             </View>
             <View style={{ flex: 1, gap: 16 }}>
               <StoreSettingsCard
@@ -425,7 +426,7 @@ export default function VendorProfileScreen() {
               rs={rs}
               isWide={isWide}
             />
-            <StoreInfoCard vendor={vendor} onEdit={openEdit} rs={rs} isWide={isWide} />
+            <StoreInfoCard vendor={vendor} onEdit={openEdit} onCategoryPress={() => setCategoryModal(true)} rs={rs} isWide={isWide} />
             <StoreSettingsCard
               vendor={vendor}
               storeOpen={storeOpen}
@@ -479,10 +480,10 @@ export default function VendorProfileScreen() {
                 onPress={() => setEditModal(false)}
                 style={styles.modalCancelBtn}
               >
-                <Text style={{ color: C.textSub, fontWeight: "600" }}>Cancel</Text>
+                <Text style={{ color: C.textSub, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={saveEdit} style={styles.modalSaveBtn}>
-                <Text style={{ color: "#000", fontWeight: "800" }}>Save</Text>
+                <Text style={{ color: "#000", fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"}}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -553,7 +554,7 @@ export default function VendorProfileScreen() {
                 }
               }}
             >
-              <Text style={{ color: "#000", fontWeight: "800" }}>Save URL</Text>
+              <Text style={{ color: "#000", fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"}}>Save URL</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -632,16 +633,72 @@ export default function VendorProfileScreen() {
                 onPress={() => setLogoutModal(false)}
                 style={[styles.modalCancelBtn, { flex: 1 }]}
               >
-                <Text style={{ color: C.textSub, fontWeight: "600" }}>Cancel</Text>
+                <Text style={{ color: C.textSub, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => { setLogoutModal(false); logout(); }}
                 style={[styles.logoutConfirmBtn, { flex: 1 }]}
               >
-                <Text style={{ color: "#fff", fontWeight: "800" }}>Log out</Text>
+                <Text style={{ color: "#fff", fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"}}>Log out</Text>
               </TouchableOpacity>
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* ── STORE CATEGORY MODAL ─────────────────────────── */}
+      <Modal
+        transparent
+        visible={categoryModal}
+        animationType="slide"
+        onRequestClose={() => setCategoryModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={() => setCategoryModal(false)}
+        />
+        <View style={[styles.sheet, { paddingBottom: Platform.OS === "ios" ? 34 : 20 }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Store Category</Text>
+            <TouchableOpacity onPress={() => setCategoryModal(false)} style={styles.modalClose}>
+              <MaterialIcons name="close" size={20} color={C.text} />
+            </TouchableOpacity>
+          </View>
+          {[
+            { value: "grocery",   label: "Grocery Store",     icon: "local-grocery-store", sub: "Daily essentials, FMCG" },
+            { value: "medical",   label: "Medical / Pharmacy", icon: "local-pharmacy",       sub: "Medicines, health products" },
+            { value: "bakery",    label: "Bakery",             icon: "cake",                 sub: "Bread, cakes, snacks" },
+            { value: "dairy",     label: "Dairy & Eggs",       icon: "egg",                  sub: "Milk, paneer, eggs" },
+            { value: "electronics", label: "Electronics",     icon: "devices",              sub: "Gadgets, accessories" },
+            { value: "stationery", label: "Stationery",        icon: "edit",                 sub: "Books, pens, office" },
+            { value: "restaurant", label: "Restaurant / Food", icon: "restaurant",           sub: "Cooked food, meals" },
+            { value: "general",   label: "General Store",      icon: "store",                sub: "Multi-category" },
+          ].map((opt) => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[
+                styles.sheetOption,
+                vendor.store_category === opt.value && { backgroundColor: C.greenDim },
+              ]}
+              onPress={() => {
+                handleUpdateField("store_category", opt.value);
+                setCategoryModal(false);
+              }}
+            >
+              <View style={[styles.sheetOptionIcon, { backgroundColor: C.greenDim }]}>
+                <MaterialIcons name={opt.icon} size={20} color={C.green} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sheetOptionTitle}>{opt.label}</Text>
+                <Text style={styles.sheetOptionSub}>{opt.sub}</Text>
+              </View>
+              {vendor.store_category === opt.value && (
+                <MaterialIcons name="check-circle" size={20} color={C.green} />
+              )}
+            </TouchableOpacity>
+          ))}
         </View>
       </Modal>
     </View>
@@ -656,8 +713,7 @@ function StatStripItem({ value, label, color, rs, isWide }) {
       <Text
         style={{
           fontSize: isWide ? 18 : rs(14, 16, 17),
-          fontWeight: "800",
-          color,
+          fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color,
           letterSpacing: -0.3,
         }}
         numberOfLines={1}
@@ -670,8 +726,7 @@ function StatStripItem({ value, label, color, rs, isWide }) {
           fontSize: isWide ? 11 : rs(9, 10, 10),
           color: "rgba(255,255,255,0.6)",
           marginTop: 3,
-          fontWeight: "500",
-        }}
+          fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"}}
       >
         {label}
       </Text>
@@ -759,13 +814,26 @@ function PersonalInfoCard({ vendor, onEdit, rs, isWide }) {
   );
 }
 
-function StoreInfoCard({ vendor, onEdit, rs, isWide }) {
+function StoreInfoCard({ vendor, onEdit, onCategoryPress, rs, isWide }) {
+  const CATEGORY_LABELS = {
+    grocery: "Grocery Store", medical: "Medical / Pharmacy",
+    bakery: "Bakery", dairy: "Dairy & Eggs",
+    electronics: "Electronics", stationery: "Stationery",
+    restaurant: "Restaurant / Food", general: "General Store",
+  };
   return (
     <SectionCard title="Store Info" overline="DETAILS" rs={rs} isWide={isWide}>
       <InfoRow
         label="Address"
         value={`${vendor.address_line}${vendor.pincode ? ", " + vendor.pincode : ""}`}
         onEdit={() => onEdit("address_line", "Address", vendor.address_line)}
+        rs={rs}
+        isWide={isWide}
+      />
+      <InfoRow
+        label="Store Category"
+        value={CATEGORY_LABELS[vendor.store_category] || "Not set"}
+        onEdit={onCategoryPress}
         rs={rs}
         isWide={isWide}
       />
@@ -916,7 +984,7 @@ function AccountSettingsCard({ rs, isWide }) {
             </View>
           </View>
           {item.right ? (
-            <Text style={{ fontSize: 12, color: "#059669", fontWeight: "700" }}>{item.right}</Text>
+            <Text style={{ fontSize: 12, color: "#059669", fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"}}>{item.right}</Text>
           ) : (
             <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
           )}
@@ -957,8 +1025,7 @@ const styles = StyleSheet.create({
   hero: { width: "100%" },
   heroOverline: {
     color: "rgba(255,255,255,0.55)",
-    fontWeight: "700",
-    letterSpacing: 1.2,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", letterSpacing: 1.2,
   },
   heroRow: { flexDirection: "row", alignItems: "center" },
   avatarRing: {
@@ -982,7 +1049,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#147538",
   },
-  heroName: { fontWeight: "900", color: "#fff", letterSpacing: -0.5, marginBottom: 6 },
+  heroName: { fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff", letterSpacing: -0.5, marginBottom: 6 },
   heroPhonePill: {
     flexDirection: "row",
     alignItems: "center",
@@ -996,8 +1063,8 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     marginBottom: 6,
   },
-  heroPhone: { color: "#fff", fontWeight: "600" },
-  heroSince: { color: "rgba(255,255,255,0.55)", fontWeight: "500" },
+  heroPhone: { color: "#fff", fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"},
+  heroSince: { color: "rgba(255,255,255,0.55)", fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -1010,7 +1077,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   statusDot: { width: 7, height: 7, borderRadius: 3.5 },
-  statusText: { fontWeight: "700" },
+  statusText: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
 
   // Stats strip
   statsStrip: {
@@ -1048,11 +1115,10 @@ const styles = StyleSheet.create({
   },
   sectionOverline: {
     color: C.textLight,
-    fontWeight: "700",
-    letterSpacing: 1,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", letterSpacing: 1,
     marginBottom: 2,
   },
-  sectionTitle: { fontWeight: "800", color: C.text, letterSpacing: -0.3 },
+  sectionTitle: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text, letterSpacing: -0.3 },
 
   // Info row
   infoRow: {
@@ -1067,11 +1133,10 @@ const styles = StyleSheet.create({
   infoRowLeft: { flex: 1, paddingRight: 12 },
   infoLabel: {
     color: C.textLight,
-    fontWeight: "700",
-    letterSpacing: 0.5,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", letterSpacing: 0.5,
     marginBottom: 3,
   },
-  infoValue: { fontWeight: "600", color: C.text },
+  infoValue: { fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: C.text },
   editIconBtn: {
     width: 32,
     height: 32,
@@ -1098,7 +1163,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  settingTitle: { fontSize: 14, fontWeight: "700", color: C.text },
+  settingTitle: { fontSize: 14, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text },
   settingSub: { fontSize: 12, color: C.textSub, marginTop: 1 },
 
   // Logout button
@@ -1117,7 +1182,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 1,
   },
-  logoutText: { fontWeight: "800", color: C.red },
+  logoutText: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.red },
 
   // Modals
   overlay: {
@@ -1143,7 +1208,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 18,
   },
-  modalTitle: { fontSize: 17, fontWeight: "800", color: C.text },
+  modalTitle: { fontSize: 17, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text },
   modalClose: {
     width: 32,
     height: 32,
@@ -1154,8 +1219,7 @@ const styles = StyleSheet.create({
   },
   modalLabel: {
     fontSize: 12,
-    fontWeight: "700",
-    color: C.textLight,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.textLight,
     letterSpacing: 0.5,
     marginBottom: 8,
   },
@@ -1214,7 +1278,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: C.border,
   },
-  sheetTitle: { fontSize: 17, fontWeight: "800", color: C.text },
+  sheetTitle: { fontSize: 17, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text },
   sheetOption: {
     flexDirection: "row",
     alignItems: "center",
@@ -1231,7 +1295,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  sheetOptionTitle: { fontSize: 15, fontWeight: "700", color: C.text },
+  sheetOptionTitle: { fontSize: 15, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text },
   sheetOptionSub: { fontSize: 12, color: C.textSub, marginTop: 2 },
 
   // Logout modal
@@ -1247,8 +1311,7 @@ const styles = StyleSheet.create({
   },
   logoutModalTitle: {
     fontSize: 20,
-    fontWeight: "900",
-    color: C.text,
+    fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text,
     textAlign: "center",
     marginBottom: 8,
   },

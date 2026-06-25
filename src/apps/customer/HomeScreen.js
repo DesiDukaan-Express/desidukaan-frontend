@@ -123,31 +123,82 @@ function AddressPicker({
   onClose,
   onSelect,
   onSaveNew,
+  onUpdate,
   onUseLocation,
   onDelete,
 }) {
-  const [showForm, setShowForm] = React.useState(false);
+  // mode: 'list' | 'add' | 'edit'
+  const [mode, setMode] = React.useState("list");
+  const [editingAddr, setEditingAddr] = React.useState(null);
   const [inputText, setInputText] = React.useState("");
+  const [inputLabel, setInputLabel] = React.useState("");
   const [inputErr, setInputErr] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
     if (!visible) {
-      setShowForm(false);
+      setMode("list");
+      setEditingAddr(null);
       setInputText("");
+      setInputLabel("");
       setInputErr("");
+      setSaving(false);
     }
   }, [visible]);
 
-  const handleSave = () => {
+  const openAdd = () => {
+    setEditingAddr(null);
+    setInputText("");
+    setInputLabel("");
+    setInputErr("");
+    setMode("add");
+  };
+
+  const openEdit = (addr) => {
+    setEditingAddr(addr);
+    setInputText(addr.address_line || addr.address || "");
+    setInputLabel(addr.label || "Home");
+    setInputErr("");
+    setMode("edit");
+  };
+
+  const handleSaveAdd = () => {
     if (inputText.trim().length < 5) {
       setInputErr("Please enter a valid address (at least 5 characters)");
       return;
     }
     onSaveNew(inputText.trim());
+    setMode("list");
     setInputText("");
     setInputErr("");
-    setShowForm(false);
   };
+
+  const handleSaveEdit = async () => {
+    if (inputText.trim().length < 5) {
+      setInputErr("Please enter a valid address (at least 5 characters)");
+      return;
+    }
+    setSaving(true);
+    await onUpdate?.(editingAddr.id, {
+      address_line: inputText.trim(),
+      label: inputLabel.trim() || editingAddr.label || "Home",
+    });
+    setSaving(false);
+    setMode("list");
+    setEditingAddr(null);
+    setInputText("");
+    setInputLabel("");
+  };
+
+  // helper: pick icon name by label
+  const getAddrIcon = (label) => {
+    const l = (label || "").toLowerCase();
+    if (l.includes("home")) return "home";
+    if (l.includes("office") || l.includes("work")) return "business";
+    return "location-on";
+  };
+
+  const isFormMode = mode === "add" || mode === "edit";
 
   return (
     <Modal
@@ -157,32 +208,64 @@ function AddressPicker({
       onRequestClose={onClose}
     >
       <Pressable style={ap.backdrop} onPress={onClose}>
-        <Pressable style={ap.sheet} onPress={() => { }}>
+        <Pressable style={ap.sheet} onPress={() => {}}>
+          {/* Handle */}
           <View style={ap.handle} />
+
+          {/* Header */}
           <View style={ap.titleRow}>
             <Text style={ap.title}>
-              {showForm ? "Add new address" : "Select delivery address"}
+              {mode === "add"
+                ? "Add new address"
+                : mode === "edit"
+                ? "Edit address"
+                : "Select delivery address"}
             </Text>
             <TouchableOpacity
-              onPress={() => (showForm ? setShowForm(false) : onClose())}
+              onPress={() => (isFormMode ? setMode("list") : onClose())}
               style={ap.closeBtn}
             >
               <MaterialIcons
-                name={showForm ? "arrow-back" : "close"}
-                size={16}
-                color={C.gray500}
+                name={isFormMode ? "arrow-back" : "close"}
+                size={18}
+                color={C.gray600}
               />
             </TouchableOpacity>
           </View>
 
-          {showForm ? (
+          {isFormMode ? (
+            /* ── Add / Edit Form ── */
             <View style={ap.formWrap}>
+              {/* Label field (only shown in edit) */}
+              {mode === "edit" && (
+                <>
+                  <Text style={ap.formLabel}>Label (e.g. Home, Office)</Text>
+                  <View style={[ap.inputBoxSingle, inputErr ? ap.inputBoxError : null]}>
+                    <MaterialIcons
+                      name="label"
+                      size={15}
+                      color={C.green}
+                      style={{ marginLeft: 14 }}
+                    />
+                    <TextInput
+                      style={ap.input}
+                      placeholder="Home"
+                      placeholderTextColor={C.gray400}
+                      value={inputLabel}
+                      onChangeText={(t) => setInputLabel(t)}
+                      underlineColorAndroid="transparent"
+                    />
+                  </View>
+                  <View style={{ height: 12 }} />
+                </>
+              )}
+
               <Text style={ap.formLabel}>Full address</Text>
               <View style={[ap.inputBox, inputErr ? ap.inputBoxError : null]}>
                 <MaterialIcons
                   name="location-on"
                   size={15}
-                  color={inputErr ? "#DC2626" : C.green}
+                  color={inputErr ? C.red : C.green}
                   style={{ marginLeft: 14 }}
                 />
                 <TextInput
@@ -190,10 +273,7 @@ function AddressPicker({
                   placeholder="House no., street, area, city…"
                   placeholderTextColor={C.gray400}
                   value={inputText}
-                  onChangeText={(t) => {
-                    setInputText(t);
-                    setInputErr("");
-                  }}
+                  onChangeText={(t) => { setInputText(t); setInputErr(""); }}
                   multiline
                   numberOfLines={3}
                   autoFocus
@@ -204,107 +284,110 @@ function AddressPicker({
               <TouchableOpacity
                 style={[
                   ap.saveBtn,
-                  inputText.trim().length < 5 && ap.saveBtnDisabled,
+                  (inputText.trim().length < 5 || saving) && ap.saveBtnDisabled,
                 ]}
-                onPress={handleSave}
+                onPress={mode === "edit" ? handleSaveEdit : handleSaveAdd}
                 activeOpacity={0.85}
-                disabled={inputText.trim().length < 5}
+                disabled={inputText.trim().length < 5 || saving}
               >
-                <MaterialIcons name="check" size={16} color={C.white} />
-                <Text style={ap.saveBtnText}>Save address</Text>
+                {saving ? (
+                  <ActivityIndicator size="small" color={C.white} />
+                ) : (
+                  <>
+                    <MaterialIcons name="check" size={16} color={C.white} />
+                    <Text style={ap.saveBtnText}>
+                      {mode === "edit" ? "Update address" : "Save address"}
+                    </Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           ) : (
+            /* ── Address List ── */
             <>
-              <TouchableOpacity
-                style={ap.locationRow}
-                onPress={onUseLocation}
-                activeOpacity={0.8}
-              >
+              {/* Use Current Location row */}
+              <TouchableOpacity style={ap.locationRow} onPress={onUseLocation} activeOpacity={0.8}>
                 <View style={ap.locationIconWrap}>
-                  <MaterialIcons name="my-location" size={18} color={C.orange} />
+                  <MaterialIcons name="my-location" size={20} color={C.green} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={ap.locationRowTitle}>Use current location</Text>
-                  <Text style={ap.locationRowSub}>
-                    Detect my location automatically
-                  </Text>
+                  <Text style={ap.locationRowSub}>Detect my location automatically</Text>
                 </View>
-                <MaterialIcons name="chevron-right" size={16} color={C.gray400} />
+                <MaterialIcons name="chevron-right" size={22} color={C.gray400} />
               </TouchableOpacity>
+
               <View style={ap.divider} />
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                style={{ maxHeight: 300 }}
-              >
+
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 340 }}>
                 {addresses.length === 0 ? (
                   <View style={ap.emptyWrap}>
-                    <MaterialIcons name="location-on" size={28} color={C.gray300} />
+                    <MaterialIcons name="location-on" size={32} color={C.gray300} />
                     <Text style={ap.emptyText}>No saved addresses yet</Text>
                   </View>
                 ) : (
                   addresses.map((addr) => {
                     const isActive = addr.id === selectedId;
                     const displayText = addr.address_line || addr.address || "";
+                    const iconName = getAddrIcon(addr.label);
                     return (
-                      <View key={addr.id} style={ap.addrRowWrapper}>
-                        <TouchableOpacity
-                          style={[ap.addrRow, isActive && { borderColor: C.green, backgroundColor: C.greenLight }]}
-                          onPress={() => onSelect(addr)}
-                          activeOpacity={0.8}
-                        >
-                          <View
-                            style={[
-                              ap.addrIconWrap,
-                              isActive && { backgroundColor: C.green },
-                            ]}
-                          >
-                            <MaterialIcons
-                              name="location-on"
-                              size={15}
-                              color={isActive ? C.white : C.gray500}
-                            />
-                          </View>
-                          <View style={{ flex: 1, paddingRight: 8 }}>
-                            <Text
-                              style={[
-                                ap.addrLabel,
-                                isActive && { color: C.greenDark },
-                              ]}
-                            >
+                      <TouchableOpacity
+                        key={addr.id}
+                        style={[ap.addrCard, isActive && ap.addrCardActive]}
+                        onPress={() => onSelect(addr)}
+                        activeOpacity={0.85}
+                      >
+                        {/* Icon badge */}
+                        <View style={[ap.addrIconBadge, isActive && ap.addrIconBadgeActive]}>
+                          <MaterialIcons name={iconName} size={20} color={isActive ? C.white : C.gray500} />
+                        </View>
+
+                        {/* Content */}
+                        <View style={{ flex: 1 }}>
+                          <View style={ap.addrCardTopRow}>
+                            <Text style={[ap.addrLabel, isActive && ap.addrLabelActive]}>
                               {addr.label || "Home"}
                             </Text>
-                            <Text style={ap.addrText} numberOfLines={2}>
-                              {displayText}
-                            </Text>
+                            {/* Radio / Check indicator */}
+                            {isActive ? (
+                              <View style={ap.checkCircle}>
+                                <MaterialIcons name="check" size={13} color={C.white} />
+                              </View>
+                            ) : (
+                              <View style={ap.radioCircle} />
+                            )}
                           </View>
-                          {isActive && (
-                            <View style={ap.activeTick}>
-                              <MaterialIcons name="check" size={12} color={C.white} />
-                            </View>
-                          )}
-                        </TouchableOpacity>
-
-                        {!isActive && (
-                          <TouchableOpacity
-                            style={ap.deleteBtn}
-                            onPress={() => onDelete && onDelete(addr.id)}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                          >
-                            <MaterialIcons name="delete" size={16} color={C.red} />
-                          </TouchableOpacity>
-                        )}
-                      </View>
+                          <Text style={ap.addrText} numberOfLines={2}>{displayText}</Text>
+                          {/* Action buttons */}
+                          <View style={ap.addrActions}>
+                            <TouchableOpacity
+                              style={ap.editBtn}
+                              onPress={() => openEdit(addr)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <MaterialIcons name="edit" size={14} color={C.gray700} />
+                              <Text style={ap.editBtnText}>Edit</Text>
+                            </TouchableOpacity>
+                            {!isActive && (
+                              <TouchableOpacity
+                                style={ap.deleteBtn}
+                                onPress={() => onDelete && onDelete(addr.id)}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              >
+                                <MaterialIcons name="delete" size={18} color={C.red} />
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        </View>
+                      </TouchableOpacity>
                     );
                   })
                 )}
               </ScrollView>
-              <TouchableOpacity
-                style={ap.addNewBtn}
-                onPress={() => setShowForm(true)}
-                activeOpacity={0.85}
-              >
-                <MaterialIcons name="add" size={16} color={C.green} />
+
+              {/* Add new address */}
+              <TouchableOpacity style={ap.addNewBtn} onPress={openAdd} activeOpacity={0.85}>
+                <MaterialIcons name="add" size={20} color={C.green} />
                 <Text style={ap.addNewText}>Add new address</Text>
               </TouchableOpacity>
             </>
@@ -315,144 +398,168 @@ function AddressPicker({
   );
 }
 
+
 const ap = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(0,0,0,0.50)",
     justifyContent: "flex-end",
   },
   sheet: {
     backgroundColor: C.white,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 36,
+    paddingTop: 10,
+    paddingBottom: 40,
   },
   handle: {
-    width: 40,
-    height: 4,
+    width: 48,
+    height: 5,
     backgroundColor: C.gray200,
-    borderRadius: 2,
+    borderRadius: 3,
     alignSelf: "center",
-    marginBottom: 20,
-  },
-  addrRowWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-    gap: 8,
-  },
-  deleteBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: C.redLight,
-    alignItems: "center",
-    justifyContent: "center",
+    marginBottom: 16,
   },
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 18,
+    marginBottom: 20,
   },
-  title: { fontSize: 18, fontWeight: "900", color: C.gray900 },
+  title: { fontSize: 20, fontWeight: "800", color: C.gray900 },
   closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: C.gray100,
     alignItems: "center",
     justifyContent: "center",
   },
+  // Location row
   locationRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    paddingVertical: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    backgroundColor: C.white,
   },
   locationIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: C.greenLight,
     alignItems: "center",
     justifyContent: "center",
   },
   locationRowTitle: { fontSize: 15, fontWeight: "700", color: C.gray900 },
-  locationRowSub: { fontSize: 12, color: C.gray400, marginTop: 2 },
-  divider: { height: 1, backgroundColor: C.gray100, marginVertical: 12 },
-  emptyWrap: { alignItems: "center", paddingVertical: 32, gap: 10 },
+  locationRowSub: { fontSize: 12, color: C.gray500, marginTop: 2 },
+  divider: { height: 1, backgroundColor: C.gray100, marginVertical: 14 },
+  emptyWrap: { alignItems: "center", paddingVertical: 36, gap: 10 },
   emptyText: { fontSize: 14, color: C.gray400 },
-  addrRow: {
+  // New card-style address row
+  addrCard: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 14,
-    paddingVertical: 13,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    marginBottom: 6,
+    padding: 14,
+    borderRadius: 20,
+    marginBottom: 12,
     borderWidth: 1.5,
     borderColor: C.gray200,
     backgroundColor: C.white,
   },
-  addrRowActive: { borderColor: C.green, backgroundColor: C.greenLight },
-  addrIconWrap: {
-    width: 38,
-    height: 38,
+  addrCardActive: {
+    borderColor: C.green,
+    borderWidth: 2,
+    backgroundColor: C.greenLight,
+  },
+  addrIconBadge: {
+    width: 42,
+    height: 42,
     borderRadius: 12,
     backgroundColor: C.gray100,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+    marginTop: 2,
   },
-  addrIconActive: { backgroundColor: C.green },
-  addrLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: C.gray900,
-    textTransform: "capitalize",
+  addrIconBadgeActive: { backgroundColor: C.green },
+  addrCardTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
   },
-  addrLabelActive: { color: C.greenDark },
-  addrText: { fontSize: 12, color: C.gray500, lineHeight: 17 },
-  activeTick: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
+  addrLabel: { fontSize: 15, fontWeight: "700", color: C.gray900, textTransform: "capitalize" },
+  addrLabelActive: { color: C.green },
+  radioCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: C.gray300,
+  },
+  checkCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: C.green,
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
   },
+  addrText: { fontSize: 13, color: C.gray500, lineHeight: 18 },
+  addrActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 10,
+  },
+  editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: C.gray100,
+  },
+  editBtnText: { fontSize: 12, fontWeight: "600", color: C.gray700 },
+  deleteBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: C.redLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // Add new button (dashed)
   addNewBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    marginTop: 14,
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: C.greenBorder,
+    marginTop: 6,
+    paddingVertical: 16,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: C.green,
     backgroundColor: C.greenLight,
   },
   addNewText: { fontSize: 15, fontWeight: "700", color: C.green },
+  // Form
   formWrap: { paddingTop: 4 },
-  formLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: C.gray700,
-    marginBottom: 8,
-    letterSpacing: 0.2,
-  },
+  formLabel: { fontSize: 12, fontWeight: "700", color: C.gray700, marginBottom: 8, letterSpacing: 0.2 },
   inputBox: {
     flexDirection: "row",
     alignItems: "flex-start",
-    backgroundColor: C.greenLight,
+    backgroundColor: C.gray100,
     borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: C.greenBorder,
     minHeight: 90,
     paddingVertical: 12,
     paddingRight: 14,
@@ -467,8 +574,9 @@ const ap = StyleSheet.create({
     fontWeight: "500",
     textAlignVertical: "top",
     lineHeight: 22,
+    ...Platform.select({ web: { outlineStyle: "none" } }),
   },
-  inputErr: { fontSize: 12, color: "#DC2626", marginTop: 6, fontWeight: "500" },
+  inputErr: { fontSize: 12, color: C.red, marginTop: 6, fontWeight: "500" },
   saveBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -481,6 +589,15 @@ const ap = StyleSheet.create({
   },
   saveBtnDisabled: { backgroundColor: C.greenMid },
   saveBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
+  // Single-line input box for label field in edit mode
+  inputBoxSingle: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingRight: 14,
+  },
 });
 
 // ─── Store Picker Modal ────────────────────────────────────────────────────────
@@ -694,6 +811,24 @@ const CAT_ACCENT = {
   "Rice": { bg: "#FEFCE8", accent: "#EAB308", icon: "🌾" },
   _default: { bg: "#F3F4F6", accent: "#6B7280", icon: "📦" },
 };
+
+// ─── Store category metadata (for filter chips on Nearby Stores) ───────────────
+const STORE_CATEGORY_META = {
+  grocery:     { icon: "🛒", color: "#16A34A", bg: "#F0FDF4" },
+  medical:     { icon: "💊", color: "#2563EB", bg: "#EFF6FF" },
+  restaurant:  { icon: "🍽️", color: "#EA580C", bg: "#FFF7ED" },
+  bakery:      { icon: "🥖", color: "#D97706", bg: "#FFFBEB" },
+  dairy:       { icon: "🥛", color: "#0EA5E9", bg: "#F0F9FF" },
+  electronics: { icon: "📱", color: "#7C3AED", bg: "#FAF5FF" },
+  stationery:  { icon: "✏️", color: "#475569", bg: "#F8FAFC" },
+  general:     { icon: "🏪", color: "#6B7280", bg: "#F3F4F6" },
+  _default:    { icon: "🏪", color: "#6B7280", bg: "#F3F4F6" },
+};
+
+
+
+
+
 
 // ─── Build 3-level hierarchy from flat inventory ───────────────────────────────
 // Returns: { [topCatName]: { [subCatName]: inventoryItem[] } }
@@ -1182,10 +1317,9 @@ const VENDOR_TYPE_META = {
   fruits: { label: "Fruits", bg: "#ECFDF5", color: "#065F46" },
 };
 
-// ─── Item Card ─────────────────────────────────────────────────────────────────
+// ─── Item Card (grid, used inside CategoryBrowseSheet) ────────────────────────
 function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker }) {
   const size = cardWidth || 130;
-  console.log(item)
   const imgUri =
     item.img ||
     item.image_url ||
@@ -1254,6 +1388,184 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
     </View>
   );
 }
+
+// ─── Popular Item Card (horizontal scroll, HTML-reference style) ───────────────
+function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker }) {
+  const CARD_W = 160;
+  const IMG_H = 100;
+
+  const imgUri =
+    item.img ||
+    item.image_url ||
+    CAT_FALLBACK_IMGS[item.category] ||
+    CAT_FALLBACK_IMGS._default;
+  const hasMrp = item.orig && item.orig > item.price;
+  const discPct = hasMrp ? Math.round((1 - item.price / item.orig) * 100) : 0;
+  const loose = isLooseItem(item);
+
+  return (
+    <View style={pic.card}>
+      {/* ── Image section ── */}
+      <View style={[pic.imgWrap, { height: IMG_H }]}>
+        {/* Discount badge – top-left */}
+        {hasMrp && (
+          <View style={pic.discBadge}>
+            <Text style={pic.discBadgeText}>{discPct}% OFF</Text>
+          </View>
+        )}
+        {/* Loose badge – top-right */}
+        {loose && (
+          <View style={[pic.discBadge, { right: 0, left: 'auto', backgroundColor: C.cyan }]}>
+            <Text style={pic.discBadgeText}>Loose</Text>
+          </View>
+        )}
+        <Image
+          source={{ uri: imgUri }}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="cover"
+        />
+      </View>
+
+      {/* ── Info section ── */}
+      <View style={pic.info}>
+        <Text style={pic.name} numberOfLines={1}>{item.name}</Text>
+        <Text style={pic.unit}>{item.unit}</Text>
+
+        {/* Price + Add button row */}
+        <View style={pic.priceRow}>
+          <View>
+            <Text style={pic.price}>₹{item.price}</Text>
+            {hasMrp && <Text style={pic.orig}>₹{item.orig}</Text>}
+          </View>
+
+          {qty === 0 ? (
+            <TouchableOpacity
+              style={pic.addBtn}
+              onPress={() => {
+                if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
+                else onAdd(item);
+              }}
+              activeOpacity={0.85}
+            >
+              <MaterialIcons
+                name={loose ? 'tune' : 'add'}
+                size={18}
+                color={C.white}
+              />
+            </TouchableOpacity>
+          ) : (
+            <View style={pic.qtyRow}>
+              <TouchableOpacity
+                style={pic.qtyBtn}
+                onPress={() => onRemove(item)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <MaterialIcons name="remove" size={12} color={C.white} />
+              </TouchableOpacity>
+              <Text style={pic.qtyNum}>{qty}</Text>
+              <TouchableOpacity
+                style={pic.qtyBtn}
+                onPress={() => onAdd(item)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <MaterialIcons name="add" size={12} color={C.white} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const pic = StyleSheet.create({
+  card: {
+    width: 160,
+    backgroundColor: C.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  imgWrap: {
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: 0,
+    backgroundColor: C.gray100,
+  },
+  discBadge: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    zIndex: 2,
+    backgroundColor: C.orange,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderBottomRightRadius: 8,
+  },
+  discBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: C.white,
+    letterSpacing: 0.3,
+  },
+  info: {
+    padding: 10,
+    paddingTop: 8,
+  },
+  name: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: C.gray900,
+    marginBottom: 2,
+    lineHeight: 18,
+  },
+  unit: {
+    fontSize: 11,
+    color: C.gray400,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 'auto',
+  },
+  price: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: C.gray900,
+  },
+  orig: {
+    fontSize: 10,
+    color: C.gray400,
+    textDecorationLine: 'line-through',
+    marginTop: 1,
+  },
+  addBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: C.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qtyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.green,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  qtyBtn: { paddingHorizontal: 7, paddingVertical: 7 },
+  qtyNum: { fontSize: 12, fontWeight: '800', color: C.white, minWidth: 18, textAlign: 'center' },
+});
 
 const ic = StyleSheet.create({
   card: {
@@ -1470,6 +1782,10 @@ export default function HomeScreen() {
   const [loadingVendors, setLoadingVendors] = useState(false);
   const [loadingInventory, setLoadingInventory] = useState(false);
 
+  // Store category filter
+  const [selectedStoreCategory, setSelectedStoreCategory] = useState(null);
+  const [storeCategories, setStoreCategories] = useState([]);
+
   // Category hierarchy from API
   const [apiCategories, setApiCategories] = useState([]);
 
@@ -1573,6 +1889,13 @@ export default function HomeScreen() {
       .catch(() => setApiCategories([]));
   }, []);
 
+  // Fetch store categories for filter chips
+  useEffect(() => {
+    vendorsAPI.getStoreCategories()
+      .then(res => setStoreCategories(res.data?.categories || []))
+      .catch(() => setStoreCategories([]));
+  }, []);
+
   // ── Handled by addressStore ──────────────────────────────────────────────────
 
 
@@ -1606,20 +1929,12 @@ export default function HomeScreen() {
   // ── Fetch vendors then inventory — FIXED stale closure ───────────────────────
   // We pass the fresh vendor list directly to fetchInventoryForVendors
   // instead of reading from state (which hasn't updated yet)
-  const fetchNearbyVendors = async (lat, lng) => {
+  const fetchNearbyVendors = async (lat, lng, storeCategory = null) => {
     setLoadingVendors(true);
     try {
-      const res = await vendorsAPI.getNearby(lat, lng, 10);
+      const res = await vendorsAPI.getNearby(lat, lng, 10, storeCategory);
       const list = res.data || [];
       // ── TEMP DEBUG — remove after checking terminal ──
-      if (list.length > 0) {
-        console.log("🔍 VENDOR:", JSON.stringify({
-          shop_name: list[0].shop_name,
-          vendor_type: list[0].vendor_type,
-          delivery_type: list[0].delivery_type,
-        }, null, 2));
-      }
-      console.log(list);
       setVendors(list);
       // Pass list directly — state update is async, list is synchronous
       await fetchInventoryForVendors(list);
@@ -1894,6 +2209,40 @@ export default function HomeScreen() {
 
   const showCategories = !loadingInventory && dynamicCategories.length > 0;
   const showPopular = !loadingInventory && popularItems.length > 0;
+  const openStoreCount = vendors.filter((vendor) => vendor.is_open).length;
+  const nearestStoreDistance = vendors
+    .map((vendor) => Number(vendor.distance_km))
+    .filter((distance) => Number.isFinite(distance))
+    .sort((a, b) => a - b)[0];
+  const heroTitle = locationCoords
+    ? "Your neighborhood market, online"
+    : "Set your location to start shopping";
+  const heroSub = locationCoords
+    ? `${openStoreCount || vendors.length || "Local"} stores ready with groceries, snacks, dairy and home essentials.`
+    : "Find nearby stores, compare essentials and get everything delivered to your door.";
+  const homeStats = [
+    {
+      icon: "storefront",
+      value: vendors.length ? `${vendors.length}` : "--",
+      label: "nearby stores",
+    },
+    {
+      icon: "inventory-2",
+      value: popularItems.length ? `${popularItems.length}+` : "--",
+      label: "popular picks",
+    },
+    {
+      icon: "near-me",
+      value: nearestStoreDistance ? `${nearestStoreDistance.toFixed(1)} km` : "Near you",
+      label: "closest store",
+    },
+  ];
+  const quickActions = [
+    { icon: "search", label: "Find Stores", onPress: () => navigation.navigate("Search") },
+    { icon: "shopping-bag", label: "Open Stores", onPress: () => navigation.navigate("Search") },
+    // { icon: "receipt-long", label: "Orders", onPress: () => navigation.navigate("Orders") },
+    // { icon: "location-on", label: "Address", onPress: openAddressPicker },
+  ];
 
 
   return (
@@ -1904,6 +2253,28 @@ export default function HomeScreen() {
       <Animated.View style={[s.headerWrap, { opacity: headerOpacity }]}>
         {wide ? (
           <View style={[s.headerRow, { paddingHorizontal: hPad }]}>
+            <TouchableOpacity
+              style={s.brandSection}
+              onPress={() => navigation.navigate("Home")}
+              activeOpacity={0.8}
+            >
+              <View style={s.miniLogoWrap}>
+                <LinearGradient
+                  colors={["#147538", "#0EE627"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={s.miniLogo}
+                >
+                  <MaterialIcons name="storefront" size={17} color={C.white} />
+                </LinearGradient>
+              </View>
+              {winW >= 900 && (
+                <Text style={s.brandName}>
+                  Kwik<Text style={s.brandAccent}>Pik</Text>
+                </Text>
+              )}
+            </TouchableOpacity>
+            <View style={s.headerDivider} />
             {/* {winW >= 900 && (
               <>
                 <View style={s.brandSection}>
@@ -1915,7 +2286,7 @@ export default function HomeScreen() {
                       <MaterialIcons name="shopping-cart" size={15} color={C.white} />
                     </LinearGradient>
                   </View>
-                  <GradientText text="DesiDukaan" style={s.brandName} />
+                  <GradientText text="KwikPik" style={s.brandName} />
                 </View>
                 <View style={s.headerDivider} />
               </>
@@ -1997,6 +2368,7 @@ export default function HomeScreen() {
           </View>
         ) : (
           <>
+            {/* ── Mobile header row: location (left) + account (right) ── */}
             <View style={[s.mobileRow1, { paddingHorizontal: hPad }]}>
               <TouchableOpacity
                 style={s.mobileLocBtn}
@@ -2013,49 +2385,61 @@ export default function HomeScreen() {
                     <Text style={s.locLoadText}>Locating…</Text>
                   </View>
                 ) : (
-                  <>
-                    <Text style={s.locationTop}>Delivering to</Text>
-                    <View style={s.locationBottomRow}>
-                      <Text style={s.mobileLocBottom} numberOfLines={1}>
-                        {locationShort || "Set location"}
-                      </Text>
-                      <MaterialIcons
-                        name="expand-more"
-                        size={13}
-                        color={C.gray700}
-                      />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <MaterialIcons name="location-on" size={20} color={C.green} />
+                    <View style={{ flexShrink: 1 }}>
+                      <Text style={s.locationTop}>Deliver to</Text>
+                      <View style={s.locationBottomRow}>
+                        <Text style={s.mobileLocBottom} numberOfLines={1}>
+                          {locationShort || "Set location"}
+                        </Text>
+                        <MaterialIcons
+                          name="expand-more"
+                          size={15}
+                          color={C.gray700}
+                        />
+                      </View>
                     </View>
-                  </>
+                  </View>
                 )}
+              </TouchableOpacity>
+              {/* Account icon — clean circle */}
+              <TouchableOpacity
+                style={s.mobileBrandBtn}
+                onPress={() => navigation.navigate("Home")}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={["#147538", "#0EE627"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={s.mobileBrandMark}
+                >
+                  <MaterialIcons name="storefront" size={18} color={C.white} />
+                </LinearGradient>
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.mobileProfileBtn}
                 onPress={() => navigation.navigate("Profile")}
                 activeOpacity={0.8}
               >
-                <View style={s.mobileAvatarRing}>
-                  <MaterialIcons name="person" size={18} color={C.orange} />
-                </View>
+                <MaterialIcons name="account-circle" size={36} color={C.green} />
               </TouchableOpacity>
             </View>
+
+            {/* ── Rounded pill search bar with mic ── */}
             <TouchableOpacity
               style={[s.mobileSearch, { marginHorizontal: hPad }]}
               onPress={() => navigation.navigate("Search")}
-              activeOpacity={0.8}
+              activeOpacity={0.9}
             >
-              <MaterialIcons name="search" size={16} color={C.gray400} />
-              <Text style={s.mobileSearchText}>Search stores, items…</Text>
+              <MaterialIcons name="search" size={18} color={C.gray400} />
+              <Text style={s.mobileSearchText}>Search 'fresh milk' or 'chips'…</Text>
+              <MaterialIcons name="mic" size={18} color={C.green} />
             </TouchableOpacity>
           </>
         )}
       </Animated.View>
-
-      <LinearGradient
-        colors={[C.orange, C.orangeDark, C.green, C.greenDark]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={s.accentLine}
-      />
 
       {/* ══ BODY ════════════════════════════════════════════════════════════ */}
       <Animated.ScrollView
@@ -2067,7 +2451,7 @@ export default function HomeScreen() {
         contentContainerStyle={s.scroll}
       >
         {/* 1. GREETING */}
-        <View style={[s.greetingRow, { paddingHorizontal: hPad }]}>
+        <View style={s.legacyGreetingRow}>
           <Text style={s.greetingLine}>
             {getGreeting()}{firstName ? "," : "!"}
             {firstName ? (
@@ -2082,7 +2466,15 @@ export default function HomeScreen() {
 
         {/* 2. HERO BANNER */}
         <View style={[s.bannerWrap, { paddingHorizontal: hPad }]}>
-          <View style={[s.heroBanner, { height: wide ? 200 : 160 }]}>
+          <View style={[s.heroIntro, wide && s.heroIntroWide]}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.greetingKicker}>{getGreeting()}</Text>
+              <Text style={s.heroIntroTitle}>
+                {firstName ? `Welcome back, ${firstName}` : "Welcome to KwikPik"}
+              </Text>
+            </View>
+          </View>
+          <View style={[s.heroBanner, { minHeight: wide ? 260 : 250 }]}>
             <Image
               source={{
                 uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&q=85&sig=banner",
@@ -2092,42 +2484,139 @@ export default function HomeScreen() {
             />
             <LinearGradient
               colors={[
-                "rgba(21,128,61,0.98)",
-                "rgba(21,128,61,0.92)",
-                "rgba(21,128,61,0.6)",
-                "rgba(21,128,61,0.1)",
-                "transparent",
+                "rgba(17,24,39,0.86)",
+                "rgba(21,128,61,0.76)",
+                "rgba(249,115,22,0.38)",
+                "rgba(17,24,39,0.12)",
               ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={StyleSheet.absoluteFillObject}
             />
-            <View style={[s.heroLeft, { width: wide ? "55%" : "70%" }]}>
-              <Text style={s.heroTitle}>{"Stock up on\ndaily essentials"}</Text>
-              <Text style={s.heroSub}>
-                {"Farm-fresh fruits, vegetables,\ndairy, eggs & more"}
-              </Text>
-              <TouchableOpacity
-                style={s.heroCTA}
-                onPress={() => navigation.navigate("Search")}
-                activeOpacity={0.85}
-              >
-                <Text style={s.heroCTAText}>Shop Now</Text>
-              </TouchableOpacity>
+            <View style={[s.heroLeft, { width: wide ? "62%" : "100%" }]}>
+              <View style={s.heroBadge}>
+                <MaterialIcons name="verified" size={13} color={C.green} />
+                <Text style={s.heroBadgeText}>Fresh from nearby stores</Text>
+              </View>
+              <Text style={s.heroTitle}>{heroTitle}</Text>
+              <Text style={s.heroSub}>{heroSub}</Text>
+              {/* <View style={s.heroActions}>
+                <TouchableOpacity
+                  style={s.heroCTA}
+                  onPress={() => navigation.navigate("Search")}
+                  activeOpacity={0.85}
+                >
+                  <MaterialIcons name="search" size={16} color={C.white} />
+                  <Text style={s.heroCTAText}>Start Shopping</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.heroGhostCTA}
+                  onPress={openAddressPicker}
+                  activeOpacity={0.85}
+                >
+                  <MaterialIcons name="location-on" size={15} color={C.white} />
+                  <Text style={s.heroGhostText}>Change Address</Text>
+                </TouchableOpacity>
+              </View> */}
+              <View style={s.heroStats}>
+                {homeStats.map((stat) => (
+                  <View key={stat.label} style={s.heroStat}>
+                    <MaterialIcons name={stat.icon} size={16} color={C.white} />
+                    <Text style={s.heroStatValue}>{stat.value}</Text>
+                    <Text style={s.heroStatLabel}>{stat.label}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
           </View>
         </View>
 
-        {/* 3. NEARBY STORES */}
+        {/* 3. NEARBY STORES — hidden as per design (user request) */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingLeft: hPad,
+            paddingRight: hPad,
+            paddingBottom: 8,
+            gap: 10,
+          }}
+          style={s.quickActionRail}
+        >
+          {quickActions.map((action) => (
+            <TouchableOpacity
+              key={action.label}
+              style={s.quickAction}
+              onPress={action.onPress}
+              activeOpacity={0.85}
+            >
+              <View style={s.quickActionIcon}>
+                <MaterialIcons name={action.icon} size={17} color={C.green} />
+              </View>
+              <Text style={s.quickActionText}>{action.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
         <View style={[s.sectionHeader, { paddingHorizontal: hPad }]}>
           <View>
             <Text style={s.sectionTitle}>Nearby Stores</Text>
             <Text style={s.sectionSub}>Delivering to your location</Text>
           </View>
-          <TouchableOpacity onPress={() => navigation.navigate("AllStores")}>
-            <Text style={s.viewAll}>View all</Text>
+          <TouchableOpacity onPress={() => navigation.navigate("Search")}>
+            <Text style={s.viewAll}>Explore</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Store Category Filter Chips */}
+        {storeCategories.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: hPad, paddingBottom: 8, gap: 8 }}
+            style={{ marginBottom: 8 }}
+          >
+            {/* All chip */}
+            <TouchableOpacity
+              style={[
+                s.storeCatChip,
+                selectedStoreCategory === null && s.storeCatChipActive,
+              ]}
+              onPress={() => {
+                setSelectedStoreCategory(null);
+                if (locationCoords) fetchNearbyVendors(locationCoords.lat, locationCoords.lng, null);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={[
+                s.storeCatChipText,
+                selectedStoreCategory === null && s.storeCatChipTextActive,
+              ]}>
+                🏪 All
+              </Text>
+            </TouchableOpacity>
+            {storeCategories.map(cat => {
+              const isActive = selectedStoreCategory === cat;
+              const catMeta = STORE_CATEGORY_META[cat] || STORE_CATEGORY_META._default;
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  style={[s.storeCatChip, isActive && s.storeCatChipActive]}
+                  onPress={() => {
+                    const newCat = isActive ? null : cat;
+                    setSelectedStoreCategory(newCat);
+                    if (locationCoords) fetchNearbyVendors(locationCoords.lat, locationCoords.lng, newCat);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.storeCatChipText, isActive && s.storeCatChipTextActive]}>
+                    {catMeta.icon} {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
 
         {loadingVendors ? (
           <View style={[s.loadingRow, { paddingHorizontal: hPad }]}>
@@ -2272,14 +2761,15 @@ export default function HomeScreen() {
             <View
               style={[
                 s.sectionHeader,
-                { marginTop: 28, paddingHorizontal: hPad },
+                { marginTop: 24, paddingHorizontal: hPad },
               ]}
             >
-              <View>
-                <Text style={s.sectionTitle}>Shop by Category</Text>
-                <Text style={s.sectionSub}>Tap to browse items inside</Text>
-              </View>
+              <Text style={s.sectionTitle}>Shop by Category</Text>
+              <TouchableOpacity onPress={() => navigation.navigate("Search")}>
+                <Text style={s.viewAll}>View All</Text>
+              </TouchableOpacity>
             </View>
+            {/* 4-column clean tile grid */}
             <View
               style={{
                 flexDirection: "row",
@@ -2287,22 +2777,13 @@ export default function HomeScreen() {
                 paddingHorizontal: hPad,
                 paddingBottom: 8,
                 rowGap: 16,
-                columnGap: 8,
+                columnGap: 0,
               }}
             >
               {dynamicCategories.map((cat) => {
-                const subCats = categoryHierarchy[cat.label]
-                  ? Object.keys(categoryHierarchy[cat.label])
-                  : [];
-                const itemCount = subCats.reduce(
-                  (sum, sc) => sum + (categoryHierarchy[cat.label]?.[sc]?.length || 0), 0
-                );
-
-                // Responsive columns
                 const catCols = winW >= 1024 ? 10 : winW >= 768 ? 6 : winW >= 480 ? 5 : 4;
-                const catGap = 8;
-                const catItemW = (winW - (hPad * 2) - (catGap * (catCols - 1))) / catCols;
-                const bandSize = catItemW;
+                const catItemW = (winW - (hPad * 2)) / catCols;
+                const tileSize = catItemW * 0.72;
 
                 return (
                   <TouchableOpacity
@@ -2314,19 +2795,22 @@ export default function HomeScreen() {
                     }}
                     activeOpacity={0.8}
                   >
-                    <View style={[s.catCardBand, { width: bandSize, height: bandSize }]}>
-                      <View style={[s.catCardImgWrap, { backgroundColor: cat.bg }]}>
-                        <Image
-                          source={{ uri: cat.img }}
-                          style={s.catImg}
-                          resizeMode="cover"
-                        />
-                      </View>
-                      {cat.icon && (
-                        <View style={[s.catCardEmojiWrap, { width: bandSize * 0.35, height: bandSize * 0.35 }]}>
-                          <Text style={[s.catCardEmoji, { fontSize: bandSize * 0.22 }]}>{cat.icon}</Text>
-                        </View>
-                      )}
+                    {/* Square tile with image */}
+                    <View
+                      style={[
+                        s.catTile,
+                        {
+                          width: tileSize,
+                          height: tileSize,
+                          backgroundColor: cat.bg,
+                        },
+                      ]}
+                    >
+                      <Image
+                        source={{ uri: cat.img }}
+                        style={{ width: tileSize * 0.72, height: tileSize * 0.72 }}
+                        resizeMode="contain"
+                      />
                     </View>
                     <Text style={s.catCardLabel} numberOfLines={2}>{cat.label}</Text>
                   </TouchableOpacity>
@@ -2345,7 +2829,7 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* 5. POPULAR ITEMS */}
+        {/* 5. POPULAR ITEMS — horizontal scroll like HTML reference */}
         {showPopular && (
           <>
             <View
@@ -2354,27 +2838,33 @@ export default function HomeScreen() {
                 { marginTop: 28, paddingHorizontal: hPad },
               ]}
             >
-              <View>
-                <Text style={s.sectionTitle}>Popular Items</Text>
-                <Text style={s.sectionSub}>Available at nearby stores</Text>
-              </View>
+              <Text style={s.sectionTitle}>Popular Items</Text>
               <TouchableOpacity onPress={() => navigation.navigate("Search")}>
                 <Text style={s.viewAll}>See all</Text>
               </TouchableOpacity>
             </View>
-            <View style={[s.itemsGrid, { paddingHorizontal: hPad }]}>
+            {/* Horizontal scroll cards */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingLeft: hPad,
+                paddingRight: 8,
+                paddingBottom: 8,
+                gap: 14,
+              }}
+            >
               {popularItems.map((item) => (
-                <ItemCard
+                <PopularItemCard
                   key={item.id}
                   item={item}
-                  qty={getCartQty(item.id)} // ← single source of truth
+                  qty={getCartQty(item.id)}
                   onAdd={handleAdd}
                   onRemove={handleRemove}
-                  cardWidth={cardW}
                   onOpenWeightPicker={setLoosePickerItem}
                 />
               ))}
-            </View>
+            </ScrollView>
           </>
         )}
 
@@ -2388,7 +2878,7 @@ export default function HomeScreen() {
               ]}
             >
               <Text style={s.sectionTitle}>Recent Orders</Text>
-              <TouchableOpacity onPress={() => navigation.navigate("MyOrders")}>
+              <TouchableOpacity onPress={() => navigation.navigate("Orders")}>
                 <Text style={s.viewAll}>View all</Text>
               </TouchableOpacity>
             </View>
@@ -2396,7 +2886,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={order.id}
                 style={[s.orderCard, { marginHorizontal: hPad }]}
-                onPress={() => navigation.navigate("MyOrders")}
+                onPress={() => navigation.navigate("Orders")}
                 activeOpacity={0.85}
               >
                 <Image
@@ -2453,6 +2943,9 @@ export default function HomeScreen() {
         onClose={() => setAddrPickerVisible(false)}
         onSelect={handleSelectAddress}
         onDelete={(id) => addressStore.removeAddress(id, token)}
+        onUpdate={async (id, patch) => {
+          await addressStore.updateAddress(id, patch, token);
+        }}
         onSaveNew={async (text) => {
           let lat = null,
             lng = null;
@@ -2460,7 +2953,7 @@ export default function HomeScreen() {
             const encoded = encodeURIComponent(text);
             const res = await fetch(
               `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1`,
-              { headers: { "User-Agent": "DesiDukaan/1.0" } },
+              { headers: { "User-Agent": "KwikPik/1.0" } },
             );
             const results = await res.json();
             if (results?.length > 0) {
@@ -2515,7 +3008,7 @@ export default function HomeScreen() {
         apiCategories={apiCategories}
       />
 
-      <ChatWidget />
+      {/* <ChatWidget /> */}
 
       {/* ══ FLOATING CART — mobile ══════════════════════════════════════════ */}
       {!wide && cartCount > 0 && (
@@ -2559,8 +3052,14 @@ const s = StyleSheet.create({
     paddingTop: Platform.OS === "android" ? 18 : 22,
     borderBottomWidth: 1,
     borderBottomColor: C.gray200,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 4,
+    zIndex: 10,
   },
-  accentLine: { height: 2.5 },
+  accentLine: { height: 0 },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2573,9 +3072,24 @@ const s = StyleSheet.create({
     gap: 8,
     flexShrink: 0,
   },
-  miniLogoWrap: { width: 34, height: 34, borderRadius: 10, overflow: "hidden" },
+  miniLogoWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    overflow: "hidden",
+    backgroundColor: C.white,
+    borderWidth: 1,
+    borderColor: C.greenBorder,
+  },
   miniLogo: { flex: 1, alignItems: "center", justifyContent: "center" },
-  brandName: { fontSize: 24, fontWeight: "900", letterSpacing: -0.5 },
+  brandName: {
+    fontSize: 24,
+    fontWeight: "900",
+    letterSpacing: 0,
+    color: C.gray900,
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+  },
+  brandAccent: { color: "#0EE627" },
   headerDivider: {
     width: 1,
     height: 38,
@@ -2664,15 +3178,29 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingBottom: 10,
+    paddingTop: 2,
   },
-  mobileLocBtn: { flex: 1, marginRight: 12 },
-  mobileLocBottom: { fontSize: 16, fontWeight: "700", color: C.gray900 },
+  mobileLocBtn: { flex: 1, marginRight: 8 },
+  mobileLocBottom: { fontSize: 16, fontWeight: "700", color: C.gray900, flexShrink: 1 },
   mobileProfileBtn: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 2,
+  },
+  mobileBrandBtn: {
     width: 38,
     height: 38,
-    borderRadius: 19,
-    borderWidth: 1.5,
-    borderColor: C.gray200,
+    borderRadius: 13,
+    marginRight: 8,
+    overflow: "hidden",
+    shadowColor: C.green,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 7,
+    elevation: 3,
+  },
+  mobileBrandMark: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2681,72 +3209,139 @@ const s = StyleSheet.create({
     height: 38,
     borderRadius: 19,
     borderWidth: 2,
-    borderColor: C.orange,
+    borderColor: C.green,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: C.orangeLight,
+    backgroundColor: C.greenLight,
     overflow: "hidden",
   },
   mobileSearch: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    backgroundColor: C.white,
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: C.gray200,
-    paddingVertical: 11,
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    gap: 10,
+    backgroundColor: C.gray100,
+    borderRadius: 9999,
+    borderWidth: 0,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    marginBottom: 14,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
   mobileSearchText: { flex: 1, fontSize: 14, color: C.gray400 },
   scroll: { paddingBottom: 40 },
+  legacyGreetingRow: { display: "none" },
   greetingRow: { paddingTop: 14, paddingBottom: 12 },
   greetingLine: {
-    fontSize: 24,
+    fontSize: 22,
     color: C.gray900,
     fontWeight: "800",
     fontFamily: "PlusJakartaSans_800ExtraBold",
-    lineHeight: 32,
+    lineHeight: 30,
+    flexDirection: "row",
+    alignItems: "center",
   },
   greetingName: {
     color: C.gray900,
     fontWeight: "800",
     fontFamily: "PlusJakartaSans_800ExtraBold",
   },
-  greetingEmoji: { fontSize: 28, marginTop: 4 },
-  greetingSub: { fontSize: 13, color: C.gray500, marginTop: 6, fontWeight: "400" },
-  bannerWrap: { marginBottom: 24 },
+  greetingEmoji: { fontSize: 24, marginTop: 2 },
+  greetingSub: { fontSize: 13, color: C.gray500, marginTop: 4, fontWeight: "400" },
+  bannerWrap: { marginBottom: 14 },
+  heroIntro: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
+  },
+  heroIntroWide: { paddingTop: 18 },
+  greetingKicker: {
+    fontSize: 12,
+    color: C.green,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  heroIntroTitle: {
+    fontSize: 22,
+    color: C.gray900,
+    fontWeight: "900",
+    lineHeight: 29,
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+  },
+  deliveryPromise: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: C.orangeLight,
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+  },
+  deliveryPromiseText: {
+    fontSize: 11,
+    color: C.orangeDark,
+    fontWeight: "800",
+  },
   heroBanner: {
-    borderRadius: 20,
+    borderRadius: 18,
     overflow: "hidden",
     justifyContent: "center",
   },
   heroLeft: { paddingHorizontal: 22, paddingVertical: 22, zIndex: 2 },
+  heroBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.94)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 12,
+  },
+  heroBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: C.greenDark,
+  },
   heroTitle: {
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: "900",
     color: C.white,
-    lineHeight: 28,
-    marginBottom: 6,
+    lineHeight: 34,
+    marginBottom: 8,
     fontFamily: "PlusJakartaSans_800ExtraBold",
   },
   heroSub: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.85)",
-    lineHeight: 18,
-    marginBottom: 16,
+    fontSize: 14,
+    color: "rgba(255,255,255,0.92)",
+    lineHeight: 20,
+    marginBottom: 18,
+    maxWidth: 520,
+  },
+  heroActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 18,
   },
   heroCTA: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     backgroundColor: C.green,
     alignSelf: "flex-start",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
     borderRadius: 9999,
     shadowColor: C.greenDark,
     shadowOffset: { width: 0, height: 3 },
@@ -2755,6 +3350,76 @@ const s = StyleSheet.create({
     elevation: 4,
   },
   heroCTAText: { fontSize: 14, fontWeight: "800", color: C.white },
+  heroGhostCTA: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.48)",
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+  heroGhostText: { fontSize: 13, fontWeight: "800", color: C.white },
+  heroStats: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  heroStat: {
+    minWidth: 96,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  heroStatValue: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: C.white,
+    marginTop: 4,
+  },
+  heroStatLabel: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.78)",
+    marginTop: 1,
+    fontWeight: "600",
+  },
+  quickActionRail: { marginBottom: 16 },
+  quickAction: {
+    minWidth: 132,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    backgroundColor: C.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  quickActionIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: C.greenLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickActionText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: C.gray800,
+  },
   infoPillRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2778,13 +3443,13 @@ const s = StyleSheet.create({
     marginTop: 4,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "800",
     color: C.gray900,
     fontFamily: "PlusJakartaSans_800ExtraBold",
   },
   sectionSub: { fontSize: 12, color: C.gray400, marginTop: 2 },
-  viewAll: { fontSize: 13, color: C.orange, fontWeight: "700", marginTop: 2 },
+  viewAll: { fontSize: 13, color: C.green, fontWeight: "700", marginTop: 2 },
   loadingRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2890,61 +3555,65 @@ const s = StyleSheet.create({
 
   // ── New category card (HomeScreen) ─────────────────────────────────────────
   catCard: {
-    alignItems: "center",
+    alignItems: 'center',
     marginBottom: 4,
   },
-  catCardBand: {
-    borderRadius: 22,
-    position: "relative",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.05)",
-    backgroundColor: C.white,
-    padding: 9,
-    shadowColor: "#000",
+  // New HTML-style clean tile
+  catTile: {
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 7,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.05)',
+    overflow: 'hidden',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
     elevation: 2,
   },
+  // Keep legacy styles for CategoryBrowseSheet compatibility
+  catCardBand: {
+    borderRadius: 22,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: C.white,
+    padding: 9,
+  },
   catCardEmojiWrap: {
-    position: "absolute",
+    position: 'absolute',
     top: 4,
     right: 4,
     zIndex: 3,
-    backgroundColor: "rgba(255,255,255,0.9)",
+    backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: 100,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  catCardEmoji: {
-    textAlign: "center",
-  },
+  catCardEmoji: { textAlign: 'center' },
   catCardImgWrap: {
-    width: "100%",
-    height: "100%",
+    width: '100%',
+    height: '100%',
     borderRadius: 14,
-    overflow: "hidden",
+    overflow: 'hidden',
   },
   catCardLabel: {
-    fontSize: 9,
-    fontWeight: "600",
+    fontSize: 10,
+    fontWeight: '600',
     color: C.gray800,
-    textAlign: "center",
-    paddingHorizontal: 1,
-    lineHeight: 11,
+    textAlign: 'center',
+    paddingHorizontal: 2,
+    lineHeight: 13,
   },
   // keep catImgWrap for compatibility
   catImgWrap: {
-    width: 114, height: 114, borderRadius: 28, overflow: "hidden",
+    width: 114, height: 114, borderRadius: 28, overflow: 'hidden',
     marginBottom: 10, elevation: 3,
   },
   itemsGrid: {
@@ -3029,4 +3698,30 @@ const s = StyleSheet.create({
     borderRadius: 11,
   },
   floatingCTAText: { fontSize: 14, fontWeight: "800", color: C.white },
+
+  // Store category filter chips
+  storeCatChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: C.gray100,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+  },
+  storeCatChipActive: {
+    backgroundColor: C.greenLight,
+    borderColor: C.green,
+  },
+  storeCatChipText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.gray700,
+  },
+  storeCatChipTextActive: {
+    color: C.green,
+  },
 });
+
+

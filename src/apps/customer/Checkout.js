@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+﻿import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -22,7 +22,6 @@ import useCartStore from "../../store/cartStore";
 import useAuthStore from "../../store/authStore";
 import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
-import Slider from '@react-native-community/slider';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const SOCKET_URL =
@@ -86,7 +85,7 @@ function useBreakpoint() {
 }
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
-function Section({ num, title, icon, children, cardR, px }) {
+function Section({ num, title, icon, children, cardR, px, rightElement }) {
   return (
     <View style={[sec.wrap, { borderRadius: cardR, marginHorizontal: px }]}>
       <View style={sec.header}>
@@ -95,6 +94,7 @@ function Section({ num, title, icon, children, cardR, px }) {
         </View>
         <Feather name={icon} size={16} color={C.green} />
         <Text style={sec.title}>{title}</Text>
+        {rightElement}
       </View>
       {children}
     </View>
@@ -104,7 +104,7 @@ const sec = StyleSheet.create({
   wrap: {
     backgroundColor: C.white,
     marginBottom: 12,
-    padding: 18,
+    padding: 16,
     borderWidth: 1,
     borderColor: C.gray200,
   },
@@ -112,18 +112,21 @@ const sec = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginBottom: 18,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
   },
   numWrap: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: C.green,
     alignItems: "center",
     justifyContent: "center",
   },
-  num: { fontSize: 13, fontWeight: "900", color: C.white },
-  title: { fontSize: 17, fontWeight: "900", color: C.gray900, flex: 1 },
+  num: { fontSize: 12, fontWeight: "900", color: C.white },
+  title: { fontSize: 16, fontWeight: "800", color: C.gray900, flex: 1 },
 });
 
 function SlotBanner({ slot }) {
@@ -263,8 +266,8 @@ function CancellationPolicy() {
   );
 }
 const cp = StyleSheet.create({
-  trigger:       { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.white, borderRadius: 14, borderWidth: 1, borderColor: C.gray200, padding: 14 },
-  triggerTitle:  { flex: 1, fontSize: 14, fontWeight: "700", color: C.gray700 },
+  trigger:       { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#FFFBEB", borderRadius: 14, borderWidth: 1, borderColor: "#FDE68A", padding: 14 },
+  triggerTitle:  { flex: 1, fontSize: 14, fontWeight: "700", color: "#92400E" },
   backdrop:      { flex: 1, backgroundColor: "rgba(0,0,0,0.48)", justifyContent: "flex-end" },
   sheet:         { backgroundColor: C.white, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingTop: 10, maxHeight: "80%" },
   handle:        { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
@@ -280,7 +283,7 @@ const cp = StyleSheet.create({
 });
 
 // ─── Order Summary card ───────────────────────────────────────────────────────
-function OrderSummaryCard({ items, subtotal, deliveryFee, total, onNegotiate, fs = 1 }) {
+function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNegotiate, deliveryTypePref = "standard", fs = 1 }) {
   return (
     <View style={osc.wrap}>
       {items.map((item, i) => (
@@ -316,46 +319,36 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, total, onNegotiate, fs
           ₹{subtotal}
         </Text>
       </View>
-      <View style={osc.row}>
-        <Text style={[osc.label, { fontSize: Math.round(13 * fs) }]}>
-          Taxes (GST 5%)
-        </Text>
-        <Text style={[osc.value, { fontSize: Math.round(13 * fs) }]}>
-          ₹{parseFloat((subtotal * 0.05).toFixed(2))}
-        </Text>
-      </View>
+
       <View style={osc.row}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <Text style={[osc.label, { fontSize: Math.round(13 * fs) }]}>
-            Delivery fee
+            Delivery ({deliveryTypePref === "quick" ? "Quick ⚡" : "Standard"})
           </Text>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          {baseFee != null && baseFee !== deliveryFee && (
+            <Text style={{ fontSize: 12, color: C.gray400, textDecorationLine: "line-through" }}>
+              ₹{baseFee}
+            </Text>
+          )}
+          {deliveryFee === 0 ? (
+            <Text style={[osc.value, { color: C.green, fontSize: Math.round(13 * fs) }]}>FREE</Text>
+          ) : (
+            <Text style={[osc.value, { fontSize: Math.round(13 * fs) }]}>₹{deliveryFee}</Text>
+          )}
           {deliveryFee > 0 && (
-            <TouchableOpacity 
-              style={osc.negotiateBtn} 
+            <TouchableOpacity
+              style={osc.negotiateBtn}
               onPress={() => onNegotiate && onNegotiate()}
               activeOpacity={0.7}
             >
-              <Feather name="edit-2" size={10} color={C.green} />
-              <Text style={osc.negotiateBtnText}>Negotiate</Text>
+              <Text style={osc.negotiateBtnText}>NEGOTIATE</Text>
             </TouchableOpacity>
           )}
         </View>
-        {deliveryFee === 0 ? (
-          <Text
-            style={[
-              osc.value,
-              { color: C.green, fontSize: Math.round(13 * fs) },
-            ]}
-          >
-            FREE
-          </Text>
-        ) : (
-          <Text style={[osc.value, { fontSize: Math.round(13 * fs) }]}>
-            ₹{deliveryFee}
-          </Text>
-        )}
       </View>
-      <View style={osc.divider} />
+      <View style={osc.dottedDivider} />
       <View style={osc.row}>
         <Text style={[osc.totalLabel, { fontSize: Math.round(16 * fs) }]}>
           Total payable
@@ -369,20 +362,19 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, total, onNegotiate, fs
 }
 const osc = StyleSheet.create({
   wrap: {
-    backgroundColor: C.bg,
+    backgroundColor: C.white,
     borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: C.gray200,
+    padding: 0,
+    borderWidth: 0,
   },
   itemRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingVertical: 7,
+    paddingVertical: 8,
   },
   itemBorder: { borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  itemDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green },
+  itemDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green, flexShrink: 0 },
   itemName: { flex: 1, fontSize: 13, color: C.gray700, fontWeight: "500" },
   itemQty: { fontSize: 12, color: C.gray400 },
   itemPrice: {
@@ -393,19 +385,58 @@ const osc = StyleSheet.create({
     textAlign: "right",
   },
   moreText: { fontSize: 12, color: C.gray400, paddingVertical: 6 },
-  divider: { height: 1, backgroundColor: C.gray200, marginVertical: 8 },
+  divider: { height: 1, backgroundColor: C.gray200, marginVertical: 10 },
+  dottedDivider: { borderTopWidth: 2, borderTopColor: C.gray200, borderStyle: "dashed", marginVertical: 10 },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 3,
+    alignItems: "center",
+    paddingVertical: 4,
   },
-  label: { fontSize: 13, color: C.gray600 },
+  label: { fontSize: 13, color: C.gray500 },
   value: { fontSize: 13, fontWeight: "600", color: C.gray900 },
-  totalLabel: { fontSize: 16, fontWeight: "900", color: C.gray900 },
-  totalVal: { fontSize: 16, fontWeight: "900", color: C.gray900 },
-  negotiateBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.greenLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  negotiateBtnText: { fontSize: 10, fontWeight: "700", color: C.green },
+  totalLabel: { fontSize: 15, fontWeight: "900", color: C.gray900 },
+  totalVal: { fontSize: 16, fontWeight: "900", color: C.green },
+  negotiateBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FFF7ED", borderWidth: 1, borderColor: "#FDBA74", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  negotiateBtnText: { fontSize: 10, fontWeight: "700", color: C.orange },
 });
+// ─── Delivery Type Selector styles ───────────────────────────────────────────
+const dts = StyleSheet.create({
+  row: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  pill: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12,
+    padding: 12, backgroundColor: '#FAFAFA',
+  },
+  pillActive: { backgroundColor: '#16A34A', borderColor: '#16A34A' },
+  pillQuick: { borderColor: '#FDE68A' },
+  pillQuickActive: { backgroundColor: '#D97706', borderColor: '#D97706' },
+  pillIconWrap: { width: 32, height: 32, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  pillBody: { flex: 1 },
+  pillTitle: { fontSize: 13, fontWeight: '800', color: '#374151' },
+  pillTitleActive: { color: '#FFFFFF' },
+  pillTitleQuickActive: { color: '#FFFFFF' },
+  pillSub: { fontSize: 11, color: '#9CA3AF', marginTop: 1 },
+  pillSubActive: { color: 'rgba(255,255,255,0.85)' },
+  pillSubQuickActive: { color: 'rgba(255,255,255,0.85)' },
+  pillFee: { fontSize: 14, fontWeight: '900', color: '#111827' },
+  pillFeeActive: { color: '#FFFFFF' },
+  pillFeeQuickActive: { color: '#FFFFFF' },
+  breakdown: {
+    backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12, gap: 8,
+    borderWidth: 1, borderColor: '#E5E7EB', marginTop: 4,
+  },
+  bRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  bLabel: { flex: 1, fontSize: 12, color: '#6B7280' },
+  bVal: { fontSize: 12, fontWeight: '700', color: '#374151' },
+  negotiatedNote: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#F0FDF4', borderRadius: 10, padding: 10, marginTop: 10,
+    borderWidth: 1, borderColor: '#BBF7D0',
+  },
+  negotiatedNoteText: { flex: 1, fontSize: 12, color: '#15803D', fontWeight: '600' },
+});
+
 
 // ─── Negotiation Banner (Shown while waiting or after response) ──────────────
 function NegotiationBanner({ status, countdown, vendorName, onDismiss }) {
@@ -522,13 +553,13 @@ function CounterOfferReview({ data, onAccept, onReject, placing, fs = 1 }) {
               </Text>
             </View>
             <Text
-              style={[
-                cor.itemPrice,
-                !it.available && { textDecorationLine: "line-through", opacity: 0.5 },
-              ]}
-            >
-              ₹{it.subtotal || it.product_price * it.new_quantity}
-            </Text>
+  style={[
+    cor.itemPrice,
+    !it.available && { textDecorationLine: "line-through", opacity: 0.5 },
+  ]}
+>
+  ₹{it.available !== false ? (it.new_quantity * it.product_price) : 0}
+</Text>
           </View>
         ))}
       </View>
@@ -638,6 +669,10 @@ export default function CheckoutScreen() {
   const vendorId = cart?.vendorId;
   const vendorName = items[0]?.vendorName || "Store";
 
+  // ── Snapshot of cart items/subtotal taken before cart is cleared on order submit ──
+  const [snapshotItems, setSnapshotItems] = useState(null);
+  const [snapshotSubtotal, setSnapshotSubtotal] = useState(null);
+
   // ── Order state ────────────────────────────────────────────────────────────
   const [placing, setPlacing] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -657,6 +692,24 @@ export default function CheckoutScreen() {
   const [proposedFee,     setProposedFee]     = useState(null);
   const isAccepted = orderStatus === "accepted";
 
+  // ── Delivery type preference ──────────────────────────────────────────────
+  // 'standard' = normal delivery, 'quick' = faster but pricier
+  const [deliveryTypePref, setDeliveryTypePref] = useState('standard');
+
+  // ── Live delivery fee info from backend ──────────────────────────────────
+  const [deliveryInfo, setDeliveryInfo] = useState(null);  // {fees, eta_minutes, quick_eta_minutes, ...}
+  const [fetchingDeliveryInfo, setFetchingDeliveryInfo] = useState(false);
+
+  // ── Negotiation modal visibility ───────────────────────────────────────────
+  const [negotiationModalVisible, setNegotiationModalVisible] = useState(false);
+
+  // Show modal automatically when status changes to pending/countered/accepted/rejected/expired
+  useEffect(() => {
+    if (orderStatus !== "idle") {
+      setNegotiationModalVisible(true);
+    }
+  }, [orderStatus]);
+
   // ── Toast notification state ───────────────────────────────────────────────
   const [toast, setToast] = useState({ visible: false, message: "", type: "info" }); // type: 'success' | 'error' | 'info'
   const toastTimer = useRef(null);
@@ -667,16 +720,28 @@ export default function CheckoutScreen() {
   };
 
   // ── Computed totals ────────────────────────────────────────────────────────
-  const subtotal = items.reduce(
+  // Use snapshot once order has been placed (cart is cleared at that point)
+  const displayItems = snapshotItems ?? items;
+  const liveSubtotal = items.reduce(
     (s, i) => s + i.price * (i.qty ?? i.quantity ?? 0),
     0,
   );
-  const baseFee = confirmedFee ?? 30; // No free delivery threshold
-  const activeFee = proposedFee !== null ? proposedFee : baseFee;
-  const gstAmount = parseFloat((subtotal * 0.05).toFixed(2));
-  const cartTotal = subtotal + activeFee + gstAmount;
+  const subtotal = snapshotSubtotal ?? liveSubtotal;
+
+  // Fee priority: negotiated (proposedFee) > live delivery-info > confirmed from cart > fallback 20
+  const liveFees = deliveryInfo?.fees;
+  const liveStandardFee = liveFees?.standard_fee ?? null;
+  const liveQuickFee    = liveFees?.quick_fee    ?? null;
+  const liveActiveFee   = deliveryTypePref === 'quick' ? (liveQuickFee ?? liveStandardFee) : liveStandardFee;
+
+  const baseFee = confirmedFee ?? liveStandardFee ?? 20;
+  const activeFee = proposedFee !== null ? proposedFee : (liveActiveFee !== null ? liveActiveFee : baseFee);
+  const cartTotal = subtotal + activeFee;
+  // counterData.total takes priority when countered or accepted-after-counter
   const total =
-    orderStatus === "accepted" && counterData ? counterData.total : cartTotal;
+    counterData?.total != null && ["countered", "accepted"].includes(orderStatus)
+      ? counterData.total
+      : cartTotal;
 
   // ── Address state ──────────────────────────────────────────────────────────
   const savedAddresses = (addressStore?.addresses || []).filter(a => a.label !== "Current Location");
@@ -703,6 +768,56 @@ export default function CheckoutScreen() {
       }
     })();
   }, [vendorId, token]);
+
+  // ── Fetch live delivery fee info ─────────────────────────────────────────
+  // Triggers whenever address selection, coordinates, or subtotal changes
+  useEffect(() => {
+    if (!vendorId) return;
+
+    // Resolve customer lat/lng from current selection
+    let customerLat = null;
+    let customerLng = null;
+
+    if (selectedAddrId === 'detected' && detectedCoords?.lat) {
+      customerLat = detectedCoords.lat;
+      customerLng = detectedCoords.lng;
+    } else if (selectedAddrId && selectedAddrId !== 'manual') {
+      const saved = (addressStore?.addresses || []).find(a => a.id === selectedAddrId);
+      if (saved?.latitude) { customerLat = saved.latitude; customerLng = saved.longitude; }
+    }
+
+    if (!customerLat || !customerLng) return; // can't compute without coords
+
+    const ctrl = new AbortController();
+    setFetchingDeliveryInfo(true);
+    (async () => {
+      try {
+        const queryParamsObj = {
+          vendor_id: vendorId,
+          customer_lat: customerLat,
+          customer_lng: customerLng,
+          subtotal: liveSubtotal,
+        };
+        if (confirmedSlot?.start) {
+          queryParamsObj.slot_start = confirmedSlot.start;
+        }
+        const params = new URLSearchParams(queryParamsObj);
+        const res = await fetch(`${BASE_URL}/slots/delivery-info?${params}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          signal: ctrl.signal,
+        });
+        const json = await res.json();
+        if (res.ok) setDeliveryInfo(json.data || null);
+      } catch (e) {
+        if (e.name !== 'AbortError') console.error('delivery-info fetch failed:', e.message);
+      } finally {
+        setFetchingDeliveryInfo(false);
+      }
+    })();
+
+    return () => ctrl.abort();
+  }, [vendorId, selectedAddrId, detectedCoords, liveSubtotal, confirmedSlot, token]);
+
   const [addrLine, setAddrLine] = useState("");
   const [addrCity, setAddrCity] = useState("");
   const [addrState, setAddrState] = useState("");
@@ -892,6 +1007,11 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
   // ── Place order ────────────────────────────────────────────────────────────
   const placeOrder = async () => {
     console.log("placeOrder function INVOKED"); // START LOG
+    if (!confirmedSlot) {
+      setErrorMsg("Please select a delivery slot before placing your order.");
+      Alert.alert("Delivery Slot Required", "Please select a delivery slot before placing your order.");
+      return;
+    }
     setErrorMsg(null);
     setPlacing(true);
     try {
@@ -924,6 +1044,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
         delivery_address_id: addrId,
         payment_method: selectedPay || "cod", // fallback so it's never null
         delivery_slot_id: null,
+        delivery_type_pref: deliveryTypePref || 'standard',
         proposed_delivery_fee: proposedFee !== null ? proposedFee : (confirmedFee !== null ? confirmedFee : null),
         proposed_slot: confirmedSlot ? { start: confirmedSlot.start, end: confirmedSlot.end } : null,
         items: items.map((i) => ({
@@ -934,6 +1055,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
         })),
         special_instructions: "",
       };
+
       console.log("PLACING ORDER PAYLOAD:", JSON.stringify(payload, null, 2)); // LOG PAYLOAD
 
       const res = await fetch(`${BASE_URL}/orders`, {
@@ -946,6 +1068,9 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
       });
       const data = await res.json();
       if (res.ok) {
+        // Snapshot current cart before clearing so order summary stays accurate
+        setSnapshotItems(items.slice());
+        setSnapshotSubtotal(liveSubtotal);
         cart?.clearCart?.();
         const newOrderId = data.data?.order?.id || data.order?.id || data.id;
         setOrderId(newOrderId);
@@ -988,6 +1113,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
   // ── Slot actions ───────────────────────────────────────────────────────────
   const handleRequestSlot = async ({ slot_start, slot_end }) => {
     setConfirmedSlot({ start: slot_start, end: slot_end });
+    setSlotId(null); // clear any previously confirmed DB slot ID
     setSlotModalVisible(false);
   };
 
@@ -1108,10 +1234,10 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
           <Feather name="arrow-left" size={20} color={C.gray900} />
         </TouchableOpacity>
         <View style={s.headerMid}>
-          <Text style={[s.headerTitle, { fontSize: Math.round(20 * fs) }]}>
+          <Text style={[s.headerTitle, { fontSize: Math.round(20 * fs), color: C.orange }]}>
             Checkout
           </Text>
-          <Text style={[s.headerSub, { fontSize: Math.round(14 * fs), fontWeight: "800", color: C.greenDark }]}>
+          <Text style={[s.headerSub, { fontSize: Math.round(12 * fs), color: C.gray500, fontWeight: "400" }]}>
             {vendorName}
           </Text>
         </View>
@@ -1127,40 +1253,13 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
         <ScrollView
           style={s.mainCol}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: 14, paddingBottom: 32 }}
+          contentContainerStyle={{ paddingTop: 14, paddingBottom: 100 }}
           keyboardShouldPersistTaps="handled"
         >
           {/* Slot banner — only if slot was negotiated */}
           {confirmedSlot && (
             <View style={{ marginHorizontal: px, marginBottom: 12 }}>
               <SlotBanner slot={confirmedSlot} />
-            </View>
-          )}
-
-          {/* Negotiation Banner */}
-          {orderStatus !== "idle" && (
-            <View style={{ marginHorizontal: px }}>
-              <NegotiationBanner
-                status={orderStatus}
-                countdown={countdown}
-                vendorName={vendorName}
-                onDismiss={
-                  orderStatus === "rejected" || orderStatus === "expired"
-                    ? () => setOrderStatus("idle")
-                    : null
-                }
-              />
-            </View>
-          )}
-
-          {orderStatus === "countered" && (
-            <View style={{ marginHorizontal: px }}>
-              <CounterOfferReview
-                data={counterData}
-                onAccept={() => handleRespondCounter("accept")}
-                onReject={() => handleRespondCounter("reject")}
-                placing={placing}
-              />
             </View>
           )}
 
@@ -1180,312 +1279,141 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             </View>
           )}
 
-          {/* ── SECTION 1: DELIVERY ADDRESS ─────────────────────────── */}
+
+          {/* ── SECTION 2: DELIVERY TYPE ──────────────────────────────── */}
           <Section
-            num="1"
-            title="Delivery Address"
-            icon="map-pin"
+            num="2"
+            title="Delivery Type"
+            icon="truck"
             cardR={cardR}
             px={px}
           >
-            {/* Saved addresses */}
-            {savedAddresses.map((addr) => {
-              const { lbl, line } = getAddrLabel(addr);
-              const active = selectedAddrId === addr.id;
-              const iconMap = {
-                Home: "home",
-                Work: "briefcase",
-                Other: "map-pin",
-              };
-              const icon = iconMap[lbl] || "map-pin";
-              return (
-                <TouchableOpacity
-                  key={addr.id}
-                  style={[
-                    s.addrOption,
-                    active && s.addrOptionActive,
-                    { borderRadius: cardR - 4 },
-                  ]}
-                  onPress={() => {
-                    setSelectedAddrId(addr.id);
-                    setManualOpen(false);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <View
-                    style={[
-                      s.addrIcon,
-                      { backgroundColor: active ? C.greenMid : C.gray100 },
-                    ]}
-                  >
-                    <Feather
-                      name={icon}
-                      size={17}
-                      color={active ? C.green : C.gray500}
-                    />
-                  </View>
-                  <View style={s.addrBody}>
-                    <Text
-                      style={[s.addrTitle, { fontSize: Math.round(14 * fs) }]}
-                    >
-                      {lbl}
-                    </Text>
-                    <Text
-                      style={[s.addrSub, { fontSize: Math.round(12 * fs) }]}
-                      numberOfLines={2}
-                    >
-                      {line}
-                    </Text>
-                  </View>
-                  <View style={[s.radioOuter, active && s.radioOuterActive]}>
-                    {active && <View style={s.radioDot} />}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-
-            {/* GPS detect */}
-            <TouchableOpacity
-              style={[
-                s.addrOption,
-                selectedAddrId === "detected" && s.addrOptionActive,
-                { borderRadius: cardR - 4 },
-              ]}
-              onPress={detectLocation}
-              activeOpacity={0.8}
-              disabled={detectingLoc}
-            >
-              <View style={[s.addrIcon, { backgroundColor: "#EFF6FF" }]}>
-                {detectingLoc ? (
-                  <ActivityIndicator size="small" color="#2563EB" />
-                ) : (
-                  <Feather name="navigation" size={17} color="#2563EB" />
-                )}
-              </View>
-              <View style={s.addrBody}>
-                <Text style={[s.addrTitle, { fontSize: Math.round(14 * fs) }]}>
-                  Use my current location
-                </Text>
-                {detectedAddr ? (
-                  <Text
-                    style={[s.addrDetected, { fontSize: Math.round(12 * fs) }]}
-                    numberOfLines={2}
-                  >
-                    {detectedAddr}
+            {/* Standard / Quick toggle pills */}
+            <View style={dts.row}>
+              <TouchableOpacity
+                style={[dts.pill, deliveryTypePref === 'standard' && dts.pillActive]}
+                onPress={() => { if (proposedFee === null) setDeliveryTypePref('standard'); }}
+                activeOpacity={0.85}
+              >
+                <View style={dts.pillIconWrap}>
+                  <Feather name="package" size={18} color={deliveryTypePref === 'standard' ? C.white : C.gray500} />
+                </View>
+                <View style={dts.pillBody}>
+                  <Text style={[dts.pillTitle, deliveryTypePref === 'standard' && dts.pillTitleActive]}>Standard</Text>
+                  <Text style={[dts.pillSub, deliveryTypePref === 'standard' && dts.pillSubActive]}>
+                    {deliveryInfo ? `~${deliveryInfo.eta_minutes} min` : 'Regular speed'}
                   </Text>
-                ) : (
-                  <Text style={[s.addrSub, { fontSize: Math.round(12 * fs) }]}>
-                    Auto-detect via GPS
+                </View>
+                <Text style={[dts.pillFee, deliveryTypePref === 'standard' && dts.pillFeeActive]}>
+                  {fetchingDeliveryInfo ? '...' :
+                    liveStandardFee === 0 ? 'FREE' :
+                    liveStandardFee != null ? `₹${liveStandardFee}` : `₹${baseFee}`
+                  }
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[dts.pill, dts.pillQuick, deliveryTypePref === 'quick' && dts.pillQuickActive]}
+                onPress={() => { if (proposedFee === null) setDeliveryTypePref('quick'); }}
+                activeOpacity={0.85}
+              >
+                <View style={dts.pillIconWrap}>
+                  <Feather name="zap" size={18} color={deliveryTypePref === 'quick' ? C.white : '#D97706'} />
+                </View>
+                <View style={dts.pillBody}>
+                  <Text style={[dts.pillTitle, deliveryTypePref === 'quick' && dts.pillTitleQuickActive]}>Quick</Text>
+                  <Text style={[dts.pillSub, deliveryTypePref === 'quick' && dts.pillSubQuickActive]}>
+                    {deliveryInfo ? `~${deliveryInfo.quick_eta_minutes} min` : 'Faster delivery'}
                   </Text>
-                )}
-              </View>
-              {selectedAddrId === "detected" ? (
-                <View style={s.radioOuterActive}>
-                  <View style={s.radioDot} />
                 </View>
-              ) : (
-                <View style={s.radioOuter} />
-              )}
-            </TouchableOpacity>
-
-            {/* Manual entry */}
-            <TouchableOpacity
-              style={[
-                s.addrOption,
-                manualOpen && s.addrOptionActive,
-                { borderRadius: cardR - 4 },
-              ]}
-              onPress={() => {
-                setManualOpen((o) => !o);
-                if (!manualOpen) setSelectedAddrId("manual");
-              }}
-              activeOpacity={0.8}
-            >
-              <View style={[s.addrIcon, { backgroundColor: "#FFF7ED" }]}>
-                <Feather name="edit-2" size={17} color={C.orange} />
-              </View>
-              <View style={s.addrBody}>
-                <Text style={[s.addrTitle, { fontSize: Math.round(14 * fs) }]}>
-                  Add address manually
+                <Text style={[dts.pillFee, deliveryTypePref === 'quick' && dts.pillFeeQuickActive]}>
+                  {fetchingDeliveryInfo ? '...' :
+                    liveQuickFee != null ? `₹${liveQuickFee}` : '—'
+                  }
                 </Text>
-                <Text style={[s.addrSub, { fontSize: Math.round(12 * fs) }]}>
-                  Type your full delivery address
-                </Text>
-              </View>
-              <Feather
-                name={manualOpen ? "chevron-up" : "chevron-down"}
-                size={17}
-                color={C.gray400}
-              />
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
 
-            {manualOpen && (
-              <View style={[s.manualForm, { borderRadius: cardR - 4 }]}>
-                {/* Label chips */}
-                <View style={s.labelRow}>
-                  {["Home", "Work", "Other"].map((l) => (
-                    <TouchableOpacity
-                      key={l}
-                      style={[
-                        s.labelChip,
-                        addrLabel === l && s.labelChipActive,
-                      ]}
-                      onPress={() => setAddrLabel(l)}
-                    >
-                      <Text
-                        style={[
-                          s.labelChipText,
-                          addrLabel === l && s.labelChipTextActive,
-                        ]}
-                      >
-                        {l}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+            {/* Transparent fee breakdown */}
+            {deliveryInfo?.fees && (
+              <View style={dts.breakdown}>
+                <View style={dts.bRow}>
+                  <Feather name="map-pin" size={12} color={C.gray400} />
+                  <Text style={dts.bLabel}>Distance charge</Text>
+                  <Text style={dts.bVal}>₹{deliveryInfo.fees.distance_based_fee}</Text>
                 </View>
-                <TextInput
-                  style={[s.input, { fontSize: Math.round(14 * fs) }]}
-                  placeholder="Flat / House no., Building, Street"
-                  placeholderTextColor={C.gray400}
-                  value={addrLine}
-                  onChangeText={setAddrLine}
-                  underlineColorAndroid="transparent"
-                  selectionColor={C.green}
-                />
-                <View style={s.inputRow}>
-                  <TextInput
-                    style={[
-                      s.input,
-                      { flex: 1, fontSize: Math.round(14 * fs) },
-                    ]}
-                    placeholder="City"
-                    placeholderTextColor={C.gray400}
-                    value={addrCity}
-                    onChangeText={setAddrCity}
-                    underlineColorAndroid="transparent"
-                    selectionColor={C.green}
-                  />
-                  <TextInput
-                    style={[
-                      s.input,
-                      { flex: 1, fontSize: Math.round(14 * fs) },
-                    ]}
-                    placeholder="State"
-                    placeholderTextColor={C.gray400}
-                    value={addrState}
-                    onChangeText={setAddrState}
-                    underlineColorAndroid="transparent"
-                    selectionColor={C.green}
-                  />
+                <View style={dts.bRow}>
+                  <Feather name="shield" size={12} color={C.gray400} />
+                  <Text style={dts.bLabel}>Min floor (₹20 or 2% of order)</Text>
+                  <Text style={dts.bVal}>₹{deliveryInfo.fees.floor_used}</Text>
                 </View>
-                <TextInput
-                  style={[s.input, { fontSize: Math.round(14 * fs) }]}
-                  placeholder="Pincode"
-                  placeholderTextColor={C.gray400}
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  value={addrPin}
-                  onChangeText={setAddrPin}
-                  underlineColorAndroid="transparent"
-                  selectionColor={C.green}
-                />
-
-                {/* Map Preview for Manual Entry */}
-                {(addrLine.length > 3 || addrCity.length > 2) && (
-                  <View style={s.mapWrapper}>
-                    <AddressMapView
-                      region={manualRegion}
-                      latitude={manualCoords.lat}
-                      longitude={manualCoords.lng}
-                      onRegionChangeComplete={setManualRegion}
-                    />
+                {deliveryInfo.fees.demand_surcharge_pct > 0 && (
+                  <View style={dts.bRow}>
+                    <Feather name="cloud-rain" size={12} color={C.amber} />
+                    <Text style={[dts.bLabel, { color: C.amber }]}>Demand surcharge ({deliveryInfo.fees.demand_surcharge_pct}%)</Text>
+                    <Text style={[dts.bVal, { color: C.amber }]}>+{deliveryInfo.fees.demand_surcharge_pct}%</Text>
                   </View>
                 )}
-
-                <TouchableOpacity
-                  style={s.useAddrBtn}
-                  onPress={async () => {
-                    const fullAddr = [addrLine, addrCity, addrState, addrPin].filter(Boolean).join(", ");
-                    if (!fullAddr) return;
-                    const savedId = await addressStore.addAddress(
-                      { 
-                        address: fullAddr, 
-                        city: addrCity, 
-                        state: addrState, 
-                        pincode: addrPin, 
-                        label: addrLabel,
-                        lat: manualCoords.lat,
-                        lng: manualCoords.lng
-                      }, 
-                      token
-                    );
-                    if (savedId) {
-                      setSelectedAddrId(savedId);
-                      addressStore.setSelectedId(savedId);
-                    }
-                    setManualOpen(false);
-                  }}
-                  activeOpacity={0.85}
-                >
-                  <LinearGradient
-                    colors={[C.green, C.greenDark]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={s.useAddrGrad}
-                  >
-                    <Text
-                      style={[s.useAddrText, { fontSize: Math.round(14 * fs) }]}
-                    >
-                      Use this address
+                {deliveryTypePref === 'quick' && (
+                  <View style={dts.bRow}>
+                    <Feather name="zap" size={12} color={C.orange} />
+                    <Text style={[dts.bLabel, { color: C.orange }]}>Quick surcharge ({deliveryInfo.fees.quick_delivery_pct}%)</Text>
+                    <Text style={[dts.bVal, { color: C.orange }]}>+{deliveryInfo.fees.quick_delivery_pct}%</Text>
+                  </View>
+                )}
+                {deliveryInfo.fees.is_free_delivery && deliveryTypePref === 'standard' && (
+                  <View style={dts.bRow}>
+                    <Feather name="gift" size={12} color={C.green} />
+                    <Text style={[dts.bLabel, { color: C.green }]}>Free delivery threshold reached!</Text>
+                    <Text style={[dts.bVal, { color: C.green }]}>FREE</Text>
+                  </View>
+                )}
+                {deliveryInfo.fees.free_delivery_threshold != null && !deliveryInfo.fees.is_free_delivery && (
+                  <View style={[dts.bRow, { backgroundColor: C.greenLight, borderRadius: 8, padding: 6, marginTop: 4 }]}>
+                    <Feather name="info" size={12} color={C.green} />
+                    <Text style={[dts.bLabel, { color: C.green, flex: 1 }]}>
+                      Add ₹{Math.round(deliveryInfo.fees.free_delivery_threshold - liveSubtotal)} more for FREE standard delivery
                     </Text>
-                    <Feather name="check" size={15} color={C.white} />
-                  </LinearGradient>
-                </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {proposedFee !== null && (
+              <View style={dts.negotiatedNote}>
+                <Feather name="check-circle" size={13} color={C.green} />
+                <Text style={dts.negotiatedNoteText}>Using negotiated fee ₹{proposedFee} — delivery type locked</Text>
               </View>
             )}
           </Section>
 
-          {/* ── SECTION 2: DELIVERY SLOT ─────────────────────────────── */}
+          {/* ── SECTION 3: DELIVERY SLOT ──────────────────────────────── */}
           <Section
-            num="2"
+            num="3"
             title="Delivery Slot"
             icon="clock"
             cardR={cardR}
             px={px}
+            rightElement={
+              confirmedSlot ? (
+                <TouchableOpacity onPress={() => setSlotModalVisible(true)}>
+                  <Text style={{ color: C.green, fontWeight: "700", fontSize: 14 }}>Change</Text>
+                </TouchableOpacity>
+              ) : null
+            }
           >
             {confirmedSlot ? (
-              <View style={s.slotDisplay}>
+              <View style={[s.slotDisplay, { backgroundColor: C.greenLight, borderColor: C.greenBorder }]}>
                 <View style={s.slotInfo}>
-                  <Text style={s.slotTimeText}>
-                    {new Date(confirmedSlot.start).toLocaleTimeString("en-IN", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      hour12: true,
-                    })}{" "}
-                    –{" "}
-                    {new Date(confirmedSlot.end).toLocaleTimeString("en-IN", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      hour12: true,
-                    })}
-                  </Text>
-                  <Text style={s.slotDateText}>
-                    {new Date(confirmedSlot.start).toDateString() ===
-                    new Date().toDateString()
-                      ? "Today"
-                      : "Tomorrow"} ·{" "}
-                    {new Date(confirmedSlot.start).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                    })}
+                  <Text style={[s.slotDateText, { color: C.gray500, fontWeight: "500", fontSize: 12 }]}>Selected Slot</Text>
+                  <Text style={[s.slotTimeText, { color: C.greenDark }]}>
+                    {new Date(confirmedSlot.start).toDateString() === new Date().toDateString() ? "Today" : "Tomorrow"},{" "}
+                    {new Date(confirmedSlot.start).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                    {" – "}
+                    {new Date(confirmedSlot.end).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  onPress={() => setSlotModalVisible(true)}
-                  style={s.slotChangeBtn}
-                >
-                  <Text style={s.slotChangeText}>Change</Text>
-                </TouchableOpacity>
+                <Feather name="check-circle" size={24} color={C.green} />
               </View>
             ) : (
               <TouchableOpacity
@@ -1498,9 +1426,9 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             )}
           </Section>
 
-          {/* ── SECTION 3: VENDOR CONTACT ────────────────────────────── */}
+          {/* ── SECTION 4: VENDOR CONTACT ────────────────────────────── */}
           <Section
-            num="3"
+            num="4"
             title="Vendor Contact"
             icon="phone"
             cardR={cardR}
@@ -1543,10 +1471,10 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             )}
           </Section>
 
-          {/* ── SECTION 4: PAYMENT METHOD (Only shown after acceptance) ── */}
+          {/* ── SECTION 5: PAYMENT METHOD (Only shown after acceptance) ── */}
           {orderStatus === "accepted" && (
             <Section
-              num="4"
+              num="5"
               title="Payment Method"
               icon="credit-card"
               cardR={cardR}
@@ -1895,24 +1823,21 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             </Section>
           )}
 
-          {/* ── SECTION 3: ORDER SUMMARY (mobile/tablet inline) ─────── */}
+          {/* ── ORDER SUMMARY (mobile/tablet inline) ─────────────────── */}
           {!isDesktop && (
-            <Section
-              num="3"
-              title="Order Summary"
-              icon="shopping-bag"
-              cardR={cardR}
-              px={px}
-            >
+            <View style={[sec.wrap, { borderRadius: cardR, marginHorizontal: px }]}>
+              <Text style={[sec.title, { marginBottom: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.gray100 }]}>Order Summary</Text>
               <OrderSummaryCard
-                items={items}
+                items={displayItems}
                 subtotal={subtotal}
                 deliveryFee={activeFee}
+                baseFee={baseFee}
                 total={total}
                 onNegotiate={() => setFeeModalVisible(true)}
+                deliveryTypePref={deliveryTypePref}
                 fs={fs}
               />
-            </Section>
+            </View>
           )}
 
           {/* ── CANCELLATION POLICY — only on mobile/tablet (sidebar has it on desktop) */}
@@ -1946,11 +1871,13 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             <View style={s.sideCard}>
               <Text style={s.sideCardTitle}>Order Summary</Text>
               <OrderSummaryCard
-                items={items}
+                items={displayItems}
                 subtotal={subtotal}
                 deliveryFee={activeFee}
+                baseFee={baseFee}
                 total={total}
                 onNegotiate={() => setFeeModalVisible(true)}
+                deliveryTypePref={deliveryTypePref}
                 fs={fs}
               />
             </View>
@@ -2022,6 +1949,104 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             </Pressable>
           </Pressable>
         </Modal>
+      )}
+
+
+      {/* ── Negotiation / Wait for Store Modal ────────────────────────── */}
+      <Modal
+        visible={negotiationModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (["rejected", "expired", "accepted"].includes(orderStatus)) {
+            setNegotiationModalVisible(false);
+          }
+        }}
+      >
+        <Pressable
+          style={negModal.backdrop}
+          onPress={() => {
+            if (["rejected", "expired", "accepted"].includes(orderStatus)) {
+              setNegotiationModalVisible(false);
+            }
+          }}
+        >
+          <Pressable style={negModal.card} onPress={(e) => e.stopPropagation()}>
+            {/* Close button — only when dismissible */}
+            {["rejected", "expired", "accepted"].includes(orderStatus) && (
+              <TouchableOpacity
+                style={negModal.closeBtn}
+                onPress={() => {
+                  setNegotiationModalVisible(false);
+                  if (orderStatus === "rejected" || orderStatus === "expired") {
+                    setOrderStatus("idle");
+                  }
+                }}
+              >
+                <Feather name="x" size={16} color={C.gray600} />
+              </TouchableOpacity>
+            )}
+
+            <NegotiationBanner
+              status={orderStatus}
+              countdown={countdown}
+              vendorName={vendorName}
+              onDismiss={null}
+            />
+
+            {orderStatus === "countered" && (
+              <CounterOfferReview
+                data={counterData}
+                onAccept={() => { handleRespondCounter("accept"); }}
+                onReject={() => { handleRespondCounter("reject"); setNegotiationModalVisible(false); }}
+                placing={placing}
+              />
+            )}
+
+            {orderStatus === "accepted" && (
+              <TouchableOpacity
+                style={negModal.proceedBtn}
+                onPress={() => { setNegotiationModalVisible(false); }}
+                activeOpacity={0.85}
+              >
+                <Feather name="credit-card" size={16} color={C.white} />
+                <Text style={negModal.proceedBtnText}>Proceed to Payment</Text>
+              </TouchableOpacity>
+            )}
+
+            {orderStatus === "pending" && (
+              <View style={negModal.pendingNote}>
+                <Feather name="info" size={13} color={C.amber} />
+                <Text style={negModal.pendingNoteText}>
+                  Please keep this screen open. The store will respond shortly.
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── Show negotiation status chip on main screen when modal closed ── */}
+      {orderStatus !== "idle" && !negotiationModalVisible && (
+        <TouchableOpacity
+          style={negModal.statusChip}
+          onPress={() => setNegotiationModalVisible(true)}
+          activeOpacity={0.85}
+        >
+          <View style={[negModal.chipDot, {
+            backgroundColor:
+              orderStatus === "accepted" ? C.green :
+              orderStatus === "pending" ? C.orange :
+              orderStatus === "countered" ? "#7C3AED" : C.red
+          }]} />
+          <Text style={negModal.chipText}>
+            {orderStatus === "accepted" ? "Order Accepted — Tap to pay" :
+             orderStatus === "pending" ? `Waiting for store... ${countdown}s` :
+             orderStatus === "countered" ? "Store sent adjustments — Tap to review" :
+             orderStatus === "rejected" ? "Order Declined" : "Request Expired"}
+          </Text>
+          <Feather name="chevron-up" size={14} color={C.gray600} />
+        </TouchableOpacity>
       )}
 
       <SlotModal
@@ -2167,24 +2192,24 @@ const extraStyles = {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: C.bg,
+    backgroundColor: C.greenLight,
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: C.gray200,
+    borderColor: C.greenBorder,
   },
   slotInfo: { gap: 2 },
-  slotTimeText: { fontSize: 16, fontWeight: "900", color: C.gray900 },
-  slotDateText: { fontSize: 12, color: C.gray500, fontWeight: "600" },
+  slotTimeText: { fontSize: 16, fontWeight: "900", color: C.greenDark },
+  slotDateText: { fontSize: 12, color: C.green, fontWeight: "600" },
   slotChangeBtn: {
     backgroundColor: C.white,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: C.gray300,
+    borderColor: C.greenBorder,
   },
-  slotChangeText: { fontSize: 13, fontWeight: "700", color: C.gray600 },
+  slotChangeText: { fontSize: 13, fontWeight: "700", color: C.green },
   phoneBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -2213,12 +2238,12 @@ const extraStyles = {
     justifyContent: "center",
     gap: 8,
     backgroundColor: C.gray100,
-    padding: 14,
+    padding: 16,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: C.gray200,
   },
-  phoneRequestText: { fontSize: 14, fontWeight: "700", color: C.gray700 },
+  phoneRequestText: { fontSize: 14, fontWeight: "700", color: C.gray600 },
   callBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -2318,65 +2343,60 @@ const fm = StyleSheet.create({
 });
 
 // ─── Slot picker modal ────────────────────────────────────────────────────────
+const SLOT_OPTIONS = [
+  { label: "7 – 9 AM",   start: 7,  end: 9  },
+  { label: "9 – 11 AM",  start: 9,  end: 11 },
+  { label: "11 AM – 1 PM", start: 11, end: 13 },
+  { label: "1 – 3 PM",   start: 13, end: 15 },
+  { label: "3 – 5 PM",   start: 15, end: 17 },
+  { label: "5 – 7 PM",   start: 17, end: 19 },
+  { label: "7 – 9 PM",   start: 19, end: 21 },
+];
+
 function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
   const [day, setDay] = useState("today");
-  const [startHour, setStartHour] = useState(10); // decimal format (e.g. 10.75 = 10:45)
-  const [duration, setDuration] = useState(2);
-  
-  const endHour = startHour + duration;
-  
-  // Helper: HH:MM string to decimal hour
+  const [selectedSlot, setSelectedSlot] = useState(null);
+
+  useEffect(() => {
+    if (visible) {
+      setDay("today");
+      setSelectedSlot(null);
+    }
+  }, [visible]);
+
   const timeToDec = (timeStr) => {
     if (!timeStr) return null;
     const [h, m] = timeStr.split(":").map(Number);
     return h + m / 60;
   };
 
-  const formatTime = (decimalHour) => {
-    const h = Math.floor(decimalHour);
-    const m = Math.round((decimalHour - h) * 60);
-    const ampm = h >= 12 && h < 24 ? "pm" : "am";
-    const displayH = (h % 12) || 12;
-    const displayM = m.toString().padStart(2, "0");
-    return `${displayH}:${displayM} ${ampm}`;
+  const getISODate = (hour) => {
+    const d = new Date();
+    if (day === "tomorrow") d.setDate(d.getDate() + 1);
+    d.setHours(hour, 0, 0, 0);
+    return d.toISOString();
   };
 
-  const getISODate = (decimalHour) => {
-  const d = new Date();
-  if (day === "tomorrow") d.setDate(d.getDate() + 1);
-  const h = Math.floor(decimalHour);
-  const m = Math.round((decimalHour - h) * 60);
-  d.setHours(h, m, 0, 0);
-  return d.toISOString();
-};
+  const now = new Date();
+  const nowHour = now.getHours() + now.getMinutes() / 60;
 
-  // Validation Logic
-  const validation = useMemo(() => {
-    const now = new Date();
-    const nowDec = now.getHours() + (now.getMinutes() / 60);
-    const buffer = 0.5; // 30 min buffer
+  const isSlotDisabled = (slot) => {
+    if (day === "tomorrow") return false;
+    // Disable if slot start is within 1 hour from now
+    return slot.start <= nowHour + 1;
+  };
 
-    // 1. Past check
-    if (day === "today" && startHour < nowDec + buffer) {
-      return { valid: false, reason: "Store needs at least 30 mins to prepare." };
-    }
-
-    // 2. Store Hours check
-    if (vendor) {
-      const open = timeToDec(vendor.opening_time);
-      const close = timeToDec(vendor.closing_time);
-      if (open !== null && close !== null) {
-        if (startHour < open) return { valid: false, reason: `Store opens at ${formatTime(open)}.` };
-        if (endHour > close) return { valid: false, reason: `Store closes at ${formatTime(close)}.` };
-      }
-    }
-
-    return { valid: true };
-  }, [day, startHour, duration, vendor]);
+  const isSlotOutsideHours = (slot) => {
+    if (!vendor) return false;
+    const open = timeToDec(vendor.opening_time);
+    const close = timeToDec(vendor.closing_time);
+    if (open === null || close === null) return false;
+    return slot.start < open || slot.end > close;
+  };
 
   const handleConfirm = () => {
-    if (!validation.valid) return;
-    onConfirm({ slot_start: getISODate(startHour), slot_end: getISODate(endHour) });
+    if (!selectedSlot) return;
+    onConfirm({ slot_start: getISODate(selectedSlot.start), slot_end: getISODate(selectedSlot.end) });
   };
 
   return (
@@ -2389,10 +2409,15 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
       <Pressable style={sm.backdrop} onPress={onClose}>
         <Pressable style={sm.sheet} onPress={(e) => e.stopPropagation()}>
           <View style={sm.handle} />
-          <Text style={sm.title}>Choose delivery window</Text>
-          <Text style={sm.sub}>Schedule your delivery using the sliders below</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <Text style={sm.title}>Choose delivery window</Text>
+            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+              <Feather name="x" size={22} color={C.gray500} />
+            </TouchableOpacity>
+          </View>
+          <Text style={sm.sub}>Pick a time slot for your delivery</Text>
 
-          <View style={{ marginBottom: 20 }}>
+          <View style={{ marginBottom: 18 }}>
             <Text style={{ fontWeight: '700', marginBottom: 10, color: C.gray700 }}>Select Day</Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               {['today', 'tomorrow'].map((d) => (
@@ -2402,7 +2427,7 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
                     sm.hintChip,
                     day === d && { borderColor: C.green, backgroundColor: C.greenLight }
                   ]}
-                  onPress={() => setDay(d)}
+                  onPress={() => { setDay(d); setSelectedSlot(null); }}
                 >
                   <Text style={[sm.hintText, day === d && { color: C.green }]}>
                     {d.charAt(0).toUpperCase() + d.slice(1)}
@@ -2412,68 +2437,59 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
             </View>
           </View>
 
-          <View style={{ marginBottom: 20 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-              <Text style={{ fontWeight: '700', color: C.gray700 }}>Start Time</Text>
-              <Text style={{ fontWeight: '800', color: C.greenDark }}>{formatTime(startHour)}</Text>
-            </View>
-            <Slider
-              style={{ width: '100%', height: 40 }}
-              minimumValue={8}
-              maximumValue={22}
-              step={0.25}
-              value={startHour}
-              onValueChange={setStartHour}
-              minimumTrackTintColor={C.green}
-              maximumTrackTintColor={C.gray200}
-              thumbTintColor={C.greenDark}
-            />
+          <Text style={{ fontWeight: '700', marginBottom: 10, color: C.gray700 }}>Available Slots</Text>
+          <View style={sm.slotGrid}>
+            {SLOT_OPTIONS.map((slot) => {
+              const disabled = isSlotDisabled(slot);
+              const outsideHours = isSlotOutsideHours(slot);
+              const unavailable = disabled || outsideHours;
+              const active = selectedSlot?.label === slot.label;
+              return (
+                <TouchableOpacity
+                  key={slot.label}
+                  style={[
+                    sm.slotChip,
+                    active && sm.slotChipActive,
+                    unavailable && sm.slotChipDisabled,
+                  ]}
+                  onPress={() => !unavailable && setSelectedSlot(slot)}
+                  activeOpacity={unavailable ? 1 : 0.75}
+                >
+                  <Feather
+                    name="clock"
+                    size={12}
+                    color={active ? C.white : unavailable ? C.gray300 : C.green}
+                  />
+                  <Text style={[
+                    sm.slotChipText,
+                    active && sm.slotChipTextActive,
+                    unavailable && sm.slotChipTextDisabled,
+                  ]}>{slot.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          <View style={{ marginBottom: 20 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-              <Text style={{ fontWeight: '700', color: C.gray700 }}>Duration</Text>
-              <Text style={{ fontWeight: '800', color: C.greenDark }}>{duration} hour{duration > 1 ? 's' : ''}</Text>
-            </View>
-            <Slider
-              style={{ width: '100%', height: 40 }}
-              minimumValue={1}
-              maximumValue={4}
-              step={0.5}
-              value={duration}
-              onValueChange={setDuration}
-              minimumTrackTintColor={C.green}
-              maximumTrackTintColor={C.gray200}
-              thumbTintColor={C.greenDark}
-            />
-          </View>
-
-          <View style={[sm.preview, validation.valid ? sm.previewValid : sm.previewInvalid]}>
-            <Feather 
-              name={validation.valid ? "check-circle" : "alert-circle"} 
-              size={16} 
-              color={validation.valid ? C.green : C.red} 
-            />
-            {validation.valid ? (
+          {selectedSlot && (
+            <View style={[sm.preview, sm.previewValid]}>
+              <Feather name="check-circle" size={16} color={C.green} />
               <Text style={sm.previewText}>
-                Delivery between <Text style={sm.previewBold}>{formatTime(startHour)}</Text> and <Text style={sm.previewBold}>{formatTime(endHour)}</Text>
+                Delivery on <Text style={sm.previewBold}>{day === 'today' ? 'Today' : 'Tomorrow'}</Text>, window: <Text style={sm.previewBold}>{selectedSlot.label}</Text>
               </Text>
-            ) : (
-              <Text style={sm.previewTextErr}>{validation.reason}</Text>
-            )}
-          </View>
+            </View>
+          )}
 
           <TouchableOpacity
-            style={[sm.confirmBtn, (!validation.valid || loading) && sm.confirmBtnDisabled]}
+            style={[sm.confirmBtn, (!selectedSlot || loading) && sm.confirmBtnDisabled]}
             onPress={handleConfirm}
-            disabled={!validation.valid || loading}
+            disabled={!selectedSlot || loading}
             activeOpacity={0.85}
           >
             {loading ? (
               <ActivityIndicator size="small" color={C.white} />
             ) : (
               <Text style={sm.confirmBtnText}>
-                {validation.valid ? "Request this window →" : "Invalid Selection"}
+                {selectedSlot ? "Confirm this slot →" : "Select a slot"}
               </Text>
             )}
           </TouchableOpacity>
@@ -2564,6 +2580,34 @@ const sm = StyleSheet.create({
   },
   confirmBtnDisabled: { backgroundColor: C.greenMid },
   confirmBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
+  slotGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 16,
+  },
+  slotChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: C.greenBorder,
+    backgroundColor: C.greenLight,
+  },
+  slotChipActive: {
+    backgroundColor: C.green,
+    borderColor: C.greenDark,
+  },
+  slotChipDisabled: {
+    backgroundColor: C.gray100,
+    borderColor: C.gray200,
+  },
+  slotChipText: { fontSize: 13, fontWeight: "700", color: C.green },
+  slotChipTextActive: { color: C.white },
+  slotChipTextDisabled: { color: C.gray300 },
 });
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -2583,23 +2627,23 @@ const s = StyleSheet.create({
     borderBottomColor: C.gray100,
   },
   backBtn: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    backgroundColor: C.gray100,
+    backgroundColor: C.white,
+    borderWidth: 1,
+    borderColor: C.gray200,
     alignItems: "center",
     justifyContent: "center",
   },
   headerMid: { flex: 1 },
   headerTitle: { fontSize: 20, fontWeight: "900", color: C.gray900 },
-  headerSub: { fontSize: 12, color: C.gray400, marginTop: 1 },
+  headerSub: { fontSize: 12, color: C.green, marginTop: 1, fontWeight: "700" },
   totalChip: {
     backgroundColor: C.greenMid,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: C.greenBorder,
   },
   totalChipText: { fontSize: 14, fontWeight: "900", color: C.greenDark },
 
@@ -2668,12 +2712,12 @@ const s = StyleSheet.create({
   },
   addrBody: { flex: 1 },
   addrTitle: { fontSize: 14, fontWeight: "700", color: C.gray900 },
-  addrSub: { fontSize: 12, color: C.gray400, marginTop: 2 },
+  addrSub: { fontSize: 12, color: C.gray500, marginTop: 2 },
   addrDetected: {
     fontSize: 12,
     color: C.green,
     marginTop: 2,
-    fontWeight: "500",
+    fontWeight: "600",
   },
 
   // Radio buttons
@@ -2703,6 +2747,22 @@ const s = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: C.green,
   },
+
+  // Address action buttons (2-col GPS + Manual)
+  addrActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    backgroundColor: C.white,
+  },
+  addrActionBtnActive: { borderColor: C.green, backgroundColor: C.greenLight },
+  addrActionBtnOrange: { borderColor: C.orange, backgroundColor: C.orange },
+  addrActionText: { fontSize: 12, fontWeight: "600", textAlign: "center" },
 
   // Manual form
   manualForm: {
@@ -2766,7 +2826,7 @@ const s = StyleSheet.create({
   },
   payBody: { flex: 1 },
   payLabel: { fontSize: 15, fontWeight: "700", color: C.gray900 },
-  paySub: { fontSize: 12, color: C.gray400, marginTop: 2 },
+  paySub: { fontSize: 12, color: C.gray500, marginTop: 2 },
   paySubRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -2963,4 +3023,81 @@ const toastStyle = StyleSheet.create({
   success: { backgroundColor: C.green },
   error: { backgroundColor: "#DC2626" },
   text: { color: C.white, fontSize: 14, fontWeight: "700", lineHeight: 20 },
+});
+
+// ─── Negotiation Modal Styles ─────────────────────────────────────────────────
+const negModal = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.52)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  card: {
+    backgroundColor: C.white,
+    borderRadius: 24,
+    padding: 20,
+    width: "100%",
+    maxWidth: 440,
+    shadowColor: "#000",
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 12,
+  },
+  closeBtn: {
+    alignSelf: "flex-end",
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: C.gray100,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
+  proceedBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: C.green,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginTop: 12,
+  },
+  proceedBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
+  pendingNote: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: C.amberLight,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+  },
+  pendingNoteText: { flex: 1, fontSize: 12, color: C.amber, fontWeight: "600", lineHeight: 17 },
+  // Status chip shown at bottom of screen when modal is dismissed
+  statusChip: {
+    position: "absolute",
+    bottom: 90,
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: C.white,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  chipDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  chipText: { flex: 1, fontSize: 13, fontWeight: "700", color: C.gray700 },
 });

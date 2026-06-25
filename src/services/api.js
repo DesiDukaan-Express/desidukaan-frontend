@@ -2,10 +2,22 @@ import { Platform } from 'react-native';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
-// ─── Core request helper ───
-const request = async (method, endpoint, body = null, token = null) => {
+// ─── Core request helper with automatic token refresh ─────────────────────────
+/**
+ * All API calls go through here.
+ * If the server returns { error: "TOKEN_EXPIRED" }, we transparently refresh
+ * the access token and retry the original request exactly once.
+ *
+ * @param {string} method
+ * @param {string} endpoint
+ * @param {*}      body      - JSON-serialisable body or null
+ * @param {string} token     - current access token (passed explicitly by callers)
+ * @param {boolean} _isRetry - internal flag to prevent infinite retry loops
+ */
+const request = async (method, endpoint, body = null, token = null, _isRetry = false) => {
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
+
   console.log("API REQUEST:", method, endpoint, "token:", token ? "YES" : "NO");
 
   const config = { method, headers };
@@ -13,6 +25,27 @@ const request = async (method, endpoint, body = null, token = null) => {
 
   const response = await fetch(`${BASE_URL}${endpoint}`, config);
   const data = await response.json();
+
+  // ── Silent token refresh on first expiry ─────────────────────────────────
+  if (!_isRetry && response.status === 401 && data.error === "TOKEN_EXPIRED") {
+    // Lazy import to avoid circular dep (authStore imports nothing from api.js)
+    const { tryRefreshToken, default: useAuthStore } = await import('../store/authStore');
+    const refreshResult = await tryRefreshToken();
+    const newAccessToken = refreshResult?.token;
+
+    if (newAccessToken) {
+      // Update the store's in-memory token
+      useAuthStore.getState()._setAccessToken(newAccessToken);
+      // Retry the original request with the fresh token
+      return request(method, endpoint, body, newAccessToken, true);
+    } else {
+      // Refresh token also expired/revoked → force logout
+      useAuthStore.getState().logout();
+      const err = new Error("Session expired. Please log in again.");
+      err.sessionExpired = true;
+      throw err;
+    }
+  }
 
   if (!response.ok) {
     const err = new Error(data.message || data.msg || "Something went wrong");
@@ -23,7 +56,7 @@ const request = async (method, endpoint, body = null, token = null) => {
   return data;
 };
 
-// ─── Auth ───
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 export const authAPI = {
   register: (phone, name, password, role) =>
     request("POST", "/auth/register", { phone, name, password, role }),
@@ -41,13 +74,13 @@ export const authAPI = {
   verifyOTP: (phone, code) => request("POST", "/auth/verify", { phone, code }),
 };
 
-// ─── Upload ───
+// ─── Upload ───────────────────────────────────────────────────────────────────
 export const uploadAPI = {
   /**
    * Upload a file (image or PDF) to the backend.
    * @param {string} localUri  - local file URI from image/document picker
    * @param {string} mimeType  - e.g. 'image/jpeg' | 'application/pdf'
-   * @param {string} token     - JWT auth token
+   * @param {string} token     - JWT access token
    * @returns {Promise<{url: string, mime: string}>}
    */
   upload: async (localUri, mimeType, token) => {
@@ -61,7 +94,6 @@ export const uploadAPI = {
     const formData = new FormData();
 
     if (Platform.OS === 'web') {
-      // On web, we must fetch the blob and append it as a real File/Blob
       try {
         const response = await fetch(localUri);
         const blob = await response.blob();
@@ -71,7 +103,6 @@ export const uploadAPI = {
         throw new Error("Could not process file for upload");
       }
     } else {
-      // On native, use the special object format that React Native's FormData polyfill expects
       formData.append("file", {
         uri:  localUri,
         name: fileName,
@@ -83,11 +114,7 @@ export const uploadAPI = {
 
     const response = await fetch(`${BASE_URL}/upload`, {
       method:  "POST",
-      headers: { 
-        "Authorization": `Bearer ${token}`,
-        // DO NOT set Content-Type: multipart/form-data here, 
-        // the browser/native layer must set it with the boundary automatically.
-      },
+      headers: { "Authorization": `Bearer ${token}` },
       body:    formData,
     });
 
@@ -100,58 +127,80 @@ export const uploadAPI = {
   },
 };
 
-// ─── Categories ───
+// ─── Categories ───────────────────────────────────────────────────────────────
 export const categoriesAPI = {
-  /** Returns all active categories as flat list with parent_id for hierarchy */
   getAll: () => request("GET", "/products/categories"),
-
-  /** Returns subcategories (children) of a parent category */
   getSubcategories: (parentId) => request("GET", `/products/subcategories/${parentId}`),
 };
 
-// ─── Admin Categories ───
-const ADMIN_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+// ─── Admin Categories ─────────────────────────────────────────────────────────
 export const adminCategoriesAPI = {
-  getAll:   (token)               => request("GET",    "/admin/categories",      null,    token),
-  create:   (data, token)         => request("POST",   "/admin/categories",      data,    token),
-  update:   (id, data, token)     => request("PUT",    `/admin/categories/${id}`, data,   token),
-  remove:   (id, token)           => request("DELETE", `/admin/categories/${id}`, null,   token),
+  getAll:   (token)           => request("GET",    "/admin/categories",      null,  token),
+  create:   (data, token)     => request("POST",   "/admin/categories",      data,  token),
+  update:   (id, data, token) => request("PUT",    `/admin/categories/${id}`, data, token),
+  remove:   (id, token)       => request("DELETE", `/admin/categories/${id}`, null, token),
 };
 
-// ─── Vendors ───
+// ─── Vendors ──────────────────────────────────────────────────────────────────
 export const vendorsAPI = {
-  getNearby: (latitude, longitude, radius_km = 2) =>
-    request("GET", `/vendors?latitude=${latitude}&longitude=${longitude}&radius_km=${radius_km}`),
+  getNearby: (latitude, longitude, radius_km = 2, store_category = null) => {
+    let url = `/vendors?latitude=${latitude}&longitude=${longitude}&radius_km=${radius_km}`;
+    if (store_category) url += `&store_category=${encodeURIComponent(store_category)}`;
+    return request("GET", url);
+  },
 
-  getById:     (id)    => request("GET",  `/vendors/${id}`),
-  getMyProfile:(token) => request("GET",  "/vendors/me/profile", null, token),
-  getMyStats:  (token) => request("GET",  "/vendors/me/stats",   null, token),
-  toggleStatus:(id, token) => request("PATCH", `/vendors/${id}/toggle`, null, token),
+  getStoreCategories: () => request("GET", "/vendors/store-categories"),
+
+  getById:      (id)         => request("GET",   `/vendors/${id}`),
+  getMyProfile: (token)      => request("GET",   "/vendors/me/profile", null, token),
+  getMyStats:   (token)      => request("GET",   "/vendors/me/stats",   null, token),
+  toggleStatus: (id, token)  => request("PATCH", `/vendors/${id}/toggle`, null, token),
 };
 
-// ─── Orders ───
+// ─── Orders ───────────────────────────────────────────────────────────────────
 export const ordersAPI = {
-  place:          (orderData, token)            => request("POST",  "/orders",                orderData, token),
-  getMyOrders:    (token, page = 1)             => request("GET",   `/orders/my?page=${page}`, null,    token),
-  getById:        (id,    token)                => request("GET",   `/orders/${id}`,           null,    token),
-  getVendorActive:(token)                       => request("GET",   "/orders/vendor/active",   null,    token),
-  getVendorHistory:(token)                      => request("GET",   "/orders/vendor/history",  null,    token),
-  updateStatus:   (id, status, token, reason="")=> request("PATCH", `/orders/${id}/status`, { status, reason }, token),
+  place:           (orderData, token)             => request("POST",  "/orders",                orderData, token),
+  getMyOrders:     (token, page = 1)              => request("GET",   `/orders/my?page=${page}`, null,    token),
+  getById:         (id, token)                    => request("GET",   `/orders/${id}`,           null,    token),
+  getVendorActive: (token)                        => request("GET",   "/orders/vendor/active",   null,    token),
+  getVendorHistory:(token)                        => request("GET",   "/orders/vendor/history",  null,    token),
+  updateStatus:    (id, status, token, reason="") => request("PATCH", `/orders/${id}/status`, { status, reason }, token),
 };
 
-// ─── Delivery ───
+// ─── Delivery ─────────────────────────────────────────────────────────────────
 export const deliveryAPI = {
-  getAvailable:      (token)               => request("GET",   "/delivery/available",         null,               token),
-  getActive:         (token)               => request("GET",   "/delivery/active",            null,               token),
-  accept:            (orderId, token)      => request("POST",  `/delivery/accept/${orderId}`,  null,               token),
-  updateStatus:      (id, status, token)   => request("PATCH", `/delivery/${id}/status`,      { status },         token),
-  trackOrder:        (orderId, token)      => request("GET",   `/delivery/track/${orderId}`,   null,               token),
-  toggleAvailability:(token)               => request("PATCH", "/delivery/toggle-availability", null,             token),
-  updateLocation:    (lat, lng, token)     => request("POST",  "/delivery/location",          { latitude: lat, longitude: lng }, token),
-
-  /** Submit (or re-submit) full onboarding data */
-  onboard:           (payload, token)      => request("POST",  "/delivery/onboard",           payload,            token),
-
-  /** Fetch full delivery partner profile including all onboarding fields */
-  getMyProfile:      (token)               => request("GET",   "/delivery/me/profile",        null,               token),
+  getAvailable:       (token)            => request("GET",   "/delivery/available",          null,                             token),
+  getActive:          (token)            => request("GET",   "/delivery/active",             null,                             token),
+  accept:             (orderId, token)   => request("POST",  `/delivery/accept/${orderId}`,  null,                             token),
+  updateStatus:       (id, status, token)=> request("PATCH", `/delivery/${id}/status`,       { status },                       token),
+  trackOrder:         (orderId, token)   => request("GET",   `/delivery/track/${orderId}`,   null,                             token),
+  toggleAvailability: (token)            => request("PATCH", "/delivery/toggle-availability", null,                            token),
+  updateLocation:     (lat, lng, token)  => request("POST",  "/delivery/location",           { latitude: lat, longitude: lng }, token),
+  onboard:            (payload, token)   => request("POST",  "/delivery/onboard",            payload,                          token),
+  getMyProfile:       (token)            => request("GET",   "/delivery/me/profile",         null,                             token),
 };
+
+// ─── Search ───────────────────────────────────────────────────────────────────
+export const searchAPI = {
+  /**
+   * Prefix autocomplete — called while user is typing (debounced on the caller).
+   * Returns { suggestions: [{ text, type }] }
+   */
+  autocomplete: (q) => request("GET", `/search/autocomplete?q=${encodeURIComponent(q)}`),
+
+  /**
+   * Typo correction — called only when search yields 0 results.
+   * Returns { suggestion: string | null }
+   */
+  correct: (q) => request("GET", `/search/correct?q=${encodeURIComponent(q)}`),
+
+  /**
+   * Fire-and-forget search tracking — called after every successful search.
+   * Increments count in search_history for popularity-based suggestions.
+   */
+  track: (query) => {
+    // Fire and forget — don't await, don't block UI
+    request("POST", "/search/track", { query }).catch(() => {});
+  },
+};
+

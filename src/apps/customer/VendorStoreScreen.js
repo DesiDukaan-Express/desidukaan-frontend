@@ -16,15 +16,24 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
-  orange: "#F97316", orangeDark: "#EA580C",
-  green: "#16A34A", greenDark: "#15803D",
-  greenDeep: "#14532D", greenLight: "#F0FDF4",
-  greenMid: "#DCFCE7", greenBorder: "#BBF7D0",
-  white: "#FFFFFF", bg: "#F8FAFC",
-  gray100: "#F3F4F6", gray200: "#E5E7EB",
+  // Brand greens
+  green: "#005e26", greenDark: "#007a33", greenDeep: "#002b12",
+  greenLight: "#F0FDF4", greenMid: "#DCFCE7", greenBorder: "#BBF7D0",
+  greenFixed: "#93f9a2", greenFixedDim: "#77dc88",
+  // Brand oranges
+  orange: "#FC8125", orangeDark: "#994700",
+  orangeLight: "#FFDBC8", orangeMid: "#FFF7ED",
+  // Neutrals
+  white: "#FFFFFF", bg: "#F8F9FA",
+  gray100: "#F3F4F5", gray200: "#E1E3E4",
   gray300: "#D1D5DB", gray400: "#9CA3AF",
-  gray500: "#6B7280", gray600: "#4B5563",
-  gray700: "#374151", gray900: "#111827",
+  gray500: "#6F7A6D", gray600: "#3F4A3E",
+  gray700: "#374151", gray900: "#191C1D",
+  // Surfaces
+  surface: "#F8F9FA", surfaceLow: "#F3F4F5",
+  surfaceHigh: "#E7E8E9", surfaceLowest: "#FFFFFF",
+  outlineVar: "#BECABB",
+  // Other
   cyan: "#0891B2", cyanLight: "#ECFEFF",
 };
 
@@ -104,20 +113,7 @@ const normalizeCatName = (name) => {
 
 const normalizeCat = (cat) => normalizeCatName(cat) || "Other";
 
-function buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCategories) {
-  const parentOf = {};
-  const catById = {};
-  if (apiCategories && apiCategories.length > 0) {
-    apiCategories.forEach(c => { catById[c.id] = c; });
-    apiCategories.forEach(c => {
-      if (c.parent_id && catById[c.parent_id]) {
-        parentOf[c.name] = catById[c.parent_id].name;
-      } else {
-        parentOf[c.name] = null;
-      }
-    });
-  }
-
+function buildHierarchyFromInventory(allInventoryItems, getCategoryName, parentOfMap) {
   const hierarchy = {};
 
   allInventoryItems.forEach(inv => {
@@ -125,12 +121,12 @@ function buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCate
     if (!catName) return;
 
     let topCat, subCat;
-    if (parentOf.hasOwnProperty(catName)) {
-      if (parentOf[catName] === null) {
+    if (parentOfMap && parentOfMap.hasOwnProperty(catName)) {
+      if (parentOfMap[catName] === null) {
         topCat = catName;
         subCat = "All";
       } else {
-        topCat = parentOf[catName];
+        topCat = parentOfMap[catName];
         subCat = catName;
       }
     } else {
@@ -165,8 +161,8 @@ function useWindowWidth() {
 // Responsive card grid — 2 cols mobile, 3 tablet, 4-5 desktop
 function useCardLayout(winW) {
   return useMemo(() => {
-    const H_PAD = winW >= 1024 ? 24 : winW >= 640 ? 16 : 12;
-    const GAP = winW >= 640 ? 12 : 10;
+    const H_PAD = winW >= 1024 ? 24 : winW >= 640 ? 16 : 16;
+    const GAP = winW >= 640 ? 16 : 14;
     let cols;
     if (winW >= 1200) cols = 5;
     else if (winW >= 900) cols = 4;
@@ -458,7 +454,7 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
   const loose = isLooseItem(p);
   const discount = p.mrp && p.mrp > p.price
     ? Math.round((1 - p.price / p.mrp) * 100) : null;
-  const imgH = Math.max(90, Math.round(cardW * 0.85));
+  const imgH = Math.max(120, Math.round(cardW));
 
   return (
     <TouchableOpacity
@@ -470,10 +466,10 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
       <View style={[pc.imgWrap, { height: imgH }]}>
         <Image
           source={{ uri: p.image_url || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300" }}
-          style={pc.img} resizeMode="cover"
+          style={pc.img} resizeMode={loose ? "cover" : "contain"}
         />
         {discount && inStock && (
-          <View style={pc.discBadge}><Text style={pc.discText}>{discount}%</Text></View>
+          <View style={pc.discBadge}><Text style={pc.discText}>{discount}% OFF</Text></View>
         )}
         {/* Loose badge — top right */}
         {loose && inStock && (
@@ -536,28 +532,48 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
   );
 }
 const pc = StyleSheet.create({
-  card: { backgroundColor: C.white, borderRadius: 14, overflow: "hidden", borderWidth: 1, borderColor: C.gray200, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 3 },
-  imgWrap: { position: "relative", width: "100%" },
+  card: {
+    backgroundColor: C.surfaceLowest,
+    borderRadius: 24,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  imgWrap: {
+    position: "relative",
+    width: "100%",
+    backgroundColor: C.white,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 14,
+  },
   img: { width: "100%", height: "100%" },
-  discBadge: { position: "absolute", top: 6, left: 6, backgroundColor: C.orange, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
-  discText: { fontSize: 9, color: C.white, fontWeight: "800" },
-  looseBadge: { position: "absolute", top: 6, right: 6, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(236,254,255,0.92)", paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8 },
+  discBadge: { position: "absolute", top: 8, left: 8, backgroundColor: C.orange, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  discText: { fontSize: 9, color: C.white, fontWeight: "800", letterSpacing: 0 },
+  looseBadge: { position: "absolute", top: 8, right: 8, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.88)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, borderWidth: 1, borderColor: C.green },
   looseBadgeText: { fontSize: 9, fontWeight: "800", color: C.cyan },
   oosOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.48)", alignItems: "center", justifyContent: "center" },
   oosText: { fontSize: 11, fontWeight: "800", color: C.white, textAlign: "center" },
-  info: { padding: 9 },
-  name: { fontSize: 13, fontWeight: "700", color: C.gray900, lineHeight: 17, marginBottom: 2 },
-  unit: { fontSize: 11, color: C.gray400, marginBottom: 6 },
-  priceRow: { flexDirection: "row", alignItems: "baseline", gap: 5, marginBottom: 8 },
-  price: { fontSize: 14, fontWeight: "900", color: C.gray900 },
-  mrp: { fontSize: 10, color: C.gray400, textDecorationLine: "line-through" },
-  addBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, backgroundColor: C.green, borderRadius: 9, paddingVertical: 9 },
-  addBtnLoose: { backgroundColor: C.cyan },   // cyan for loose items
-  addText: { fontSize: 12, fontWeight: "800", color: C.white },
-  qtyRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: C.green, borderRadius: 9, overflow: "hidden" },
-  qtyBtn: { paddingHorizontal: 12, paddingVertical: 9 },
-  qtyNum: { fontSize: 13, fontWeight: "900", color: C.white },
-  oosBtn: { backgroundColor: C.gray100, borderRadius: 9, paddingVertical: 8, alignItems: "center" },
+  info: { padding: 12, flex: 1 },
+  name: { fontSize: 16, fontWeight: "800", color: C.gray900, lineHeight: 21, marginBottom: 2 },
+  unit: { fontSize: 11, color: C.gray500, marginBottom: 6 },
+  priceRow: { flexDirection: "row", alignItems: "baseline", gap: 6, marginBottom: 10 },
+  price: { fontSize: 20, fontWeight: "900", color: C.green },
+  mrp: { fontSize: 11, color: C.gray400, textDecorationLine: "line-through" },
+  addBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5,
+    backgroundColor: C.greenDark, borderRadius: 12, paddingVertical: 10, minHeight: 40,
+    shadowColor: "rgba(0,122,51,0.2)", shadowOffset: { width: 0, height: 4 }, shadowRadius: 12, elevation: 3,
+  },
+  addBtnLoose: { backgroundColor: C.cyan },
+  addText: { fontSize: 12, fontWeight: "800", color: "#a1ffad", letterSpacing: 0.5 },
+  qtyRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: C.green, borderRadius: 12, overflow: "hidden" },
+  qtyBtn: { paddingHorizontal: 14, paddingVertical: 10 },
+  qtyNum: { fontSize: 14, fontWeight: "900", color: C.white },
+  oosBtn: { backgroundColor: C.gray100, borderRadius: 12, paddingVertical: 9, alignItems: "center" },
   oosBtnText: { fontSize: 11, fontWeight: "600", color: C.gray400 },
 });
 
@@ -580,13 +596,24 @@ function CatSectionHeader({ cat, count }) {
   );
 }
 const csh = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12, backgroundColor: C.bg },
-  iconWrap: { width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  row: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    paddingHorizontal: 16, paddingTop: 22, paddingBottom: 12,
+    backgroundColor: C.bg,
+  },
+  iconWrap: {
+    width: 44, height: 44, borderRadius: 14,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: C.outlineVar,
+  },
   emoji: { fontSize: 22 },
-  title: { fontSize: 17, fontWeight: "900", color: C.gray900 },
-  sub: { fontSize: 12, color: C.gray400, marginTop: 1 },
-  badge: { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20 },
-  badgeText: { fontSize: 12, fontWeight: "800" },
+  title: { fontSize: 17, fontWeight: "900", color: C.gray900, letterSpacing: -0.3 },
+  sub: { fontSize: 12, color: C.gray500, marginTop: 2 },
+  badge: {
+    paddingHorizontal: 11, paddingVertical: 5,
+    borderRadius: 999, backgroundColor: C.greenMid,
+  },
+  badgeText: { fontSize: 12, fontWeight: "800", color: C.green },
 });
 
 // ─── Category Tab Pill ─────────────────────────────────────────────────────────
@@ -596,19 +623,32 @@ function CatTabPill({ cat, count, isActive, onPress }) {
     <TouchableOpacity style={[ct.pill, isActive && ct.pillActive]} onPress={onPress} activeOpacity={0.8}>
       <Text style={ct.emoji}>{meta.emoji}</Text>
       <Text style={[ct.label, isActive && ct.labelActive]} numberOfLines={1}>{cat}</Text>
-      <View style={[ct.bubble, { backgroundColor: isActive ? "rgba(255,255,255,0.25)" : meta.bg }]}>
-        <Text style={[ct.bubbleText, { color: isActive ? C.white : meta.accent }]}>{count}</Text>
+      <View style={[ct.bubble, { backgroundColor: isActive ? "rgba(255,255,255,0.22)" : C.surfaceHigh }]}>
+        <Text style={[ct.bubbleText, { color: isActive ? C.white : C.gray600 }]}>{count}</Text>
       </View>
     </TouchableOpacity>
   );
 }
 const ct = StyleSheet.create({
-  pill: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 22, borderWidth: 1.5, borderColor: C.gray200, backgroundColor: C.white, marginRight: 8 },
-  pillActive: { backgroundColor: C.green, borderColor: C.green },
+  pill: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999,
+    borderWidth: 1, borderColor: C.outlineVar,
+    backgroundColor: C.surfaceLowest, marginRight: 8,
+  },
+  pillActive: {
+    backgroundColor: C.greenDark, borderColor: C.greenDark,
+    shadowColor: C.green, shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3, shadowRadius: 7, elevation: 4,
+  },
   emoji: { fontSize: 14 },
   label: { fontSize: 12, fontWeight: "700", color: C.gray600 },
   labelActive: { color: C.white },
-  bubble: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, minWidth: 20, alignItems: "center" },
+  bubble: {
+    paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999,
+    minWidth: 20, alignItems: "center",
+    backgroundColor: C.surfaceHigh,
+  },
   bubbleText: { fontSize: 10, fontWeight: "800" },
 });
 
@@ -632,6 +672,7 @@ export default function VendorStoreScreen() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [searchFocus, setSearchFocus] = useState(false);
+  const searchInputRef = useRef(null);
   const [activeCat, setActiveCat] = useState("All");
   const [detailItem, setDetailItem] = useState(null);
   const [loosePickerItem, setLoosePickerItem] = useState(null); // weight picker
@@ -695,9 +736,29 @@ export default function VendorStoreScreen() {
     return normalizeCatName(raw) || "Other";
   }, []);
 
+  const parentOfMap = useMemo(() => {
+    const map = {};
+    const catById = {};
+    if (apiCategories && apiCategories.length > 0) {
+      apiCategories.forEach(c => { catById[c.id] = c; });
+      apiCategories.forEach(c => {
+        const normName = normalizeCatName(c.name);
+        if (normName) {
+          if (c.parent_id && catById[c.parent_id]) {
+            const normParent = normalizeCatName(catById[c.parent_id].name);
+            map[normName] = normParent;
+          } else {
+            map[normName] = null;
+          }
+        }
+      });
+    }
+    return map;
+  }, [apiCategories]);
+
   const categoryHierarchy = useMemo(
-    () => buildHierarchyFromInventory(inventory, getCatName, apiCategories),
-    [inventory, getCatName, apiCategories],
+    () => buildHierarchyFromInventory(inventory, getCatName, parentOfMap),
+    [inventory, getCatName, parentOfMap],
   );
 
   const categories = useMemo(() => {
@@ -728,9 +789,20 @@ export default function VendorStoreScreen() {
     const name = (item.product?.name || "").toLowerCase();
     const cat = getCatName(item);
     const matchesSearch = !search || name.includes(search.toLowerCase());
-    const matchesCat = activeCat === "All" || cat === activeCat;
+
+    let matchesCat = activeCat === "All";
+    if (!matchesCat) {
+      if (cat === activeCat) {
+        matchesCat = true;
+      } else {
+        const parentCatName = parentOfMap[cat];
+        if (parentCatName === activeCat) {
+          matchesCat = true;
+        }
+      }
+    }
     return matchesSearch && matchesCat;
-  }), [inventory, search, activeCat, getCatName]);
+  }), [inventory, search, activeCat, getCatName, parentOfMap]);
 
   const inStock = filtered.filter(i => i.stock_qty > 0);
   const outStock = filtered.filter(i => i.stock_qty <= 0);
@@ -754,7 +826,7 @@ export default function VendorStoreScreen() {
     }
 
     const unitStr = formatWeight(selectedWeight || p.unit);
-    const finalPrice = loose 
+    const finalPrice = loose
       ? calculateProportionalPrice(p.price, unitStr, p.unit || "1kg")
       : p.price;
 
@@ -802,13 +874,13 @@ export default function VendorStoreScreen() {
   if (loading) {
     return (
       <View style={s.root}>
-        <StatusBar barStyle="light-content" />
-        <LinearGradient colors={[C.orange, C.orangeDark, C.greenDark, C.green]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.header}>
+        <StatusBar barStyle="dark-content" backgroundColor={C.surfaceLowest} />
+        <LinearGradient colors={[C.orange, C.orangeDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.loadingHeader}>
           <TouchableOpacity style={s.backBtn} onPress={goBack}>
             <Feather name="arrow-left" size={18} color={C.white} />
           </TouchableOpacity>
           <View style={s.headerMid}>
-            <Text style={s.appName}>DesiDukaan</Text>
+            <Text style={s.appName}>KwikPik</Text>
             <Text style={s.shopName}>{vendorName || "Store"}</Text>
           </View>
         </LinearGradient>
@@ -822,19 +894,15 @@ export default function VendorStoreScreen() {
 
   return (
     <View style={s.root}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" backgroundColor={C.surfaceLowest} />
 
       {/* HEADER */}
-      <LinearGradient
-        colors={[C.orange, C.orangeDark, C.greenDark, C.green]}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={s.header}
-      >
+      <View style={s.header}>
         <TouchableOpacity style={s.backBtn} onPress={goBack} activeOpacity={0.8}>
-          <Feather name="arrow-left" size={18} color={C.white} />
+          <Feather name="arrow-left" size={18} color={C.orangeDark} />
         </TouchableOpacity>
         <View style={s.headerMid}>
-          <Text style={s.appName}>DesiDukaan</Text>
+          <Text style={s.appName}>KwikPik</Text>
           <Text style={s.shopName} numberOfLines={1}>{vendor?.shop_name || vendorName}</Text>
           <View style={s.shopMetaRow}>
             <View style={[s.statusDot, { backgroundColor: vendor?.is_open ? "#4ADE80" : "#F87171" }]} />
@@ -843,19 +911,27 @@ export default function VendorStoreScreen() {
             <Text style={s.metaText}>{inStockTotal} in stock</Text>
           </View>
         </View>
-        <View style={s.ratingChip}>
-          <Feather name="star" size={11} color="#FCD34D" />
-          <Text style={s.ratingText}>
-            {vendor?.avg_rating ? parseFloat(vendor.avg_rating).toFixed(1) : "New"}
+        <View style={[s.statusChip, !vendor?.is_open && s.statusChipClosed]}>
+          <View style={[s.statusDot, { backgroundColor: vendor?.is_open ? C.greenFixed : "#F87171" }]} />
+          <Text style={[s.statusText, !vendor?.is_open && s.statusTextClosed]}>
+            {vendor?.is_open ? "Open" : "Closed"}
           </Text>
         </View>
-      </LinearGradient>
+        <TouchableOpacity
+          style={s.headerSearchBtn}
+          onPress={() => searchInputRef.current?.focus?.()}
+          activeOpacity={0.8}
+        >
+          <Feather name="search" size={18} color={C.green} />
+        </TouchableOpacity>
+      </View>
 
       {/* SEARCH */}
       <View style={s.searchWrap}>
         <View style={[s.searchBox, searchFocus && s.searchBoxActive]}>
           <Feather name="search" size={15} color={searchFocus ? C.green : C.gray400} />
           <TextInput
+            ref={searchInputRef}
             style={s.searchInput}
             placeholder={`Search in ${vendor?.shop_name || "store"}…`}
             placeholderTextColor={C.gray400}
@@ -963,6 +1039,32 @@ export default function VendorStoreScreen() {
                   {renderProductGrid(outStock)}
                 </View>
               )}
+              {!search && activeCat === "All" && inStock.length > 0 && (
+                <View style={s.promoWrap}>
+                  <View style={s.promoLarge}>
+                    <Text style={s.promoTitle}>Neighborhood Special</Text>
+                    <Text style={s.promoSub}>
+                      Free delivery on orders above ₹500 today.
+                    </Text>
+                    <MaterialIcons name="local-shipping" size={36} color={C.orangeDark} style={s.promoIcon} />
+                  </View>
+                  <View style={s.promoStack}>
+                    <View style={s.promoMini}>
+                      <View>
+                        <Text style={s.promoOverline}>STORE</Text>
+                        <Text style={s.promoMiniValue}>{inStockTotal} items</Text>
+                      </View>
+                      <MaterialIcons name="inventory-2" size={24} color={C.green} />
+                    </View>
+                    <View style={[s.promoMini, s.promoMiniGreen]}>
+                      <View style={s.couponIcon}>
+                        <MaterialIcons name="redeem" size={18} color={C.green} />
+                      </View>
+                      <Text style={s.couponText}>Fresh deals available</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
             </>
           )}
           <View style={{ height: 130 }} />
@@ -1018,40 +1120,100 @@ export default function VendorStoreScreen() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   centered: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-  loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" },
+  loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500" },
 
-  header: { padding: 14, paddingTop: Platform.OS === "android" ? 14 : 52, flexDirection: "row", alignItems: "center", gap: 10 },
-  backBtn: { width: 34, height: 34, borderRadius: 11, backgroundColor: "rgba(0,0,0,0.18)", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  // ── Header — white surface card style ──
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === "android" ? 14 : 52,
+    paddingBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: C.surfaceLowest,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 6,
+    elevation: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray200,
+  },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 999,
+    backgroundColor: C.orangeLight,
+    alignItems: "center", justifyContent: "center", flexShrink: 0,
+  },
   headerMid: { flex: 1 },
-  appName: { fontSize: 10, fontWeight: "700", color: "rgba(255,255,255,0.7)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 2, fontFamily: "PlusJakartaSans_700Bold" },
-  shopName: { fontSize: 17, fontWeight: "900", color: C.white, letterSpacing: -0.2, fontFamily: "PlusJakartaSans_800ExtraBold" },
-  shopMetaRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
-  statusDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
-  metaText: { fontSize: 11, color: "rgba(255,255,255,0.82)", fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" },
-  metaSep: { color: "rgba(255,255,255,0.45)", fontSize: 11 },
-  ratingChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(0,0,0,0.18)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 18, flexShrink: 0 },
-  ratingText: { fontSize: 12, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
+  appName: {
+    fontSize: 10, fontWeight: "800", color: C.orangeDark,
+    letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2,
+  },
+  shopName: { fontSize: 22, fontWeight: "900", color: C.green, letterSpacing: 0 },
+  shopMetaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
+  statusDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
+  metaText: { fontSize: 12, color: C.gray600, fontWeight: "600" },
+  metaSep: { color: C.outlineVar, fontSize: 12 },
+  ratingChip: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: C.greenMid,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, flexShrink: 0,
+  },
+  ratingText: { fontSize: 12, fontWeight: "800", color: C.green },
+  statusChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: C.greenDark,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    flexShrink: 0,
+  },
+  statusChipClosed: { backgroundColor: C.gray200 },
+  statusText: { fontSize: 12, fontWeight: "800", color: C.greenFixed },
+  statusTextClosed: { color: C.gray600 },
+  headerSearchBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: C.surfaceLow,
+  },
 
-  searchWrap: { paddingHorizontal: 14, paddingVertical: 10, backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: C.gray100, borderRadius: 12, borderWidth: 1.5, borderColor: "transparent", paddingHorizontal: 12, paddingVertical: 9, gap: 9 },
-  searchBoxActive: { borderColor: C.greenBorder, backgroundColor: C.greenLight },
-  searchInput: { flex: 1, fontSize: 14, color: C.gray900, fontFamily: "PlusJakartaSans_500Medium", ...Platform.select({ web: { outlineStyle: "none" } }) },
-  searchClearBtn: { width: 20, height: 20, borderRadius: 10, backgroundColor: C.gray300, alignItems: "center", justifyContent: "center" },
+  // ── Search ──
+  searchWrap: {
+    paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8,
+    backgroundColor: C.bg,
+  },
+  searchBox: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: C.surfaceLow, borderRadius: 12,
+    borderWidth: 1, borderColor: "transparent",
+    paddingHorizontal: 14, paddingVertical: 13, gap: 10,
+  },
+  searchBoxActive: { borderColor: C.greenBorder, backgroundColor: C.greenMid },
+  searchInput: { flex: 1, fontSize: 14, color: C.gray900, ...Platform.select({ web: { outlineStyle: "none" } }) },
+  searchClearBtn: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.gray300, alignItems: "center", justifyContent: "center" },
 
-  catTabsWrap: { backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  catTabsRow: { paddingHorizontal: 14, paddingVertical: 10, flexDirection: "row" },
+  // ── Category tabs ──
+  catTabsWrap: { backgroundColor: C.bg },
+  catTabsRow: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 10, flexDirection: "row" },
+
+  loadingHeader: { paddingHorizontal: 16, paddingTop: Platform.OS === "android" ? 14 : 52, paddingBottom: 14, flexDirection: "row", alignItems: "center", gap: 12 },
 
   // Desktop layout
   bodyRow: { flex: 1, flexDirection: "row" },
-  sidebar: { width: 140, backgroundColor: C.white, borderRightWidth: 1, borderRightColor: C.gray100, paddingTop: 8 },
-  sidebarItem: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 13, position: "relative" },
-  sidebarItemActive: { backgroundColor: C.greenLight },
-  sidebarEmoji: { fontSize: 16 },
-  sidebarLabel: { fontSize: 12, fontWeight: "600", color: C.gray600, flex: 1, fontFamily: "PlusJakartaSans_600SemiBold" },
-  sidebarLabelActive: { color: C.green, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold" },
+  sidebar: { width: 144, backgroundColor: C.surfaceLowest, borderRightWidth: 1, borderRightColor: C.gray200, paddingTop: 8 },
+  sidebarItem: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 14, position: "relative" },
+  sidebarItemActive: { backgroundColor: C.greenMid },
+  sidebarEmoji: { fontSize: 17 },
+  sidebarLabel: { fontSize: 12, fontWeight: "600", color: C.gray600, flex: 1 },
+  sidebarLabelActive: { color: C.green, fontWeight: "800" },
   sidebarDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: C.green, position: "absolute", right: 10 },
 
-  body: { paddingTop: 4 },
+  body: { paddingTop: 8 },
   grid: { flexDirection: "row", flexWrap: "wrap" },
   sectionDivider: { height: 1, backgroundColor: C.gray100, marginTop: 16, marginHorizontal: 4 },
 
@@ -1060,22 +1222,73 @@ const s = StyleSheet.create({
   oosSectionHeader: { flexDirection: "row", alignItems: "center", gap: 8, paddingBottom: 12 },
   oosSectionTitle: { fontSize: 16, fontWeight: "800", color: C.gray400, fontFamily: "PlusJakartaSans_800ExtraBold" },
 
-  emptyBox: { alignItems: "center", paddingTop: 70, paddingBottom: 40 },
-  emptyIconWrap: { width: 72, height: 72, borderRadius: 24, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center", marginBottom: 14, overflow: "hidden" },
-  emptyTitle: { fontSize: 18, fontWeight: "700", color: C.gray700, textAlign: "center", fontFamily: "PlusJakartaSans_700Bold" },
-  emptySub: { fontSize: 14, color: C.gray400, marginTop: 4, textAlign: "center", lineHeight: 20, fontFamily: "PlusJakartaSans_500Medium" },
-  browseAllBtn: { marginTop: 16, backgroundColor: C.greenLight, borderWidth: 1.5, borderColor: C.greenBorder, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12 },
-  browseAllText: { fontSize: 14, fontWeight: "700", color: C.green, fontFamily: "PlusJakartaSans_700Bold" },
+  emptyBox: { alignItems: "center", paddingTop: 70, paddingBottom: 40, gap: 8 },
+  emptyIconWrap: {
+    width: 80, height: 80, borderRadius: 999,
+    backgroundColor: C.surfaceLow,
+    alignItems: "center", justifyContent: "center",
+    marginBottom: 6, overflow: "hidden",
+  },
+  emptyTitle: { fontSize: 18, fontWeight: "700", color: C.gray700, textAlign: "center" },
+  emptySub: { fontSize: 14, color: C.gray400, textAlign: "center", lineHeight: 20 },
+  browseAllBtn: { marginTop: 10, backgroundColor: C.greenMid, borderWidth: 1, borderColor: C.greenBorder, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 999 },
+  browseAllText: { fontSize: 14, fontWeight: "700", color: C.green },
+
+  promoWrap: {
+    flexDirection: "row",
+    gap: 14,
+    marginTop: 28,
+    minHeight: 192,
+  },
+  promoLarge: {
+    flex: 1,
+    borderRadius: 24,
+    padding: 16,
+    backgroundColor: "rgba(252,129,37,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(252,129,37,0.28)",
+    justifyContent: "space-between",
+    overflow: "hidden",
+  },
+  promoTitle: { fontSize: 14, fontWeight: "900", color: C.orangeDark, lineHeight: 19 },
+  promoSub: { fontSize: 12, color: C.gray600, lineHeight: 17, marginTop: 8 },
+  promoIcon: { alignSelf: "flex-end", opacity: 0.55 },
+  promoStack: { flex: 1, gap: 14 },
+  promoMini: {
+    flex: 1,
+    borderRadius: 24,
+    padding: 14,
+    backgroundColor: C.greenLight,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  promoMiniGreen: {
+    backgroundColor: "rgba(0,94,38,0.1)",
+    justifyContent: "flex-start",
+    gap: 12,
+  },
+  promoOverline: { fontSize: 10, fontWeight: "900", color: C.green, letterSpacing: 1 },
+  promoMiniValue: { fontSize: 15, fontWeight: "900", color: C.gray900, marginTop: 4 },
+  couponIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: C.greenFixed,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  couponText: { flex: 1, fontSize: 11, fontWeight: "800", color: C.green, lineHeight: 15 },
 
 
 
-  floatingCart: { position: "absolute", bottom: 20, left: 16, right: 16, backgroundColor: C.green, borderRadius: 18, shadowColor: C.green, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 14, zIndex: 100 },
-  floatingInner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14, paddingHorizontal: 18, borderRadius: 18 },
+  floatingCart: { position: "absolute", bottom: 20, left: 16, right: 16, backgroundColor: C.green, borderRadius: 20, shadowColor: C.green, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 14, zIndex: 100 },
+  floatingInner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 15, paddingHorizontal: 18, borderRadius: 20 },
   floatingLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  floatingBadge: { width: 34, height: 34, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
-  floatingBadgeText: { fontSize: 15, fontWeight: "900", color: C.white, fontFamily: "PlusJakartaSans_800ExtraBold" },
-  floatingItems: { fontSize: 14, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
-  floatingTotal: { fontSize: 12, color: "rgba(255,255,255,0.82)", marginTop: 1, fontFamily: "PlusJakartaSans_500Medium" },
-  floatingCTA: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 16, paddingVertical: 9, borderRadius: 12 },
-  floatingCTAText: { fontSize: 14, fontWeight: "800", color: C.white, fontFamily: "PlusJakartaSans_800ExtraBold" },
+  floatingBadge: { width: 36, height: 36, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" },
+  floatingBadgeText: { fontSize: 16, fontWeight: "900", color: C.white },
+  floatingItems: { fontSize: 14, fontWeight: "700", color: C.white },
+  floatingTotal: { fontSize: 12, color: "rgba(255,255,255,0.82)", marginTop: 1 },
+  floatingCTA: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14 },
+  floatingCTAText: { fontSize: 14, fontWeight: "800", color: C.white },
 });

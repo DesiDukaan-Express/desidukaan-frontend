@@ -7,7 +7,7 @@ import useAuthStore from "../store/authStore";
 import { USER_ROLES } from "../constants";
 import { colors } from "../styles/colors";
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http:localhost:3000/api";
 
 import LoginScreen from "../apps/customer/LoginScreen";
 import CustomerTabs from "./CustomerTabs";
@@ -18,6 +18,8 @@ import OrderPlaced from "../apps/customer/OrderPlaced";
 import VendorOnboardingScreen from "../apps/vendor/VendorOnboardingScreen";
 import DashboardScreen from "../apps/vendor/DashboardScreen";
 import DeliveryOnboardingScreen from "../apps/delivery/DeliveryOnboardingScreen";
+import DeliveryPendingScreen from "../apps/delivery/DeliveryPendingScreen";
+import HomeScreen from "../apps/customer/HomeScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -77,10 +79,16 @@ export default function Navigation() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      // If profile exists and onboarding_submitted is true
-      setDeliveryOnboarded(!!data.data?.profile?.onboarding_submitted);
+      const profile = data.data?.profile;
+      if (!profile?.onboarding_submitted) {
+        setDeliveryOnboarded('not_submitted');
+      } else if (profile?.is_certified) {
+        setDeliveryOnboarded('approved');
+      } else {
+        setDeliveryOnboarded('pending');
+      }
     } catch (err) {
-      setDeliveryOnboarded(false);
+      setDeliveryOnboarded('not_submitted');
     } finally {
       setCheckingOnboard(false);
     }
@@ -122,64 +130,71 @@ export default function Navigation() {
   }
 
   return (
+
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!isAuthenticated ? (
-          // ── Unauthenticated screens ──────────────────────────────────
-          <>
-            <Stack.Screen name="Login" component={LoginScreen} />
-            <Stack.Screen name="Signup" component={SignupScreen} />
-          </>
-        ) : (
-          // ── Authenticated screens ────────────────────────────────────
-          // Checkout and OrderPlaced are here so they unmount on logout,
-          // preventing navigation to those screens after logging out
-          <>
-            {role?.toLowerCase() === "vendor" ? (
-              vendorOnboarded ? (
-                <Stack.Screen name="VendorApp" component={VendorTabs} />
-              ) : (
-                <>
-                  <Stack.Screen name="Dashboard">
-                    {(props) => (
-                      <DashboardScreen
-                        {...props}
-                        vendorStatus={vendorStatus}
-                        missingDocs={vendorMissingDocs}
+        {
+          !isAuthenticated ? (
+            <>
+              <Stack.Screen name="Login" component={LoginScreen} />
+              <Stack.Screen name="Signup" component={SignupScreen} />
+            </>
+          ) : (
+            <>
+              {role?.toLowerCase() === "vendor" ? (
+                vendorOnboarded ? (
+                  <Stack.Screen name="VendorApp" component={VendorTabs} />
+                ) : (
+                  <>
+                    <Stack.Screen name="Dashboard">
+                      {(props) => (
+                        <DashboardScreen
+                          {...props}
+                          vendorStatus={vendorStatus}
+                          missingDocs={vendorMissingDocs}
+                        />
+                      )}
+                    </Stack.Screen>
+                    <Stack.Screen name="VendorOnboarding">
+                      {(props) => (
+                        <VendorOnboardingScreen
+                          {...props}
+                          onComplete={() => checkVendorProfile()}
+                        />
+                      )}
+                    </Stack.Screen>
+                  </>
+                )
+              ) : role?.toLowerCase() === "delivery" ? (
+                deliveryOnboarded === 'approved' ? (
+                  <Stack.Screen name="DeliveryApp" component={DeliveryTabs} />
+                ) : deliveryOnboarded === 'pending' ? (
+                  <Stack.Screen name="DeliveryPending">
+                    {() => (
+                      <DeliveryPendingScreen
+                        onRefresh={checkDeliveryProfile}
+                        refreshing={checkingOnboard}
                       />
                     )}
                   </Stack.Screen>
-                  <Stack.Screen name="VendorOnboarding">
+                ) : (
+                  <Stack.Screen name="DeliveryOnboarding">
                     {(props) => (
-                      <VendorOnboardingScreen
+                      <DeliveryOnboardingScreen
                         {...props}
-                        onComplete={() => checkVendorProfile()}
+                        onComplete={() => setDeliveryOnboarded('pending')}
                       />
                     )}
                   </Stack.Screen>
-                </>
-              )
-            ) : role?.toLowerCase() === "delivery" ? (
-              deliveryOnboarded ? (
-                <Stack.Screen name="DeliveryApp" component={DeliveryTabs} />
+                )
               ) : (
-                <Stack.Screen name="DeliveryOnboarding">
-                  {(props) => (
-                    <DeliveryOnboardingScreen
-                      {...props}
-                      onComplete={() => setDeliveryOnboarded(true)}
-                    />
-                  )}
-                </Stack.Screen>
-              )
-            ) : (
-              <Stack.Screen name="CustomerApp" component={CustomerTabs} />
-            )}
-            <Stack.Screen name="Checkout" component={CheckoutScreen} />
-            <Stack.Screen name="OrderPlaced" component={OrderPlaced} />
-          </>
-        )}
+                <Stack.Screen name="CustomerApp" component={CustomerTabs} />
+              )}
+              <Stack.Screen name="Checkout" component={CheckoutScreen} />
+              <Stack.Screen name="OrderPlaced" component={OrderPlaced} />
+            </>
+          )}
       </Stack.Navigator>
-    </NavigationContainer>
+    </NavigationContainer >
   );
 }

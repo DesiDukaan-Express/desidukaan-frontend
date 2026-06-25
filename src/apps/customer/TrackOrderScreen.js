@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-  Platform, StatusBar, Animated, ScrollView,
+  Platform, StatusBar, Animated, ScrollView, Modal, Pressable
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -345,6 +345,40 @@ export default function TrackOrderScreen() {
           )}
         </View>
 
+        {/* ETA CARD */}
+        {isActive && (
+          <View style={s.etaCard}>
+            <View style={s.etaCardHeader}>
+              <View style={s.etaIconBg}>
+                <Feather name="clock" size={20} color={C.orange} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.etaTitleText}>Estimated Arrival</Text>
+                <Text style={s.etaValueText}>
+                  {(() => {
+                    let etaMins = order?.delivery_estimate_mins ?? null;
+                    if (etaMins == null) {
+                      if (order?.status === 'picked_up') etaMins = 15;
+                      else if (order?.status === 'ready') etaMins = 20;
+                      else etaMins = 30;
+                    }
+                    if (etaMins < 60) return `~${etaMins} mins`;
+                    const h = Math.floor(etaMins / 60);
+                    const m = etaMins % 60;
+                    return m > 0 ? `~${h}h ${m}m` : `~${h}h`;
+                  })()}
+                </Text>
+              </View>
+              {order?.delivery_distance_km != null && (
+                <View style={s.etaBadge}>
+                  <Feather name="map-pin" size={12} color={C.gray500} />
+                  <Text style={s.etaBadgeText}>{order.delivery_distance_km} km away</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
         {/* Partner location details */}
         {partnerPos ? (
           <View style={s.partnerCard}>
@@ -527,6 +561,58 @@ const s = StyleSheet.create({
   deliveredGrad: { flexDirection: "row", alignItems: "center", gap: 14, padding: 20 },
   deliveredTitle: { fontSize: 17, fontWeight: "900", color: C.white },
   deliveredSub:   { fontSize: 13, color: "rgba(255,255,255,0.85)", marginTop: 2 },
+
+  // ETA Card
+  etaCard: {
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  etaCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  etaIconBg: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: "#FFEDD5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  etaTitleText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: C.orange,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  etaValueText: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: C.orangeDark,
+  },
+  etaBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: C.white,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+  },
+  etaBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.gray600,
+  },
 });
 
 // ─── Order Detail Modal Helper ───────────────────────────────────────────────
@@ -550,6 +636,37 @@ function OrderDetailModal({ visible, order, onClose }) {
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={od.content}>
+            {/* ETA Banner */}
+            {(() => {
+              const isActive = order && !["delivered", "cancelled", "rejected"].includes(order.status);
+              if (!isActive) return null;
+              let etaMins = order.delivery_estimate_mins ?? null;
+              if (etaMins == null) {
+                if (order.status === 'picked_up') etaMins = 15;
+                else if (order.status === 'ready') etaMins = 20;
+                else etaMins = 30;
+              }
+              return (
+                <View style={od.etaBanner}>
+                  <View style={od.etaBannerLeft}>
+                    <View style={od.etaIconBg}>
+                      <Feather name="clock" size={16} color={C.orange} />
+                    </View>
+                    <View>
+                      <Text style={od.etaBannerTitle}>Estimated Delivery</Text>
+                      <Text style={od.etaBannerLabel}>~{etaMins} mins</Text>
+                    </View>
+                  </View>
+                  {order.delivery_distance_km != null && (
+                    <View style={od.etaBadge}>
+                      <Feather name="map-pin" size={11} color={C.gray500} />
+                      <Text style={od.etaBadgeText}>{order.delivery_distance_km} km</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
+
             <Text style={od.sectionTitle}>Items</Text>
             {items.map((item, i) => (
               <View key={i} style={od.itemRow}>
@@ -609,4 +726,60 @@ const od = StyleSheet.create({
   statusBox: { marginTop: 20, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: C.greenBorder, backgroundColor: C.greenLight, alignItems: "center" },
   statusLabel: { fontSize: 11, fontWeight: "800", color: C.green, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 },
   statusValue: { fontSize: 16, fontWeight: "900" },
+
+  // ETA Banner
+  etaBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  etaBannerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  etaIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#FFEDD5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  etaBannerTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.orange,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  etaBannerLabel: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: C.orangeDark,
+  },
+  etaBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: C.white,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: C.gray200,
+  },
+  etaBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.gray600,
+  },
 });

@@ -103,6 +103,54 @@ const useAddressStore = create((set, get) => ({
     }));
   },
 
+  // Update an existing address (address_line and/or label)
+  updateAddress: async (id, patch, token) => {
+    try {
+      const res  = await fetch(`${BASE_URL}/addresses/${id}`, {
+        method:  "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json();
+      const saved = data.data?.address || data.address;
+      if (saved) {
+        set(state => ({
+          addresses: state.addresses.map(a =>
+            a.id === id
+              ? {
+                  ...a,
+                  label:        saved.label        ?? a.label,
+                  address_line: saved.address_line ?? a.address_line,
+                  address:      saved.address_line ?? a.address,
+                  lat:          saved.latitude     ?? a.lat,
+                  lng:          saved.longitude    ?? a.lng,
+                }
+              : a,
+          ),
+        }));
+        return true;
+      }
+    } catch (e) {
+      console.error("updateAddress failed:", e.message);
+    }
+    // Local-only fallback
+    set(state => ({
+      addresses: state.addresses.map(a =>
+        a.id === id
+          ? {
+              ...a,
+              ...(patch.label        && { label: patch.label }),
+              ...(patch.address_line && { address_line: patch.address_line, address: patch.address_line }),
+            }
+          : a,
+      ),
+    }));
+    return false;
+  },
+
   clearAddresses: () => set({ addresses: [], selectedId: null }),
 
   // ── Session-based location fetching ─────────────────────────────────────────

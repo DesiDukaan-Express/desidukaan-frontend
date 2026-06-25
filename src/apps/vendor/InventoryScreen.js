@@ -1009,28 +1009,23 @@ const s = StyleSheet.create({
     gap: 8,
     marginTop: 3,
   },
-  productPrice: {
-    fontSize: 13,
-    fontWeight: "700",
-    fontFamily: "PlusJakartaSans_700Bold",
-    color: TEXT,
+  productPrice: { fontSize: 13, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: TEXT },
+  statusPill: {
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
   },
-  // statusPill: {
-  //   borderRadius: 6,
-  //   paddingHorizontal: 7,
-  //   paddingVertical: 2,
-  // },
-  // statusPillText: { fontSize: 11, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
+  statusPillText: { fontSize: 11, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
 
   // Actions
-  // cardActions: { alignItems: "flex-end", gap: 6 },
-  // editBtn: {
-  //   backgroundColor: GREEN,
-  //   borderRadius: 8,
-  //   paddingHorizontal: 12,
-  //   paddingVertical: 6,
-  // },
-  // editBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
+  cardActions: { alignItems: "flex-end", gap: 6 },
+  editBtn: {
+    backgroundColor: GREEN,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  editBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
   menuBtn: {
     width: 30,
     height: 26,
@@ -1165,6 +1160,8 @@ const s = StyleSheet.create({
   productNameDim: {
     color: TEXT_LIGHT,
   },
+  dropdownItemText: { fontSize: 14, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: TEXT },
+  dropdownDivider: { height: 1, backgroundColor: BORDER },
 
   // Loading / Empty
   centered: {
