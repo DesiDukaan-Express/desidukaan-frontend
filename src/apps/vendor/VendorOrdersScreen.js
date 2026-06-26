@@ -77,7 +77,7 @@ export default function VendorOrdersScreen() {
     if (!token) return;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/vendors/me`, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch(`${API_BASE}/vendors/me/profile`, { headers: { Authorization: `Bearer ${token}` } });
         const json = await res.json();
         const v = json.data?.vendor || json.vendor;
         if (v) {

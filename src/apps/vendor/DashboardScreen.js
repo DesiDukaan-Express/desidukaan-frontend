@@ -192,8 +192,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           return;
         }
 
+        let s = null;
         if (data.success && data.data?.stats) {
-          const s = data.data.stats;
+          s = data.data.stats;
           setStats({
             pendingOrders: s.pending_orders ?? 0,
             labels: s.weekly_chart_data?.map((d) =>
@@ -232,47 +233,49 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           setAllPartners(s.all_delivery_partners || s.delivery_partners || []);
         }
 
-        const profileRes = await fetch(`${API_BASE}/vendors/me`, {
+        const profileRes = await fetch(`${API_BASE}/vendors/me/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const profileData = await profileRes.json();
-        if (profileData.success && profileData.data) {
-          const addr =
-            profileData.data.address || profileData.data.store_address;
-          if (addr) setVendorLocation(addr.city || addr.area || addr);
+        if (profileData.success && profileData.data?.vendor) {
+          const v = profileData.data.vendor;
+          const addr = v.address_line || v.landmark;
+          if (addr) setVendorLocation(addr);
         }
 
         // Build notifications from stats data instead of a missing endpoint
         const builtNotifs = [];
 
-        if (s.pending_orders > 0) {
-          builtNotifs.push({
-            type: "order",
-            title: `${s.pending_orders} order${s.pending_orders > 1 ? "s" : ""} waiting for your response`,
-            body: "Tap to go to Orders and respond.",
-            time: "Just now",
-            read: false,
-          });
-        }
+        if (s) {
+          if (s.pending_orders > 0) {
+            builtNotifs.push({
+              type: "order",
+              title: `${s.pending_orders} order${s.pending_orders > 1 ? "s" : ""} waiting for your response`,
+              body: "Tap to go to Orders and respond.",
+              time: "Just now",
+              read: false,
+            });
+          }
 
-        if (s.low_stock_count > 0) {
-          builtNotifs.push({
-            type: "system",
-            title: `${s.low_stock_count} product${s.low_stock_count > 1 ? "s" : ""} running low on stock`,
-            body: "Check your inventory before accepting more orders.",
-            time: "Today",
-            read: false,
-          });
-        }
+          if (s.low_stock_count > 0) {
+            builtNotifs.push({
+              type: "system",
+              title: `${s.low_stock_count} product${s.low_stock_count > 1 ? "s" : ""} running low on stock`,
+              body: "Check your inventory before accepting more orders.",
+              time: "Today",
+              read: false,
+            });
+          }
 
-        if (s.today_revenue > 0) {
-          builtNotifs.push({
-            type: "order",
-            title: `₹${Number(s.today_revenue).toLocaleString("en-IN")} earned today`,
-            body: `${s.today_orders} orders completed successfully.`,
-            time: "Today",
-            read: true,
-          });
+          if (s.today_revenue > 0) {
+            builtNotifs.push({
+              type: "order",
+              title: `₹${Number(s.today_revenue).toLocaleString("en-IN")} earned today`,
+              body: `${s.today_orders} orders completed successfully.`,
+              time: "Today",
+              read: true,
+            });
+          }
         }
 
         setNotifications(builtNotifs);
