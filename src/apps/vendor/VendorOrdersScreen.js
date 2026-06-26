@@ -134,15 +134,11 @@ export default function VendorOrdersScreen() {
 
   // Fetch nearby riders when modal opens and storeLocation is available
   useEffect(() => {
-    if (
-      isDeliveryModalVisible &&
-      !selectedOrder?.delivery?.partner &&
-      storeLocation
-    ) {
+    if (isDeliveryModalVisible && storeLocation) {
       fetchNearbyRiders();
       setBroadcastStatus(null);
     }
-  }, [isDeliveryModalVisible, selectedOrder]);
+  }, [isDeliveryModalVisible]);
 
   const fetchNearbyRiders = async () => {
     try {
@@ -372,6 +368,11 @@ export default function VendorOrdersScreen() {
       if (result.success) {
         const fetchedOrders = result.data.orders || [];
         setOrders(fetchedOrders);
+        setSelectedOrder((currentSelected) => {
+          if (!currentSelected) return null;
+          const updated = fetchedOrders.find((o) => Number(o.id) === Number(currentSelected.id));
+          return updated || null;
+        });
         // Auto-expand all customer groups so no orders are hidden
         const expanded = {};
         fetchedOrders.forEach((o) => {
@@ -465,6 +466,13 @@ export default function VendorOrdersScreen() {
     socket.on("delivery:declined", (data) => {
       console.log("Delivery declined:", data);
       fetchOrdersRef.current?.();
+      if (selectedOrderRef.current && Number(selectedOrderRef.current.id) === Number(data.order_id)) {
+        setBroadcastStatus({
+          count: 0,
+          message: `${data.partner_name} has declined this request.`,
+          type: "declined",
+        });
+      }
 
       let customerPhone = null;
       let customerName = "the customer";
@@ -655,6 +663,9 @@ export default function VendorOrdersScreen() {
 
   useEffect(() => {
     selectedOrderRef.current = selectedOrder;
+    if (selectedOrder?.delivery?.partner) {
+      setBroadcastStatus(null);
+    }
   }, [selectedOrder]);
 
   useEffect(() => {
@@ -1642,9 +1653,31 @@ export default function VendorOrdersScreen() {
               )}
 
               {broadcastStatus && (
-                <View style={dmStyles.broadcastBanner}>
-                  <View style={dmStyles.broadcastDot} />
-                  <Text style={dmStyles.broadcastText}>
+                <View
+                  style={[
+                    dmStyles.broadcastBanner,
+                    broadcastStatus.type === "declined" && {
+                      backgroundColor: "#FEE2E2",
+                      borderColor: "#FCA5A5",
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      dmStyles.broadcastDot,
+                      broadcastStatus.type === "declined" && {
+                        backgroundColor: "#EF4444",
+                      },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      dmStyles.broadcastText,
+                      broadcastStatus.type === "declined" && {
+                        color: "#991B1B",
+                      },
+                    ]}
+                  >
                     {broadcastStatus.message}
                   </Text>
                 </View>
