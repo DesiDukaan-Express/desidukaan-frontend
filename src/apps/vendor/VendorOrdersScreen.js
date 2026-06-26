@@ -72,6 +72,10 @@ export default function VendorOrdersScreen() {
   const [showSurchargeEdit, setShowSurchargeEdit] = useState(false);
   const [vendorId, setVendorId] = useState(null);
 
+  const ordersRef = useRef(orders);
+  const selectedOrderRef = useRef(selectedOrder);
+  const updateOrderStatusRef = useRef(null);
+
   // Fetch vendor profile to read current demand_surcharge_pct
   useEffect(() => {
     if (!token) return;
@@ -449,22 +453,6 @@ export default function VendorOrdersScreen() {
     fetchHistory();
   }, []);
 
-  const ordersRef = useRef(orders);
-  const selectedOrderRef = useRef(selectedOrder);
-  const updateOrderStatusRef = useRef(null);
-
-  useEffect(() => {
-    ordersRef.current = orders;
-  }, [orders]);
-
-  useEffect(() => {
-    selectedOrderRef.current = selectedOrder;
-  }, [selectedOrder]);
-
-  useEffect(() => {
-    updateOrderStatusRef.current = updateOrderStatus;
-  }, [updateOrderStatus]);
-
   // Socket setup for real-time negotiation
   useEffect(() => {
     if (!token) return;
@@ -660,6 +648,18 @@ export default function VendorOrdersScreen() {
       Alert.alert("Error", "Something went wrong while updating status.");
     }
   };
+
+  useEffect(() => {
+    ordersRef.current = orders;
+  }, [orders]);
+
+  useEffect(() => {
+    selectedOrderRef.current = selectedOrder;
+  }, [selectedOrder]);
+
+  useEffect(() => {
+    updateOrderStatusRef.current = updateOrderStatus;
+  }, [updateOrderStatus]);
 
   useEffect(() => {
     if (selectedOrder) {
