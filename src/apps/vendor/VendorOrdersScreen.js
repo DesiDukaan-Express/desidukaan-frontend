@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -172,7 +172,7 @@ export default function VendorOrdersScreen() {
     ? [
         {
           id: selectedOrder.delivery.partner.id,
-          name: selectedOrder.delivery.partner.user?.name || "Delivery Partner",
+          name: selectedOrder.delivery.partner.user?.name || "Partner",
           status:
             selectedOrder.delivery.status === "assigned"
               ? "On the way to pickup"
@@ -188,7 +188,7 @@ export default function VendorOrdersScreen() {
       ]
     : nearbyRiders.map((r, i) => ({
         id: r.id,
-        name: r.name || "Delivery Partner",
+        name: r.name || "Partner",
         status: "Available",
         image: "https://cdn-icons-png.flaticon.com/512/3208/3208726.png",
         coordinate: {
@@ -449,6 +449,22 @@ export default function VendorOrdersScreen() {
     fetchHistory();
   }, []);
 
+  const ordersRef = useRef(orders);
+  const selectedOrderRef = useRef(selectedOrder);
+  const updateOrderStatusRef = useRef(null);
+
+  useEffect(() => {
+    ordersRef.current = orders;
+  }, [orders]);
+
+  useEffect(() => {
+    selectedOrderRef.current = selectedOrder;
+  }, [selectedOrder]);
+
+  useEffect(() => {
+    updateOrderStatusRef.current = updateOrderStatus;
+  }, [updateOrderStatus]);
+
   // Socket setup for real-time negotiation
   useEffect(() => {
     if (!token) return;
@@ -461,18 +477,44 @@ export default function VendorOrdersScreen() {
     socket.on("delivery:declined", (data) => {
       console.log("Delivery declined:", data);
       fetchOrdersRef.current?.();
+
+      let customerPhone = null;
+      let customerName = "the customer";
+      const ordersList = ordersRef.current || [];
+      const order = ordersList.find(o => Number(o.id) === Number(data.order_id)) || selectedOrderRef.current;
+      if (order && Number(order.id) === Number(data.order_id) && order.customer) {
+        customerPhone = order.customer.phone;
+        customerName = order.customer.name || customerName;
+      }
+
       Alert.alert(
         "Delivery Request Declined",
-        `${data.partner_name} (${data.partner_phone}) has declined. You can move on to another delivery partner of that area or deliver it yourself.`,
+        `${data.partner_name} has declined. You can move on to another delivery partner of that area or deliver the order yourself.`,
         [
           {
-            text: `Call ${data.partner_name}`,
+            text: `Call Partner (${data.partner_name})`,
             onPress: () => {
               if (data.partner_phone && data.partner_phone !== 'N/A') {
                 Linking.openURL(`tel:${data.partner_phone}`);
               } else {
                 Alert.alert("Error", "No phone number available for this partner.");
               }
+            }
+          },
+          {
+            text: `Call Customer (${customerName})`,
+            onPress: () => {
+              if (customerPhone && customerPhone !== 'N/A') {
+                Linking.openURL(`tel:${customerPhone}`);
+              } else {
+                Alert.alert("Error", "No phone number available for this customer.");
+              }
+            }
+          },
+          {
+            text: "Deliver Myself",
+            onPress: () => {
+              updateOrderStatusRef.current?.(data.order_id, "picked_up");
             }
           },
           { text: "Dismiss", style: "cancel" }

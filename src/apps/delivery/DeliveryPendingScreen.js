@@ -47,7 +47,7 @@ export default function DeliveryPendingScreen({ onRefresh, refreshing }) {
             <Text style={s.avatarTxt}>{name.substring(0, 2).toUpperCase()}</Text>
           </View>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={s.heroEyebrow}>DELIVERY PARTNER</Text>
+            <Text style={s.heroEyebrow}>PARTNER</Text>
             <Text style={s.heroTitle}>Hi, {name.split(' ')[0]} 👋</Text>
           </View>
           <View style={s.heroBadge}>

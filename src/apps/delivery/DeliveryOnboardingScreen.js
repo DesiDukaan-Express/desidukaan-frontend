@@ -486,7 +486,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
             <Text style={s.backArrow}>←</Text>
         </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={s.heroEyebrow}>DELIVERY PARTNER</Text>
+            <Text style={s.heroEyebrow}>PARTNER</Text>
             <Text style={s.heroTitle}>Partner Onboarding</Text>
         </View>
         <View style={s.heroBadge}>

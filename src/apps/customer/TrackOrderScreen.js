@@ -67,7 +67,7 @@ function DeliveryMap({ partnerLat, partnerLng, destLat, destLng }) {
         {partnerLat && (
           <View style={mapS.partnerBadge}>
             <Feather name="truck" size={13} color={C.white} />
-            <Text style={mapS.badgeText}>Delivery Partner</Text>
+            <Text style={mapS.badgeText}>Partner</Text>
           </View>
         )}
       </View>
@@ -386,7 +386,7 @@ export default function TrackOrderScreen() {
               <Feather name="truck" size={22} color={C.white} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.partnerTitle}>Delivery Partner</Text>
+              <Text style={s.partnerTitle}>Partner</Text>
               <Text style={s.partnerCoord}>
                 {parseFloat(partnerPos.lat).toFixed(5)}, {parseFloat(partnerPos.lng).toFixed(5)}
               </Text>

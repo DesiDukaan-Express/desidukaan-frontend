@@ -783,7 +783,7 @@ function OrderDetailModal({ order, onClose }) {
                     >
                       <Feather name="navigation" size={16} color="#fff" />
                       <Text style={od.trackBtnText}>
-                        Track Delivery Partner
+                        Track Partner
                       </Text>
                     </LinearGradient>
                   </TouchableOpacity>

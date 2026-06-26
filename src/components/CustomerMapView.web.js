@@ -120,11 +120,11 @@ export default function CustomerMapView({ partnerPos, destLat, destLng }) {
       });
       driverMarker.current = L.marker([partnerPos.lat, partnerPos.lng], {
         icon: driverIcon,
-        title: "Delivery Partner",
+        title: "Partner",
         zIndexOffset: 1000,
       })
         .addTo(map)
-        .bindTooltip("Delivery Partner", { permanent: false, direction: "top" });
+        .bindTooltip("Partner", { permanent: false, direction: "top" });
     }
 
     // ── Destination marker ──
@@ -170,11 +170,11 @@ export default function CustomerMapView({ partnerPos, destLat, destLng }) {
       });
       driverMarker.current = L.marker(newLatLng, {
         icon: driverIcon,
-        title: "Delivery Partner",
+        title: "Partner",
         zIndexOffset: 1000,
       })
         .addTo(map)
-        .bindTooltip("Delivery Partner", { permanent: false, direction: "top" });
+        .bindTooltip("Partner", { permanent: false, direction: "top" });
     }
 
     // Pan map to keep driver centered (with slight animation)

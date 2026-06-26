@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -530,7 +530,7 @@ const nb = StyleSheet.create({
 });
 
 // ─── Counter Offer Review Component ──────────────────────────────────────────
-function CounterOfferReview({ data, onAccept, onReject, placing, fs = 1 }) {
+function CounterOfferReview({ data, onAccept, onReject, placing, fs = 1, deliveryTypePref, deliveryInfo, confirmedSlot }) {
   if (!data) return null;
   const { items = [], delivery_fee = 0, total = 0, note = "", slot = null } = data;
 
@@ -569,14 +569,30 @@ function CounterOfferReview({ data, onAccept, onReject, placing, fs = 1 }) {
           <Text style={cor.totalLbl}>New Delivery Fee</Text>
           <Text style={cor.totalVal}>₹{delivery_fee}</Text>
         </View>
-        {slot && (
-          <View style={[cor.totalRow, { marginTop: 4 }]}>
-            <Text style={cor.totalLbl}>New Delivery Window</Text>
-            <Text style={cor.totalVal}>
-              {new Date(slot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(slot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </Text>
-          </View>
-        )}
+        <View style={[cor.totalRow, { marginTop: 4 }]}>
+          <Text style={cor.totalLbl}>Delivery Time</Text>
+          <Text style={cor.totalVal}>
+            {slot
+              ? "Specified by new slot"
+              : (deliveryTypePref === "quick"
+                ? `⚡ ~${deliveryInfo?.quick_eta_minutes ?? 15} mins (Quick)`
+                : `~${deliveryInfo?.eta_minutes ?? 30} mins (Standard)`)
+            }
+          </Text>
+        </View>
+        <View style={[cor.totalRow, { marginTop: 4 }]}>
+          <Text style={cor.totalLbl}>Delivery Slot</Text>
+          <Text style={cor.totalVal}>
+            {(() => {
+              const activeSlot = slot || confirmedSlot;
+              if (!activeSlot) return "As soon as possible";
+              const startStr = new Date(activeSlot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              const endStr = new Date(activeSlot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              const dayStr = new Date(activeSlot.start).toDateString() === new Date().toDateString() ? "Today" : "Tomorrow";
+              return `${dayStr}, ${startStr} - ${endStr}`;
+            })()}
+          </Text>
+        </View>
         <View style={[cor.totalRow, { marginTop: 4 }]}>
           <Text style={cor.grandLbl}>New Total</Text>
           <Text style={cor.grandVal}>₹{total}</Text>
@@ -2000,7 +2016,83 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                 onAccept={() => { handleRespondCounter("accept"); }}
                 onReject={() => { handleRespondCounter("reject"); setNegotiationModalVisible(false); }}
                 placing={placing}
+                deliveryTypePref={deliveryTypePref}
+                deliveryInfo={deliveryInfo}
+                confirmedSlot={confirmedSlot}
               />
+            )}
+
+            {(orderStatus === "pending" || orderStatus === "accepted") && (
+              <View style={{
+                backgroundColor: "#F8FAFC",
+                borderRadius: 16,
+                borderWidth: 1.5,
+                borderColor: "#E2E8F0",
+                padding: 16,
+                marginTop: 14,
+                marginBottom: 4,
+              }}>
+                <Text style={{
+                  fontSize: 12,
+                  fontWeight: "800",
+                  color: C.gray900,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.8,
+                  marginBottom: 12,
+                  textAlign: "center"
+                }}>
+                  Selected Delivery Details
+                </Text>
+
+                {/* Delivery Time Row */}
+                <View style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  paddingVertical: 8,
+                  borderBottomWidth: 1,
+                  borderBottomColor: "#F1F5F9",
+                }}>
+                  <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>Delivery Time</Text>
+                  <Text style={{ fontSize: 13, color: C.gray900, fontWeight: "700" }}>
+                    {deliveryTypePref === "quick"
+                      ? `⚡ ~${deliveryInfo?.quick_eta_minutes ?? 15} mins (Quick)`
+                      : `~${deliveryInfo?.eta_minutes ?? 30} mins (Standard)`
+                    }
+                  </Text>
+                </View>
+
+                {/* Slot Row */}
+                <View style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  paddingVertical: 8,
+                  borderBottomWidth: 1,
+                  borderBottomColor: "#F1F5F9",
+                }}>
+                  <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>Delivery Slot</Text>
+                  <Text style={{ fontSize: 13, color: C.gray900, fontWeight: "700" }}>
+                    {(() => {
+                      if (!confirmedSlot) return "As soon as possible";
+                      const startStr = new Date(confirmedSlot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      const endStr = new Date(confirmedSlot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      const dayStr = new Date(confirmedSlot.start).toDateString() === new Date().toDateString() ? "Today" : "Tomorrow";
+                      return `${dayStr}, ${startStr} - ${endStr}`;
+                    })()}
+                  </Text>
+                </View>
+
+                {/* Delivery Charges Row */}
+                <View style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  paddingVertical: 8,
+                }}>
+                  <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>Delivery Charges</Text>
+                  <Text style={{ fontSize: 13, color: C.greenDark, fontWeight: "800" }}>
+                    ₹{liveActiveFee}
+                  </Text>
+                </View>
+              </View>
             )}
 
             {orderStatus === "accepted" && (

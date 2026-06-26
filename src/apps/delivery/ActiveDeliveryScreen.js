@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Animated, PanResponder, Dimensions,
   StatusBar, Platform,
@@ -856,7 +856,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
   useEffect(() => {
     if (user) {
       setPartner({
-        name: user.name || 'Delivery Partner',
+        name: user.name || 'Partner',
         id: `DP-${user.id}`,
         initials: (user.name || 'DP').substring(0, 2).toUpperCase(),
       });

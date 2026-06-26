@@ -35,7 +35,7 @@ export default function CustomerMapView({ partnerPos, destLat, destLng }) {
         {partnerPos && (
           <Marker
             coordinate={{ latitude: partnerPos.lat, longitude: partnerPos.lng }}
-            title="Delivery Partner"
+            title="Partner"
           >
             <View style={styles.driverPin}>
               <Text style={styles.driverPinText}>🚚</Text>
