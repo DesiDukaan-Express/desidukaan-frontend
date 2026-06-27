@@ -111,6 +111,11 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
   const startXRef       = useRef(0);
   const trackRef        = useRef(null);
 
+  // Always hold the latest onComplete so PanResponder (created once via useRef)
+  // never calls a stale closure from the first render.
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+
   // Remake states for premium interactions
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
@@ -215,7 +220,7 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
           Animated.spring(pan, { toValue: dragRange.current, useNativeDriver: false })
             .start(async () => {
               try {
-                const ok = await onComplete?.();
+                const ok = await onCompleteRef.current?.();
                 if (ok === false) {
                   // Action rejected — reset slider back to start
                   setDone(false);
@@ -1004,7 +1009,8 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
     const displayStep = Math.min(Math.max(step, 0), STEPS.length - 1);
     
     // Distance check for Reach Pickup (0) and Reach Drop (2)
-    if (displayStep === 0 || displayStep === 2) {
+    // Skip on web — browser GPS is unreliable for proximity enforcement.
+    if (Platform.OS !== 'web' && (displayStep === 0 || displayStep === 2)) {
       const targetLoc = displayStep === 0 ? activeOrder?.vendorLoc : activeOrder?.dropLoc;
       if (targetLoc && targetLoc.latitude && targetLoc.longitude) {
         if (!myLocation) {
