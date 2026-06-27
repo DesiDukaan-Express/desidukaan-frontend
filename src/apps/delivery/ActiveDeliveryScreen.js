@@ -213,7 +213,21 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
         onDragEnd?.();
         if (g.dx >= dragRange.current * 0.80) {
           Animated.spring(pan, { toValue: dragRange.current, useNativeDriver: false })
-            .start(() => { setDone(true); onComplete?.(); });
+            .start(async () => {
+              try {
+                const ok = await onComplete?.();
+                if (ok === false) {
+                  // Action rejected — reset slider back to start
+                  setDone(false);
+                  Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
+                } else {
+                  setDone(true);
+                }
+              } catch (_) {
+                setDone(false);
+                Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
+              }
+            });
         } else {
           Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
         }
@@ -268,7 +282,7 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
       pan.setValue(Math.max(0, Math.min(dx, currentDragRange)));
     };
 
-    const onUp = (mu) => {
+    const onUp = async (mu) => {
       isDragging.current = false;
       setPressed(false);
       onDragEnd?.();
@@ -282,7 +296,21 @@ function SlideButton({ label, onComplete, color = C.primary, onDragStart, onDrag
       const dx = currentX - startX;
       if (dx >= currentDragRange * 0.80) {
         Animated.spring(pan, { toValue: currentDragRange, useNativeDriver: false })
-          .start(() => { setDone(true); onComplete?.(); });
+          .start(async () => {
+            try {
+              const ok = await onComplete?.();
+              if (ok === false) {
+                // Action rejected — reset slider back to start
+                setDone(false);
+                Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
+              } else {
+                setDone(true);
+              }
+            } catch (_) {
+              setDone(false);
+              Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
+            }
+          });
       } else {
         Animated.spring(pan, { toValue: 0, useNativeDriver: false }).start();
       }
@@ -981,7 +1009,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
       if (targetLoc && targetLoc.latitude && targetLoc.longitude) {
         if (!myLocation) {
           Alert.alert("Location Error", "Unable to determine your current location. Please ensure location services are enabled.");
-          return;
+          return false; // Signal slider to reset
         }
         const distMeters = calculateDistanceMeters(
           myLocation.latitude,
@@ -1008,12 +1036,13 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
               }
             ]
           );
-          return;
+          return false; // Signal slider to reset
         }
       }
     }
 
     await proceedStepComplete(displayStep);
+    return true; // Signal slider to stay done
   };
 
   const proceedStepComplete = async (displayStep) => {
