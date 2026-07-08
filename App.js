@@ -3,6 +3,9 @@ import { View, ActivityIndicator } from 'react-native';
 import { useFonts, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold, PlusJakartaSans_600SemiBold, PlusJakartaSans_500Medium } from '@expo-google-fonts/plus-jakarta-sans';
 import Navigation from './src/navigation';
 
+// ── i18n: must be imported before any component using useTranslation ──────────
+import './src/i18n';
+
 import useAuthStore from './src/store/authStore';
 import useAddressStore from './src/store/addressStore';
 

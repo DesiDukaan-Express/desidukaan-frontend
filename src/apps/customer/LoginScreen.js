@@ -15,8 +15,10 @@ import {
 } from "react-native";
 import { Feather, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useTranslation } from "react-i18next";
 import useAuthStore from "../../store/authStore";
 import useAddressStore from "../../store/addressStore";
+import LanguageSwitcher from "../../components/common/LanguageSwitcher";
 
 const { width } = Dimensions.get("window");
 
@@ -56,10 +58,10 @@ const C = {
   errorText:    "#DC2626",
 };
 
-const ROLES = [
-  { key: "customer",  label: "Customer",  icon: "shopping-bag" },
-  { key: "vendor",    label: "Vendor",    icon: "home" },
-  { key: "delivery",  label: "Delivery",  icon: "truck" },
+const ROLE_KEYS = [
+  { key: "customer", icon: "shopping-bag" },
+  { key: "vendor",   icon: "home" },
+  { key: "delivery", icon: "truck" },
 ];
 
 const ROLE_HOME = {
@@ -71,6 +73,7 @@ const ROLE_HOME = {
 const isValidIndianMobile = (num) => /^[6-9]\d{9}$/.test(num);
 
 export default function LoginScreen({ navigation }) {
+  const { t } = useTranslation();
   const [mobile, setMobile]           = useState("");
   const [otp, setOtp]                 = useState("");
   const [step, setStep]               = useState("mobile");
@@ -144,7 +147,7 @@ export default function LoginScreen({ navigation }) {
   const getMobileError = () => {
     if (!mobile.length) return "";
     if (!["6", "7", "8", "9"].includes(mobile[0]))
-      return "Indian numbers start with 6, 7, 8 or 9";
+      return t("auth.mobileStartError");
     return "";
   };
 
@@ -165,7 +168,7 @@ export default function LoginScreen({ navigation }) {
         navigation.navigate("Signup", { phone: mobile, role: selectedRole });
         return;
       }
-      if (!res.ok) throw new Error(data.msg || "Failed to send OTP");
+      if (!res.ok) throw new Error(data.msg || t("auth.failedToSendOtp"));
       animateStep(() => { setStep("otp"); setOtp(""); setResendTimer(30); });
     } catch (e) { setError(e.message); shakeError(); }
     finally { setLoading(false); }
@@ -181,7 +184,7 @@ export default function LoginScreen({ navigation }) {
         body: JSON.stringify({ phone: mobile, code: otp, role: selectedRole }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.msg || "Invalid OTP");
+      if (!res.ok) throw new Error(data.msg || t("auth.invalidOtp"));
       login(data.user, data.accessToken, data.refreshToken);
       const addrStore = useAddressStore.getState();
       await addrStore.loadAddresses(data.accessToken);
@@ -226,6 +229,11 @@ export default function LoginScreen({ navigation }) {
             <Animated.View
               style={[s.topSection, { opacity: logoAnim, transform: [{ scale: logoAnim }] }]}
             >
+              {/* Language Switcher top-right */}
+              <View style={s.langSwitcherWrap}>
+                <LanguageSwitcher />
+              </View>
+
               {/* Cart icon badge */}
               <View style={s.logoBadge}>
                 <LinearGradient
@@ -236,8 +244,8 @@ export default function LoginScreen({ navigation }) {
                 </LinearGradient>
               </View>
 
-              <Text style={s.brandName}>KwikPik</Text>
-              <Text style={s.brandTagline}>Your Neighborhood, Now Delivered</Text>
+              <Text style={s.brandName}>{t("common.appName")}</Text>
+              <Text style={s.brandTagline}>{t("common.tagline")}</Text>
             </Animated.View>
 
             {/* ── Glass Form Card ── */}
@@ -246,7 +254,7 @@ export default function LoginScreen({ navigation }) {
             >
               {/* Role Tabs */}
               <View style={s.tabBar}>
-                {ROLES.map((role) => {
+                {ROLE_KEYS.map((role) => {
                   const active = selectedRole === role.key;
                   return (
                     <TouchableOpacity
@@ -256,7 +264,7 @@ export default function LoginScreen({ navigation }) {
                       activeOpacity={0.75}
                     >
                       <Text style={[s.tabText, active && s.tabTextActive]}>
-                        {role.label}
+                        {t(`roles.${role.key}`)}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -270,12 +278,12 @@ export default function LoginScreen({ navigation }) {
                 >
                   {step === "mobile" ? (
                     <>
-                      <Text style={s.formHeading}>Welcome back</Text>
-                      <Text style={s.formSubheading}>Log in with your mobile number</Text>
+                      <Text style={s.formHeading}>{t("auth.welcomeBack")}</Text>
+                      <Text style={s.formSubheading}>{t("auth.loginSubtitle")}</Text>
 
                       {/* Mobile field */}
                       <View style={s.fieldGroup}>
-                        <Text style={s.fieldLabel}>Mobile Number</Text>
+                        <Text style={s.fieldLabel}>{t("auth.mobileNumber")}</Text>
                         <View style={[
                           s.inputRow,
                           focusedField === "mobile" && s.inputRowFocused,
@@ -289,7 +297,7 @@ export default function LoginScreen({ navigation }) {
                           <View style={s.prefixDivider} />
                           <TextInput
                             style={s.fieldInput}
-                            placeholder="10-digit number"
+                            placeholder={t("auth.mobilePlaceholder")}
                             placeholderTextColor={C.outlineVar}
                             keyboardType="phone-pad"
                             maxLength={10}
@@ -307,7 +315,7 @@ export default function LoginScreen({ navigation }) {
                           <Text style={s.fieldError}>{mobileError}</Text>
                         ) : mobile.length > 0 && !isMobileReady ? (
                           <Text style={s.fieldHint}>
-                            {10 - mobile.length} more digit{10 - mobile.length !== 1 ? "s" : ""} needed
+                            {t("auth.moreDigits", { count: 10 - mobile.length })}
                           </Text>
                         ) : null}
                       </View>
@@ -315,7 +323,7 @@ export default function LoginScreen({ navigation }) {
                       {error ? <ErrorBox msg={error} /> : null}
 
                       <PrimaryCta
-                        label="Send OTP"
+                        label={t("auth.sendOtp")}
                         loading={loading}
                         disabled={!isMobileReady}
                         onPress={handleSendOtp}
@@ -329,16 +337,16 @@ export default function LoginScreen({ navigation }) {
                           <Feather name="arrow-left" size={16} color={C.gray700} />
                         </TouchableOpacity>
                         <View style={{ flex: 1 }}>
-                          <Text style={[s.formHeading, { textAlign: "left" }]}>Enter OTP</Text>
+                          <Text style={[s.formHeading, { textAlign: "left" }]}>{t("auth.enterOtp")}</Text>
                           <Text style={[s.formSubheading, { textAlign: "left", marginBottom: 0 }]}>
-                            Sent to +91 {mobile}
+                            {t("auth.otpSentTo", { mobile })}
                           </Text>
                         </View>
                       </View>
 
                       {/* OTP field */}
                       <View style={[s.fieldGroup, { marginTop: 14 }]}>
-                        <Text style={s.fieldLabel}>One-Time Password</Text>
+                        <Text style={s.fieldLabel}>{t("auth.oneTimePassword")}</Text>
                         <View style={[
                           s.inputRow,
                           focusedField === "otp" && s.inputRowFocused,
@@ -349,12 +357,12 @@ export default function LoginScreen({ navigation }) {
                           </View>
                           <TextInput
                             style={[s.fieldInput, otp.length > 0 && s.otpInput]}
-                            placeholder="6-digit code"
+                            placeholder={t("auth.otpPlaceholder")}
                             placeholderTextColor={C.outlineVar}
                             keyboardType="number-pad"
                             maxLength={6}
                             value={otp}
-                            onChangeText={(t) => { setOtp(t.replace(/\D/g, "")); setError(""); }}
+                            onChangeText={(v) => { setOtp(v.replace(/\D/g, "")); setError(""); }}
                             onFocus={() => setFocusedField("otp")}
                             onBlur={() => setFocusedField(null)}
                             underlineColorAndroid="transparent"
@@ -381,10 +389,12 @@ export default function LoginScreen({ navigation }) {
 
                       {/* Resend row */}
                       <View style={s.resendRow}>
-                        <Text style={s.resendText}>Didn't receive it? </Text>
+                        <Text style={s.resendText}>{t("auth.didntReceive")}</Text>
                         <TouchableOpacity onPress={handleResend} disabled={resendTimer > 0}>
                           <Text style={[s.resendLink, resendTimer > 0 && s.resendLinkDisabled]}>
-                            {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend OTP"}
+                            {resendTimer > 0
+                              ? t("auth.resendIn", { seconds: resendTimer })
+                              : t("auth.resendOtp")}
                           </Text>
                         </TouchableOpacity>
                       </View>
@@ -392,7 +402,7 @@ export default function LoginScreen({ navigation }) {
                       {error ? <ErrorBox msg={error} /> : null}
 
                       <PrimaryCta
-                        label="Verify & Sign In"
+                        label={t("auth.verifySignIn")}
                         loading={loading}
                         disabled={otp.length !== 6}
                         onPress={handleVerifyOtp}
@@ -404,7 +414,7 @@ export default function LoginScreen({ navigation }) {
                 {/* Or divider */}
                 <View style={s.orRow}>
                   <View style={s.orLine} />
-                  <Text style={s.orText}>or</Text>
+                  <Text style={s.orText}>{t("common.or")}</Text>
                   <View style={s.orLine} />
                 </View>
 
@@ -413,23 +423,23 @@ export default function LoginScreen({ navigation }) {
                   onPress={() => navigation.navigate("Signup", { role: selectedRole })}
                 >
                   <Text style={s.registerText}>
-                    New here?{" "}
-                    <Text style={s.registerLink}>Create an account</Text>
+                    {t("auth.newHere")}
+                    <Text style={s.registerLink}>{t("auth.createAccount")}</Text>
                   </Text>
                 </TouchableOpacity>
 
                 {/* Legal + footer */}
                 <View style={s.footerLinks}>
-                  <Text style={s.legalLink}>Terms of Service</Text>
+                  <Text style={s.legalLink}>{t("auth.termsOfService")}</Text>
                   <Text style={s.legalDot}>·</Text>
-                  <Text style={s.legalLink}>Privacy Policy</Text>
+                  <Text style={s.legalLink}>{t("auth.privacyPolicy")}</Text>
                 </View>
               </View>
             </Animated.View>
 
             {/* ── Powered by ── */}
             <View style={s.poweredWrap}>
-              <Text style={s.poweredBy}>Powered by Simtrak Solutions</Text>
+              <Text style={s.poweredBy}>{t("common.poweredBy")}</Text>
             </View>
 
           </View>
@@ -496,6 +506,7 @@ const s = StyleSheet.create({
 
   // ── Brand ──
   topSection: { alignItems: "center", marginBottom: 28 },
+  langSwitcherWrap: { alignSelf: "flex-end", marginBottom: 12 },
 
   logoBadge: {
     width: 80,
