@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { T } from "../common/tokens";
 import Spinner from "../common/Spinner";
+import { Feather } from "@expo/vector-icons";
 
 /**
  * BulkDeleteDialog - A confirmation modal shown before bulk-deleting selected products.
@@ -11,7 +12,7 @@ export default function BulkDeleteDialog({ count, onConfirm, onCancel, saving })
     <View style={styles.overlay}>
       <View style={styles.card}>
         <View style={styles.iconBox}>
-          <Text style={{ fontSize: 24 }}>🗑</Text>
+          <Feather name="trash-2" size={24} color="#EF4444" />
         </View>
 
         <Text style={styles.title}>

@@ -57,25 +57,25 @@ const CAT_FALLBACK_IMGS = {
 };
 
 const CAT_ACCENT = {
-  "Dairy, Bread & Eggs": { bg: "#EFF6FF", accent: "#2563EB", icon: "🥛" },
-  "Fruits & Vegetables": { bg: "#ECFDF5", accent: "#059669", icon: "🍎" },
-  "Cold Drinks & Juices": { bg: "#F0FDF4", accent: "#16A34A", icon: "🧃" },
-  "Snacks & Munchies": { bg: "#FFF7ED", accent: "#EA580C", icon: "🍿" },
-  "Breakfast & Instant Food": { bg: "#FEF9C3", accent: "#CA8A04", icon: "🥣" },
-  "Sweet Tooth": { bg: "#FDF4FF", accent: "#9333EA", icon: "🍫" },
-  "Bakery & Biscuits": { bg: "#FFF1F2", accent: "#E11D48", icon: "🍪" },
-  "Tea, Coffee & Milk Drinks": { bg: "#F5F5F4", accent: "#57534E", icon: "☕" },
-  "Atta, Rice & Dal": { bg: "#FEFCE8", accent: "#A16207", icon: "🌾" },
-  "Masala, Oil & More": { bg: "#FFF7ED", accent: "#C2410C", icon: "🌶️" },
-  "Sauces & Spreads": { bg: "#F0FDFA", accent: "#0D9488", icon: "🥫" },
-  "Cleaning Essentials": { bg: "#F0F9FF", accent: "#0284C7", icon: "🧼" },
-  "Personal Care": { bg: "#FAF5FF", accent: "#7C3AED", icon: "🧴" },
-  "Home & Office": { bg: "#F8FAFC", accent: "#475569", icon: "🖇️" },
-  "Bread": { bg: "#FFFBEB", accent: "#D97706", icon: "🍞" },
-  "Chips": { bg: "#FEF2F2", accent: "#EF4444", icon: "🍟" },
-  "Milk": { bg: "#F0F9FF", accent: "#0EA5E9", icon: "🥛" },
-  "Rice": { bg: "#FEFCE8", accent: "#EAB308", icon: "🌾" },
-  _default: { bg: "#F3F4F6", accent: "#6B7280", icon: "📦" },
+  "Dairy, Bread & Eggs": { bg: "#EFF6FF", accent: "#2563EB", icon: "local-cafe" },
+  "Fruits & Vegetables": { bg: "#ECFDF5", accent: "#059669", icon: "eco" },
+  "Cold Drinks & Juices": { bg: "#F0FDF4", accent: "#16A34A", icon: "local-drink" },
+  "Snacks & Munchies": { bg: "#FFF7ED", accent: "#EA580C", icon: "fastfood" },
+  "Breakfast & Instant Food": { bg: "#FEF9C3", accent: "#CA8A04", icon: "breakfast-dining" },
+  "Sweet Tooth": { bg: "#FDF4FF", accent: "#9333EA", icon: "cake" },
+  "Bakery & Biscuits": { bg: "#FFF1F2", accent: "#E11D48", icon: "cookie" },
+  "Tea, Coffee & Milk Drinks": { bg: "#F5F5F4", accent: "#57534E", icon: "coffee" },
+  "Atta, Rice & Dal": { bg: "#FEFCE8", accent: "#A16207", icon: "grain" },
+  "Masala, Oil & More": { bg: "#FFF7ED", accent: "#C2410C", icon: "opacity" },
+  "Sauces & Spreads": { bg: "#F0FDFA", accent: "#0D9488", icon: "bubble-chart" },
+  "Cleaning Essentials": { bg: "#F0F9FF", accent: "#0284C7", icon: "cleaning-services" },
+  "Personal Care": { bg: "#FAF5FF", accent: "#7C3AED", icon: "face" },
+  "Home & Office": { bg: "#F8FAFC", accent: "#475569", icon: "business-center" },
+  "Bread": { bg: "#FFFBEB", accent: "#D97706", icon: "bakery-dining" },
+  "Chips": { bg: "#FEF2F2", accent: "#EF4444", icon: "fastfood" },
+  "Milk": { bg: "#F0F9FF", accent: "#0EA5E9", icon: "local-cafe" },
+  "Rice": { bg: "#FEFCE8", accent: "#EAB308", icon: "grain" },
+  _default: { bg: "#F3F4F6", accent: "#6B7280", icon: "inventory" },
 };
 
 const getCatMeta = (cat) => {
@@ -83,7 +83,7 @@ const getCatMeta = (cat) => {
     return {
       bg: "#F0FDF4",
       accent: "#16A34A",
-      emoji: "🛒",
+      emoji: "shopping-basket",
       img: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80",
     };
   }
@@ -583,7 +583,7 @@ function CatSectionHeader({ cat, count }) {
   return (
     <View style={csh.row}>
       <View style={[csh.iconWrap, { backgroundColor: meta.bg }]}>
-        <Text style={csh.emoji}>{meta.emoji}</Text>
+        <MaterialIcons name={meta.emoji} size={20} color={meta.accent} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={csh.title}>{cat}</Text>
@@ -621,7 +621,7 @@ function CatTabPill({ cat, count, isActive, onPress }) {
   const meta = getCatMeta(cat);
   return (
     <TouchableOpacity style={[ct.pill, isActive && ct.pillActive]} onPress={onPress} activeOpacity={0.8}>
-      <Text style={ct.emoji}>{meta.emoji}</Text>
+      <MaterialIcons name={meta.emoji} size={14} color={isActive ? C.white : meta.accent} />
       <Text style={[ct.label, isActive && ct.labelActive]} numberOfLines={1}>{cat}</Text>
       <View style={[ct.bubble, { backgroundColor: isActive ? "rgba(255,255,255,0.22)" : C.surfaceHigh }]}>
         <Text style={[ct.bubbleText, { color: isActive ? C.white : C.gray600 }]}>{count}</Text>
@@ -674,6 +674,7 @@ export default function VendorStoreScreen() {
   const [searchFocus, setSearchFocus] = useState(false);
   const searchInputRef = useRef(null);
   const [activeCat, setActiveCat] = useState("All");
+  const [sortBy, setSortBy] = useState("default");
   const [detailItem, setDetailItem] = useState(null);
   const [loosePickerItem, setLoosePickerItem] = useState(null); // weight picker
 
@@ -804,8 +805,29 @@ export default function VendorStoreScreen() {
     return matchesSearch && matchesCat;
   }), [inventory, search, activeCat, getCatName, parentOfMap]);
 
-  const inStock = filtered.filter(i => i.stock_qty > 0);
-  const outStock = filtered.filter(i => i.stock_qty <= 0);
+  const inStock = useMemo(() => {
+    let list = filtered.filter(i => i.stock_qty > 0);
+    if (sortBy === "price_asc") {
+      list.sort((a, b) => (a.price || 0) - (b.price || 0));
+    } else if (sortBy === "price_desc") {
+      list.sort((a, b) => (b.price || 0) - (a.price || 0));
+    } else if (sortBy === "name_asc") {
+      list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    }
+    return list;
+  }, [filtered, sortBy]);
+
+  const outStock = useMemo(() => {
+    let list = filtered.filter(i => i.stock_qty <= 0);
+    if (sortBy === "price_asc") {
+      list.sort((a, b) => (a.price || 0) - (b.price || 0));
+    } else if (sortBy === "price_desc") {
+      list.sort((a, b) => (b.price || 0) - (a.price || 0));
+    } else if (sortBy === "name_asc") {
+      list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    }
+    return list;
+  }, [filtered, sortBy]);
 
 
 
@@ -950,6 +972,35 @@ export default function VendorStoreScreen() {
         </View>
       </View>
 
+      {/* SORT OPTIONS */}
+      <View style={s.sortWrap}>
+        <View style={s.sortHeader}>
+          <Feather name="sliders" size={12} color={C.gray500} />
+          <Text style={s.sortTitle}>Sort:</Text>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.sortRow}>
+          {[
+            { key: "default", label: "Default" },
+            { key: "price_asc", label: "Price: Low to High", icon: "arrow-up" },
+            { key: "price_desc", label: "Price: High to Low", icon: "arrow-down" },
+            { key: "name_asc", label: "Name: A-Z" },
+          ].map((opt) => {
+            const active = sortBy === opt.key;
+            return (
+              <TouchableOpacity
+                key={opt.key}
+                onPress={() => setSortBy(opt.key)}
+                style={[s.sortPill, active && s.sortPillActive]}
+                activeOpacity={0.8}
+              >
+                {opt.icon && <Feather name={opt.icon} size={10} color={active ? C.white : C.gray600} style={{ marginRight: 4 }} />}
+                <Text style={[s.sortPillText, active && s.sortPillTextActive]}>{opt.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
       {/* CATEGORY TABS — hidden on wide screens where sidebar shows */}
       {!search && categories.length > 0 && !(isWide && categories.length > 2) && (
         <View style={s.catTabsWrap}>
@@ -982,7 +1033,7 @@ export default function VendorStoreScreen() {
                     onPress={() => setActiveCat(cat)}
                     activeOpacity={0.8}
                   >
-                    <Text style={s.sidebarEmoji}>{meta.emoji}</Text>
+                    <MaterialIcons name={meta.emoji} size={16} color={isActive ? C.green : C.gray500} />
                     <Text style={[s.sidebarLabel, isActive && s.sidebarLabelActive]} numberOfLines={1}>{cat}</Text>
                     {isActive && <View style={s.sidebarDot} />}
                   </TouchableOpacity>
@@ -1003,7 +1054,7 @@ export default function VendorStoreScreen() {
               <View style={s.emptyIconWrap}>
                 {activeCat !== "All"
                   ? <Image source={{ uri: getCatMeta(activeCat).img }} style={{ width: 72, height: 72, borderRadius: 24, opacity: 0.35 }} resizeMode="cover" />
-                  : <Text style={{ fontSize: 34 }}>{search ? "🔍" : "📦"}</Text>}
+                  : <MaterialIcons name={search ? "search-off" : "inventory"} size={44} color={C.gray400} />}
               </View>
               <Text style={s.emptyTitle}>
                 {search ? "No results found" : activeCat === "All" ? "No products available" : `No ${activeCat} in stock`}
@@ -1184,7 +1235,7 @@ const s = StyleSheet.create({
 
   // ── Search ──
   searchWrap: {
-    paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8,
+    paddingHorizontal: 24, paddingTop: 16, paddingBottom: 4,
     backgroundColor: C.bg,
   },
   searchBox: {
@@ -1196,6 +1247,56 @@ const s = StyleSheet.create({
   searchBoxActive: { borderColor: C.greenBorder, backgroundColor: C.greenMid },
   searchInput: { flex: 1, fontSize: 14, color: C.gray900, ...Platform.select({ web: { outlineStyle: "none" } }) },
   searchClearBtn: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.gray300, alignItems: "center", justifyContent: "center" },
+
+  // ── Sort Options ──
+  sortWrap: {
+    paddingHorizontal: 24,
+    paddingBottom: 10,
+    backgroundColor: C.bg,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  sortHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  sortTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.gray500,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+  sortRow: {
+    flexDirection: "row",
+    gap: 6,
+    paddingLeft: 4,
+  },
+  sortPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: C.white,
+  },
+  sortPillActive: {
+    borderColor: C.green,
+    backgroundColor: C.green,
+  },
+  sortPillText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: C.gray600,
+  },
+  sortPillTextActive: {
+    color: C.white,
+    fontWeight: "700",
+  },
 
   // ── Category tabs ──
   catTabsWrap: { backgroundColor: C.bg },

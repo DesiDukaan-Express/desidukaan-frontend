@@ -18,7 +18,7 @@ import {
 import { Linking } from "react-native";
 
 import VendorMapView from "../../components/VendorMapView";
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons, Feather } from "@expo/vector-icons";
 import { io } from "socket.io-client";
 import useOrderSound from "../../hooks/useOrderSound";
 import { useRoute } from "@react-navigation/native";
@@ -347,9 +347,11 @@ export default function VendorOrdersScreen() {
     }
   };
 
-  // Always-current ref so socket handlers (which close over stale state)
-  // can call the latest fetchOrders without going stale.
+  // Always-current refs so socket handlers (which close over stale state)
+  // can call the latest functions without going stale.
   const fetchOrdersRef = useRef(null);
+  const fetchHistoryRef = useRef(null);
+  const fetchRequestsRef = useRef(null);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -389,7 +391,7 @@ export default function VendorOrdersScreen() {
     }
   }, [token]);
 
-  // Keep ref always pointing to the latest fetchOrders
+  // Keep refs always pointing to the latest fetch functions
   useEffect(() => {
     fetchOrdersRef.current = fetchOrders;
   }, [fetchOrders]);
@@ -447,6 +449,14 @@ export default function VendorOrdersScreen() {
       setLoadingHistory(false);
     }
   };
+
+  useEffect(() => {
+    fetchHistoryRef.current = fetchHistory;
+  }, [fetchHistory]);
+
+  useEffect(() => {
+    fetchRequestsRef.current = fetchRequests;
+  }, [fetchRequests]);
 
   useEffect(() => {
     fetchOrders();
@@ -547,13 +557,13 @@ export default function VendorOrdersScreen() {
     // Slot & Fee Negotiation updates
     socket.on("slot:request", () => {
       fetchOrdersRef.current?.();
-      fetchRequests();
+      fetchRequestsRef.current?.();
       showVendorToast("📅 New delivery slot request from a customer!", "info");
     });
     socket.on("fee:request", () => fetchOrdersRef.current?.());
     socket.on("phone:request", () => {
       playOrderSound();
-      fetchRequests();
+      fetchRequestsRef.current?.();
       showVendorToast("📞 New phone number request from a customer!", "info");
     });
 
@@ -566,7 +576,10 @@ export default function VendorOrdersScreen() {
 
     // Delivery Updates
     socket.on("order_assigned_to_delivery", () => fetchOrdersRef.current?.());
-    socket.on("delivery_status_update", () => fetchOrdersRef.current?.());
+    socket.on("delivery_status_update", () => {
+      fetchOrdersRef.current?.();
+      fetchHistoryRef.current?.(1);
+    });
     socket.on("delivery_location_update", (data) => {
       if (data.deliveryId) {
         setLiveRiderLocations((prev) => ({
@@ -606,12 +619,14 @@ export default function VendorOrdersScreen() {
 
       if (res.ok && result.success) {
         // ── 1. Instantly update the orders LIST so the card re-renders NOW ──
-        if (status === "rejected" || status === "cancelled") {
+        if (status === "rejected" || status === "cancelled" || status === "delivered") {
           // Remove from active list immediately — these go to history
           setOrders((prev) => {
             console.log('[updateOrderStatus] removing order from list, prev length:', prev.length);
             return prev.filter((o) => Number(o.id) !== Number(id));
           });
+          // Refresh order history immediately so it appears there
+          fetchHistory(1);
         } else {
           // Update the status badge on the card
           setOrders((prev) => {
@@ -932,7 +947,7 @@ export default function VendorOrdersScreen() {
             onPress={() => setShowSurchargeEdit(true)}
             activeOpacity={0.8}
           >
-            <Text style={{ fontSize: 16 }}>🌧️</Text>
+            <Feather name="cloud-rain" size={16} color="#92400E" />
             <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: '#92400E' }}>Demand surcharge ACTIVE: +{demandSurcharge}% on delivery</Text>
             <Text style={{ fontSize: 11, color: '#B45309', fontWeight: '600' }}>Edit</Text>
           </TouchableOpacity>
@@ -942,7 +957,7 @@ export default function VendorOrdersScreen() {
             onPress={() => setShowSurchargeEdit(true)}
             activeOpacity={0.8}
           >
-            <Text style={{ fontSize: 13 }}>⚡</Text>
+            <Feather name="zap" size={13} color="#9CA3AF" />
             <Text style={{ fontSize: 12, color: '#9CA3AF', flex: 1 }}>Set demand surcharge (rain, peak hours...)</Text>
             <Text style={{ fontSize: 11, color: '#D97706', fontWeight: '700' }}>+ Add</Text>
           </TouchableOpacity>
@@ -1013,12 +1028,15 @@ export default function VendorOrdersScreen() {
       </View>
 
       <FlatList
-        extraData={orders}
+        extraData={{ orders, requests, history, activeTab }}
         data={
           activeTab === "orders"
-            ? groupByCustomer(orders)
+            ? groupByCustomer(orders.filter(o => o.status !== "pending" && o.status !== "countered"))
             : activeTab === "requests"
               ? [
+                  ...orders
+                    .filter((o) => o.status === "pending" || o.status === "countered")
+                    .map((o) => ({ ...o, type: "order_request" })),
                   ...groupPhoneRequestsByCustomer(requests.phones).map((g) => ({
                     ...g,
                     type: "phone_group",
@@ -1297,6 +1315,60 @@ export default function VendorOrdersScreen() {
                   </TouchableOpacity>
                 ))}
             </View>
+          ) : item.type === "order_request" ? (
+            <TouchableOpacity
+              style={styles.requestCard}
+              onPress={() => {
+                setSelectedOrder(item);
+                setModalVisible(true);
+              }}
+              activeOpacity={0.75}
+            >
+              <View style={styles.requestHeader}>
+                <View style={[styles.requestIcon, { backgroundColor: "#FEF3C7" }]}>
+                  <MaterialIcons name="shopping-bag" size={20} color="#D97706" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.requestTitle, { color: "#D97706" }]}>
+                    New Order Request
+                  </Text>
+                  <Text style={styles.requestCustomer}>
+                    {item.customer?.name || `Customer #${item.customer_id}`}
+                  </Text>
+                </View>
+                <Text style={styles.orderTime}>
+                  {formatOrderTime(item.created_at)}
+                </Text>
+              </View>
+
+              <View style={styles.requestDetails}>
+                <Text style={styles.slotRange} numberOfLines={1}>
+                  {(item.items || []).map((i) => `${i.quantity}× ${i.product_name}`).join(" · ")}
+                </Text>
+                <Text style={styles.slotDay}>
+                  ₹{item.total}
+                </Text>
+              </View>
+
+              <View style={styles.requestActions}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.rejectBtn]}
+                  onPress={() => {
+                    updateOrderStatus(item.id, "rejected");
+                  }}
+                >
+                  <Text style={styles.rejectBtnText}>Reject</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.approveBtn]}
+                  onPress={() => {
+                    updateOrderStatus(item.id, "accepted");
+                  }}
+                >
+                  <Text style={styles.approveBtnText}>Accept</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
           ) : item.type === "phone_group" ? (
             <View style={styles.customerGroupCard}>
               <View style={styles.customerGroupHeader}>

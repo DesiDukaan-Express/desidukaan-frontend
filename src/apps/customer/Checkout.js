@@ -1192,7 +1192,9 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
   const cardR = isDesktop ? 20 : isTablet ? 18 : 14;
   const fs = isDesktop ? 1.15 : isTablet ? 1.07 : 1;
 
-  const canPlace = true; // validation disabled for testing
+  const minOrderValue = vendor?.min_order_value ?? 0;
+  const isBelowMinOrder = liveSubtotal < minOrderValue;
+  const canPlace = !isBelowMinOrder && confirmedSlot !== null;
 
   // ── Status Polling Fallback ───────────────────────────────────────────────
   useEffect(() => {
@@ -1295,6 +1297,21 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             </View>
           )}
 
+          {/* Min Order warning banner */}
+          {isBelowMinOrder && (
+            <View
+              style={[
+                s.errorBanner,
+                { marginHorizontal: px, borderRadius: cardR, backgroundColor: "#FEF2F2", borderColor: "#FCA5A5", marginBottom: 12 },
+              ]}
+            >
+              <Feather name="alert-circle" size={15} color={C.red} />
+              <Text style={[s.errorText, { color: C.red, fontWeight: "700" }]}>
+                Minimum order value for {vendorName} is ₹{minOrderValue}. Please add ₹{Math.round(minOrderValue - liveSubtotal)} more worth of items to place the order.
+              </Text>
+            </View>
+          )}
+
 
           {/* ── SECTION 2: DELIVERY TYPE ──────────────────────────────── */}
           <Section
@@ -1371,10 +1388,25 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                   </View>
                 )}
                 {deliveryTypePref === 'quick' && (
+                  deliveryInfo.fees.quick_delivery_fee > 0 ? (
+                    <View style={dts.bRow}>
+                      <Feather name="zap" size={12} color={C.orange} />
+                      <Text style={[dts.bLabel, { color: C.orange }]}>Flat Quick Delivery Surcharge</Text>
+                      <Text style={[dts.bVal, { color: C.orange }]}>+₹{deliveryInfo.fees.quick_delivery_fee}</Text>
+                    </View>
+                  ) : (
+                    <View style={dts.bRow}>
+                      <Feather name="zap" size={12} color={C.orange} />
+                      <Text style={[dts.bLabel, { color: C.orange }]}>Quick surcharge ({deliveryInfo.fees.quick_delivery_pct}%)</Text>
+                      <Text style={[dts.bVal, { color: C.orange }]}>+{deliveryInfo.fees.quick_delivery_pct}%</Text>
+                    </View>
+                  )
+                )}
+                {deliveryInfo.fees.is_bad_weather && deliveryInfo.fees.weather_surcharge > 0 && (
                   <View style={dts.bRow}>
-                    <Feather name="zap" size={12} color={C.orange} />
-                    <Text style={[dts.bLabel, { color: C.orange }]}>Quick surcharge ({deliveryInfo.fees.quick_delivery_pct}%)</Text>
-                    <Text style={[dts.bVal, { color: C.orange }]}>+{deliveryInfo.fees.quick_delivery_pct}%</Text>
+                    <Feather name="cloud-rain" size={12} color={C.red} />
+                    <Text style={[dts.bLabel, { color: C.red }]}>Bad Weather Surcharge</Text>
+                    <Text style={[dts.bVal, { color: C.red }]}>+₹{deliveryInfo.fees.weather_surcharge}</Text>
                   </View>
                 )}
                 {deliveryInfo.fees.is_free_delivery && deliveryTypePref === 'standard' && (
@@ -1910,7 +1942,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
               total={total}
               canPlace={canPlace}
               placing={placing}
-              onPress={isAccepted ? handlePayment : placeOrder}
+              onPress={orderStatus === "accepted" ? handlePayment : placeOrder}
               fs={fs}
             />
           </View>
