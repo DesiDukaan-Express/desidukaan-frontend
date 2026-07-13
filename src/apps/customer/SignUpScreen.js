@@ -22,6 +22,7 @@ import useAuthStore from "../../store/authStore";
 const { width: SCREEN_W } = Dimensions.get("window");
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+const IS_TESTING = process.env.EXPO_PUBLIC_ENV === "testing";
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -223,7 +224,9 @@ export default function SignupScreen({ navigation, route }) {
     gender !== "" &&
     agreed;
 
-  // Step 1: register → account saved to DB → OTP sent
+  // Step 1: register → account saved to DB
+  // Testing:    tokens returned directly, navigate to app (no OTP step)
+  // Production: OTP sent, navigate to OTP step
   const handleSignup = async () => {
     if (!isFormValid) return;
     setLoading(true); setError("");
@@ -246,7 +249,15 @@ export default function SignupScreen({ navigation, route }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.msg || "Registration failed");
-      // Account created in DB + OTP sent → go to OTP step
+
+      // Testing mode: server returns tokens directly
+      if (data.accessToken) {
+        login(data.user, data.accessToken, data.refreshToken);
+        navigation.replace(ROLE_HOME[selectedRole] || "CustomerApp");
+        return;
+      }
+
+      // Production mode: OTP sent — show OTP step
       animateStep(() => {
         setStep("otp");
         setOtp("");
@@ -521,7 +532,7 @@ export default function SignupScreen({ navigation, route }) {
                       {error ? <ErrorBox msg={error} /> : null}
 
                       <GreenCta
-                        label="Create Account & Send OTP"
+                        label={IS_TESTING ? "Create Account" : "Create Account & Send OTP"}
                         loading={loading}
                         disabled={!isFormValid}
                         onPress={handleSignup}

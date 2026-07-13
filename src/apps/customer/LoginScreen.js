@@ -85,6 +85,7 @@ export default function LoginScreen({ navigation }) {
 
   const login    = useAuthStore((state) => state.login);
   const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+  const IS_TESTING = process.env.EXPO_PUBLIC_ENV === "testing";
 
   const logoAnim    = useRef(new Animated.Value(0)).current;
   const formAnim    = useRef(new Animated.Value(30)).current;
@@ -169,6 +170,17 @@ export default function LoginScreen({ navigation }) {
         return;
       }
       if (!res.ok) throw new Error(data.msg || t("auth.failedToSendOtp"));
+
+      // Testing mode: server returns tokens directly — skip OTP step
+      if (data.accessToken) {
+        login(data.user, data.accessToken, data.refreshToken);
+        const addrStore = useAddressStore.getState();
+        await addrStore.loadAddresses(data.accessToken);
+        navigation.replace(ROLE_HOME[selectedRole] || "CustomerApp");
+        return;
+      }
+
+      // Production mode: server returns { msg: 'OTP sent' } — show OTP step
       animateStep(() => { setStep("otp"); setOtp(""); setResendTimer(30); });
     } catch (e) { setError(e.message); shakeError(); }
     finally { setLoading(false); }
