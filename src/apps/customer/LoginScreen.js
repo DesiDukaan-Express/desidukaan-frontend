@@ -25,37 +25,37 @@ const { width } = Dimensions.get("window");
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
   // greens (background / brand)
-  greenDeep:    "#002b12",
-  greenDark:    "#004d1f",
-  greenMid:     "#005e26",
-  greenBright:  "#006e2d",
-  greenLight:   "#77dc88",
-  greenFixed:   "#93f9a2",
+  greenDeep:    "#04160e",
+  greenDark:    "#093a24",
+  greenMid:     "#0b5133",
+  greenBright:  "#10B981", // Vibrant Emerald Green
+  greenLight:   "#E6FBF0", // Soft Emerald Tint
+  greenFixed:   "#34D399",
 
   // oranges (accent / CTA)
-  orange:       "#FC8125",
-  orangeDark:   "#994700",
-  orangeLight:  "#FFDBC8",
+  orange:       "#F97316", // Premium Vibrant Orange
+  orangeDark:   "#C2410C",
+  orangeLight:  "#FFEDD5",
 
   // neutrals
   white:        "#FFFFFF",
-  gray100:      "#F3F4F6",
-  gray200:      "#E5E7EB",
-  gray300:      "#D1D5DB",
+  gray100:      "#F9FAFB",
+  gray200:      "#F3F4F6",
+  gray300:      "#E5E7EB",
   gray400:      "#9CA3AF",
   gray500:      "#6B7280",
   gray700:      "#374151",
   gray900:      "#111827",
 
   // surface
-  surface:      "#F8F9FA",
-  outline:      "#6F7A6D",
-  outlineVar:   "#BECABB",
+  surface:      "#F9FAFB",
+  outline:      "#9CA3AF",
+  outlineVar:   "#D1D5DB",
 
   // error
   errorBg:      "#FEF2F2",
   errorBorder:  "#FCA5A5",
-  errorText:    "#DC2626",
+  errorText:    "#EF4444",
 };
 
 const ROLE_KEYS = [
@@ -221,14 +221,16 @@ export default function LoginScreen({ navigation }) {
     animateStep(() => { setStep("mobile"); setOtp(""); setError(""); });
   };
 
+
+
   return (
     <LinearGradient
-      colors={[C.greenDark, C.greenMid, C.greenDeep]}
+      colors={["#E6FBF0", "#F0FDF4", "#FFFFFF"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={s.root}
     >
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
       <SafeAreaView style={s.safe}>
         <KeyboardAvoidingView
@@ -340,6 +342,8 @@ export default function LoginScreen({ navigation }) {
                         disabled={!isMobileReady}
                         onPress={handleSendOtp}
                       />
+
+
                     </>
                   ) : (
                     <>
@@ -537,12 +541,12 @@ const s = StyleSheet.create({
   brandName: {
     fontSize: 32,
     fontWeight: "900",
-    color: C.white,
+    color: C.greenDeep,
     letterSpacing: -1.2,
   },
   brandTagline: {
     fontSize: 13,
-    color: C.greenFixed,
+    color: C.greenMid,
     marginTop: 4,
     opacity: 0.85,
     letterSpacing: 0.2,
@@ -578,8 +582,8 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   tabActive: {
-    backgroundColor: C.orange,
-    shadowColor: C.orange,
+    backgroundColor: C.greenBright,
+    shadowColor: C.greenBright,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -765,8 +769,9 @@ const s = StyleSheet.create({
   poweredWrap: { alignItems: "center", marginTop: 20 },
   poweredBy: {
     fontSize: 11,
-    color: C.greenFixed,
+    color: C.greenMid,
     opacity: 0.55,
     fontWeight: "500",
   },
+
 });
