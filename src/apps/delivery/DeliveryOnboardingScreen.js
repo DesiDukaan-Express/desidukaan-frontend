@@ -434,13 +434,18 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                 await login(partner.user, token, undefined);
             }
 
-            // Trigger success flow
+            // Check if auto-approved
+            const autoApproved = res.data?.auto_approved === true;
+
+            // Trigger success flow with appropriate message
             Alert.alert(
-                '🎉 Application Submitted!',
-                "We'll verify your documents within 24 hours. You'll receive an SMS once approved.",
+                autoApproved ? '✅ Instantly Approved!' : '🎉 Application Submitted!',
+                autoApproved
+                    ? "You've been instantly approved! You can start accepting delivery orders right away."
+                    : "We'll verify your documents within 24 hours. You'll receive an SMS once approved.",
                 [
                     {
-                        text: 'OK',
+                        text: autoApproved ? 'Start Earning →' : 'OK',
                         onPress: () => {
                             if (onComplete) {
                                 onComplete();
