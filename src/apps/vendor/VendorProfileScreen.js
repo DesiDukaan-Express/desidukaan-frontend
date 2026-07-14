@@ -21,6 +21,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import useAuthStore from "../../store/authStore";
 import * as ImagePicker from "expo-image-picker";
 import { uploadAPI } from "../../services/api";
+import AccountManagerModal from "../../components/common/AccountManagerModal";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -71,6 +72,7 @@ export default function VendorProfileScreen() {
   const [editModal, setEditModal]       = useState(false);
   const [logoutModal, setLogoutModal]   = useState(false);
   const [categoryModal, setCategoryModal] = useState(false);
+  const [showAccountManager, setShowAccountManager] = useState(false);
 
   // Edit fields
   const [activeField, setActiveField] = useState("");
@@ -447,7 +449,7 @@ export default function VendorProfileScreen() {
                 rs={rs}
                 isWide={isWide}
               />
-              <AccountSettingsCard rs={rs} isWide={isWide} />
+              <AccountSettingsCard rs={rs} isWide={isWide} onPressManage={() => setShowAccountManager(true)} />
               <LogoutButton onPress={() => setLogoutModal(true)} rs={rs} isWide={isWide} />
             </View>
           </View>
@@ -472,7 +474,7 @@ export default function VendorProfileScreen() {
               rs={rs}
               isWide={isWide}
             />
-            <AccountSettingsCard rs={rs} isWide={isWide} />
+            <AccountSettingsCard rs={rs} isWide={isWide} onPressManage={() => setShowAccountManager(true)} />
             <LogoutButton onPress={() => setLogoutModal(true)} rs={rs} isWide={isWide} />
           </View>
         )}
@@ -737,6 +739,10 @@ export default function VendorProfileScreen() {
           ))}
         </View>
       </Modal>
+      <AccountManagerModal
+        visible={showAccountManager}
+        onClose={() => setShowAccountManager(false)}
+      />
     </View>
   );
 }
@@ -1124,8 +1130,9 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
   );
 }
 
-function AccountSettingsCard({ rs, isWide }) {
+function AccountSettingsCard({ rs, isWide, onPressManage }) {
   const items = [
+    { icon: "switch-account", label: "Manage Accounts", sub: "Switch profile or link accounts", color: "#6366F1", bg: "#EEF2FF", action: "manage" },
     { icon: "account-balance", label: "Bank Account", sub: "Manage payout bank details", color: "#059669", bg: "#ECFDF5" },
     { icon: "payments", label: "Payout Settings", sub: "UPI & withdrawal preferences", color: C.blue, bg: C.blueDim },
     { icon: "verified-user", label: "KYC Verification", sub: "Documents & compliance", color: "#7C3AED", bg: "#EDE9FE", right: "Verified ✓" },
@@ -1141,6 +1148,7 @@ function AccountSettingsCard({ rs, isWide }) {
           key={item.label}
           style={[styles.settingRow, i === items.length - 1 && { borderBottomWidth: 0 }]}
           activeOpacity={0.6}
+          onPress={() => item.action === "manage" ? onPressManage() : null}
         >
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
             <View style={[styles.settingIconBox, { backgroundColor: item.bg }]}>
