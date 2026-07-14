@@ -675,6 +675,7 @@ export default function VendorStoreScreen() {
   const searchInputRef = useRef(null);
   const [activeCat, setActiveCat] = useState("All");
   const [sortBy, setSortBy] = useState("default");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
   const [loosePickerItem, setLoosePickerItem] = useState(null); // weight picker
 
@@ -976,29 +977,60 @@ export default function VendorStoreScreen() {
       <View style={s.sortWrap}>
         <View style={s.sortHeader}>
           <Feather name="sliders" size={12} color={C.gray500} />
-          <Text style={s.sortTitle}>Sort:</Text>
+          <Text style={s.sortTitle}>Sort By:</Text>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.sortRow}>
-          {[
-            { key: "default", label: "Default" },
-            { key: "price_asc", label: "Price: Low to High", icon: "arrow-up" },
-            { key: "price_desc", label: "Price: High to Low", icon: "arrow-down" },
-            { key: "name_asc", label: "Name: A-Z" },
-          ].map((opt) => {
-            const active = sortBy === opt.key;
-            return (
-              <TouchableOpacity
-                key={opt.key}
-                onPress={() => setSortBy(opt.key)}
-                style={[s.sortPill, active && s.sortPillActive]}
-                activeOpacity={0.8}
-              >
-                {opt.icon && <Feather name={opt.icon} size={10} color={active ? C.white : C.gray600} style={{ marginRight: 4 }} />}
-                <Text style={[s.sortPillText, active && s.sortPillTextActive]}>{opt.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <View style={s.dropdownContainer}>
+          <TouchableOpacity
+            style={s.dropdownTrigger}
+            onPress={() => setDropdownOpen(!dropdownOpen)}
+            activeOpacity={0.85}
+          >
+            <Text style={s.dropdownTriggerText}>
+              {(() => {
+                const selected = [
+                  { key: "default", label: "Default" },
+                  { key: "price_asc", label: "Price: Low to High" },
+                  { key: "price_desc", label: "Price: High to Low" },
+                  { key: "name_asc", label: "Name: A-Z" },
+                ].find(o => o.key === sortBy);
+                return selected ? selected.label : "Default";
+              })()}
+            </Text>
+            <Feather name={dropdownOpen ? "chevron-up" : "chevron-down"} size={13} color={C.gray600} />
+          </TouchableOpacity>
+
+          {dropdownOpen && (
+            <View style={s.dropdownMenu}>
+              {[
+                { key: "default", label: "Default" },
+                { key: "price_asc", label: "Price: Low to High", icon: "arrow-up" },
+                { key: "price_desc", label: "Price: High to Low", icon: "arrow-down" },
+                { key: "name_asc", label: "Name: A-Z" },
+              ].map((opt) => {
+                const active = sortBy === opt.key;
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[s.dropdownItem, active && s.dropdownItemActive]}
+                    onPress={() => {
+                      setSortBy(opt.key);
+                      setDropdownOpen(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      {opt.icon && <Feather name={opt.icon} size={11} color={active ? C.green : C.gray500} style={{ marginRight: 6 }} />}
+                      <Text style={[s.dropdownItemText, active && s.dropdownItemTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </View>
+                    {active && <Feather name="check" size={12} color={C.green} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </View>
       </View>
 
       {/* CATEGORY TABS — hidden on wide screens where sidebar shows */}
@@ -1255,7 +1287,8 @@ const s = StyleSheet.create({
     backgroundColor: C.bg,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 12,
+    zIndex: 1000,
   },
   sortHeader: {
     flexDirection: "row",
@@ -1269,33 +1302,66 @@ const s = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.3,
   },
-  sortRow: {
-    flexDirection: "row",
-    gap: 6,
-    paddingLeft: 4,
+  dropdownContainer: {
+    position: "relative",
+    zIndex: 9999,
   },
-  sortPill: {
+  dropdownTrigger: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: C.white,
     borderWidth: 1.5,
     borderColor: C.gray200,
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: C.white,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    minWidth: 140,
+    gap: 8,
   },
-  sortPillActive: {
-    borderColor: C.green,
-    backgroundColor: C.green,
-  },
-  sortPillText: {
-    fontSize: 11,
+  dropdownTriggerText: {
+    fontSize: 12,
     fontWeight: "600",
-    color: C.gray600,
+    color: C.gray700,
+    fontFamily: "PlusJakartaSans_600SemiBold",
   },
-  sortPillTextActive: {
-    color: C.white,
+  dropdownMenu: {
+    position: "absolute",
+    top: 36,
+    left: 0,
+    backgroundColor: C.white,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 9999,
+    paddingVertical: 4,
+    minWidth: 160,
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 12,
+  },
+  dropdownItemActive: {
+    backgroundColor: C.greenLight,
+  },
+  dropdownItemText: {
+    fontSize: 12,
+    color: C.gray700,
+    fontFamily: "PlusJakartaSans_500Medium",
+  },
+  dropdownItemTextActive: {
+    color: C.green,
     fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
   },
 
   // ── Category tabs ──

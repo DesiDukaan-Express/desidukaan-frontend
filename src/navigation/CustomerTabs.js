@@ -39,7 +39,6 @@ const C = {
 // Icon names per tab
 const TAB_ICONS = {
   Home:    'home',
-  Search:  'search',
   Cart:    'shopping-cart',
   Orders:  'receipt-long',
   Profile: 'person',
@@ -178,7 +177,6 @@ function CustomerTabNavigator() {
       })}
     >
       <Tab.Screen name="Home"    component={HomeScreen}    />
-      <Tab.Screen name="Search"  component={SearchScreen}  />
       <Tab.Screen name="Cart"    component={CartScreen}    />
       <Tab.Screen name="Orders"  component={OrdersScreen}  />
       <Tab.Screen name="Profile" component={ProfileScreen} />
@@ -343,6 +341,7 @@ export default function CustomerTabs() {
     <View style={{ flex: 1 }}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="CustomerTabNavigator" component={CustomerTabNavigator} />
+        <Stack.Screen name="Search"      component={SearchScreen}      />
         <Stack.Screen name="VendorStore" component={VendorStoreScreen} />
         <Stack.Screen name="TrackOrder"  component={TrackOrderScreen}  />
       </Stack.Navigator>

@@ -67,6 +67,7 @@ export default function AccountManagerModal({ visible, onClose }) {
       }
     } catch (e) {
       console.error("Fetch profiles error:", e);
+      Alert.alert("Network Error", "Could not connect to the backend server. Please check your backend connection.\n" + e.message);
     } finally {
       setLoading(false);
     }
