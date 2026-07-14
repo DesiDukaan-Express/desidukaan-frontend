@@ -21,7 +21,7 @@ import {
   StatusBar,
   Pressable,
 } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons, Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
@@ -887,7 +887,7 @@ function buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCate
 function CategoryBrowseSheet({
   visible, category, hierarchy, onClose,
   onAdd, onRemove, getCartQty, onOpenWeightPicker, vendors,
-  onStoreSelect, apiCategories,
+  onStoreSelect, apiCategories, onItemDetail,
 }) {
   const [activeSubCat, setActiveSubCat] = React.useState(null);
   const subCats = category && hierarchy[category]
@@ -1086,6 +1086,13 @@ function CategoryBrowseSheet({
                                 <Text style={cbs.discPillText}>Loose</Text>
                               </View>
                             )}
+                            <TouchableOpacity
+                              style={cbs.eyeBtn}
+                              activeOpacity={0.7}
+                              onPress={() => onItemDetail && onItemDetail(item, p)}
+                            >
+                              <MaterialIcons name="visibility" size={11} color={C.white} />
+                            </TouchableOpacity>
                           </View>
                           <View style={{ flex: 1 }}>
                             <Text style={cbs.productName} numberOfLines={2}>{p.name}</Text>
@@ -1223,6 +1230,18 @@ const cbs = StyleSheet.create({
   productCell: { justifyContent: "center" },
   productImgWrap: { width: 52, height: 52, borderRadius: 10, overflow: "hidden", backgroundColor: C.gray100, flexShrink: 0, position: "relative" },
   productImg: { width: "100%", height: "100%" },
+  eyeBtn: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
+  },
   discPill: {
     position: "absolute", bottom: 0, left: 0, right: 0,
     backgroundColor: C.orange,
@@ -1390,7 +1409,7 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
 }
 
 // ─── Popular Item Card (horizontal scroll, HTML-reference style) ───────────────
-function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker }) {
+function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPress }) {
   const CARD_W = 160;
   const IMG_H = 100;
 
@@ -1404,7 +1423,7 @@ function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker }) {
   const loose = isLooseItem(item);
 
   return (
-    <View style={pic.card}>
+    <TouchableOpacity style={pic.card} onPress={onPress} activeOpacity={0.85}>
       {/* ── Image section ── */}
       <View style={[pic.imgWrap, { height: IMG_H }]}>
         {/* Discount badge – top-left */}
@@ -1415,10 +1434,17 @@ function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker }) {
         )}
         {/* Loose badge – top-right */}
         {loose && (
-          <View style={[pic.discBadge, { right: 0, left: 'auto', backgroundColor: C.cyan }]}>
+          <View style={[pic.discBadge, { right: 32, left: 'auto', backgroundColor: C.cyan }]}>
             <Text style={pic.discBadgeText}>Loose</Text>
           </View>
         )}
+        <TouchableOpacity
+          style={pic.eyeBtn}
+          onPress={(e) => { e.stopPropagation?.(); onPress?.(); }}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons name="visibility" size={14} color={C.white} />
+        </TouchableOpacity>
         <Image
           source={{ uri: imgUri }}
           style={{ width: '100%', height: '100%' }}
@@ -1474,7 +1500,7 @@ function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker }) {
           )}
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -1513,6 +1539,18 @@ const pic = StyleSheet.create({
     fontWeight: '800',
     color: C.white,
     letterSpacing: 0.3,
+  },
+  eyeBtn: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
   },
   info: {
     padding: 10,
@@ -1733,6 +1771,294 @@ const wp = StyleSheet.create({
   addBtnText: { fontSize: 16, fontWeight: "800", color: C.white },
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Item Detail Modal (animated slide-up + blurred backdrop) ─────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+function ItemDetailModal({ item, onClose, onAdd, onRemove, qty }) {
+  const { width: W, height: H } = Dimensions.get("window");
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.82)).current;
+  const slideAnim = useRef(new Animated.Value(100)).current;
+  const backdropDark = useRef(new Animated.Value(0)).current;
+  const backdropBlur1 = useRef(new Animated.Value(0)).current;
+  const backdropBlur2 = useRef(new Animated.Value(0)).current;
+  const backdropBlur3 = useRef(new Animated.Value(0)).current;
+  const contentSlide = useRef(new Animated.Value(30)).current;
+  const contentFade = useRef(new Animated.Value(0)).current;
+  const imgScale = useRef(new Animated.Value(1.08)).current;
+  const isClosing = useRef(false);
+
+  useEffect(() => {
+    if (item) {
+      isClosing.current = false;
+      fadeAnim.setValue(0);
+      scaleAnim.setValue(0.82);
+      slideAnim.setValue(100);
+      backdropDark.setValue(0);
+      backdropBlur1.setValue(0);
+      backdropBlur2.setValue(0);
+      backdropBlur3.setValue(0);
+      contentSlide.setValue(30);
+      contentFade.setValue(0);
+      imgScale.setValue(1.08);
+
+      Animated.parallel([
+        Animated.timing(backdropDark, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.parallel([
+          Animated.timing(backdropBlur1, { toValue: 1, duration: 350, useNativeDriver: true }),
+          Animated.timing(backdropBlur2, { toValue: 1, duration: 420, useNativeDriver: true }),
+          Animated.timing(backdropBlur3, { toValue: 1, duration: 500, useNativeDriver: true }),
+        ]),
+        Animated.spring(scaleAnim, { toValue: 1, tension: 50, friction: 8, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 0, tension: 45, friction: 9, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }),
+      ]).start(() => {
+        Animated.parallel([
+          Animated.spring(contentSlide, { toValue: 0, tension: 60, friction: 9, useNativeDriver: true }),
+          Animated.timing(contentFade, { toValue: 1, duration: 280, useNativeDriver: true }),
+          Animated.spring(imgScale, { toValue: 1, tension: 40, friction: 10, useNativeDriver: true }),
+        ]).start();
+      });
+    }
+  }, [item]);
+
+  const handleClose = () => {
+    if (isClosing.current) return;
+    isClosing.current = true;
+    Animated.parallel([
+      Animated.timing(backdropDark, { toValue: 0, duration: 260, useNativeDriver: true }),
+      Animated.timing(backdropBlur1, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(backdropBlur2, { toValue: 0, duration: 220, useNativeDriver: true }),
+      Animated.timing(backdropBlur3, { toValue: 0, duration: 240, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 0, duration: 240, useNativeDriver: true }),
+      Animated.timing(scaleAnim, { toValue: 0.9, duration: 260, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 60, duration: 280, useNativeDriver: true }),
+      Animated.timing(contentFade, { toValue: 0, duration: 160, useNativeDriver: true }),
+    ]).start(() => onClose());
+  };
+
+  if (!item) return null;
+
+  const p = item.product || item;
+  const name = p.name || item.name;
+  const price = p.price || item.price;
+  const mrp = p.mrp || item.orig;
+  const unit = p.unit || item.unit || "1 pc";
+  const description = p.description || item.description;
+  const imgUri = p.image_url || item.img;
+  const hasDiscount = mrp && mrp > price;
+  const discountPct = hasDiscount ? Math.round((1 - price / mrp) * 100) : 0;
+  const currentQty = qty || 0;
+
+  return (
+    <Modal visible transparent onRequestClose={handleClose} statusBarTranslucent animationType="none">
+      {/* ── Layered blur backdrop ─────────────────────────────────── */}
+      <Animated.View style={[dm.blurLayer, dm.blurLayer1, {
+        opacity: backdropBlur1,
+        transform: [{ scale: backdropDark.interpolate({ inputRange: [0, 1], outputRange: [1.1, 1] }) }],
+      }]} />
+      <Animated.View style={[dm.blurLayer, dm.blurLayer2, {
+        opacity: backdropBlur2,
+        transform: [{ scale: backdropDark.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) }],
+      }]} />
+      <Animated.View style={[dm.blurLayer, dm.blurLayer3, {
+        opacity: backdropBlur3,
+      }]} />
+      <Animated.View style={[dm.darkOverlay, { opacity: backdropDark }]} />
+
+      {/* ── Pressable dismiss area ────────────────────────────────── */}
+      <Pressable style={dm.backdropPress} onPress={handleClose}>
+        <View style={StyleSheet.absoluteFillObject} />
+      </Pressable>
+
+      {/* ── Card ──────────────────────────────────────────────────── */}
+      <View style={dm.centerWrap} pointerEvents="box-none">
+        <Animated.View style={[dm.card, {
+          transform: [{ scale: scaleAnim }, { translateY: slideAnim }],
+          opacity: fadeAnim,
+        }]}>
+          <ScrollView showsVerticalScrollIndicator={false} bounces={false} style={{ maxHeight: "100%" }}>
+            {/* Image header */}
+            <View style={dm.imgWrap}>
+              <Animated.Image
+                source={{ uri: imgUri || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=700&q=80" }}
+                style={[dm.img, { transform: [{ scale: imgScale }] }]}
+                resizeMode="cover"
+              />
+              <LinearGradient colors={["rgba(0,0,0,0.12)", "transparent", "rgba(0,0,0,0.06)", "rgba(0,0,0,0.55)"]} style={StyleSheet.absoluteFillObject} />
+              <TouchableOpacity onPress={handleClose} style={dm.closeBtn} activeOpacity={0.7}>
+                <Feather name="x" size={15} color="#fff" />
+              </TouchableOpacity>
+              {hasDiscount && (
+                <View style={dm.discBadge}>
+                  <Text style={dm.discBadgeText}>{discountPct}% OFF</Text>
+                </View>
+              )}
+              <View style={dm.priceOnImg}>
+                <Text style={dm.priceOnImgText}>₹{price}</Text>
+                {hasDiscount && <Text style={dm.mrpOnImgText}>₹{mrp}</Text>}
+              </View>
+            </View>
+
+            {/* Body content */}
+            <Animated.View style={[dm.body, {
+              opacity: contentFade,
+              transform: [{ translateY: contentSlide }],
+            }]}>
+              <Text style={dm.name}>{name}</Text>
+              <Text style={dm.unit}>{unit}</Text>
+
+              {description ? (
+                <View style={dm.descBox}>
+                  <View style={dm.descIconRow}>
+                    <MaterialIcons name="info-outline" size={13} color={C.green} />
+                    <Text style={dm.descLabel}>Description</Text>
+                  </View>
+                  <Text style={dm.descText}>{description}</Text>
+                </View>
+              ) : null}
+
+              {hasDiscount && (
+                <View style={dm.savingsPill}>
+                  <MaterialIcons name="savings" size={14} color="#D97706" />
+                  <Text style={dm.savingsText}>You save ₹{mrp - price} per item</Text>
+                </View>
+              )}
+
+              {/* Divider with dots */}
+              <View style={dm.dividerRow}>
+                <View style={dm.dividerLine} />
+                <View style={dm.dividerDot} />
+                <View style={dm.dividerLine} />
+              </View>
+
+              <View style={dm.actionRow}>
+                <View>
+                  <Text style={dm.totalLabel}>TOTAL</Text>
+                  <Text style={dm.totalPrice}>₹{price}</Text>
+                </View>
+                {currentQty === 0 ? (
+                  <TouchableOpacity style={dm.addBtn} onPress={() => { onAdd(item); handleClose(); }} activeOpacity={0.85}>
+                    <MaterialIcons name="shopping-cart" size={16} color="#fff" />
+                    <Text style={dm.addBtnText}>Add to Cart</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={dm.qtyRow}>
+                    <TouchableOpacity style={dm.qtyBtn} onPress={() => onRemove(item)}>
+                      <Feather name="minus" size={15} color="#fff" />
+                    </TouchableOpacity>
+                    <Text style={dm.qtyNum}>{currentQty}</Text>
+                    <TouchableOpacity style={dm.qtyBtn} onPress={() => onAdd(item)}>
+                      <Feather name="plus" size={15} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            </Animated.View>
+          </ScrollView>
+
+          {/* Bottom handle bar */}
+          <View style={dm.handleWrap}>
+            <View style={dm.handleBar} />
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+const dm = StyleSheet.create({
+  /* ── Blur backdrop layers ──────────────────────────────────────── */
+  blurLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  blurLayer1: {
+    backgroundColor: "rgba(180, 190, 210, 0.28)",
+  },
+  blurLayer2: {
+    backgroundColor: "rgba(120, 130, 160, 0.22)",
+  },
+  blurLayer3: {
+    backgroundColor: "rgba(80, 90, 120, 0.18)",
+  },
+  darkOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(10, 10, 25, 0.65)",
+  },
+  backdropPress: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  centerWrap: {
+    ...StyleSheet.absoluteFillObject, justifyContent: "center", alignItems: "center", padding: 24,
+  },
+  card: {
+    width: "100%", maxWidth: 380, maxHeight: "82%", backgroundColor: C.white,
+    borderRadius: 26, overflow: "hidden",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.38, shadowRadius: 40, elevation: 24,
+  },
+  imgWrap: { width: "100%", height: 210, backgroundColor: "#F3F4F5", position: "relative", overflow: "hidden" },
+  img: { width: "100%", height: "100%" },
+  closeBtn: {
+    position: "absolute", top: 12, right: 12, width: 34, height: 34, borderRadius: 17,
+    backgroundColor: "rgba(0,0,0,0.5)", borderWidth: 1.2, borderColor: "rgba(255,255,255,0.25)",
+    alignItems: "center", justifyContent: "center",
+  },
+  discBadge: {
+    position: "absolute", top: 12, left: 12, backgroundColor: C.orange,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10,
+    shadowColor: C.orange, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 6, elevation: 5,
+  },
+  discBadgeText: { fontSize: 11, color: C.white, fontWeight: "800" },
+  priceOnImg: { position: "absolute", bottom: 12, left: 16, flexDirection: "row", alignItems: "baseline", gap: 6 },
+  priceOnImgText: {
+    fontSize: 30, fontWeight: "900", color: C.white,
+    textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10,
+  },
+  mrpOnImgText: { fontSize: 14, color: "rgba(255,255,255,0.55)", textDecorationLine: "line-through" },
+  body: { padding: 20 },
+  name: { fontSize: 20, fontWeight: "900", color: C.gray900, lineHeight: 26, marginBottom: 4 },
+  unit: { fontSize: 13, color: C.gray400, fontWeight: "500", marginBottom: 14 },
+  descBox: {
+    backgroundColor: C.greenLight, borderRadius: 14, padding: 14, marginBottom: 14,
+    borderLeftWidth: 3.5, borderLeftColor: C.green,
+  },
+  descIconRow: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 },
+  descLabel: { fontSize: 10, fontWeight: "800", color: C.green, textTransform: "uppercase", letterSpacing: 0.6 },
+  descText: { fontSize: 13.5, color: C.gray600, lineHeight: 20 },
+  savingsPill: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: "#FEF3C7", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 16,
+  },
+  savingsText: { fontSize: 12.5, color: "#92400E", fontWeight: "700" },
+  dividerRow: {
+    flexDirection: "row", alignItems: "center", marginBottom: 16, gap: 8,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: C.gray100 },
+  dividerDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: C.gray200 },
+  actionRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+  },
+  totalLabel: { fontSize: 10, color: C.gray400, fontWeight: "600", marginBottom: 2 },
+  totalPrice: { fontSize: 26, fontWeight: "900", color: C.green },
+  addBtn: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: C.green, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14,
+    shadowColor: C.green, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
+  },
+  addBtnText: { fontSize: 15, fontWeight: "800", color: "#fff" },
+  qtyRow: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: C.green, borderRadius: 14, overflow: "hidden",
+    shadowColor: C.green, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
+  },
+  qtyBtn: { paddingHorizontal: 18, paddingVertical: 13 },
+  qtyNum: { fontSize: 16, fontWeight: "900", color: "#fff", minWidth: 34, textAlign: "center" },
+  handleWrap: { alignItems: "center", paddingBottom: 8, paddingTop: 2 },
+  handleBar: { width: 36, height: 4, borderRadius: 2, backgroundColor: C.gray200 },
+});
+
 // ═════════════════════════════════════════════════════════════════════════════
 export default function HomeScreen() {
   const { token, user } = useAuthStore();
@@ -1797,6 +2123,8 @@ export default function HomeScreen() {
   const [pickerItem, setPickerItem] = useState(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [loosePickerItem, setLoosePickerItem] = useState(null);
+  const [popularDetailItem, setPopularDetailItem] = useState(null);
+  const [catDetailItem, setCatDetailItem] = useState(null);
 
   // Address picker
   const [addrPickerVisible, setAddrPickerVisible] = useState(false);
@@ -2862,6 +3190,7 @@ export default function HomeScreen() {
                   onAdd={handleAdd}
                   onRemove={handleRemove}
                   onOpenWeightPicker={setLoosePickerItem}
+                  onPress={() => setPopularDetailItem(item)}
                 />
               ))}
             </ScrollView>
@@ -2984,6 +3313,24 @@ export default function HomeScreen() {
         onAdd={handleAdd}
       />
 
+      {/* ══ POPULAR ITEM DETAIL MODAL ══════════════════════════════════════ */}
+      <ItemDetailModal
+        item={popularDetailItem}
+        qty={popularDetailItem ? getCartQty(popularDetailItem.id) : 0}
+        onClose={() => setPopularDetailItem(null)}
+        onAdd={(item) => handleAdd(item)}
+        onRemove={(item) => handleRemove(item)}
+      />
+
+      {/* ══ CATEGORY ITEM DETAIL MODAL ══════════════════════════════════════ */}
+      <ItemDetailModal
+        item={catDetailItem}
+        qty={catDetailItem ? getCartQty(catDetailItem.id) : 0}
+        onClose={() => setCatDetailItem(null)}
+        onAdd={(item) => handleAdd(item)}
+        onRemove={(item) => handleRemove(item)}
+      />
+
       {/* ══ STORE PICKER MODAL ═════════════════════════════════════════════ */}
       <StorePicker
         visible={pickerVisible}
@@ -3006,6 +3353,23 @@ export default function HomeScreen() {
         vendors={vendors}
         onStoreSelect={handleStoreSelect}
         apiCategories={apiCategories}
+        onItemDetail={(item, product) => {
+          setCatSheetVisible(false);
+          setTimeout(() => {
+            setCatDetailItem({
+              id: product.id,
+              name: product.name,
+              price: product.price,
+              img: product.image_url || null,
+              unit: product.unit || "1 pc",
+              orig: product.mrp && product.mrp > product.price ? product.mrp : null,
+              description: product.description || null,
+              category: catSheetCategory,
+              item_type: product.item_type,
+              weight_options: product.weight_options,
+            });
+          }, 300);
+        }}
       />
 
       {/* <ChatWidget /> */}

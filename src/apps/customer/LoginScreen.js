@@ -185,10 +185,9 @@ export default function LoginScreen({ navigation }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.msg || t("auth.invalidOtp"));
-      login(data.user, data.accessToken, data.refreshToken);
       const addrStore = useAddressStore.getState();
+      await login(data.user, data.accessToken, data.refreshToken);
       await addrStore.loadAddresses(data.accessToken);
-      navigation.replace(ROLE_HOME[selectedRole] || "CustomerApp");
     } catch (e) { setError(e.message); shakeError(); }
     finally { setLoading(false); }
   };

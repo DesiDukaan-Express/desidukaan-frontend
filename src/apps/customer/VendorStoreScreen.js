@@ -316,10 +316,11 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
     ? Math.round((1 - p.price / p.mrp) * 100) : null;
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={pm.backdrop} onPress={onClose}>
         <Pressable style={pm.sheet} onPress={() => { }}>
           <View style={pm.handleWrap}><View style={pm.handle} /></View>
+          <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
           <View style={pm.imgWrap}>
             <Image
               source={{ uri: p.image_url || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=700&q=80" }}
@@ -402,6 +403,7 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
               )}
             </View>
           </View>
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -468,6 +470,13 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
           source={{ uri: p.image_url || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300" }}
           style={pc.img} resizeMode={loose ? "cover" : "contain"}
         />
+        <TouchableOpacity
+          style={pc.eyeBtn}
+          onPress={(e) => { e.stopPropagation?.(); onPress?.(); }}
+          activeOpacity={0.7}
+        >
+          <Feather name="eye" size={14} color={C.white} />
+        </TouchableOpacity>
         {discount && inStock && (
           <View style={pc.discBadge}><Text style={pc.discText}>{discount}% OFF</Text></View>
         )}
@@ -553,10 +562,17 @@ const pc = StyleSheet.create({
   img: { width: "100%", height: "100%" },
   discBadge: { position: "absolute", top: 8, left: 8, backgroundColor: C.orange, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   discText: { fontSize: 9, color: C.white, fontWeight: "800", letterSpacing: 0 },
-  looseBadge: { position: "absolute", top: 8, right: 8, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.88)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, borderWidth: 1, borderColor: C.green },
+  looseBadge: { position: "absolute", top: 44, right: 8, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.88)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, borderWidth: 1, borderColor: C.green },
   looseBadgeText: { fontSize: 9, fontWeight: "800", color: C.cyan },
   oosOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.48)", alignItems: "center", justifyContent: "center" },
   oosText: { fontSize: 11, fontWeight: "800", color: C.white, textAlign: "center" },
+  eyeBtn: {
+    position: "absolute", top: 8, right: 8,
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center", justifyContent: "center",
+    zIndex: 2,
+  },
   info: { padding: 12, flex: 1 },
   name: { fontSize: 16, fontWeight: "800", color: C.gray900, lineHeight: 21, marginBottom: 2 },
   unit: { fontSize: 11, color: C.gray500, marginBottom: 6 },
@@ -950,8 +966,8 @@ export default function VendorStoreScreen() {
         </View>
       </View>
 
-      {/* CATEGORY TABS — hidden on wide screens where sidebar shows */}
-      {!search && categories.length > 0 && !(isWide && categories.length > 2) && (
+      {/* CATEGORY TABS — phones only */}
+      {!isWide && !search && categories.length > 0 && (
         <View style={s.catTabsWrap}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.catTabsRow}>
             {categories.map(cat => (
@@ -968,8 +984,8 @@ export default function VendorStoreScreen() {
 
       {/* PRODUCTS BODY */}
       <View style={s.bodyRow}>
-        {/* Desktop sidebar — category list */}
-        {isWide && categories.length > 1 && (
+        {/* Desktop sidebar — category list (bigger screens only) */}
+        {isWide && categories.length > 0 && (
           <View style={s.sidebar}>
             <ScrollView showsVerticalScrollIndicator={false}>
               {categories.map(cat => {
