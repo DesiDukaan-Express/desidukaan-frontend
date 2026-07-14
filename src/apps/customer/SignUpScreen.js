@@ -14,36 +14,52 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import AddressMapView from "../../components/AddressMapView";
-import { Feather } from "@expo/vector-icons";
+import { Feather, FontAwesome } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import useAuthStore from "../../store/authStore";
+import { useTranslation } from "react-i18next";
+import LanguageSwitcher from "../../components/common/LanguageSwitcher";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+const IS_TESTING = process.env.EXPO_PUBLIC_ENV === "testing";
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
-  orange: "#F97316",
-  orangeDark: "#EA580C",
-  green: "#16A34A",
-  greenDark: "#15803D",
-  greenDeep: "#14532D",
-  greenLight: "#F0FDF4",
-  greenMid: "#DCFCE7",
-  greenBorder: "#BBF7D0",
-  navy: "#1E3A5F",
-  white: "#FFFFFF",
-  gray100: "#F3F4F6",
-  gray200: "#E5E7EB",
-  gray400: "#9CA3AF",
-  gray500: "#6B7280",
-  gray700: "#374151",
-  gray900: "#111827",
-  errorBg: "#FEF2F2",
-  errorBorder: "#FCA5A5",
-  errorText: "#DC2626",
+  // greens (background / brand)
+  greenDeep:    "#04160e",
+  greenDark:    "#093a24",
+  greenMid:     "#0b5133",
+  greenBright:  "#10B981", // Vibrant Emerald Green
+  greenLight:   "#E6FBF0", // Soft Emerald Tint
+  greenBorder:  "#BBF7D0",
+  greenFixed:   "#34D399",
+
+  // oranges (accent / CTA)
+  orange:       "#F97316", // Premium Vibrant Orange
+  orangeDark:   "#C2410C",
+  orangeLight:  "#FFEDD5",
+
+  // neutrals
+  white:        "#FFFFFF",
+  gray100:      "#F9FAFB",
+  gray200:      "#F3F4F6",
+  gray300:      "#E5E7EB",
+  gray400:      "#9CA3AF",
+  gray500:      "#6B7280",
+  gray700:      "#374151",
+  gray900:      "#111827",
+
+  // surface
+  surface:      "#F9FAFB",
+  outline:      "#9CA3AF",
+  outlineVar:   "#D1D5DB",
+
+  // error
+  errorBg:      "#FEF2F2",
+  errorBorder:  "#FCA5A5",
+  errorText:    "#EF4444",
 };
 
 const ROLES = [
@@ -53,9 +69,9 @@ const ROLES = [
 ];
 
 const GENDERS = [
-  { key: "male", label: "Male", icon: "👨" },
-  { key: "female", label: "Female", icon: "👩" },
-  { key: "other", label: "Other", icon: "🧑" },
+  { key: "male", label: "Male", icon: "mars" },
+  { key: "female", label: "Female", icon: "venus" },
+  { key: "other", label: "Other", icon: "genderless" },
 ];
 
 const ROLE_HOME = {
@@ -67,12 +83,12 @@ const ROLE_HOME = {
 const isValidIndianMobile = (num) => /^[6-9]\d{9}$/.test(num);
 
 export default function SignupScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const prefillPhone = route?.params?.phone || "";
   const prefillRole = route?.params?.role || "customer";
 
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState(prefillPhone);
-  const [address, setAddress] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
   const [selectedRole, setSelectedRole] = useState(prefillRole);
@@ -94,10 +110,11 @@ export default function SignupScreen({ navigation, route }) {
     return () => window.removeEventListener("resize", handler);
   }, []);
   const tablet = winW > 600;
-  const hPad = tablet ? 60 : 22;
-  const cardHPad = tablet ? 32 : 20;
-  const brandSize = tablet ? 32 : 26;
-  const headingSize = tablet ? 22 : 20;
+  const mobileSmall = winW < 385;
+  const hPad = tablet ? 60 : mobileSmall ? 10 : 20;
+  const cardHPad = tablet ? 32 : mobileSmall ? 12 : 18;
+  const brandSize = tablet ? 32 : 24;
+  const headingSize = tablet ? 22 : 18;
 
   const login = useAuthStore((state) => state.login);
 
@@ -107,52 +124,6 @@ export default function SignupScreen({ navigation, route }) {
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const stepAnim = useRef(new Animated.Value(0)).current;
   const timerRef = useRef(null);
-
-  const [latitude, setLatitude] = useState(null);
-  const [longitude, setLongitude] = useState(null);
-  const [region, setRegion] = useState({
-    latitude: 28.6139,
-    longitude: 77.2090,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-  });
-
-  const geocodeAddress = async (addr) => {
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1`,
-        { headers: { 'User-Agent': 'DesiDukaan/1.0' } }
-      );
-      const data = await response.json();
-      if (data && data.length > 0) {
-        console.log("Geocoded:", data[0].lat, data[0].lon);
-        return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-      }
-    } catch (error) {
-      console.error("Geocoding error:", error);
-    }
-    return { lat: null, lon: null };
-  };
-
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(async () => {
-      if (address.trim().length >= 5) {
-        console.log("Triggering geocode for:", address.trim());
-        const coords = await geocodeAddress(address.trim());
-        if (coords.lat && coords.lon) {
-          setLatitude(coords.lat);
-          setLongitude(coords.lon);
-          setRegion((prev) => ({
-            ...prev,
-            latitude: coords.lat,
-            longitude: coords.lon,
-          }));
-        }
-      }
-    }, 800);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [address]);
 
   useEffect(() => {
     Animated.stagger(100, [
@@ -218,35 +189,37 @@ export default function SignupScreen({ navigation, route }) {
   const isFormValid =
     name.trim().length >= 2 &&
     isMobileReady &&
-    (selectedRole === 'vendor' || address.trim().length >= 5) &&
     isAgeValid &&
     gender !== "" &&
     agreed;
 
-  // Step 1: register → account saved to DB → OTP sent
+  // Step 1: register → account saved to DB
+  // Testing:    tokens returned directly, navigate to app (no OTP step)
+  // Production: OTP sent, navigate to OTP step
   const handleSignup = async () => {
     if (!isFormValid) return;
     setLoading(true); setError("");
     try {
-      let coords = { lat: null, lon: null };
-      if (address.trim().length >= 5) {
-        coords = await geocodeAddress(address.trim());
-      }
-
       const res = await fetch(`${BASE_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(), phone: mobile,
-          address: address.trim(), age: ageNum,
+          age: ageNum,
           gender, role: selectedRole,
-          latitude: coords.lat,
-          longitude: coords.lon,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.msg || "Registration failed");
-      // Account created in DB + OTP sent → go to OTP step
+
+      // Testing mode: server returns tokens directly
+      if (data.accessToken) {
+        login(data.user, data.accessToken, data.refreshToken);
+        navigation.replace(ROLE_HOME[selectedRole] || "CustomerApp");
+        return;
+      }
+
+      // Production mode: OTP sent — show OTP step
       animateStep(() => {
         setStep("otp");
         setOtp("");
@@ -287,8 +260,13 @@ export default function SignupScreen({ navigation, route }) {
   };
 
   return (
-    <View style={s.root}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.white} />
+    <LinearGradient
+      colors={["#E6FBF0", "#F0FDF4", "#FFFFFF"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={s.root}
+    >
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       <SafeAreaView style={s.safe}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -308,13 +286,18 @@ export default function SignupScreen({ navigation, route }) {
               <Animated.View
                 style={[s.topSection, { opacity: logoAnim, transform: [{ scale: logoAnim }] }]}
               >
+                {/* Language Switcher top-right */}
+                <View style={s.langSwitcherWrap}>
+                  <LanguageSwitcher />
+                </View>
+
                 <View style={s.logoOuter}>
                   <LinearGradient colors={[C.orange, C.orangeDark]} style={s.logoInner}>
-                    <Feather name="shopping-cart" size={22} color={C.white} />
+                    <Feather name="shopping-cart" size={28} color={C.white} />
                   </LinearGradient>
                 </View>
-                <Text style={[s.brandName, { fontSize: brandSize }]}>DesiDukaan</Text>
-                <Text style={s.brandTagline}>Your Neighbourhood, Delivered</Text>
+                <Text style={[s.brandName, { fontSize: brandSize }]}>{t("common.appName")}</Text>
+                <Text style={s.brandTagline}>{t("common.tagline")}</Text>
               </Animated.View>
 
               {/* ── Card — no accent strip ── */}
@@ -348,7 +331,7 @@ export default function SignupScreen({ navigation, route }) {
                             >
                               <Feather name={role.icon} size={12} color={active ? C.white : C.gray500} />
                               <Text style={[s.roleTabText, active && s.roleTabTextActive]}>
-                                {role.label}
+                                {t(`roles.${role.key}`)}
                               </Text>
                             </TouchableOpacity>
                           );
@@ -412,51 +395,11 @@ export default function SignupScreen({ navigation, route }) {
                         </View>
                       </Field>
 
-                      {/* Address */}
 
-                      {
-                        selectedRole !== 'vendor' && 
-                        (
-                          <Field label="Address">
-                            <View style={[
-                              s.inputBox, s.inputBoxMultiline,
-                              focusedField === "address" && s.inputBoxFocused,
-                            ]}>
-                              <View style={[s.inputIconWrap, { alignSelf: "flex-start", paddingTop: 13 }]}>
-                                <Feather name="map-pin" size={14}
-                                  color={focusedField === "address" ? C.green : C.gray400} />
-                              </View>
-                              <TextInput
-                                placeholder="House no., street, area, city"
-                                placeholderTextColor={C.gray400}
-                                autoCapitalize="sentences"
-                                multiline
-                                numberOfLines={3}
-                                value={address}
-                                onChangeText={(t) => { setAddress(t); setError(""); }}
-                                onFocus={() => setFocusedField("address")}
-                                onBlur={() => setFocusedField(null)}
-                                style={[s.fieldInput, s.fieldInputMultiline]}
-                                underlineColorAndroid="transparent"
-                              />
-                            </View>
-                            {address.length > 0 && (
-                              <View style={s.mapWrapper}>
-                                <AddressMapView
-                                  region={region}
-                                  latitude={latitude}
-                                  longitude={longitude}
-                                  onRegionChangeComplete={setRegion}
-                                />
-                              </View>
-                            )}
-                          </Field>
-                        )
-                      }
 
                       {/* Age + Gender */}
-                      <View style={s.rowFields}>
-                        <View style={[s.fieldGroup, { flex: 1, marginRight: 10 }]}>
+                      <View style={tablet ? s.rowFields : s.colFields}>
+                        <View style={[s.fieldGroup, tablet ? { flex: 1, marginRight: 10 } : { width: "100%" }]}>
                           <Text style={s.fieldLabel}>Age</Text>
                           <View style={[
                             s.inputBox,
@@ -480,7 +423,7 @@ export default function SignupScreen({ navigation, route }) {
                           {isAgeError && <Text style={s.fieldError}>Must be 16–100</Text>}
                         </View>
 
-                        <View style={[s.fieldGroup, { flex: 2 }]}>
+                        <View style={[s.fieldGroup, tablet ? { flex: 2 } : { width: "100%" }]}>
                           <Text style={s.fieldLabel}>Gender</Text>
                           <View style={s.genderRow}>
                             {GENDERS.map((g) => {
@@ -492,7 +435,7 @@ export default function SignupScreen({ navigation, route }) {
                                   onPress={() => setGender(g.key)}
                                   activeOpacity={0.7}
                                 >
-                                  <Text style={s.genderEmoji}>{g.icon}</Text>
+                                  <FontAwesome name={g.icon} size={15} color={active ? C.white : C.greenBright} />
                                   <Text style={[s.genderText, active && s.genderTextActive]}>
                                     {g.label}
                                   </Text>
@@ -521,7 +464,7 @@ export default function SignupScreen({ navigation, route }) {
                       {error ? <ErrorBox msg={error} /> : null}
 
                       <GreenCta
-                        label="Create Account & Send OTP"
+                        label={IS_TESTING ? "Create Account" : "Create Account & Send OTP"}
                         loading={loading}
                         disabled={!isFormValid}
                         onPress={handleSignup}
@@ -551,7 +494,7 @@ export default function SignupScreen({ navigation, route }) {
                       </TouchableOpacity>
 
                       <View style={s.successBanner}>
-                        <Feather name="check-circle" size={16} color={C.green} />
+                        <Feather name="check-circle" size={16} color={C.greenBright} />
                         <Text style={s.successText}>
                           Account created! Verify your number to continue.
                         </Text>
@@ -623,16 +566,18 @@ export default function SignupScreen({ navigation, route }) {
                   <Text style={s.legalLink}>Terms</Text> &{" "}
                   <Text style={s.legalLink}>Privacy</Text>
                 </Text>
-                <Text style={s.poweredBy}>
-                  Powered by <Text style={s.poweredByBrand}>Simtrak Solutions</Text>
-                </Text>
+              </View>
+
+              {/* ── Powered by ── */}
+              <View style={s.poweredWrap}>
+                <Text style={s.poweredBy}>{t("common.poweredBy")}</Text>
               </View>
 
             </Animated.View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -653,13 +598,13 @@ function IIcon({ name, focused, error }) {
   return (
     <View style={s.inputIconWrap}>
       <Feather name={name} size={14}
-        color={error ? C.errorText : focused ? C.green : C.gray400} />
+        color={error ? C.errorText : focused ? C.greenBright : C.gray400} />
     </View>
   );
 }
 
 function Check() {
-  return <Feather name="check-circle" size={14} color={C.green} style={{ marginRight: 12 }} />;
+  return <Feather name="check-circle" size={14} color={C.greenBright} style={{ marginRight: 12 }} />;
 }
 
 function GreenCta({ label, loading, disabled, onPress }) {
@@ -671,7 +616,7 @@ function GreenCta({ label, loading, disabled, onPress }) {
       activeOpacity={0.88}
     >
       <LinearGradient
-        colors={!disabled ? [C.green, C.greenDark] : [C.greenMid, C.greenMid]}
+        colors={!disabled ? ["#005e26", "#003d17"] : ["#DCFCE7", "#DCFCE7"]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
         style={s.ctaInner}
       >
@@ -682,7 +627,7 @@ function GreenCta({ label, loading, disabled, onPress }) {
             <Text style={[s.ctaText, disabled && s.ctaTextOff]}>{label}</Text>
             <View style={[s.ctaArrow, disabled && s.ctaArrowOff]}>
               <Feather name="arrow-right" size={14}
-                color={!disabled ? C.white : C.greenBorder} />
+                color={!disabled ? C.white : "#86EFAC"} />
             </View>
           </>
         )}
@@ -702,7 +647,7 @@ function ErrorBox({ msg }) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.white },
+  root: { flex: 1 },
   safe: { flex: 1 },
   kav: { flex: 1 },
   scroll: { flexGrow: 1, paddingTop: 24, paddingBottom: 32 },
@@ -712,26 +657,48 @@ const s = StyleSheet.create({
     width: "100%", maxWidth: 500,
   },
 
-  topSection: { alignItems: "center", marginBottom: 18 },
+  topSection: { alignItems: "center", marginBottom: 18, width: "100%" },
+  langSwitcherWrap: { alignSelf: "flex-end", marginBottom: 12 },
   logoOuter: {
-    width: 56, height: 56, borderRadius: 17,
-    overflow: "hidden", marginBottom: 10,
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    overflow: "hidden",
+    marginBottom: 16,
     shadowColor: C.orange,
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3, shadowRadius: 10, elevation: 7,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
+    elevation: 10,
   },
   logoInner: { flex: 1, alignItems: "center", justifyContent: "center" },
-  brandName: { fontWeight: "900", color: C.greenDeep, letterSpacing: -1 },
-  brandTagline: { fontSize: 12, color: C.gray500, marginTop: 2 },
+  brandName: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: C.greenDeep,
+    letterSpacing: -1.2,
+  },
+  brandTagline: {
+    fontSize: 13,
+    color: C.greenMid,
+    marginTop: 4,
+    opacity: 0.85,
+    letterSpacing: 0.2,
+  },
 
-  // Card — accent strip removed, direct paddingTop instead
   formCard: {
-    backgroundColor: C.white,
-    borderRadius: 20, borderWidth: 1.5, borderColor: C.gray200,
-    overflow: "hidden", paddingBottom: 22, paddingTop: 18,
+    backgroundColor: "rgba(255,255,255,0.98)",
+    borderRadius: 28,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.4)",
+    paddingBottom: 22,
+    paddingTop: 18,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 14, elevation: 4,
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.25,
+    shadowRadius: 40,
+    elevation: 12,
     width: "100%",
   },
 
@@ -752,7 +719,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: C.greenBorder,
     paddingVertical: 10, paddingHorizontal: 14, marginBottom: 16,
   },
-  successText: { fontSize: 13, color: C.greenDark, fontWeight: "600", flex: 1 },
+  successText: { fontSize: 13, color: C.greenBright, fontWeight: "600", flex: 1 },
 
   roleContainer: {
     flexDirection: "row", backgroundColor: C.gray100,
@@ -764,8 +731,8 @@ const s = StyleSheet.create({
     borderRadius: 9, gap: 5,
   },
   roleTabActive: {
-    backgroundColor: C.orange,
-    shadowColor: C.orange,
+    backgroundColor: C.greenBright,
+    shadowColor: C.greenBright,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3, shadowRadius: 5, elevation: 3,
   },
@@ -781,13 +748,16 @@ const s = StyleSheet.create({
   fieldHint: { fontSize: 11, color: C.gray400, marginTop: 4 },
 
   inputBox: {
-    flexDirection: "row", alignItems: "center",
-    backgroundColor: C.greenLight,
-    borderRadius: 12, borderWidth: 1.5, borderColor: C.greenBorder,
-    minHeight: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "rgba(190,202,187,0.5)",
+    minHeight: 54,
   },
-  inputBoxMultiline: { alignItems: "flex-start", minHeight: 80 },
-  inputBoxFocused: { borderColor: C.green, backgroundColor: C.greenMid },
+  inputBoxMultiline: { alignItems: "flex-start", minHeight: 84 },
+  inputBoxFocused: { borderColor: C.greenBright, backgroundColor: C.surface },
   inputBoxError: { borderColor: C.errorBorder, backgroundColor: C.errorBg },
   inputBoxLocked: { backgroundColor: C.gray100, borderColor: C.gray200 },
   inputIconWrap: { width: 42, alignItems: "center", justifyContent: "center" },
@@ -816,8 +786,8 @@ const s = StyleSheet.create({
   prefixDivider: { width: 1, height: 18, backgroundColor: C.greenBorder, marginLeft: 8 },
 
   otpDots: { flexDirection: "row", marginTop: 8, justifyContent: "center" },
-  otpDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.greenMid, marginHorizontal: 3 },
-  otpDotFilled: { backgroundColor: C.green },
+  otpDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.greenLight, marginHorizontal: 3 },
+  otpDotFilled: { backgroundColor: C.greenBright },
   otpDotError: { backgroundColor: C.errorBorder },
 
   resendRow: {
@@ -825,10 +795,11 @@ const s = StyleSheet.create({
     justifyContent: "center", marginBottom: 8,
   },
   resendText: { fontSize: 12, color: C.gray500 },
-  resendLink: { fontSize: 12, color: C.green, fontWeight: "700" },
+  resendLink: { fontSize: 12, color: C.greenBright, fontWeight: "700" },
   resendLinkDisabled: { color: C.gray400 },
 
   rowFields: { flexDirection: "row", alignItems: "flex-start" },
+  colFields: { flexDirection: "column", width: "100%" },
 
   genderRow: { flexDirection: "row", gap: 5 },
   genderChip: {
@@ -836,7 +807,7 @@ const s = StyleSheet.create({
     borderRadius: 12, borderWidth: 1.5,
     borderColor: C.greenBorder, backgroundColor: C.greenLight, gap: 3,
   },
-  genderChipActive: { backgroundColor: C.green, borderColor: C.green },
+  genderChipActive: { backgroundColor: C.greenBright, borderColor: C.greenBright },
   genderEmoji: { fontSize: 15 },
   genderText: { fontSize: 11, color: C.gray500, fontWeight: "600" },
   genderTextActive: { color: C.white, fontWeight: "700" },
@@ -852,9 +823,9 @@ const s = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     marginTop: 1, flexShrink: 0,
   },
-  checkboxActive: { backgroundColor: C.green, borderColor: C.green },
+  checkboxActive: { backgroundColor: C.greenBright, borderColor: C.greenBright },
   checkboxText: { fontSize: 13, color: C.gray500, flex: 1, lineHeight: 20 },
-  checkboxLink: { color: C.green, fontWeight: "700" },
+  checkboxLink: { color: C.greenBright, fontWeight: "700" },
 
   errorBox: {
     flexDirection: "row", alignItems: "center",
@@ -886,11 +857,17 @@ const s = StyleSheet.create({
   orText: { fontSize: 11, color: C.gray400, fontWeight: "500", marginHorizontal: 10 },
 
   loginText: { fontSize: 13, color: C.gray500, textAlign: "center" },
-  loginLink: { color: C.green, fontWeight: "800" },
+  loginLink: { color: C.greenBright, fontWeight: "800" },
 
   footer: { alignItems: "center", marginTop: 20, marginBottom: 8, gap: 5 },
   legalText: { fontSize: 12, color: C.gray500, textAlign: "center", lineHeight: 18 },
   legalLink: { color: C.gray700, fontWeight: "600" },
-  poweredBy: { fontSize: 12, color: C.gray500, textAlign: "center" },
-  poweredByBrand: { fontWeight: "800", color: C.navy },
+  
+  poweredWrap: { alignItems: "center", marginTop: 20 },
+  poweredBy: {
+    fontSize: 11,
+    color: C.greenMid,
+    opacity: 0.55,
+    fontWeight: "500",
+  },
 });

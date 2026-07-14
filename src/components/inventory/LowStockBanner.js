@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { T } from "../common/tokens";
+import { Feather } from "@expo/vector-icons";
 
 export default function LowStockBanner({ stats, onFilterLowStock }) {
   const [dismissed, setDismissed] = useState(false);
@@ -12,7 +13,7 @@ export default function LowStockBanner({ stats, onFilterLowStock }) {
   return (
     <View style={styles.banner}>
       <View style={styles.iconBox}>
-        <Text style={{ fontSize: 18 }}>⚠️</Text>
+        <Feather name="alert-triangle" size={18} color="#F59E0B" />
       </View>
       <View style={styles.body}>
         <Text style={styles.title}>Inventory alert</Text>
@@ -30,7 +31,7 @@ export default function LowStockBanner({ stats, onFilterLowStock }) {
         <Text style={styles.viewBtnText}>View</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={() => setDismissed(true)} style={styles.closeBtn}>
-        <Text style={styles.closeText}>✕</Text>
+        <Feather name="x" size={14} color="#FFF" />
       </TouchableOpacity>
     </View>
   );
