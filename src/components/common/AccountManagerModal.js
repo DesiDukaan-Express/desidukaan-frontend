@@ -41,7 +41,7 @@ const ROLE_INFO = {
 export default function AccountManagerModal({ visible, onClose }) {
   const { t } = useTranslation();
   const navigation = useNavigation();
-  const { user, token, switchRole } = useAuthStore();
+  const { user, token, switchRole, addProfile } = useAuthStore();
   
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,9 +85,17 @@ export default function AccountManagerModal({ visible, onClose }) {
     }
   };
 
-  const handleAddProfile = (role) => {
-    onClose();
-    navigation.navigate("Signup", { phone: user.phone, role });
+  const handleAddProfile = async (role) => {
+    if (switching) return;
+    setSwitching(role);
+    try {
+      await addProfile(role);
+      onClose();
+    } catch (e) {
+      Alert.alert("Failed to add profile", e.message || "Something went wrong");
+    } finally {
+      setSwitching(null);
+    }
   };
 
   const availableRoles = ["customer", "vendor", "delivery"];
@@ -162,8 +170,9 @@ export default function AccountManagerModal({ visible, onClose }) {
                   return (
                     <TouchableOpacity
                       key={role}
-                      style={s.addAccountRow}
+                      style={[s.addAccountRow, switching === role && { opacity: 0.7 }]}
                       onPress={() => handleAddProfile(role)}
+                      disabled={switching !== null}
                       activeOpacity={0.8}
                     >
                       <View style={s.dashedIconBox}>
@@ -173,7 +182,11 @@ export default function AccountManagerModal({ visible, onClose }) {
                         <Text style={s.addAccountLabel}>Add {role.charAt(0).toUpperCase() + role.slice(1)} Profile</Text>
                         <Text style={s.addAccountSub}>Register to use this app as a {role}</Text>
                       </View>
-                      <Feather name="plus" size={16} color={C.greenMid} />
+                      {switching === role ? (
+                        <ActivityIndicator size="small" color={C.greenMid} />
+                      ) : (
+                        <Feather name="plus" size={16} color={C.greenMid} />
+                      )}
                     </TouchableOpacity>
                   );
                 }

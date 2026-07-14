@@ -237,7 +237,7 @@ export default function SignupScreen({ navigation, route }) {
       const res = await fetch(`${BASE_URL}/auth/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: mobile, code: otp }),
+        body: JSON.stringify({ phone: mobile, code: otp, role: selectedRole }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.msg || "Invalid OTP");

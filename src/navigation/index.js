@@ -192,6 +192,7 @@ export default function Navigation() {
               )}
               <Stack.Screen name="Checkout" component={CheckoutScreen} />
               <Stack.Screen name="OrderPlaced" component={OrderPlaced} />
+              <Stack.Screen name="Signup" component={SignupScreen} />
             </>
           )}
       </Stack.Navigator>
