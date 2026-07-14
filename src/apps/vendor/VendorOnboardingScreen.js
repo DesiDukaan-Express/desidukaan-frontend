@@ -10,6 +10,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import useAuthStore from '../../store/authStore';
 import AddressMapView from "../../components/AddressMapView";
 import { uploadAPI } from '../../services/api';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const PRIMARY = '#1ca049';
