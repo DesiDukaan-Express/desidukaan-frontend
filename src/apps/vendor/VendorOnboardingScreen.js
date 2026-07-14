@@ -203,6 +203,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const [loading, setLoading] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [autoApproved, setAutoApproved] = useState(false);
 
   const scrollRef = useRef(null);
 
@@ -561,7 +562,10 @@ export default function VendorOnboardingScreen({ onComplete }) {
       });
 
       const vendorData = await vendorRes.json();
-      if (!vendorRes.ok) throw new Error(vendorData.msg || 'Failed to create shop');
+      if (!vendorRes.ok) throw new Error(vendorData.msg || vendorData.message || 'Failed to create shop');
+
+      // Capture auto-approve flag from backend (response: { data: { vendor: { auto_approved, ... } } })
+      setAutoApproved(vendorData.data?.vendor?.auto_approved === true);
 
       // 3. Create products
       //    Note: we send item_type (DB column name) NOT type, to avoid backend mapping issues
@@ -619,37 +623,68 @@ export default function VendorOnboardingScreen({ onComplete }) {
       <Modal visible={showSuccess} transparent animationType="fade">
         <View style={styles.successOverlay}>
           <View style={styles.successCard}>
-            {/* Green circle icon */}
+            {/* Icon */}
             <View style={styles.successIconWrap}>
               <View style={styles.successIconInner}>
-                <MaterialIcons name="rocket-launch" size={48} color="#16A34A" />
+                <MaterialIcons
+                  name={autoApproved ? 'check-circle' : 'rocket-launch'}
+                  size={48}
+                  color="#16A34A"
+                />
               </View>
             </View>
 
-            <Text style={styles.successTitle}>You're Submitted!</Text>
+            <Text style={styles.successTitle}>
+              {autoApproved ? "You're Live! 🎉" : "You're Submitted!"}
+            </Text>
             <Text style={styles.successSub}>
-              <Text style={{ fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#16A34A' }}>{shopName || 'Your shop'}</Text> is under review.
+              <Text style={{ fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#16A34A' }}>
+                {shopName || 'Your shop'}
+              </Text>
+              {autoApproved
+                ? ' is now live and ready to accept orders!'
+                : ' is under review.'}
             </Text>
             <Text style={styles.successDesc}>
-              Our team will verify your FSSAI & GST details within{' '}
-              <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>24–48 hours</Text>. You'll get an
-              email notification once approved and live.
+              {autoApproved
+                ? 'Your shop has been instantly approved. Customers can now find and order from your store.'
+                : <>
+                    Our team will verify your FSSAI &amp; GST details within{' '}
+                    <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>24–48 hours</Text>. You'll get an
+                    email notification once approved and live.
+                  </>
+              }
             </Text>
 
             {/* Timeline */}
-            {[
-              { icon: 'assignment', label: 'Application submitted', done: true },
-              { icon: 'search', label: 'Admin verification (24–48 hrs)', done: false },
-              { icon: 'check-circle', label: 'Shop goes live!', done: false },
-            ].map((step, i) => (
-              <View key={i} style={styles.successStep}>
-                <MaterialIcons name={step.icon} size={18} color={step.done ? '#16A34A' : '#9CA3AF'} style={{ marginRight: 8 }} />
-                <Text style={[styles.successStepText, step.done && { color: '#16A34A', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }]}>
-                  {step.label}
-                </Text>
-                {step.done && <MaterialIcons name="check" size={14} color="#16A34A" style={{ marginLeft: 'auto' }} />}
-              </View>
-            ))}
+            {autoApproved
+              ? [
+                  { icon: 'assignment', label: 'Application submitted', done: true },
+                  { icon: 'check-circle', label: 'Auto-approved instantly', done: true },
+                  { icon: 'store', label: 'Shop is live!', done: true },
+                ].map((step, i) => (
+                  <View key={i} style={styles.successStep}>
+                    <MaterialIcons name={step.icon} size={18} color="#16A34A" style={{ marginRight: 8 }} />
+                    <Text style={[styles.successStepText, { color: '#16A34A', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }]}>
+                      {step.label}
+                    </Text>
+                    <MaterialIcons name="check" size={14} color="#16A34A" style={{ marginLeft: 'auto' }} />
+                  </View>
+                ))
+              : [
+                  { icon: 'assignment', label: 'Application submitted', done: true },
+                  { icon: 'search', label: 'Admin verification (24–48 hrs)', done: false },
+                  { icon: 'check-circle', label: 'Shop goes live!', done: false },
+                ].map((step, i) => (
+                  <View key={i} style={styles.successStep}>
+                    <MaterialIcons name={step.icon} size={18} color={step.done ? '#16A34A' : '#9CA3AF'} style={{ marginRight: 8 }} />
+                    <Text style={[styles.successStepText, step.done && { color: '#16A34A', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }]}>
+                      {step.label}
+                    </Text>
+                    {step.done && <MaterialIcons name="check" size={14} color="#16A34A" style={{ marginLeft: 'auto' }} />}
+                  </View>
+                ))
+            }
 
             <TouchableOpacity
               style={styles.successBtn}
