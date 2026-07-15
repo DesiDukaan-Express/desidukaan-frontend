@@ -1135,21 +1135,15 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
       snapshotSubtotal: orderSubtotalSnapshot,
     });
 
-    setOrderId(null);
-    setOrderStatus("idle");
-    setNegotiationModalVisible(false);
+    // Keep customer on the screen so the countdown timer + counter-offer modal stays visible
+    setOrderId(order.id);
+    setOrderStatus("pending");  // triggers the 90s countdown & modal
+    setNegotiationModalVisible(true);
     setPlacing(false);
 
     cart?.clearCart?.();
 
-    showToast("Order sent to the store. You can keep browsing while they respond.", "success");
-
-    navigation.replace("CustomerApp", {
-        screen: "CustomerTabNavigator",
-        params: {
-            screen: "Home",
-        },
-    });
+    showToast("Order sent! Waiting for store to respond...", "success");
 } else {
         console.log("ORDER CREATION FAILED", data); // LOG ERROR DATA
         setErrorMsg(
@@ -2204,12 +2198,28 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             )}
 
             {orderStatus === "pending" && (
-              <View style={negModal.pendingNote}>
-                <Feather name="info" size={13} color={C.amber} />
-                <Text style={negModal.pendingNoteText}>
-                  You can keep browsing while the store responds. We will notify you here.
-                </Text>
-              </View>
+              <>
+                <View style={negModal.pendingNote}>
+                  <Feather name="info" size={13} color={C.amber} />
+                  <Text style={negModal.pendingNoteText}>
+                    Waiting for store response. Timer is running — we'll alert you here.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[negModal.proceedBtn, { backgroundColor: C.gray600, marginTop: 10 }]}
+                  onPress={() => {
+                    setNegotiationModalVisible(false);
+                    navigation.navigate("CustomerApp", {
+                      screen: "CustomerTabNavigator",
+                      params: { screen: "Home" },
+                    });
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Feather name="home" size={16} color={C.white} />
+                  <Text style={negModal.proceedBtnText}>Browse while waiting</Text>
+                </TouchableOpacity>
+              </>
             )}
           </Pressable>
         </Pressable>
