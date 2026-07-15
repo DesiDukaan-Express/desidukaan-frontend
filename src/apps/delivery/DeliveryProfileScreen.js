@@ -11,6 +11,7 @@ import {
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import useAuthStore from '../../store/authStore';
+import AccountManagerModal from '../../components/common/AccountManagerModal';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 
@@ -85,6 +86,7 @@ export default function DeliveryProfileScreen({ navigation }) {
   const [stats,   setStats]   = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showAccountManager, setShowAccountManager] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -248,6 +250,11 @@ export default function DeliveryProfileScreen({ navigation }) {
             </TouchableOpacity>
           )}
 
+          {/* ── Manage Accounts ── */}
+          <TouchableOpacity style={p.manageBtn} onPress={() => setShowAccountManager(true)} activeOpacity={0.8}>
+            <Text style={p.manageText}>Manage Accounts</Text>
+          </TouchableOpacity>
+
           {/* ── Log out ── */}
           <TouchableOpacity style={p.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
             <Text style={p.logoutText}>Log out</Text>
@@ -257,6 +264,11 @@ export default function DeliveryProfileScreen({ navigation }) {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      <AccountManagerModal
+        visible={showAccountManager}
+        onClose={() => setShowAccountManager(false)}
+      />
     </View>
   );
 }
@@ -321,4 +333,10 @@ const p = StyleSheet.create({
     marginTop: 4,
   },
   logoutText: { fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: C.red },
+  manageBtn: {
+    borderRadius: 16, paddingVertical: 14, alignItems: 'center',
+    borderWidth: 1.5, borderColor: '#50C878' + '40', backgroundColor: C.white,
+    marginTop: 12,
+  },
+  manageText: { fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: C.greenDark },
 });
