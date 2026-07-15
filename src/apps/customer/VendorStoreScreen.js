@@ -306,6 +306,35 @@ const wp = StyleSheet.create({
 // ─── Product Detail Modal ────────────────────────────────────────────────── //
 // ═══════════════════════════════════════════════════════════════════════════ //
 function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker }) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.88)).current;
+  const slideAnim = useRef(new Animated.Value(40)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (item) {
+      fadeAnim.setValue(0);
+      scaleAnim.setValue(0.88);
+      slideAnim.setValue(40);
+      backdropOpacity.setValue(0);
+      Animated.parallel([
+        Animated.timing(backdropOpacity, { toValue: 1, duration: 320, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, tension: 55, friction: 9, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 0, tension: 55, friction: 9, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [item]);
+
+  const handleClose = () => {
+    Animated.parallel([
+      Animated.timing(backdropOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+      Animated.timing(scaleAnim, { toValue: 0.92, duration: 220, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 25, duration: 220, useNativeDriver: true }),
+    ]).start(() => onClose());
+  };
+
   if (!item) return null;
   const p = item.product || {};
   const catName = p.category?.name || p.category || "Other";
@@ -316,132 +345,166 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
     ? Math.round((1 - p.price / p.mrp) * 100) : null;
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={pm.backdrop} onPress={onClose}>
-        <Pressable style={pm.sheet} onPress={() => { }}>
-          <View style={pm.handleWrap}><View style={pm.handle} /></View>
-          <View style={pm.imgWrap}>
-            <Image
-              source={{ uri: p.image_url || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=700&q=80" }}
-              style={pm.img} resizeMode="cover"
-            />
-            <LinearGradient colors={["transparent", "rgba(0,0,0,0.3)"]} style={StyleSheet.absoluteFillObject} />
-            <TouchableOpacity style={pm.closeBtn} onPress={onClose}>
-              <Feather name="x" size={16} color={C.white} />
-            </TouchableOpacity>
-            <View style={[pm.catBadge, { backgroundColor: meta.bg }]}>
-              <Text>{meta.emoji}</Text>
-              <Text style={[pm.catBadgeText, { color: meta.accent }]}>{catName}</Text>
+    <Modal visible transparent onRequestClose={handleClose} statusBarTranslucent animationType="none">
+      <Animated.View style={[pm.backdropLayer, { opacity: backdropOpacity }]} />
+      <Animated.View style={[pm.backdropBlur, { opacity: backdropOpacity }]} />
+      <Pressable style={pm.backdropPress} onPress={handleClose}>
+        <Animated.View style={[pm.backdropOverlay, { opacity: fadeAnim }]} />
+      </Pressable>
+      <View style={pm.centerWrap} pointerEvents="box-none">
+        <Animated.View style={[pm.card, {
+          transform: [{ scale: scaleAnim }, { translateY: slideAnim }],
+          opacity: fadeAnim,
+        }]}>
+          <ScrollView showsVerticalScrollIndicator={false} bounces={false} style={{ maxHeight: "100%" }}>
+            <View style={pm.imgWrap}>
+              <Image
+                source={{ uri: p.image_url || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=700&q=80" }}
+                style={pm.img} resizeMode="cover"
+              />
+              <LinearGradient colors={["transparent", "rgba(0,0,0,0.06)", "rgba(0,0,0,0.5)"]} style={StyleSheet.absoluteFillObject} />
+              <TouchableOpacity style={pm.closeBtn} onPress={handleClose} activeOpacity={0.7}>
+                <Feather name="x" size={16} color={C.white} />
+              </TouchableOpacity>
+              <View style={[pm.catBadge, { backgroundColor: meta.bg }]}>
+                <Text>{meta.emoji}</Text>
+                <Text style={[pm.catBadgeText, { color: meta.accent }]}>{catName}</Text>
+              </View>
+              {loose && (
+                <View style={pm.looseBadge}>
+                  <Feather name="droplet" size={9} color={C.cyan} />
+                  <Text style={pm.looseBadgeText}>Loose</Text>
+                </View>
+              )}
+              {discount && <View style={pm.discBadge}><Text style={pm.discText}>{discount}% OFF</Text></View>}
+              {!inStock && <View style={pm.oosLayer}><Text style={pm.oosLayerText}>Out of Stock</Text></View>}
+              <View style={pm.priceOnImg}>
+                <Text style={pm.priceOnImgText}>₹{p.price}</Text>
+                {p.mrp && p.mrp > p.price && <Text style={pm.mrpOnImgText}>₹{p.mrp}</Text>}
+              </View>
             </View>
-            {loose && (
-              <View style={pm.looseBadge}>
-                <Feather name="droplet" size={9} color={C.cyan} />
-                <Text style={pm.looseBadgeText}>Loose</Text>
-              </View>
-            )}
-            {discount && <View style={pm.discBadge}><Text style={pm.discText}>{discount}% off</Text></View>}
-            {!inStock && <View style={pm.oosLayer}><Text style={pm.oosLayerText}>Out of Stock</Text></View>}
-          </View>
-          <View style={pm.body}>
-            {item.stock_qty > 0 && item.stock_qty <= 10 && (
-              <View style={pm.lowBanner}>
-                <Feather name="alert-circle" size={13} color="#D97706" />
-                <Text style={pm.lowBannerText}>Only {item.stock_qty} left — order soon!</Text>
-              </View>
-            )}
-            <Text style={pm.name}>{p.name}</Text>
-            <Text style={pm.unit}>{p.unit || "1 pc"}</Text>
-            {loose && (
-              <View style={pm.looseNote}>
-                <Feather name="droplet" size={12} color={C.cyan} />
-                <Text style={pm.looseNoteText}>
-                  Sold loose. Select your quantity (e.g. 100g, 500g, 1kg).
-                </Text>
-              </View>
-            )}
-            {p.description ? <Text style={pm.desc}>{p.description}</Text> : null}
-            <View style={pm.footer}>
-              <View>
-                <Text style={pm.price}>₹{p.price}</Text>
-                {p.mrp && p.mrp > p.price && (
-                  <>
-                    <Text style={pm.mrp}>MRP ₹{p.mrp}</Text>
-                    <View style={pm.savePill}><Text style={pm.savePillText}>Save ₹{p.mrp - p.price}</Text></View>
-                  </>
+            <View style={pm.body}>
+              {item.stock_qty > 0 && item.stock_qty <= 10 && (
+                <View style={pm.lowBanner}>
+                  <Feather name="alert-circle" size={13} color="#D97706" />
+                  <Text style={pm.lowBannerText}>Only {item.stock_qty} left — order soon!</Text>
+                </View>
+              )}
+              <Text style={pm.name}>{p.name}</Text>
+              <Text style={pm.unit}>{p.unit || "1 pc"}</Text>
+              {loose && (
+                <View style={pm.looseNote}>
+                  <Feather name="droplet" size={12} color={C.cyan} />
+                  <Text style={pm.looseNoteText}>
+                    Sold loose. Select your quantity (e.g. 100g, 500g, 1kg).
+                  </Text>
+                </View>
+              )}
+              {p.description ? (
+                <View style={pm.descBox}>
+                  <Text style={pm.descLabel}>Description</Text>
+                  <Text style={pm.descText}>{p.description}</Text>
+                </View>
+              ) : null}
+              {discount && (
+                <View style={pm.savingsPill}>
+                  <MaterialIcons name="savings" size={14} color="#D97706" />
+                  <Text style={pm.savingsText}>You save ₹{p.mrp - p.price} per item</Text>
+                </View>
+              )}
+              <View style={pm.actionRow}>
+                <View>
+                  <Text style={pm.totalLabel}>TOTAL</Text>
+                  <Text style={pm.totalPrice}>₹{p.price}</Text>
+                </View>
+                {inStock ? (
+                  loose ? (
+                    <TouchableOpacity
+                      style={pm.addBtn}
+                      onPress={() => { handleClose(); onOpenWeightPicker(item); }}
+                      activeOpacity={0.85}
+                    >
+                      <Feather name="sliders" size={15} color={C.white} />
+                      <Text style={pm.addBtnText}>Select Weight</Text>
+                    </TouchableOpacity>
+                  ) : qty === 0 ? (
+                    <TouchableOpacity style={pm.addBtn} onPress={() => { onAdd(item); handleClose(); }} activeOpacity={0.85}>
+                      <MaterialIcons name="shopping-cart" size={16} color="#fff" />
+                      <Text style={pm.addBtnText}>Add to Cart</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={pm.qtyRow}>
+                      <TouchableOpacity style={pm.qtyBtn} onPress={() => onRemove(item)}>
+                        <Feather name="minus" size={15} color="#fff" />
+                      </TouchableOpacity>
+                      <Text style={pm.qtyNum}>{qty}</Text>
+                      <TouchableOpacity style={pm.qtyBtn} onPress={() => onAdd(item)}>
+                        <Feather name="plus" size={15} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  )
+                ) : (
+                  <View style={pm.oosBtn}><Text style={pm.oosBtnText}>Out of Stock</Text></View>
                 )}
               </View>
-              {inStock ? (
-                loose ? (
-                  // Loose — always open weight picker
-                  <TouchableOpacity
-                    style={pm.addBtn}
-                    onPress={() => { onClose(); onOpenWeightPicker(item); }}
-                    activeOpacity={0.85}
-                  >
-                    <Feather name="sliders" size={15} color={C.white} />
-                    <Text style={pm.addBtnText}>Select Weight</Text>
-                  </TouchableOpacity>
-                ) : qty === 0 ? (
-                  <TouchableOpacity style={pm.addBtn} onPress={() => { onAdd(item); onClose(); }} activeOpacity={0.85}>
-                    <Text style={pm.addBtnText}>Add to Cart</Text>
-                    <Feather name="shopping-cart" size={15} color={C.white} />
-                  </TouchableOpacity>
-                ) : (
-                  <View style={pm.qtyRow}>
-                    <TouchableOpacity style={pm.qtyBtn} onPress={() => onRemove(item)}>
-                      <Feather name="minus" size={15} color={C.white} />
-                    </TouchableOpacity>
-                    <Text style={pm.qtyNum}>{qty}</Text>
-                    <TouchableOpacity style={pm.qtyBtn} onPress={() => onAdd(item)}>
-                      <Feather name="plus" size={15} color={C.white} />
-                    </TouchableOpacity>
-                  </View>
-                )
-              ) : (
-                <View style={pm.oosBtn}><Text style={pm.oosBtnText}>Out of Stock</Text></View>
-              )}
             </View>
-          </View>
-        </Pressable>
-      </Pressable>
+          </ScrollView>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
 const pm = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: C.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: "hidden", maxHeight: "88%" },
-  handleWrap: { alignItems: "center", paddingTop: 10, paddingBottom: 4, backgroundColor: C.white },
-  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2 },
-  imgWrap: { width: "100%", height: 230 },
+  backdropLayer: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.75)" },
+  backdropBlur: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(15,15,30,0.35)" },
+  backdropPress: { ...StyleSheet.absoluteFillObject },
+  backdropOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.15)" },
+  centerWrap: { ...StyleSheet.absoluteFillObject, justifyContent: "center", alignItems: "center", padding: 24 },
+  card: {
+    width: "100%", maxWidth: 380, maxHeight: "80%", backgroundColor: C.white,
+    borderRadius: 24, overflow: "hidden",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.32, shadowRadius: 32, elevation: 20,
+  },
+  imgWrap: { width: "100%", height: 200, backgroundColor: "#F3F4F5", position: "relative" },
   img: { width: "100%", height: "100%" },
-  closeBtn: { position: "absolute", top: 14, right: 14, width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(0,0,0,0.42)", alignItems: "center", justifyContent: "center" },
+  closeBtn: {
+    position: "absolute", top: 12, right: 12, width: 34, height: 34, borderRadius: 17,
+    backgroundColor: "rgba(0,0,0,0.45)", borderWidth: 1, borderColor: "rgba(255,255,255,0.2)",
+    alignItems: "center", justifyContent: "center",
+  },
   catBadge: { position: "absolute", bottom: 12, left: 12, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   catBadgeText: { fontSize: 12, fontWeight: "700" },
-  looseBadge: { position: "absolute", top: 12, right: 12, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(236,254,255,0.92)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
+  looseBadge: { position: "absolute", top: 12, right: 52, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(236,254,255,0.92)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
   looseBadgeText: { fontSize: 10, fontWeight: "800", color: C.cyan },
-  discBadge: { position: "absolute", top: 14, left: 14, backgroundColor: C.orange, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 },
+  discBadge: { position: "absolute", top: 12, left: 12, backgroundColor: C.orange, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, shadowColor: C.orange, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 6, elevation: 5 },
   discText: { fontSize: 11, color: C.white, fontWeight: "800" },
   oosLayer: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.52)", alignItems: "center", justifyContent: "center" },
   oosLayerText: { fontSize: 20, fontWeight: "900", color: C.white, letterSpacing: 1 },
+  priceOnImg: { position: "absolute", bottom: 12, left: 16, flexDirection: "row", alignItems: "baseline", gap: 6 },
+  priceOnImgText: { fontSize: 30, fontWeight: "900", color: C.white, textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10 },
+  mrpOnImgText: { fontSize: 14, color: "rgba(255,255,255,0.55)", textDecorationLine: "line-through" },
   body: { padding: 20 },
   lowBanner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FEF3C7", borderRadius: 10, padding: 10, marginBottom: 12 },
   lowBannerText: { fontSize: 13, color: "#92400E", fontWeight: "600", flex: 1 },
-  name: { fontSize: 22, fontWeight: "900", color: C.gray900, marginBottom: 3 },
-  unit: { fontSize: 14, color: C.gray400, marginBottom: 10 },
+  name: { fontSize: 20, fontWeight: "900", color: C.gray900, lineHeight: 26, marginBottom: 4 },
+  unit: { fontSize: 13, color: C.gray400, fontWeight: "500", marginBottom: 14 },
   looseNote: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.cyanLight, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 12 },
   looseNoteText: { fontSize: 12, color: C.cyan, fontWeight: "600", flex: 1 },
-  desc: { fontSize: 14, color: C.gray500, lineHeight: 21, marginBottom: 12 },
-  footer: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", paddingTop: 16, borderTopWidth: 1, borderTopColor: C.gray100 },
-  price: { fontSize: 27, fontWeight: "900", color: C.gray900 },
-  mrp: { fontSize: 13, color: C.gray400, textDecorationLine: "line-through", marginTop: 2 },
-  savePill: { backgroundColor: C.greenMid, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, alignSelf: "flex-start", marginTop: 4 },
-  savePillText: { fontSize: 11, color: C.green, fontWeight: "700" },
-  addBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.green, paddingHorizontal: 22, paddingVertical: 14, borderRadius: 15 },
-  addBtnText: { fontSize: 16, fontWeight: "800", color: C.white },
-  qtyRow: { flexDirection: "row", alignItems: "center", backgroundColor: C.green, borderRadius: 15, overflow: "hidden" },
-  qtyBtn: { paddingHorizontal: 16, paddingVertical: 13 },
-  qtyNum: { fontSize: 18, fontWeight: "900", color: C.white, minWidth: 32, textAlign: "center" },
-  oosBtn: { backgroundColor: C.gray200, paddingHorizontal: 20, paddingVertical: 14, borderRadius: 15 },
+  descBox: { backgroundColor: C.greenLight, borderRadius: 14, padding: 14, marginBottom: 14, borderLeftWidth: 3.5, borderLeftColor: C.green },
+  descLabel: { fontSize: 10, fontWeight: "800", color: C.green, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 },
+  descText: { fontSize: 13.5, color: C.gray600, lineHeight: 20 },
+  savingsPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#FEF3C7", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 16 },
+  savingsText: { fontSize: 12.5, color: "#92400E", fontWeight: "700" },
+  actionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 16, borderTopWidth: 1, borderTopColor: C.gray100 },
+  totalLabel: { fontSize: 10, color: C.gray400, fontWeight: "600", marginBottom: 2 },
+  totalPrice: { fontSize: 26, fontWeight: "900", color: C.green },
+  addBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.green, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14, shadowColor: C.green, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
+  addBtnText: { fontSize: 15, fontWeight: "800", color: "#fff" },
+  qtyRow: { flexDirection: "row", alignItems: "center", backgroundColor: C.green, borderRadius: 14, overflow: "hidden", shadowColor: C.green, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
+  qtyBtn: { paddingHorizontal: 18, paddingVertical: 13 },
+  qtyNum: { fontSize: 16, fontWeight: "900", color: "#fff", minWidth: 34, textAlign: "center" },
+  oosBtn: { backgroundColor: C.gray200, paddingHorizontal: 20, paddingVertical: 14, borderRadius: 14 },
   oosBtnText: { fontSize: 15, fontWeight: "700", color: C.gray500 },
 });
 
@@ -468,6 +531,13 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
           source={{ uri: p.image_url || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300" }}
           style={pc.img} resizeMode={loose ? "cover" : "contain"}
         />
+        <TouchableOpacity
+          style={pc.eyeBtn}
+          onPress={(e) => { e.stopPropagation?.(); onPress?.(); }}
+          activeOpacity={0.7}
+        >
+          <Feather name="eye" size={14} color={C.white} />
+        </TouchableOpacity>
         {discount && inStock && (
           <View style={pc.discBadge}><Text style={pc.discText}>{discount}% OFF</Text></View>
         )}
@@ -553,10 +623,17 @@ const pc = StyleSheet.create({
   img: { width: "100%", height: "100%" },
   discBadge: { position: "absolute", top: 8, left: 8, backgroundColor: C.orange, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   discText: { fontSize: 9, color: C.white, fontWeight: "800", letterSpacing: 0 },
-  looseBadge: { position: "absolute", top: 8, right: 8, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.88)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, borderWidth: 1, borderColor: C.green },
+  looseBadge: { position: "absolute", top: 44, right: 8, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.88)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, borderWidth: 1, borderColor: C.green },
   looseBadgeText: { fontSize: 9, fontWeight: "800", color: C.cyan },
   oosOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.48)", alignItems: "center", justifyContent: "center" },
   oosText: { fontSize: 11, fontWeight: "800", color: C.white, textAlign: "center" },
+  eyeBtn: {
+    position: "absolute", top: 8, right: 8,
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center", justifyContent: "center",
+    zIndex: 2,
+  },
   info: { padding: 12, flex: 1 },
   name: { fontSize: 16, fontWeight: "800", color: C.gray900, lineHeight: 21, marginBottom: 2 },
   unit: { fontSize: 11, color: C.gray500, marginBottom: 6 },
@@ -1051,8 +1128,8 @@ export default function VendorStoreScreen() {
 
       {/* PRODUCTS BODY */}
       <View style={s.bodyRow}>
-        {/* Desktop sidebar — category list */}
-        {isWide && categories.length > 1 && (
+        {/* Desktop sidebar — category list (bigger screens only) */}
+        {isWide && categories.length > 0 && (
           <View style={s.sidebar}>
             <ScrollView showsVerticalScrollIndicator={false}>
               {categories.map(cat => {
