@@ -10,6 +10,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import useAuthStore from '../../store/authStore';
 import AddressMapView from "../../components/AddressMapView";
 import { uploadAPI } from '../../services/api';
+import { MaterialIcons } from '@expo/vector-icons';
+import AccountManagerModal from '../../components/common/AccountManagerModal';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const PRIMARY = '#1ca049';
@@ -203,8 +205,30 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const [loading, setLoading] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [autoApproved, setAutoApproved] = useState(false);
+  const [accountModalVisible, setAccountModalVisible] = useState(false);
+  const [hasOtherProfiles, setHasOtherProfiles] = useState(false);
 
   const scrollRef = useRef(null);
+
+  // Check if user has other profiles to switch to (only show switcher if yes)
+  useEffect(() => {
+    const checkProfiles = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/auth/profiles`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (res.ok) {
+          const others = (data.profiles || []).filter(
+            (p) => p.role !== (user?.role || 'vendor')
+          );
+          setHasOtherProfiles(others.length > 0);
+        }
+      } catch (_) { /* silently fail */ }
+    };
+    checkProfiles();
+  }, [token]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -561,7 +585,10 @@ export default function VendorOnboardingScreen({ onComplete }) {
       });
 
       const vendorData = await vendorRes.json();
-      if (!vendorRes.ok) throw new Error(vendorData.msg || 'Failed to create shop');
+      if (!vendorRes.ok) throw new Error(vendorData.msg || vendorData.message || 'Failed to create shop');
+
+      // Capture auto-approve flag from backend (response: { data: { vendor: { auto_approved, ... } } })
+      setAutoApproved(vendorData.data?.vendor?.auto_approved === true);
 
       // 3. Create products
       //    Note: we send item_type (DB column name) NOT type, to avoid backend mapping issues
@@ -615,48 +642,90 @@ export default function VendorOnboardingScreen({ onComplete }) {
   return (
     <View style={styles.container}>
 
+      {/* Account Switcher Modal — only if other profiles exist */}
+      {hasOtherProfiles && (
+        <AccountManagerModal
+          visible={accountModalVisible}
+          onClose={() => setAccountModalVisible(false)}
+        />
+      )}
+
       {/* ── SUCCESS POPUP ── */}
       <Modal visible={showSuccess} transparent animationType="fade">
         <View style={styles.successOverlay}>
           <View style={styles.successCard}>
-            {/* Green circle icon */}
+            {/* Icon */}
             <View style={styles.successIconWrap}>
               <View style={styles.successIconInner}>
-                <MaterialIcons name="rocket-launch" size={48} color="#16A34A" />
+                <MaterialIcons
+                  name={autoApproved ? 'check-circle' : 'rocket-launch'}
+                  size={48}
+                  color="#16A34A"
+                />
               </View>
             </View>
 
-            <Text style={styles.successTitle}>You're Submitted!</Text>
+            <Text style={styles.successTitle}>
+              {autoApproved ? "You're Live! 🎉" : "You're Submitted!"}
+            </Text>
             <Text style={styles.successSub}>
-              <Text style={{ fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#16A34A' }}>{shopName || 'Your shop'}</Text> is under review.
+              <Text style={{ fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#16A34A' }}>
+                {shopName || 'Your shop'}
+              </Text>
+              {autoApproved
+                ? ' is now live and ready to accept orders!'
+                : ' is under review.'}
             </Text>
             <Text style={styles.successDesc}>
-              Our team will verify your FSSAI & GST details within{' '}
-              <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>24–48 hours</Text>. You'll get an
-              email notification once approved and live.
+              {autoApproved
+                ? 'Your shop has been instantly approved. Customers can now find and order from your store.'
+                : <>
+                    Our team will verify your FSSAI &amp; GST details within{' '}
+                    <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>24–48 hours</Text>. You'll get an
+                    email notification once approved and live.
+                  </>
+              }
             </Text>
 
             {/* Timeline */}
-            {[
-              { icon: 'assignment', label: 'Application submitted', done: true },
-              { icon: 'search', label: 'Admin verification (24–48 hrs)', done: false },
-              { icon: 'check-circle', label: 'Shop goes live!', done: false },
-            ].map((step, i) => (
-              <View key={i} style={styles.successStep}>
-                <MaterialIcons name={step.icon} size={18} color={step.done ? '#16A34A' : '#9CA3AF'} style={{ marginRight: 8 }} />
-                <Text style={[styles.successStepText, step.done && { color: '#16A34A', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }]}>
-                  {step.label}
-                </Text>
-                {step.done && <MaterialIcons name="check" size={14} color="#16A34A" style={{ marginLeft: 'auto' }} />}
-              </View>
-            ))}
+            {autoApproved
+              ? [
+                  { icon: 'assignment', label: 'Application submitted', done: true },
+                  { icon: 'check-circle', label: 'Auto-approved instantly', done: true },
+                  { icon: 'store', label: 'Shop is live!', done: true },
+                ].map((step, i) => (
+                  <View key={i} style={styles.successStep}>
+                    <MaterialIcons name={step.icon} size={18} color="#16A34A" style={{ marginRight: 8 }} />
+                    <Text style={[styles.successStepText, { color: '#16A34A', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }]}>
+                      {step.label}
+                    </Text>
+                    <MaterialIcons name="check" size={14} color="#16A34A" style={{ marginLeft: 'auto' }} />
+                  </View>
+                ))
+              : [
+                  { icon: 'assignment', label: 'Application submitted', done: true },
+                  { icon: 'search', label: 'Admin verification (24–48 hrs)', done: false },
+                  { icon: 'check-circle', label: 'Shop goes live!', done: false },
+                ].map((step, i) => (
+                  <View key={i} style={styles.successStep}>
+                    <MaterialIcons name={step.icon} size={18} color={step.done ? '#16A34A' : '#9CA3AF'} style={{ marginRight: 8 }} />
+                    <Text style={[styles.successStepText, step.done && { color: '#16A34A', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }]}>
+                      {step.label}
+                    </Text>
+                    {step.done && <MaterialIcons name="check" size={14} color="#16A34A" style={{ marginLeft: 'auto' }} />}
+                  </View>
+                ))
+            }
 
             <TouchableOpacity
               style={styles.successBtn}
-              onPress={() => { setShowSuccess(false); navigation.navigate('Dashboard'); }}
+              onPress={() => {
+                setShowSuccess(false);
+                if (onComplete) onComplete();
+              }}
               activeOpacity={0.88}
             >
-              <Text style={styles.successBtnText}>Go to Dashboard →</Text>
+              <Text style={styles.successBtnText}>Continue →</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -664,13 +733,26 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
       {/* Top bar */}
       <View style={styles.topBar}>
-        <View style={styles.brandRow}>
-          <MaterialIcons name="storefront" size={24} color={PRIMARY} style={{ marginRight: 6 }} />
+        {/* Account Switcher pill — only visible when user has other profiles to switch to */}
+        {hasOtherProfiles && (
+          <TouchableOpacity
+            onPress={() => setAccountModalVisible(true)}
+            style={styles.switchAccountBtn}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="account-circle" size={16} color={PRIMARY} />
+            <Text style={styles.switchAccountTxt}>Switch</Text>
+          </TouchableOpacity>
+        )}
+
+        <View style={[styles.brandRow, { flex: 1, justifyContent: 'center' }]}>
+          <MaterialIcons name="storefront" size={20} color={PRIMARY} style={{ marginRight: 5 }} />
           <View>
-            <Text style={styles.brandName}>DesiDukaan</Text>
-            <Text style={styles.brandSub}>Seller Registration</Text>
+            <Text style={[styles.brandName, { fontSize: 13 }]}>DesiDukaan</Text>
+            <Text style={[styles.brandSub, { fontSize: 10 }]}>Vendor Account • Setup</Text>
           </View>
         </View>
+
         <Text style={styles.stepCount}>{currentStep} of {STEPS.length}</Text>
       </View>
 
@@ -1374,6 +1456,14 @@ const styles = StyleSheet.create({
   brandName: { fontSize: 17, fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#fff' },
   brandSub: { fontSize: 11, color: 'rgba(255,255,255,0.75)' },
   stepCount: { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" },
+  switchAccountBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)',
+    marginRight: 4,
+  },
+  switchAccountTxt: { fontSize: 11, color: '#fff', fontWeight: '700', letterSpacing: 0.3 },
 
   progressTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.25)' },
   progressFill: { height: 3, backgroundColor: '#fff' },

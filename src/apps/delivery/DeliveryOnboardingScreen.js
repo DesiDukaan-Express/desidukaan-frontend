@@ -16,12 +16,13 @@
  *  6. Education & Training
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import useAuthStore from '../../store/authStore';
 import { uploadAPI, deliveryAPI } from '../../services/api';
+import AccountManagerModal from '../../components/common/AccountManagerModal';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     TextInput, Image, Alert, Platform, StatusBar,
@@ -325,13 +326,36 @@ function ProgressBar({ form }) {
 
 export default function DeliveryOnboarding({ navigation, onComplete }) {
     const token = useAuthStore((state) => state.token);
+    const user  = useAuthStore((state) => state.user);
     const login = useAuthStore((state) => state.login);
 
     const [form, setForm]           = useState(INITIAL_FORM);
     const [errors, setErrors]       = useState({});
     const [submitting, setSubmitting] = useState(false);
-    // uploading: null | 'profile' | 'license' | 'rc'
     const [uploading, setUploading] = useState(null);
+    const [accountModalVisible, setAccountModalVisible] = useState(false);
+    const [hasOtherProfiles, setHasOtherProfiles] = useState(false);
+
+    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+
+    // Check if user has other profiles to switch to (show back/switch only if yes)
+    useEffect(() => {
+        const checkProfiles = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/auth/profiles`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    const others = (data.profiles || []).filter(
+                        (p) => p.role !== (user?.role || 'delivery')
+                    );
+                    setHasOtherProfiles(others.length > 0);
+                }
+            } catch (_) { /* silently fail */ }
+        };
+        checkProfiles();
+    }, [token]);
 
     // Generic nested field setter — also clears that field's error
     const setField = (section, key, value) => {
@@ -434,13 +458,18 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                 await login(partner.user, token, undefined);
             }
 
-            // Trigger success flow
+            // Check if auto-approved
+            const autoApproved = res.data?.auto_approved === true;
+
+            // Trigger success flow with appropriate message
             Alert.alert(
-                '🎉 Application Submitted!',
-                "We'll verify your documents within 24 hours. You'll receive an SMS once approved.",
+                autoApproved ? '✅ Instantly Approved!' : '🎉 Application Submitted!',
+                autoApproved
+                    ? "You've been instantly approved! You can start accepting delivery orders right away."
+                    : "We'll verify your documents within 24 hours. You'll receive an SMS once approved.",
                 [
                     {
-                        text: 'OK',
+                        text: autoApproved ? 'Start Earning →' : 'OK',
                         onPress: () => {
                             if (onComplete) {
                                 onComplete();
@@ -467,6 +496,14 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <StatusBar barStyle="light-content" backgroundColor={C.greenDark} />
 
+            {/* Account Switcher Modal — only if has other profiles */}
+            {hasOtherProfiles && (
+                <AccountManagerModal
+                    visible={accountModalVisible}
+                    onClose={() => setAccountModalVisible(false)}
+                />
+            )}
+
             <ScrollView
                 style={{ flex: 1, backgroundColor: C.bg }}
                 contentContainerStyle={s.scrollContent}
@@ -482,11 +519,16 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
 >
     {/* Nav row */}
     <View style={s.heroNav}>
-        <TouchableOpacity onPress={() => navigation?.goBack()} style={s.backBtn} activeOpacity={0.7}>
-            <Text style={s.backArrow}>←</Text>
-        </TouchableOpacity>
+        {/* Back/switch button — only show when user has other profiles */}
+        {hasOtherProfiles ? (
+            <TouchableOpacity onPress={() => setAccountModalVisible(true)} style={s.backBtn} activeOpacity={0.7}>
+                <Text style={s.backArrow}>←</Text>
+            </TouchableOpacity>
+        ) : (
+            <View style={{ width: 40 }} />
+        )}
         <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={s.heroEyebrow}>PARTNER</Text>
+            <Text style={[s.heroEyebrow, { color: 'rgba(255,255,255,0.7)', fontSize: 10 }]}>DELIVERY PARTNER • SETUP</Text>
             <Text style={s.heroTitle}>Partner Onboarding</Text>
         </View>
         <View style={s.heroBadge}>

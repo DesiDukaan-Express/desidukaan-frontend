@@ -237,7 +237,7 @@ export default function SignupScreen({ navigation, route }) {
       const res = await fetch(`${BASE_URL}/auth/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: mobile, code: otp }),
+        body: JSON.stringify({ phone: mobile, code: otp, role: selectedRole }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.msg || "Invalid OTP");
@@ -665,11 +665,18 @@ const s = StyleSheet.create({
     borderRadius: 24,
     overflow: "hidden",
     marginBottom: 16,
-    shadowColor: C.orange,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.45,
-    shadowRadius: 20,
-    elevation: 10,
+    ...Platform.select({
+      web: {
+        boxShadow: `0px 10px 20px ${C.orange}73`,
+      },
+      default: {
+        shadowColor: C.orange,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.45,
+        shadowRadius: 20,
+        elevation: 10,
+      },
+    }),
   },
   logoInner: { flex: 1, alignItems: "center", justifyContent: "center" },
   brandName: {
@@ -694,11 +701,18 @@ const s = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.4)",
     paddingBottom: 22,
     paddingTop: 18,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.25,
-    shadowRadius: 40,
-    elevation: 12,
+    ...Platform.select({
+      web: {
+        boxShadow: "0px 20px 40px rgba(0, 0, 0, 0.25)",
+      },
+      default: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 20 },
+        shadowOpacity: 0.25,
+        shadowRadius: 40,
+        elevation: 12,
+      },
+    }),
     width: "100%",
   },
 
@@ -732,9 +746,18 @@ const s = StyleSheet.create({
   },
   roleTabActive: {
     backgroundColor: C.greenBright,
-    shadowColor: C.greenBright,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3, shadowRadius: 5, elevation: 3,
+    ...Platform.select({
+      web: {
+        boxShadow: `0px 2px 5px rgba(16, 185, 129, 0.3)`,
+      },
+      default: {
+        shadowColor: C.greenBright,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 3,
+      },
+    }),
   },
   roleTabText: { fontSize: 12, color: C.gray500, fontWeight: "600" },
   roleTabTextActive: { color: C.white, fontWeight: "700" },
