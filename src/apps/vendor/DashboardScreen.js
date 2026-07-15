@@ -62,7 +62,7 @@ const getGreetingConfig = () => {
   if (h < 12)
     return {
       text: "Good Morning",
-      emoji: "☀️",
+      icon: "wb-sunny",
       gradient: ["#FEF3C7", "#FDE68A"],
       iconBg: "#F59E0B",
       sub: "Your store is ready to serve!",
@@ -71,7 +71,7 @@ const getGreetingConfig = () => {
   if (h < 17)
     return {
       text: "Good Afternoon",
-      emoji: "⛅",
+      icon: "wb-cloudy",
       gradient: ["#DBEAFE", "#BFDBFE"],
       iconBg: "#3B82F6",
       sub: "Keep the momentum going!",
@@ -79,7 +79,7 @@ const getGreetingConfig = () => {
     };
   return {
     text: "Good Evening",
-    emoji: "🌙",
+    icon: "nights-stay",
     gradient: ["#EDE9FE", "#DDD6FE"],
     iconBg: "#7C3AED",
     sub: "Wrapping up strong today!",
@@ -920,7 +920,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
       )}
       {vendorStatus === "rejected" && (
         <StatusBanner
-          title="❌ Application Rejected"
+          title="Application Rejected"
           message="Your application was rejected. Please re-submit with correct documents."
           bg={C.danger}
           border={C.dangerBorder}
@@ -971,12 +971,12 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                     height: rs(52, 58, 64),
                     borderRadius: rs(16, 18, 20),
                     backgroundColor: greeting.iconBg + "20",
+                    alignItems: "center",
+                    justifyContent: "center",
                   },
                 ]}
               >
-                <Text style={{ fontSize: rs(26, 28, 32) }}>
-                  {greeting.emoji}
-                </Text>
+                <MaterialIcons name={greeting.icon} size={rs(26, 28, 32)} color={greeting.iconBg} />
               </View>
 
               <View style={{ flex: 1 }}>
@@ -1015,7 +1015,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 <Text
                   style={[styles.greetingName, { fontSize: rs(19, 22, 24) }]}
                 >
-                  {vendorName.split(" ")[0]} 👋
+                  {vendorName.split(" ")[0]}
                 </Text>
                 <Text
                   style={[
@@ -2173,11 +2173,14 @@ function StatusBanner({ title, message, bg, border, textColor, missingDocs }) {
       <Text style={[styles.bannerMsg, { color: textColor }]}>{message}</Text>
       {missingDocs.length > 0 && (
         <View style={{ marginTop: 8 }}>
-          <Text
-            style={[styles.bannerTitle, { color: textColor, marginBottom: 4 }]}
-          >
-            📄 Missing Documents:
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <MaterialIcons name="description" size={14} color={textColor} />
+            <Text
+              style={[styles.bannerTitle, { color: textColor, marginBottom: 0 }]}
+            >
+              Missing Documents:
+            </Text>
+          </View>
           {missingDocs.map((doc) => (
             <Text key={doc} style={[styles.bannerDoc, { color: textColor }]}>
               • {doc}

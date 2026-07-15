@@ -61,6 +61,7 @@ export default function VendorProfileScreen() {
   const [vendor, setVendor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [storeOpen, setStoreOpen] = useState(true);
+  const [badWeather, setBadWeather] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   // Modals
@@ -91,6 +92,7 @@ export default function VendorProfileScreen() {
       if (data.success) {
         setVendor(data.data.vendor);
         setStoreOpen(data.data.vendor.is_open);
+        setBadWeather(data.data.vendor.is_bad_weather || false);
       }
     } catch (err) {
       console.error("Profile fetch error:", err);
@@ -136,25 +138,55 @@ export default function VendorProfileScreen() {
     }
   };
 
+  const handleToggleBadWeather = async (val) => {
+    const prev = badWeather;
+    setBadWeather(val);
+    try {
+      const res = await fetch(`${API_BASE}/vendors/${vendor.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ is_bad_weather: val }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setVendor(data.data.vendor);
+      } else {
+        setBadWeather(prev);
+      }
+    } catch {
+      setBadWeather(prev);
+    }
+  };
+
   const openEdit = (field, label, currentValue) => {
     setActiveField(field);
     setActiveLabel(label);
-    setEditValue(currentValue || "");
+    setEditValue(String(currentValue ?? ""));
     setEditModal(true);
   };
 
   const saveEdit = () => {
-    if (!editValue.trim()) {
+    const valTrim = editValue.trim();
+    if (!valTrim) {
       Alert.alert("Required", `${activeLabel} cannot be empty`);
       return;
     }
     if (activeField === "opening_time" || activeField === "closing_time") {
-      if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(editValue.trim())) {
+      if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(valTrim)) {
         Alert.alert("Invalid Format", "Use HH:MM format (e.g. 09:30)");
         return;
       }
     }
-    handleUpdateField(activeField, editValue.trim());
+    if (["min_order_value", "quick_delivery_fee", "weather_surcharge", "delivery_base_km", "delivery_fee_base", "delivery_fee_per_km"].includes(activeField)) {
+      if (isNaN(parseFloat(valTrim))) {
+        Alert.alert("Invalid Input", "Please enter a valid numeric value.");
+        return;
+      }
+    }
+    handleUpdateField(activeField, valTrim);
     setEditModal(false);
   };
 
@@ -408,6 +440,8 @@ export default function VendorProfileScreen() {
                 vendor={vendor}
                 storeOpen={storeOpen}
                 onToggle={handleToggleOpen}
+                badWeather={badWeather}
+                onToggleBadWeather={handleToggleBadWeather}
                 onEdit={openEdit}
                 onDeliveryPress={() => setDeliveryModal(true)}
                 rs={rs}
@@ -431,6 +465,8 @@ export default function VendorProfileScreen() {
               vendor={vendor}
               storeOpen={storeOpen}
               onToggle={handleToggleOpen}
+              badWeather={badWeather}
+              onToggleBadWeather={handleToggleBadWeather}
               onEdit={openEdit}
               onDeliveryPress={() => setDeliveryModal(true)}
               rs={rs}
@@ -869,7 +905,7 @@ function StoreInfoCard({ vendor, onEdit, onCategoryPress, rs, isWide }) {
   );
 }
 
-function StoreSettingsCard({ vendor, storeOpen, onToggle, onEdit, onDeliveryPress, rs, isWide }) {
+function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBadWeather, onEdit, onDeliveryPress, rs, isWide }) {
   return (
     <SectionCard title="Store Settings" overline="OPERATIONS" rs={rs} isWide={isWide}>
       {/* Store toggle */}
@@ -932,6 +968,138 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, onEdit, onDeliveryPres
         </View>
         <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
       </TouchableOpacity>
+
+      {/* Minimum Order Value */}
+      <TouchableOpacity
+        style={styles.settingRow}
+        onPress={() => onEdit("min_order_value", "Minimum Order Value", vendor.min_order_value)}
+        activeOpacity={0.6}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <View style={[styles.settingIconBox, { backgroundColor: "#FEF3C7" }]}>
+            <MaterialIcons name="shopping-basket" size={18} color="#D97706" />
+          </View>
+          <View>
+            <Text style={styles.settingTitle}>Minimum Order Value</Text>
+            <Text style={styles.settingSub}>₹{vendor.min_order_value ?? 0}</Text>
+          </View>
+        </View>
+        <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
+      </TouchableOpacity>
+
+      {/* Flat Quick Delivery Fee */}
+      <TouchableOpacity
+        style={styles.settingRow}
+        onPress={() => onEdit("quick_delivery_fee", "Flat Quick Delivery Fee", vendor.quick_delivery_fee)}
+        activeOpacity={0.6}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <View style={[styles.settingIconBox, { backgroundColor: "#EFF6FF" }]}>
+            <MaterialIcons name="flash-on" size={18} color="#2563EB" />
+          </View>
+          <View>
+            <Text style={styles.settingTitle}>Flat Quick Delivery Fee</Text>
+            <Text style={styles.settingSub}>₹{vendor.quick_delivery_fee ?? 0} (0 to use % surge)</Text>
+          </View>
+        </View>
+        <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
+      </TouchableOpacity>
+
+      {/* Bad Weather Surcharge */}
+      <TouchableOpacity
+        style={styles.settingRow}
+        onPress={() => onEdit("weather_surcharge", "Bad Weather Surcharge", vendor.weather_surcharge)}
+        activeOpacity={0.6}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <View style={[styles.settingIconBox, { backgroundColor: "#FCE7F3" }]}>
+            <MaterialIcons name="umbrella" size={18} color="#DB2777" />
+          </View>
+          <View>
+            <Text style={styles.settingTitle}>Bad Weather Surcharge</Text>
+            <Text style={styles.settingSub}>₹{vendor.weather_surcharge ?? 0}</Text>
+          </View>
+        </View>
+        <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
+      </TouchableOpacity>
+
+      {/* Bad Weather Toggle Switch */}
+      <View style={styles.settingRow}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <View style={[styles.settingIconBox, { backgroundColor: badWeather ? "#FEE2E2" : C.bg }]}>
+            <MaterialIcons name="cloudy-snowing" size={18} color={badWeather ? "#EF4444" : C.textLight} />
+          </View>
+          <View>
+            <Text style={styles.settingTitle}>Active Bad Weather</Text>
+            <Text style={styles.settingSub}>Apply weather fee surcharge to orders</Text>
+          </View>
+        </View>
+        <Switch
+          value={badWeather}
+          onValueChange={onToggleBadWeather}
+          trackColor={{ true: "#EF4444", false: C.border }}
+          thumbColor={badWeather ? "#fff" : "#fff"}
+        />
+      </View>
+
+      {/* Self Delivery Pricing Options */}
+      {vendor.delivery_type === "self" && (
+        <>
+          {/* Base Delivery Distance */}
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => onEdit("delivery_base_km", "Base Delivery Distance (km)", vendor.delivery_base_km)}
+            activeOpacity={0.6}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <View style={[styles.settingIconBox, { backgroundColor: "#E0F2FE" }]}>
+                <MaterialIcons name="edit-road" size={18} color="#0369A1" />
+              </View>
+              <View>
+                <Text style={styles.settingTitle}>Base Delivery Distance</Text>
+                <Text style={styles.settingSub}>{vendor.delivery_base_km ?? 2} km</Text>
+              </View>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
+          </TouchableOpacity>
+
+          {/* Base Delivery Fee */}
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => onEdit("delivery_fee_base", "Base Delivery Fee (₹)", vendor.delivery_fee_base)}
+            activeOpacity={0.6}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <View style={[styles.settingIconBox, { backgroundColor: "#E0F2FE" }]}>
+                <MaterialIcons name="payments" size={18} color="#0369A1" />
+              </View>
+              <View>
+                <Text style={styles.settingTitle}>Base Delivery Fee</Text>
+                <Text style={styles.settingSub}>₹{vendor.delivery_fee_base ?? 20}</Text>
+              </View>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
+          </TouchableOpacity>
+
+          {/* Extra Delivery Fee per KM */}
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => onEdit("delivery_fee_per_km", "Extra Delivery Fee per KM (₹)", vendor.delivery_fee_per_km)}
+            activeOpacity={0.6}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <View style={[styles.settingIconBox, { backgroundColor: "#E0F2FE" }]}>
+                <MaterialIcons name="add-road" size={18} color="#0369A1" />
+              </View>
+              <View>
+                <Text style={styles.settingTitle}>Extra Delivery Fee per KM</Text>
+                <Text style={styles.settingSub}>₹{vendor.delivery_fee_per_km ?? 5} / km</Text>
+              </View>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
+          </TouchableOpacity>
+        </>
+      )}
 
       {/* Delivery type */}
       <TouchableOpacity

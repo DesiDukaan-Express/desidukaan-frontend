@@ -31,7 +31,7 @@ import { vendorsAPI, ordersAPI, categoriesAPI } from "../../services/api";
 import ChatWidget from "./ChatWidget";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 
-// ── Use env var — works on device, emulator, and web ─────────────────────────
+// Use env var works on device, emulator, and web
 // In your .env: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 

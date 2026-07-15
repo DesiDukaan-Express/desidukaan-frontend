@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, Alert,
@@ -10,6 +10,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import useAuthStore from '../../store/authStore';
 import AddressMapView from "../../components/AddressMapView";
 import { uploadAPI } from '../../services/api';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const PRIMARY = '#1ca049';
@@ -19,12 +20,12 @@ const BG = '#f6f6f6';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STEPS = [
-  { id: 1, title: 'Shop Info', icon: '🏪', desc: 'Basic store details' },
-  { id: 2, title: 'Compliance', icon: '📋', desc: 'FSSAI, GST & legal' },
-  { id: 3, title: 'Bank', icon: '🏦', desc: 'Payment setup' },
-  { id: 4, title: 'Catalog', icon: '📦', desc: 'Pick your products' },
-  { id: 5, title: 'Review', icon: '📊', desc: 'Inventory & pricing' },
-  { id: 6, title: 'Go Live', icon: '🚀', desc: 'Submit & launch' },
+  { id: 1, title: 'Shop Info', icon: 'store', desc: 'Basic store details' },
+  { id: 2, title: 'Compliance', icon: 'assignment', desc: 'FSSAI, GST & legal' },
+  { id: 3, title: 'Bank', icon: 'account-balance', desc: 'Payment setup' },
+  { id: 4, title: 'Catalog', icon: 'inventory', desc: 'Pick your products' },
+  { id: 5, title: 'Review', icon: 'assessment', desc: 'Inventory & pricing' },
+  { id: 6, title: 'Go Live', icon: 'publish', desc: 'Submit & launch' },
 ];
 
 
@@ -203,6 +204,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const [loading, setLoading] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [autoApproved, setAutoApproved] = useState(false);
 
   const scrollRef = useRef(null);
 
@@ -561,7 +563,10 @@ export default function VendorOnboardingScreen({ onComplete }) {
       });
 
       const vendorData = await vendorRes.json();
-      if (!vendorRes.ok) throw new Error(vendorData.msg || 'Failed to create shop');
+      if (!vendorRes.ok) throw new Error(vendorData.msg || vendorData.message || 'Failed to create shop');
+
+      // Capture auto-approve flag from backend (response: { data: { vendor: { auto_approved, ... } } })
+      setAutoApproved(vendorData.data?.vendor?.auto_approved === true);
 
       // 3. Create products
       //    Note: we send item_type (DB column name) NOT type, to avoid backend mapping issues
@@ -619,37 +624,68 @@ export default function VendorOnboardingScreen({ onComplete }) {
       <Modal visible={showSuccess} transparent animationType="fade">
         <View style={styles.successOverlay}>
           <View style={styles.successCard}>
-            {/* Green circle icon */}
+            {/* Icon */}
             <View style={styles.successIconWrap}>
               <View style={styles.successIconInner}>
-                <Text style={{ fontSize: 48 }}>🚀</Text>
+                <MaterialIcons
+                  name={autoApproved ? 'check-circle' : 'rocket-launch'}
+                  size={48}
+                  color="#16A34A"
+                />
               </View>
             </View>
 
-            <Text style={styles.successTitle}>You're Submitted!</Text>
+            <Text style={styles.successTitle}>
+              {autoApproved ? "You're Live! 🎉" : "You're Submitted!"}
+            </Text>
             <Text style={styles.successSub}>
-              <Text style={{ fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#16A34A' }}>{shopName || 'Your shop'}</Text> is under review.
+              <Text style={{ fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#16A34A' }}>
+                {shopName || 'Your shop'}
+              </Text>
+              {autoApproved
+                ? ' is now live and ready to accept orders!'
+                : ' is under review.'}
             </Text>
             <Text style={styles.successDesc}>
-              Our team will verify your FSSAI & GST details within{' '}
-              <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>24–48 hours</Text>. You'll get an
-              email notification once approved and live.
+              {autoApproved
+                ? 'Your shop has been instantly approved. Customers can now find and order from your store.'
+                : <>
+                    Our team will verify your FSSAI &amp; GST details within{' '}
+                    <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>24–48 hours</Text>. You'll get an
+                    email notification once approved and live.
+                  </>
+              }
             </Text>
 
             {/* Timeline */}
-            {[
-              { icon: '📋', label: 'Application submitted', done: true },
-              { icon: '🔍', label: 'Admin verification (24–48 hrs)', done: false },
-              { icon: '✅', label: 'Shop goes live!', done: false },
-            ].map((step, i) => (
-              <View key={i} style={styles.successStep}>
-                <Text style={styles.successStepIcon}>{step.icon}</Text>
-                <Text style={[styles.successStepText, step.done && { color: '#16A34A', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }]}>
-                  {step.label}
-                </Text>
-                {step.done && <Text style={{ color: '#16A34A', fontSize: 14 }}>✓</Text>}
-              </View>
-            ))}
+            {autoApproved
+              ? [
+                  { icon: 'assignment', label: 'Application submitted', done: true },
+                  { icon: 'check-circle', label: 'Auto-approved instantly', done: true },
+                  { icon: 'store', label: 'Shop is live!', done: true },
+                ].map((step, i) => (
+                  <View key={i} style={styles.successStep}>
+                    <MaterialIcons name={step.icon} size={18} color="#16A34A" style={{ marginRight: 8 }} />
+                    <Text style={[styles.successStepText, { color: '#16A34A', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }]}>
+                      {step.label}
+                    </Text>
+                    <MaterialIcons name="check" size={14} color="#16A34A" style={{ marginLeft: 'auto' }} />
+                  </View>
+                ))
+              : [
+                  { icon: 'assignment', label: 'Application submitted', done: true },
+                  { icon: 'search', label: 'Admin verification (24–48 hrs)', done: false },
+                  { icon: 'check-circle', label: 'Shop goes live!', done: false },
+                ].map((step, i) => (
+                  <View key={i} style={styles.successStep}>
+                    <MaterialIcons name={step.icon} size={18} color={step.done ? '#16A34A' : '#9CA3AF'} style={{ marginRight: 8 }} />
+                    <Text style={[styles.successStepText, step.done && { color: '#16A34A', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }]}>
+                      {step.label}
+                    </Text>
+                    {step.done && <MaterialIcons name="check" size={14} color="#16A34A" style={{ marginLeft: 'auto' }} />}
+                  </View>
+                ))
+            }
 
             <TouchableOpacity
               style={styles.successBtn}
@@ -665,7 +701,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
       {/* Top bar */}
       <View style={styles.topBar}>
         <View style={styles.brandRow}>
-          <Text style={styles.brandEmoji}>🛕</Text>
+          <MaterialIcons name="storefront" size={24} color={PRIMARY} style={{ marginRight: 6 }} />
           <View>
             <Text style={styles.brandName}>DesiDukaan</Text>
             <Text style={styles.brandSub}>Seller Registration</Text>
@@ -742,7 +778,10 @@ export default function VendorOnboardingScreen({ onComplete }) {
               <TextInput style={styles.input} placeholder="For order notifications & updates" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
 
               {/* Contacts */}
-              <Text style={styles.sectionSep}>📞 Contact Details</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16, marginBottom: 12 }}>
+                <MaterialIcons name="phone" size={18} color={PRIMARY} />
+                <Text style={[styles.sectionSep, { marginTop: 0, marginBottom: 0 }]}>Contact Details</Text>
+              </View>
               <View style={styles.row}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>Primary Name <Text style={styles.req}>*</Text></Text>
@@ -766,11 +805,17 @@ export default function VendorOnboardingScreen({ onComplete }) {
                 </View>
               </View>
               <View style={styles.infoBox}>
-                <Text style={styles.infoText}>💡 Two contacts ensure customers can always reach someone if one person is unavailable.</Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <MaterialIcons name="lightbulb-outline" size={14} color="#047857" style={{ marginTop: 2 }} />
+                  <Text style={styles.infoText}>Two contacts ensure customers can always reach someone if one person is unavailable.</Text>
+                </View>
               </View>
 
               {/* Address */}
-              <Text style={styles.sectionSep}>📍 Shop Address</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16, marginBottom: 12 }}>
+                <MaterialIcons name="location-on" size={18} color={PRIMARY} />
+                <Text style={[styles.sectionSep, { marginTop: 0, marginBottom: 0 }]}>Shop Address</Text>
+              </View>
               <Text style={styles.label}>Street Address <Text style={styles.req}>*</Text></Text>
               <TextInput style={[styles.input, styles.textArea]} placeholder="Shop no., Street, Area" value={address} onChangeText={setAddress} multiline numberOfLines={2} />
 
@@ -802,7 +847,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
               {/* Geocoding note */}
               <View style={styles.geoNote}>
-                <Text style={styles.geoNoteIcon}>📍</Text>
+                <MaterialIcons name="location-on" size={18} color="#D97706" style={{ marginRight: 6 }} />
                 <Text style={styles.geoNoteText}>
                   Your shop location will be auto-detected from pincode + city when you submit. This helps customers find you nearby.
                 </Text>
@@ -830,7 +875,10 @@ export default function VendorOnboardingScreen({ onComplete }) {
           {currentStep === 2 && (
             <View style={styles.form}>
               <View style={styles.infoBox}>
-                <Text style={styles.infoText}>📋 These details are required for shop verification. Your shop will be reviewed by our team before going live.</Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <MaterialIcons name="assignment" size={14} color="#047857" style={{ marginTop: 2 }} />
+                  <Text style={styles.infoText}>These details are required for shop verification. Your shop will be reviewed by our team before going live.</Text>
+                </View>
               </View>
               <Text style={styles.label}>FSSAI License Number <Text style={styles.req}>*</Text></Text>
               <TextInput style={styles.input} placeholder="14-digit FSSAI number" keyboardType="numeric" maxLength={14} value={fssai} onChangeText={setFssai} />
@@ -849,13 +897,19 @@ export default function VendorOnboardingScreen({ onComplete }) {
               <TextInput style={styles.input} placeholder="Enter Trade License number" maxLength={50} value={tradeLicense} onChangeText={setTradeLicense} />
 
               <View style={[styles.infoBox, { marginTop: 16 }]}>
-                <Text style={[styles.infoText, { fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", marginBottom: 4 }]}>⏳ Admin Approval Process</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <MaterialIcons name="hourglass-empty" size={14} color="#047857" />
+                  <Text style={[styles.infoText, { fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", marginBottom: 0 }]}>Admin Approval Process</Text>
+                </View>
                 <Text style={styles.infoText}>
                   Once you submit, our team will verify your FSSAI & GST details within <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>24–48 hours</Text>. You'll receive an email once approved. Your shop will not be visible to customers until then.
                 </Text>
               </View>
 
-              <Text style={styles.sectionSep}>📄 Document Upload (optional — speeds up approval)</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 12 }}>
+                <MaterialIcons name="description" size={18} color={PRIMARY} />
+                <Text style={[styles.sectionSep, { marginTop: 0, marginBottom: 0 }]}>Document Upload (optional — speeds up approval)</Text>
+              </View>
               {[
                 { label: 'FSSAI Certificate', key: 'fssai' },
                 { label: 'GST Registration Certificate', key: 'gst' },
@@ -864,10 +918,11 @@ export default function VendorOnboardingScreen({ onComplete }) {
                   <Text style={styles.label}>{doc.label}</Text>
                   {docUrls[doc.key] ? (
                     <View style={styles.uploadedBox}>
-                      <Text style={styles.uploadedIcon}>✅</Text>
+                      <MaterialIcons name="check-circle" size={18} color="#16A34A" style={{ marginRight: 6 }} />
                       <Text style={styles.uploadedText} numberOfLines={1}>Document uploaded successfully</Text>
-                      <TouchableOpacity onPress={() => setDocUrls(prev => ({ ...prev, [doc.key]: null }))}>
-                        <Text style={styles.uploadRemove}>✕ Remove</Text>
+                      <TouchableOpacity onPress={() => setDocUrls(prev => ({ ...prev, [doc.key]: null }))} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <MaterialIcons name="close" size={13} color="#EF4444" />
+                        <Text style={styles.uploadRemove}>Remove</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
@@ -879,7 +934,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
                       {docUploading[doc.key] ? (
                         <ActivityIndicator color={PRIMARY} size="small" />
                       ) : (
-                        <Text style={styles.uploadIcon}>📁</Text>
+                        <MaterialIcons name="folder-open" size={24} color="#9CA3AF" />
                       )}
                       <Text style={styles.uploadText}>
                         {docUploading[doc.key] ? 'Uploading…' : 'Tap to upload PDF or photo'}
@@ -896,7 +951,10 @@ export default function VendorOnboardingScreen({ onComplete }) {
           {currentStep === 3 && (
             <View style={styles.form}>
               <View style={styles.infoBox}>
-                <Text style={styles.infoText}>💡 Payments settled within 2 business days after delivery confirmation.</Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <MaterialIcons name="lightbulb-outline" size={14} color="#047857" style={{ marginTop: 2 }} />
+                  <Text style={styles.infoText}>Payments settled within 2 business days after delivery confirmation.</Text>
+                </View>
               </View>
               <Text style={styles.sectionLabel}>UPI ID (Recommended)</Text>
               <TextInput style={styles.input} placeholder="yourname@upi or phone@paytm" value={upiId} onChangeText={setUpiId} autoCapitalize="none" />
@@ -919,15 +977,16 @@ export default function VendorOnboardingScreen({ onComplete }) {
             <View style={styles.form}>
               <View style={styles.modeToggle}>
                 {[
-                  { key: 'generic', label: '🛒 Catalog' },
-                  { key: 'manual', label: '✏️ Manual' },
-                  { key: 'csv', label: '📂 CSV' },
+                  { key: 'generic', label: 'Catalog', icon: 'shopping-basket' },
+                  { key: 'manual', label: 'Manual', icon: 'edit' },
+                  { key: 'csv', label: 'CSV', icon: 'insert-drive-file' },
                 ].map(m => (
                   <TouchableOpacity
                     key={m.key}
-                    style={[styles.modeBtn, addMode === m.key && styles.modeBtnActive]}
+                    style={[styles.modeBtn, addMode === m.key && styles.modeBtnActive, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }]}
                     onPress={() => setAddMode(m.key)}
                   >
+                    <MaterialIcons name={m.icon} size={14} color={addMode === m.key ? '#fff' : PRIMARY} />
                     <Text style={[styles.modeBtnText, addMode === m.key && styles.modeBtnTextActive]}>{m.label}</Text>
                   </TouchableOpacity>
                 ))}
@@ -962,7 +1021,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
                                   <Image source={{ uri: cat.image_url }} style={styles.segGridImage} />
                                 ) : (
                                   <View style={[styles.segGridImage, { alignItems: 'center', justifyContent: 'center' }]}>
-                                    <Text style={{ fontSize: 24 }}>📦</Text>
+                                    <MaterialIcons name="inventory" size={24} color={PRIMARY} />
                                   </View>
                                 )}
                                 <Text style={styles.segGridText}>{cat.name}</Text>
@@ -1002,7 +1061,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
                                     <Image source={{ uri: p.image_url }} style={styles.catalogImage} />
                                   ) : (
                                     <View style={[styles.catalogImage, { alignItems: 'center', justifyContent: 'center' }]}>
-                                      <Text style={{ fontSize: 24 }}>📦</Text>
+                                      <MaterialIcons name="inventory" size={24} color={PRIMARY} />
                                     </View>
                                   )}
                                   <View style={{ flex: 1 }}>
@@ -1013,7 +1072,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
                                     <Text style={styles.catalogMeta}>{p.unit} • {p.item_type}</Text>
                                   </View>
                                   <View style={[styles.checkbox, isSel && styles.checkboxSel]}>
-                                    {isSel && <Text style={styles.checkmark}>✓</Text>}
+                                    {isSel && <MaterialIcons name="check" size={12} color="#fff" />}
                                   </View>
                                 </TouchableOpacity>
                               );
@@ -1023,7 +1082,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
                       {masterCategories.length === 0 && (!currentCategory?.products || currentCategory.products.length === 0) && !loadingCatalog && (
                         <View style={styles.emptyState}>
-                          <Text style={styles.emptyEmoji}>🔍</Text>
+                          <MaterialIcons name="search" size={44} color="#9CA3AF" style={{ marginBottom: 8 }} />
                           <Text style={styles.emptyTitle}>No items found</Text>
                         </View>
                       )}
@@ -1044,8 +1103,9 @@ export default function VendorOnboardingScreen({ onComplete }) {
                       <View style={styles.productCardHeader}>
                         <Text style={styles.productCardNum}>Product {index + 1}</Text>
                         {manualProds.length > 1 && (
-                          <TouchableOpacity onPress={() => removeManualRow(index)}>
-                            <Text style={styles.removeBtn}>✕ Remove</Text>
+                          <TouchableOpacity onPress={() => removeManualRow(index)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <MaterialIcons name="close" size={13} color="#EF4444" />
+                            <Text style={styles.removeBtn}>Remove</Text>
                           </TouchableOpacity>
                         )}
                       </View>
@@ -1058,7 +1118,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
                               style={styles.photoRemoveBtn}
                               onPress={() => updateManualProd(index, 'image_url', null)}
                             >
-                              <Text style={styles.photoRemoveText}>✕</Text>
+                              <MaterialIcons name="close" size={14} color="#fff" />
                             </TouchableOpacity>
                           </View>
                         ) : (
@@ -1070,13 +1130,13 @@ export default function VendorOnboardingScreen({ onComplete }) {
                             {prodImgUploading[index] ? (
                               <ActivityIndicator color={PRIMARY} size="small" />
                             ) : (
-                              <Text style={styles.photoIcon}>📷</Text>
+                              <MaterialIcons name="camera-alt" size={20} color="#9CA3AF" />
                             )}
                           </TouchableOpacity>
                         )}
                         <Text style={styles.photoHint}>
                           {product.image_url
-                            ? 'Photo uploaded! Tap ✕ to remove.'
+                            ? 'Photo uploaded! Tap close icon to remove.'
                             : `Add a photo for better visibility.\nCustomers trust shops with product photos.`}
                         </Text>
                       </View>
@@ -1170,7 +1230,10 @@ export default function VendorOnboardingScreen({ onComplete }) {
               {addMode === 'csv' && (
                 <View>
                   <View style={styles.infoBox}>
-                    <Text style={styles.infoText}>📋 Paste CSV with headers:</Text>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <MaterialIcons name="assignment" size={14} color="#047857" style={{ marginTop: 2 }} />
+                      <Text style={styles.infoText}>Paste CSV with headers:</Text>
+                    </View>
                     <Text style={[styles.infoText, styles.codeText]}>{SAMPLE_CSV}</Text>
                   </View>
                   <TextInput
@@ -1179,12 +1242,16 @@ export default function VendorOnboardingScreen({ onComplete }) {
                     value={csvText} onChangeText={setCsvText}
                     multiline numberOfLines={8}
                   />
-                  <TouchableOpacity style={styles.parseBtn} onPress={parseCSV}>
-                    <Text style={styles.parseBtnText}>📥 Parse & Preview</Text>
+                  <TouchableOpacity style={[styles.parseBtn, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} onPress={parseCSV}>
+                    <MaterialIcons name="file-download" size={16} color="#fff" />
+                    <Text style={styles.parseBtnText}>Parse & Preview</Text>
                   </TouchableOpacity>
                   {csvPreview.length > 0 && (
                     <View style={styles.previewBox}>
-                      <Text style={styles.previewTitle}>✅ {csvPreview.length} products ready</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                        <MaterialIcons name="check-circle" size={16} color="#16A34A" />
+                        <Text style={styles.previewTitle}>{csvPreview.length} products ready</Text>
+                      </View>
                       {csvPreview.slice(0, 3).map((p, i) => (
                         <Text key={i} style={styles.previewItem}>• {p.name} — MRP ₹{p.mrp} / SP ₹{p.sp} / {p.unit}</Text>
                       ))}
@@ -1199,11 +1266,14 @@ export default function VendorOnboardingScreen({ onComplete }) {
           {currentStep === 5 && (
             <View style={styles.form}>
               <View style={styles.infoBox}>
-                <Text style={styles.infoText}>📊 Review pricing and stock. You can edit anytime from your dashboard.</Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <MaterialIcons name="assessment" size={14} color="#047857" style={{ marginTop: 2 }} />
+                  <Text style={styles.infoText}>Review pricing and stock. You can edit anytime from your dashboard.</Text>
+                </View>
               </View>
               {getAllProducts().length === 0 ? (
                 <View style={styles.emptyState}>
-                  <Text style={styles.emptyEmoji}>📦</Text>
+                  <MaterialIcons name="inventory" size={44} color="#9CA3AF" style={{ marginBottom: 8 }} />
                   <Text style={styles.emptyTitle}>No products added</Text>
                   <TouchableOpacity onPress={() => setCurrentStep(4)}>
                     <Text style={{ color: PRIMARY, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", marginTop: 8 }}>← Go back and add products</Text>
@@ -1252,26 +1322,26 @@ export default function VendorOnboardingScreen({ onComplete }) {
           {currentStep === 6 && (
             <View>
               <View style={styles.goLiveContainer}>
-                <Text style={styles.goLiveEmoji}>🎉</Text>
+                <MaterialIcons name="stars" size={44} color="#D97706" style={{ marginBottom: 8 }} />
                 <Text style={styles.goLiveTitle}>Almost live!</Text>
                 <Text style={styles.goLiveSub}>Here's your shop summary before submission.</Text>
               </View>
               <View style={styles.summaryCard}>
                 {[
-                  { icon: '🏪', label: 'Shop Name', value: shopName || '—' },
-                  { icon: '👤', label: 'Owner', value: ownerName || '—' },
-                  { icon: '📍', label: 'Location', value: city && pincode ? `${city} – ${pincode}` : '—' },
-                  { icon: '📋', label: 'FSSAI / GST', value: `${fssai || '—'} / ${gst || '—'}` },
-                  ...(aadhar ? [{ icon: '🆔', label: 'Aadhaar', value: aadhar }] : []),
-                  ...(pan ? [{ icon: '📑', label: 'PAN', value: pan }] : []),
-                  ...(tradeLicense ? [{ icon: '📜', label: 'Trade License', value: tradeLicense }] : []),
-                  { icon: '📦', label: 'Products', value: `${getAllProducts().length} products ready` },
-                  { icon: '💰', label: 'Payment', value: upiId || (accountNumber ? 'Bank account' : 'Not set') },
-                  { icon: '🚚', label: 'Delivery', value: deliveryType === 'partner' ? 'Via Delivery Boy' : 'Own Staff / Self' },
+                  { icon: 'store', label: 'Shop Name', value: shopName || '—' },
+                  { icon: 'person', label: 'Owner', value: ownerName || '—' },
+                  { icon: 'location-on', label: 'Location', value: city && pincode ? `${city} – ${pincode}` : '—' },
+                  { icon: 'assignment', label: 'FSSAI / GST', value: `${fssai || '—'} / ${gst || '—'}` },
+                  ...(aadhar ? [{ icon: 'badge', label: 'Aadhaar', value: aadhar }] : []),
+                  ...(pan ? [{ icon: 'description', label: 'PAN', value: pan }] : []),
+                  ...(tradeLicense ? [{ icon: 'receipt-long', label: 'Trade License', value: tradeLicense }] : []),
+                  { icon: 'inventory', label: 'Products', value: `${getAllProducts().length} products ready` },
+                  { icon: 'payment', label: 'Payment', value: upiId || (accountNumber ? 'Bank account' : 'Not set') },
+                  { icon: 'local-shipping', label: 'Delivery', value: deliveryType === 'partner' ? 'Via Delivery Boy' : 'Own Staff / Self' },
                 ].map((row, i, arr) => (
                   <View key={row.label}>
                     <View style={styles.summaryRow}>
-                      <Text style={styles.summaryIcon}>{row.icon}</Text>
+                      <MaterialIcons name={row.icon} size={20} color={PRIMARY} style={{ marginRight: 12, marginTop: 2 }} />
                       <View>
                         <Text style={styles.summaryLabel}>{row.label}</Text>
                         <Text style={styles.summaryValue}>{row.value}</Text>
@@ -1282,9 +1352,12 @@ export default function VendorOnboardingScreen({ onComplete }) {
                 ))}
               </View>
               <View style={[styles.infoBox, { marginTop: 16 }]}>
-                <Text style={styles.infoText}>
-                  ✅ Your shop will be reviewed within <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>24–48 hours</Text>. You'll be notified at <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>{email || 'your email'}</Text> once approved and live.
-                </Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <MaterialIcons name="check-circle" size={14} color="#047857" style={{ marginTop: 2 }} />
+                  <Text style={styles.infoText}>
+                    Your shop will be reviewed within <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>24–48 hours</Text>. You'll be notified at <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>{email || 'your email'}</Text> once approved and live.
+                  </Text>
+                </View>
               </View>
             </View>
           )}
@@ -1314,7 +1387,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
             </View>
           ) : (
             <Text style={styles.nextText}>
-              {currentStep === STEPS.length ? '🚀 Submit & Go Live' : 'Save & Continue →'}
+              {currentStep === STEPS.length ? 'Submit & Go Live' : 'Save & Continue →'}
             </Text>
           )}
         </TouchableOpacity>

@@ -23,6 +23,9 @@ export default function useInventory() {
   const [page, setPage] = useState(1);
   const [storeFilter, setStoreF] = useState("all");
   const [stores] = useState(STORES_OPTS);
+  const [parentFilter, setParentFilter] = useState("all");
+  const [subFilter, setSubFilter] = useState("all");
+  const [globalCategories, setGlobalCategories] = useState([]);
 
   const loadVendor = useCallback(async () => {
     try {
@@ -35,9 +38,24 @@ export default function useInventory() {
     }
   }, [token]);
 
+  const loadGlobalCategories = useCallback(async () => {
+    try {
+      const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+      const res = await fetch(`${API_BASE}/products/categories`);
+      const result = await res.json();
+      if (res.ok) {
+        const cats = (result.data?.categories || []).filter((c) => c.parent_id === null);
+        setGlobalCategories(cats);
+      }
+    } catch (err) {
+      console.error("Load Global Categories Error:", err);
+    }
+  }, []);
+
   useEffect(() => {
     loadVendor();
-  }, [loadVendor]);
+    loadGlobalCategories();
+  }, [loadVendor, loadGlobalCategories]);
 
   const load = useCallback(async () => {
     if (!vendorId) return;
@@ -62,21 +80,44 @@ export default function useInventory() {
     load();
   }, [load]);
 
+  const filteredProducts = useMemo(() => {
+    let data = products;
+    if (parentFilter !== "all") {
+      data = data.filter((p) => {
+        const pCat = typeof p.category === "object" ? p.category?.name : p.category;
+        return String(pCat).toLowerCase() === parentFilter.toLowerCase();
+      });
+    }
+    if (subFilter !== "all") {
+      data = data.filter((p) => {
+        return p.subcategory && String(p.subcategory).toLowerCase() === subFilter.toLowerCase();
+      });
+    }
+    return data;
+  }, [products, parentFilter, subFilter]);
+
   const sortedProducts = useMemo(() => {
-    if (!sortKey) return products;
-    return [...products].sort((a, b) => {
-      const av = a[sortKey] ?? "";
-      const bv = b[sortKey] ?? "";
-      const cmp = String(av).localeCompare(String(bv), undefined, { numeric: true });
+    if (!sortKey) return filteredProducts;
+    return [...filteredProducts].sort((a, b) => {
+      let av = a[sortKey];
+      let bv = b[sortKey];
+
+      if (sortKey === "stock") {
+        av = a.rawStock ?? 0;
+        bv = b.rawStock ?? 0;
+      }
+
+      if (typeof av === "number" && typeof bv === "number") {
+        return sortDir === "asc" ? av - bv : bv - av;
+      }
+
+      const cmp = String(av ?? "").localeCompare(String(bv ?? ""), undefined, { numeric: true });
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [products, sortKey, sortDir]);
+  }, [filteredProducts, sortKey, sortDir]);
 
-  const totalPages = Math.max(1, Math.ceil(sortedProducts.length / PAGE_SIZE));
-  const pagedProducts = sortedProducts.slice(
-    (page - 1) * PAGE_SIZE,
-    page * PAGE_SIZE
-  );
+  const totalPages = 1;
+  const pagedProducts = sortedProducts;
 
   const toggleSort = (key) => {
     setSortKey((prev) => {
@@ -103,6 +144,7 @@ export default function useInventory() {
   return {
     products: pagedProducts,
     allProducts: sortedProducts,
+    rawProducts: products,
     stats,
     stores,
     loading,
@@ -114,11 +156,17 @@ export default function useInventory() {
     search,
     setSearch,
     sortKey,
+    setSortKey,
     sortDir,
+    setSortDir,
     toggleSort,
     page,
     setPage,
     totalPages,
+    parentFilter,
+    setParentFilter,
+    subFilter,
+    setSubFilter,
     createProduct: (payload) =>
       withSave(() => inventoryService.createProduct(token, payload)),
     updateProduct: (id, payload) =>
@@ -131,6 +179,19 @@ export default function useInventory() {
       }),
     bulkImport: (items) =>
       withSave(() => inventoryService.bulkImport(token, items)),
+    globalCategories,
+
+    deleteCategoryProducts: async (categoryId) => {
+      await withSave(async () => {
+        const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+        const res = await fetch(`${API_BASE}/products/category/${categoryId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Failed to delete category products");
+      });
+    },
 
     toggleAvailability: async (productId, available) => {
   // Optimistic update immediately

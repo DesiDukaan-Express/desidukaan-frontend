@@ -13,6 +13,7 @@ import {
   Pressable,
   Dimensions,
   Linking,
+  Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -22,6 +23,8 @@ import useCartStore from "../../store/cartStore";
 import useAuthStore from "../../store/authStore";
 import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
+import useOrderStore from "../../store/orderStore";
+
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const SOCKET_URL =
@@ -664,15 +667,23 @@ export default function CheckoutScreen() {
   const cart = useCartStore();
   const { token } = useAuthStore();
   const addressStore = useAddressStore();
+  const setPendingOrder = useOrderStore((s) => s.setPendingOrder);
+  const updatePendingOrder = useOrderStore((s) => s.updatePendingOrder);
+  const clearPendingOrder = useOrderStore((s) => s.clearPendingOrder);
+  const pendingOrderFromStore = useOrderStore((s) => s.pendingOrder);
+  const isResumingPendingOrder = !!route.params?.resumePendingOrder;
+  const resumeOrder = isResumingPendingOrder
+    ? route.params?.pendingOrder || pendingOrderFromStore || null
+    : null;
 
   // Slot passed from CartScreen via navigation params or cartStore
   const [confirmedSlot, setConfirmedSlot] = useState(
-    route.params?.confirmedSlot || cart?.confirmedSlot || null
+    route.params?.confirmedSlot || resumeOrder?.confirmedSlot || resumeOrder?.slot || cart?.confirmedSlot || null
   );
   const [slotId, setSlotId] = useState(
     route.params?.slotId || cart?.slotId || null
   );
-  const confirmedFee = route.params?.confirmedFee ?? cart?.confirmedFee ?? null;
+  const confirmedFee = route.params?.confirmedFee ?? resumeOrder?.confirmedFee ?? cart?.confirmedFee ?? null;
 
   const [vendorPhone, setVendorPhone] = useState(
     route.params?.vendorPhone || null
@@ -681,19 +692,30 @@ export default function CheckoutScreen() {
     route.params?.phoneStatus || null // 'pending', 'approved', 'rejected'
   );
 
-  const items = cart?.items || [];
-  const vendorId = cart?.vendorId;
-  const vendorName = items[0]?.vendorName || "Store";
+  const items = isResumingPendingOrder ? [] : (cart?.items || []);
+  const vendorId = route.params?.vendorId || resumeOrder?.vendor_id || resumeOrder?.vendorId || cart?.vendorId;
+  const vendorName =
+    route.params?.vendorName ||
+    resumeOrder?.vendorName ||
+    resumeOrder?.vendor?.shop_name ||
+    items[0]?.vendorName ||
+    "Store";
 
   // ── Snapshot of cart items/subtotal taken before cart is cleared on order submit ──
-  const [snapshotItems, setSnapshotItems] = useState(null);
-  const [snapshotSubtotal, setSnapshotSubtotal] = useState(null);
+  const [snapshotItems, setSnapshotItems] = useState(
+    route.params?.snapshotItems || resumeOrder?.snapshotItems || null
+  );
+  const [snapshotSubtotal, setSnapshotSubtotal] = useState(
+    route.params?.snapsgithotSubtotal ?? resumeOrder?.snapshotSubtotal ?? null
+  );
 
   // ── Order state ────────────────────────────────────────────────────────────
   const [placing, setPlacing] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
-  const [orderId, setOrderId] = useState(null);
-  const [orderStatus, setOrderStatus] = useState("idle"); // idle, pending, accepted, rejected, expired, countered
+  const [orderId, setOrderId] = useState(route.params?.orderId || resumeOrder?.id || null);
+  const [orderStatus, setOrderStatus] = useState(
+    route.params?.initialOrderStatus || resumeOrder?.status || "idle"
+  ); // idle, pending, accepted, rejected, expired, countered
   const [countdown, setCountdown] = useState(90);
   const [counterData, setCounterData] = useState(null);
   const timerRef = useRef(null);
@@ -705,12 +727,14 @@ export default function CheckoutScreen() {
   const [requestingPhone, setRequestingPhone] = useState(false);
   const [feeModalVisible, setFeeModalVisible] = useState(false);
   const [requestingFee,   setRequestingFee]   = useState(false);
-  const [proposedFee,     setProposedFee]     = useState(null);
+  const [proposedFee,     setProposedFee]     = useState(route.params?.proposedFee ?? resumeOrder?.proposedFee ?? null);
   const isAccepted = orderStatus === "accepted";
 
   // ── Delivery type preference ──────────────────────────────────────────────
   // 'standard' = normal delivery, 'quick' = faster but pricier
-  const [deliveryTypePref, setDeliveryTypePref] = useState('standard');
+  const [deliveryTypePref, setDeliveryTypePref] = useState(
+    route.params?.deliveryTypePref || resumeOrder?.deliveryTypePref || resumeOrder?.delivery_type_pref || 'standard'
+  );
 
   // ── Live delivery fee info from backend ──────────────────────────────────
   const [deliveryInfo, setDeliveryInfo] = useState(null);  // {fees, eta_minutes, quick_eta_minutes, ...}
@@ -874,7 +898,7 @@ export default function CheckoutScreen() {
   }, [addrLine, addrCity, addrPin]);
 
   // ── Payment state ──────────────────────────────────────────────────────────
-  const [selectedPay, setSelectedPay] = useState(null);
+  const [selectedPay, setSelectedPay] = useState(route.params?.selectedPay || resumeOrder?.selectedPay || null);
   const [selectedUPI, setSelectedUPI] = useState(null);
   const [upiId, setUpiId] = useState("");
   const [upiValidating, setUpiValidating] = useState(false);
@@ -894,10 +918,12 @@ export default function CheckoutScreen() {
       if (orderId && String(data.order_id) !== String(orderId)) return;
       if (data.status === "accepted") {
         setOrderStatus("accepted");
+        updatePendingOrder({ status: "accepted", order_number: data.order_number });
         setPlacing(false);
         if (timerRef.current) clearInterval(timerRef.current);
       } else if (data.status === "rejected") {
         setOrderStatus("rejected");
+        updatePendingOrder({ status: "rejected", cancellation_reason: data.reason });
         setPlacing(false);
         setErrorMsg(data.reason || "Vendor couldn't accept your order.");
         if (timerRef.current) clearInterval(timerRef.current);
@@ -914,6 +940,7 @@ export default function CheckoutScreen() {
           note: data.counter_offer.note,
           slot: data.counter_offer.slot || data.counter_offer.delivery_slot,
         });
+        updatePendingOrder({ status: "countered", counter_offer: data.counter_offer });
         setOrderStatus("countered");
         setPlacing(false);
       } else {
@@ -1084,15 +1111,46 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
       });
       const data = await res.json();
       if (res.ok) {
-        // Snapshot current cart before clearing so order summary stays accurate
-        setSnapshotItems(items.slice());
-        setSnapshotSubtotal(liveSubtotal);
-        cart?.clearCart?.();
-        const newOrderId = data.data?.order?.id || data.order?.id || data.id;
-        setOrderId(newOrderId);
-        setOrderStatus("pending");
-        // Navigation removed — we stay on Checkout for negotiation
-      } else {
+
+    const orderItemsSnapshot = items.slice();
+    const orderSubtotalSnapshot = liveSubtotal;
+
+    setSnapshotItems(orderItemsSnapshot);
+    setSnapshotSubtotal(orderSubtotalSnapshot);
+
+    const order = data.data?.order || data.order || data;
+
+    setPendingOrder({
+      ...order,
+      id: order.id,
+      status: order.status || "pending",
+      vendorId,
+      vendorName,
+      selectedPay,
+      confirmedSlot,
+      confirmedFee,
+      proposedFee,
+      deliveryTypePref,
+      snapshotItems: orderItemsSnapshot,
+      snapshotSubtotal: orderSubtotalSnapshot,
+    });
+
+    setOrderId(null);
+    setOrderStatus("idle");
+    setNegotiationModalVisible(false);
+    setPlacing(false);
+
+    cart?.clearCart?.();
+
+    showToast("Order sent to the store. You can keep browsing while they respond.", "success");
+
+    navigation.replace("CustomerApp", {
+        screen: "CustomerTabNavigator",
+        params: {
+            screen: "Home",
+        },
+    });
+} else {
         console.log("ORDER CREATION FAILED", data); // LOG ERROR DATA
         setErrorMsg(
           data.errors?.join(', ') || data.message || data.msg || "Order failed. Please try again.",
@@ -1117,6 +1175,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
     // Simulate payment processing for now as requested
     setTimeout(() => {
       setPlacing(false);
+      clearPendingOrder();
       navigation.replace("OrderPlaced", {
         orderId,
         orderNumber: `ORD-${orderId}`,
@@ -1192,7 +1251,9 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
   const cardR = isDesktop ? 20 : isTablet ? 18 : 14;
   const fs = isDesktop ? 1.15 : isTablet ? 1.07 : 1;
 
-  const canPlace = true; // validation disabled for testing
+  const minOrderValue = vendor?.min_order_value ?? 0;
+  const isBelowMinOrder = liveSubtotal < minOrderValue;
+  const canPlace = !isBelowMinOrder && confirmedSlot !== null;
 
   // ── Status Polling Fallback ───────────────────────────────────────────────
   useEffect(() => {
@@ -1221,6 +1282,12 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
               } : null,
             });
           }
+          updatePendingOrder({
+            status: order.status,
+            counter_offer: order.counter_offer_items,
+            delivery_fee: order.delivery_fee,
+            total: order.total,
+          });
           setOrderStatus(order.status);
           setPlacing(false);
         }
@@ -1292,6 +1359,21 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
               <TouchableOpacity onPress={() => setErrorMsg(null)}>
                 <Feather name="x" size={14} color={C.red} />
               </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Min Order warning banner */}
+          {isBelowMinOrder && (
+            <View
+              style={[
+                s.errorBanner,
+                { marginHorizontal: px, borderRadius: cardR, backgroundColor: "#FEF2F2", borderColor: "#FCA5A5", marginBottom: 12 },
+              ]}
+            >
+              <Feather name="alert-circle" size={15} color={C.red} />
+              <Text style={[s.errorText, { color: C.red, fontWeight: "700" }]}>
+                Minimum order value for {vendorName} is ₹{minOrderValue}. Please add ₹{Math.round(minOrderValue - liveSubtotal)} more worth of items to place the order.
+              </Text>
             </View>
           )}
 
@@ -1371,10 +1453,25 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                   </View>
                 )}
                 {deliveryTypePref === 'quick' && (
+                  deliveryInfo.fees.quick_delivery_fee > 0 ? (
+                    <View style={dts.bRow}>
+                      <Feather name="zap" size={12} color={C.orange} />
+                      <Text style={[dts.bLabel, { color: C.orange }]}>Flat Quick Delivery Surcharge</Text>
+                      <Text style={[dts.bVal, { color: C.orange }]}>+₹{deliveryInfo.fees.quick_delivery_fee}</Text>
+                    </View>
+                  ) : (
+                    <View style={dts.bRow}>
+                      <Feather name="zap" size={12} color={C.orange} />
+                      <Text style={[dts.bLabel, { color: C.orange }]}>Quick surcharge ({deliveryInfo.fees.quick_delivery_pct}%)</Text>
+                      <Text style={[dts.bVal, { color: C.orange }]}>+{deliveryInfo.fees.quick_delivery_pct}%</Text>
+                    </View>
+                  )
+                )}
+                {deliveryInfo.fees.is_bad_weather && deliveryInfo.fees.weather_surcharge > 0 && (
                   <View style={dts.bRow}>
-                    <Feather name="zap" size={12} color={C.orange} />
-                    <Text style={[dts.bLabel, { color: C.orange }]}>Quick surcharge ({deliveryInfo.fees.quick_delivery_pct}%)</Text>
-                    <Text style={[dts.bVal, { color: C.orange }]}>+{deliveryInfo.fees.quick_delivery_pct}%</Text>
+                    <Feather name="cloud-rain" size={12} color={C.red} />
+                    <Text style={[dts.bLabel, { color: C.red }]}>Bad Weather Surcharge</Text>
+                    <Text style={[dts.bVal, { color: C.red }]}>+₹{deliveryInfo.fees.weather_surcharge}</Text>
                   </View>
                 )}
                 {deliveryInfo.fees.is_free_delivery && deliveryTypePref === 'standard' && (
@@ -1910,7 +2007,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
               total={total}
               canPlace={canPlace}
               placing={placing}
-              onPress={isAccepted ? handlePayment : placeOrder}
+              onPress={orderStatus === "accepted" ? handlePayment : placeOrder}
               fs={fs}
             />
           </View>
@@ -2110,7 +2207,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
               <View style={negModal.pendingNote}>
                 <Feather name="info" size={13} color={C.amber} />
                 <Text style={negModal.pendingNoteText}>
-                  Please keep this screen open. The store will respond shortly.
+                  You can keep browsing while the store responds. We will notify you here.
                 </Text>
               </View>
             )}

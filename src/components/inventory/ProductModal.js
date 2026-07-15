@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import { Feather, MaterialIcons } from "@expo/vector-icons";
 import useAuthStore from "../../store/authStore";
 import { uploadAPI } from "../../services/api";
 import { T, UNITS } from "../common/tokens";
@@ -48,8 +49,8 @@ const FALLBACK_CATEGORIES = [
 ];
 
 const TYPE_OPTS = [
-  { label: "Packed", value: "packed", icon: "📦" },
-  { label: "Loose",  value: "loose",  icon: "⚖️" },
+  { label: "Packed", value: "packed", icon: "archive" },
+  { label: "Loose",  value: "loose",  icon: "sliders" },
 ];
 
 const WEIGHT_PRESETS = [
@@ -140,6 +141,7 @@ const fi = StyleSheet.create({
     fontSize: 14,
     color: TEXT,
     backgroundColor: "#fff",
+    ...(Platform.OS === "web" ? { outlineWidth: 0, outlineStyle: "none" } : {}),
   },
   focused: {
     borderColor: PRIMARY,
@@ -161,9 +163,9 @@ function TypeCard({ option, active, onPress }) {
       activeOpacity={0.75}
       style={[tc.card, active && tc.cardActive]}
     >
-      <Text style={tc.icon}>{option.icon}</Text>
+      <Feather name={option.icon} size={16} color={active ? PRIMARY_D : TEXT_MED} />
       <Text style={[tc.label, active && tc.labelActive]}>{option.label}</Text>
-      {active && <View style={tc.check}><Text style={tc.checkText}>✓</Text></View>}
+      {active && <View style={tc.check}><Feather name="check" size={10} color="#fff" /></View>}
     </TouchableOpacity>
   );
 }
@@ -224,15 +226,17 @@ function ImageUploader({ imageUrl, uploading, onUpload, onRemove, onUrlInput }) 
         </View>
       ) : (
         <>
-          <Text style={img.dropzoneIcon}>🖼️</Text>
+          <Feather name="image" size={32} color={TEXT_LITE} style={{ marginBottom: 6 }} />
           <Text style={img.dropzoneTitle}>Add Product Image</Text>
           <Text style={img.dropzoneSub}>Optional but recommended</Text>
           <View style={img.btnRow}>
-            <TouchableOpacity onPress={onUpload} style={img.uploadBtn}>
-              <Text style={img.uploadBtnText}>📷  Upload Photo</Text>
+            <TouchableOpacity onPress={onUpload} style={[img.uploadBtn, { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }]}>
+              <Feather name="camera" size={13} color="#fff" />
+              <Text style={img.uploadBtnText}>Upload Photo</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={onUrlInput} style={img.urlBtn}>
-              <Text style={img.urlBtnText}>🔗  Use URL</Text>
+            <TouchableOpacity onPress={onUrlInput} style={[img.urlBtn, { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }]}>
+              <Feather name="link" size={13} color={PRIMARY} />
+              <Text style={img.urlBtnText}>Use URL</Text>
             </TouchableOpacity>
           </View>
         </>
@@ -442,78 +446,105 @@ function CategoryPicker({
   onSelectTop, onSelectSub,
   categoryName,
 }) {
+  const [catOpen, setCatOpen] = useState(false);
+  const [subOpen, setSubOpen] = useState(false);
+
   return (
     <View style={cp.wrap}>
       <Label>Category</Label>
-      {catLoading ? (
-        <View style={cp.loadingRow}>
-          <ActivityIndicator size="small" color={PRIMARY} />
-          <Text style={cp.loadingText}>Loading…</Text>
+      
+      {/* Drop Box for Top Category */}
+      <TouchableOpacity
+        style={cp.dropdownBox}
+        onPress={() => { setCatOpen(!catOpen); setSubOpen(false); }}
+        activeOpacity={0.8}
+      >
+        <Text style={cp.dropdownValue}>
+          {selectedTopCat ? selectedTopCat.name : "Select Category..."}
+        </Text>
+        <Feather name={catOpen ? "chevron-up" : "chevron-down"} size={16} color={TEXT_MED} />
+      </TouchableOpacity>
+
+      {catOpen && (
+        <View style={cp.dropdownList}>
+          {catLoading ? (
+            <ActivityIndicator size="small" color={PRIMARY} style={{ margin: 10 }} />
+          ) : (
+            <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+              {topCategories.map((cat) => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[cp.dropdownItem, selectedTopCat?.id === cat.id && cp.dropdownItemActive]}
+                  onPress={() => {
+                    onSelectTop(cat);
+                    setCatOpen(false);
+                  }}
+                >
+                  <Text style={[cp.dropdownItemText, selectedTopCat?.id === cat.id && cp.dropdownItemTextActive]}>
+                    {cat.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
         </View>
-      ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={cp.chipRow}>
-            {topCategories.map((cat) => (
-              <TouchableOpacity
-                key={cat.id}
-                onPress={() => onSelectTop(cat)}
-                style={[cp.chip, selectedTopCat?.id === cat.id && cp.chipActive]}
-              >
-                <Text style={[cp.chipText, selectedTopCat?.id === cat.id && cp.chipTextActive]}>
-                  {cat.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
       )}
 
+      {/* Subcategory selection dropdown */}
       {selectedTopCat && (
         <View style={cp.subSection}>
-          <View style={cp.subHeader}>
-            <Text style={cp.subLabel}>Subcategory</Text>
-            {selectedSubName ? (
-              <View style={cp.badge}>
-                <Text style={cp.badgeText}>✓ {selectedSubName}</Text>
-              </View>
-            ) : null}
-          </View>
-          {subLoading ? (
-            <View style={cp.loadingRow}>
-              <ActivityIndicator size="small" color={PRIMARY} />
-              <Text style={cp.loadingText}>Loading…</Text>
+          <Text style={cp.subLabel}>Subcategory</Text>
+          
+          <TouchableOpacity
+            style={cp.dropdownBox}
+            onPress={() => { setSubOpen(!subOpen); setCatOpen(false); }}
+            activeOpacity={0.8}
+          >
+            <Text style={cp.dropdownValue}>
+              {selectedSubName ? selectedSubName : "Select Subcategory (Optional)..."}
+            </Text>
+            <Feather name={subOpen ? "chevron-up" : "chevron-down"} size={16} color={TEXT_MED} />
+          </TouchableOpacity>
+
+          {subOpen && (
+            <View style={cp.dropdownList}>
+              {subLoading ? (
+                <ActivityIndicator size="small" color={PRIMARY} style={{ margin: 10 }} />
+              ) : subcategories.length === 0 ? (
+                <View style={cp.noSub}>
+                  <Text style={cp.noSubText}>
+                    No subcategories available under "{selectedTopCat.name}".
+                  </Text>
+                </View>
+              ) : (
+                <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                  {subcategories.map((sub) => (
+                    <TouchableOpacity
+                      key={sub.id}
+                      style={[cp.dropdownItem, selectedSubId === sub.id && cp.dropdownItemActive]}
+                      onPress={() => {
+                        onSelectSub(sub);
+                        setSubOpen(false);
+                      }}
+                    >
+                      <Text style={[cp.dropdownItemText, selectedSubId === sub.id && cp.dropdownItemTextActive]}>
+                        {sub.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
             </View>
-          ) : subcategories.length === 0 ? (
-            <View style={cp.noSub}>
-              <Text style={cp.noSubText}>
-                No subcategories — product will file directly under "{selectedTopCat.name}".
-              </Text>
-            </View>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={cp.chipRow}>
-                {subcategories.map((sub) => (
-                  <TouchableOpacity
-                    key={sub.id}
-                    onPress={() => onSelectSub(sub)}
-                    style={[cp.chip, selectedSubId === sub.id && cp.chipActive]}
-                  >
-                    <Text style={[cp.chipText, selectedSubId === sub.id && cp.chipTextActive]}>
-                      {sub.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
           )}
         </View>
       )}
 
       {/* Breadcrumb */}
       {categoryName && (
-        <View style={cp.breadcrumb}>
+        <View style={[cp.breadcrumb, { flexDirection: "row", alignItems: "center", gap: 5 }]}>
+          <Feather name="folder" size={13} color={PRIMARY_D} />
           <Text style={cp.breadcrumbText}>
-            📁 {categoryName}
+            {categoryName}
             {selectedSubName ? ` › ${selectedSubName}` : ""}
           </Text>
         </View>
@@ -525,34 +556,43 @@ const cp = StyleSheet.create({
   wrap:      { gap: 6 },
   loadingRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6 },
   loadingText: { fontSize: 12, color: TEXT_MED },
-  chipRow:   { flexDirection: "row", gap: 7 },
-  chip: {
+  subSection: { marginTop: 4, gap: 6 },
+  subLabel:   { fontSize: 11, fontWeight: "700", color: TEXT_LITE, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 2 },
+  dropdownBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     borderWidth: 1.5,
     borderColor: BORDER,
-    borderRadius: 20,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     backgroundColor: "#fff",
   },
-  chipActive:     { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  chipText:       { fontSize: 12, fontWeight: "600", color: TEXT_MED },
-  chipTextActive: { color: "#fff" },
-  subSection: { marginTop: 4, gap: 6 },
-  subHeader:  { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  subLabel:   { fontSize: 11, fontWeight: "700", color: TEXT_LITE, textTransform: "uppercase", letterSpacing: 0.8 },
-  badge: {
-    backgroundColor: PRIMARY_L,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  badgeText: { fontSize: 11, fontWeight: "700", color: PRIMARY_D },
-  noSub: {
-    borderWidth: 1,
+  dropdownValue: { fontSize: 14, color: TEXT, fontWeight: "500" },
+  dropdownList: {
+    borderWidth: 1.5,
     borderColor: BORDER,
-    borderStyle: "dashed",
-    borderRadius: 10,
-    padding: 10,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    marginTop: 2,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  dropdownItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F4F4F5",
+  },
+  dropdownItemActive: { backgroundColor: PRIMARY_L },
+  dropdownItemText: { fontSize: 13, color: TEXT_MED },
+  dropdownItemTextActive: { color: PRIMARY_D, fontWeight: "700" },
+  noSub: {
+    padding: 14,
     backgroundColor: BG,
   },
   noSubText: { fontSize: 12, color: TEXT_LITE },
@@ -565,7 +605,7 @@ const cp = StyleSheet.create({
     paddingVertical: 6,
     marginTop: 4,
   },
-  breadcrumbText: { fontSize: 12, fontWeight: "600", color: "#15803D" },
+  breadcrumbText: { fontSize: 12, fontWeight: "700", color: "#166534" },
 });
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
@@ -609,6 +649,7 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
   const [selectedTopCat, setSelectedTopCat] = useState(null);
   const [catLoading, setCatLoading]         = useState(false);
   const [subLoading, setSubLoading]         = useState(false);
+  const [unitOpen, setUnitOpen]             = useState(false);
 
   // Slide-up animation
   const slideAnim = useRef(new Animated.Value(80)).current;
@@ -703,6 +744,10 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
       setErr("Name, Stock and Price are required.");
       return;
     }
+    if (!selectedTopCat) {
+      setErr("Please select a Category.");
+      return;
+    }
     if (form.type === "loose" && form.weight_options.length === 0) {
       setErr("Loose items need at least one weight option.");
       return;
@@ -718,7 +763,7 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
       ...form,
       weight_options:  cleanedOptions,
       subcategory_id:  form.subcategoryId || null,
-      category_id:     form.subcategoryId || null,
+      category_id:     form.subcategoryId || selectedTopCat?.id || null,
       category:        form.categoryName  || "Other",
       brand:           form.brand.trim()  || null,
       mrp:             form.mrp ? parseFloat(form.mrp) : null,
@@ -747,7 +792,7 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
           <View style={s.header}>
             <View style={s.headerLeft}>
               <View style={s.headerIconBox}>
-                <Text style={{ fontSize: 18 }}>{editing ? "✎" : "＋"}</Text>
+                <Feather name={editing ? "edit-2" : "plus"} size={16} color={PRIMARY_D} />
               </View>
               <View>
                 <Text style={s.title}>{editing ? "Edit Product" : "Add New Product"}</Text>
@@ -837,19 +882,35 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
             {/* Unit */}
             <View style={s.section}>
               <Label>Unit</Label>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={s.chipRow}>
-                  {UNITS.map((u) => (
-                    <TouchableOpacity
-                      key={u}
-                      onPress={() => set("unit", u)}
-                      style={[s.chip, form.unit === u && s.chipActive]}
-                    >
-                      <Text style={[s.chipText, form.unit === u && s.chipTextActive]}>{u}</Text>
-                    </TouchableOpacity>
-                  ))}
+              <TouchableOpacity
+                style={cp.dropdownBox}
+                onPress={() => setUnitOpen(!unitOpen)}
+                activeOpacity={0.8}
+              >
+                <Text style={cp.dropdownValue}>{form.unit || "Select Unit..."}</Text>
+                <Feather name={unitOpen ? "chevron-up" : "chevron-down"} size={16} color={TEXT_MED} />
+              </TouchableOpacity>
+
+              {unitOpen && (
+                <View style={cp.dropdownList}>
+                  <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                    {UNITS.map((u) => (
+                      <TouchableOpacity
+                        key={u}
+                        style={[cp.dropdownItem, form.unit === u && cp.dropdownItemActive]}
+                        onPress={() => {
+                          set("unit", u);
+                          setUnitOpen(false);
+                        }}
+                      >
+                        <Text style={[cp.dropdownItemText, form.unit === u && cp.dropdownItemTextActive]}>
+                          {u}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
                 </View>
-              </ScrollView>
+              )}
             </View>
 
             {/* Type */}
@@ -923,8 +984,9 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
 
             {/* Error */}
             {!!err && (
-              <View style={s.errBox}>
-                <Text style={s.errText}>⚠️  {err}</Text>
+              <View style={[s.errBox, { flexDirection: "row", alignItems: "center", gap: 8 }]}>
+                <Feather name="alert-circle" size={14} color={RED} />
+                <Text style={s.errText}>{err}</Text>
               </View>
             )}
 
@@ -938,7 +1000,7 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
               {saving ? (
                 <Spinner size={18} color="#fff" />
               ) : (
-                <Text style={s.submitBtnIcon}>{editing ? "💾" : "＋"}</Text>
+                <Feather name={editing ? "save" : "plus"} size={16} color="#fff" />
               )}
               <Text style={s.submitBtnText}>
                 {saving ? "Saving…" : editing ? "Save Changes" : "Add Product"}
