@@ -36,8 +36,11 @@ function fmt(iso) {
 }
 function fmtSlot(slot) {
   if (!slot) return "As soon as possible";
-  const day = new Date(slot.start).toDateString() === new Date().toDateString() ? "Today" : "Tomorrow";
-  return `${day}, ${fmt(slot.start)} – ${fmt(slot.end)}`;
+  const start = slot.vendor_slot_start || slot.slot_start || slot.start;
+  const end = slot.vendor_slot_end || slot.slot_end || slot.end;
+  if (!start || !end) return "As soon as possible";
+  const day = new Date(start).toDateString() === new Date().toDateString() ? "Today" : "Tomorrow";
+  return `${day}, ${fmt(start)} – ${fmt(end)}`;
 }
 
 export default function PaymentScreen() {

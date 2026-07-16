@@ -677,9 +677,15 @@ export default function CheckoutScreen() {
     : null;
 
   // Slot passed from CartScreen via navigation params or cartStore
-  const [confirmedSlot, setConfirmedSlot] = useState(
-    route.params?.confirmedSlot || resumeOrder?.confirmedSlot || resumeOrder?.slot || cart?.confirmedSlot || null
-  );
+  const [confirmedSlot, setConfirmedSlot] = useState(() => {
+    const raw = route.params?.confirmedSlot || resumeOrder?.confirmedSlot || resumeOrder?.slot || resumeOrder?.delivery_slot || cart?.confirmedSlot || null;
+    if (!raw) return null;
+    if (raw.start && raw.end) return { start: raw.start, end: raw.end };
+    const start = raw.vendor_slot_start || raw.slot_start || raw.start || null;
+    const end = raw.vendor_slot_end || raw.slot_end || raw.end || null;
+    if (start && end) return { start, end };
+    return null;
+  });
   const [slotId, setSlotId] = useState(
     route.params?.slotId || cart?.slotId || null
   );
@@ -717,7 +723,19 @@ export default function CheckoutScreen() {
     route.params?.initialOrderStatus || resumeOrder?.status || "idle"
   ); // idle, pending, accepted, rejected, expired, countered
   const [countdown, setCountdown] = useState(90);
-  const [counterData, setCounterData] = useState(null);
+  const [counterData, setCounterData] = useState(() => {
+    const rawCounter = resumeOrder?.counter_offer || null;
+    if (!rawCounter) return null;
+    const rawSlot = rawCounter.slot || rawCounter.delivery_slot || null;
+    const slot = rawSlot ? {
+      start: rawSlot.vendor_slot_start || rawSlot.slot_start || rawSlot.start,
+      end: rawSlot.vendor_slot_end || rawSlot.slot_end || rawSlot.end,
+    } : null;
+    return {
+      ...rawCounter,
+      slot,
+    };
+  });
   const timerRef = useRef(null);
   const scrollViewRef = useRef(null);       // ref to main ScrollView
   const paymentSectionY = useRef(0);        // Y-offset of payment section inside scroll
@@ -992,6 +1010,60 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
 
     return () => socket.disconnect();
   }, [token, orderId]);
+
+  // ── Fetch order details on mount if resuming ───────────────────────────────
+  useEffect(() => {
+    if (orderId && token && (orderStatus === "pending" || orderStatus === "countered" || orderStatus === "accepted")) {
+      (async () => {
+        try {
+          const res = await fetch(`${BASE_URL}/orders/${orderId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const d = await res.json();
+          if (res.ok && (d.success || d.data)) {
+            const order = d.data?.order || d.order;
+            // Sync status
+            if (order.status) {
+              setOrderStatus(order.status);
+            }
+            
+            // Sync vendor phone/contact status
+            if (order.vendorPhone) {
+              setVendorPhone(order.vendorPhone);
+            }
+            if (order.phoneStatus) {
+              setPhoneStatus(order.phoneStatus);
+            }
+
+            // Sync slot
+            if (order.delivery_slot) {
+              const parsedSlot = {
+                start: order.delivery_slot.vendor_slot_start || order.delivery_slot.slot_start,
+                end: order.delivery_slot.vendor_slot_end || order.delivery_slot.slot_end,
+              };
+              setConfirmedSlot(parsedSlot);
+            }
+
+            // Sync counter data if countered
+            if (order.status === "countered") {
+              setCounterData({
+                items: order.counter_offer_items,
+                delivery_fee: order.delivery_fee,
+                total: order.total,
+                note: order.vendor_note,
+                slot: order.delivery_slot ? {
+                  start: order.delivery_slot.vendor_slot_start || order.delivery_slot.slot_start,
+                  end: order.delivery_slot.vendor_slot_end || order.delivery_slot.slot_end,
+                } : null,
+              });
+            }
+          }
+        } catch (e) {
+          console.error("Error fetching order details on mount:", e);
+        }
+      })();
+    }
+  }, [orderId, token]);
 
   // ── Negotiation Timer Logic ────────────────────────────────────────────────
   useEffect(() => {

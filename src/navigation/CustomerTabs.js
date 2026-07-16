@@ -188,9 +188,11 @@ function PendingOrderMonitor() {
     // If accepted, go directly to PaymentScreen with all final order data
     if (effectiveStatus === 'accepted') {
       const counterOffer = order.counter_offer || null;
-      const finalSlot = counterOffer?.slot
-        ? { start: counterOffer.slot.start, end: counterOffer.slot.end }
-        : (order.confirmedSlot || order.slot || null);
+      const rawSlot = counterOffer?.slot || order.confirmedSlot || order.slot || order.delivery_slot || null;
+      const finalSlot = rawSlot ? {
+        start: rawSlot.vendor_slot_start || rawSlot.slot_start || rawSlot.start,
+        end: rawSlot.vendor_slot_end || rawSlot.slot_end || rawSlot.end
+      } : null;
       const finalFee  = counterOffer?.delivery_fee != null
         ? counterOffer.delivery_fee
         : (order.confirmedFee ?? order.delivery_fee ?? null);
