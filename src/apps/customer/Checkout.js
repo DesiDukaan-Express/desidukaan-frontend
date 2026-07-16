@@ -1058,11 +1058,11 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
     setErrorMsg(null);
     setPlacing(true);
     try {
-      let addrId = 0;
+      let addrId = null;
       if (selectedAddrId === "detected") {
         const allAddrs = addressStore?.addresses || [];
-        const existing = allAddrs.find(a => 
-          a.label === "Current Location" && 
+        const existing = allAddrs.find(a =>
+          a.label === "Current Location" &&
           (a.address_line === detectedAddr || a.address === detectedAddr)
         );
         if (existing) {
@@ -1075,12 +1075,18 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
           addrId = savedId;
         }
       } else if (selectedAddrId === "manual") {
-        // Fallback for manual or use a default if not saved
-        addrId = savedAddresses[0]?.id || 10;
+        addrId = savedAddresses[0]?.id || null;
       } else {
-        addrId = selectedAddrId || savedAddresses[0]?.id;
+        addrId = selectedAddrId || savedAddresses[0]?.id || null;
       }
-      addrId = parseInt(addrId, 10) || 10;
+
+      // Guard: ensure we have a real numeric address ID before proceeding
+      addrId = addrId ? parseInt(addrId, 10) : null;
+      if (!addrId || isNaN(addrId)) {
+        setErrorMsg("Please select or add a delivery address before placing your order.");
+        setPlacing(false);
+        return;
+      }
 
       const payload = {
         vendor_id: parseInt(vendorId, 10),
