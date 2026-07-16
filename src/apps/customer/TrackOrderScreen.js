@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-  Platform, StatusBar, Animated, ScrollView, Modal, Pressable
+  Platform, StatusBar, Animated, ScrollView, Modal, Pressable, Linking
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -266,6 +266,9 @@ export default function TrackOrderScreen() {
   const isActive       = order && !["delivered", "cancelled", "rejected"].includes(order.status);
   const destLat        = order?.delivery_address?.latitude;
   const destLng        = order?.delivery_address?.longitude;
+  const partner        = order?.delivery?.partner;
+  const partnerName    = partner?.user?.name || "Delivery Partner";
+  const partnerPhone   = partner?.user?.phone;
 
   const [showDetails,   setShowDetails]   = useState(false);
 
@@ -379,26 +382,40 @@ export default function TrackOrderScreen() {
           </View>
         )}
 
-        {/* Partner location details */}
-        {partnerPos ? (
+        {/* Partner location / details */}
+        {partner ? (
           <View style={s.partnerCard}>
             <View style={s.partnerIconWrap}>
-              <Feather name="truck" size={22} color={C.white} />
+              <Feather name="user" size={22} color={C.white} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.partnerTitle}>Partner</Text>
-              <Text style={s.partnerCoord}>
-                {parseFloat(partnerPos.lat).toFixed(5)}, {parseFloat(partnerPos.lng).toFixed(5)}
-              </Text>
+              <Text style={s.partnerLabel}>Delivery Partner Assigned</Text>
+              <Text style={s.partnerTitle}>{partnerName}</Text>
+              {partnerPos ? (
+                <Text style={s.partnerCoord}>
+                  📍 {parseFloat(partnerPos.lat).toFixed(5)}, {parseFloat(partnerPos.lng).toFixed(5)}
+                </Text>
+              ) : (
+                <Text style={s.partnerCoord}>Waiting for live location updates…</Text>
+              )}
             </View>
-            {isActive && <PulseDot color={C.green} />}
+            {partnerPhone && (
+              <TouchableOpacity
+                style={s.callBtn}
+                onPress={() => Linking.openURL(`tel:${partnerPhone}`)}
+                activeOpacity={0.7}
+              >
+                <Feather name="phone" size={18} color={C.white} />
+              </TouchableOpacity>
+            )}
+            {isActive && partnerPos && <PulseDot color={C.green} />}
           </View>
         ) : (
           <View style={s.waitCard}>
             <Feather name="clock" size={18} color={C.amber} />
             <View style={{ flex: 1 }}>
-              <Text style={s.waitTitle}>Waiting for partner location…</Text>
-              <Text style={s.waitSub}>Location will appear once the partner is on the way</Text>
+              <Text style={s.waitTitle}>Waiting for partner assignment…</Text>
+              <Text style={s.waitSub}>A delivery partner will be assigned to your order soon.</Text>
             </View>
           </View>
         )}
@@ -527,7 +544,17 @@ const s = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   partnerTitle: { fontSize: 14, fontWeight: "800", color: C.gray900, marginBottom: 3 },
+  partnerLabel: { fontSize: 11, fontWeight: "600", color: C.gray400, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 },
   partnerCoord: { fontSize: 12, color: C.gray400, fontFamily: Platform.OS === "web" ? "monospace" : undefined },
+  callBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: C.green,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
 
   waitCard: {
     flexDirection: "row", alignItems: "flex-start", gap: 12,

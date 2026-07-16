@@ -279,8 +279,7 @@ function PendingOrderMonitor() {
 
   // ── Socket listener ────────────────────────────────────────────────────
   useEffect(() => {
-    if (!token || !pendingOrder?.id) return;
-    if (!['pending', 'countered'].includes(pendingOrder?.status)) return;
+    if (!token) return;
 
     const socket = io(SOCKET_URL, { auth: { token }, transports: ['websocket'] });
 
@@ -312,8 +311,24 @@ function PendingOrderMonitor() {
       showToast('🔄 Store suggested changes. Tap to review.', 'countered', () => openCheckout('countered'), null);
     });
 
+    socket.on('delivery_assigned', (data) => {
+      console.log('[CustomerTabs WS] delivery_assigned received', data);
+      const partnerName = data.partner?.user?.name || 'A delivery partner';
+      const orderId = data.order_id || data.orderId;
+
+      showToast(
+        `🛵 ${partnerName} has been assigned as your delivery partner! Tap to track.`,
+        'success',
+        () => {
+          const root = navigation.getParent?.() || navigation;
+          root.navigate('TrackOrder', { orderId, orderNumber: `ORD-${orderId}` });
+        },
+        10000
+      );
+    });
+
     return () => socket.disconnect();
-  }, [token, pendingOrder?.id, pendingOrder?.status]);
+  }, [token]);
 
   // ── Polling fallback ───────────────────────────────────────────────────
   useEffect(() => {
