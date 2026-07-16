@@ -719,6 +719,8 @@ export default function CheckoutScreen() {
   const [countdown, setCountdown] = useState(90);
   const [counterData, setCounterData] = useState(null);
   const timerRef = useRef(null);
+  const scrollViewRef = useRef(null);       // ref to main ScrollView
+  const paymentSectionY = useRef(0);        // Y-offset of payment section inside scroll
 
   // Slot management states
   const [vendor, setVendor] = useState(null);
@@ -1227,6 +1229,17 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
       const d = await res.json();
       if (res.ok) {
         if (action === "accept") {
+          // ── Apply counter offer details when customer accepts ──
+          if (counterData) {
+            // Update slot to the new one proposed by vendor (if any)
+            if (counterData.slot) {
+              setConfirmedSlot({ start: counterData.slot.start, end: counterData.slot.end });
+            }
+            // Lock the delivery fee to the counter-offered fee
+            if (counterData.delivery_fee != null) {
+              setProposedFee(counterData.delivery_fee);
+            }
+          }
           setOrderStatus("accepted");
         } else {
           setOrderStatus("rejected");
@@ -1334,6 +1347,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
       <View style={[s.pageBody, isDesktop && s.pageBodyDesktop]}>
         {/* ══ MAIN / LEFT COLUMN ══════════════════════════════════════════ */}
         <ScrollView
+          ref={scrollViewRef}
           style={s.mainCol}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingTop: 14, paddingBottom: 100 }}
@@ -1586,6 +1600,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
 
           {/* ── SECTION 5: PAYMENT METHOD (Only shown after acceptance) ── */}
           {orderStatus === "accepted" && (
+            <View onLayout={(e) => { paymentSectionY.current = e.nativeEvent.layout.y; }}>
             <Section
               num="5"
               title="Payment Method"
@@ -1934,6 +1949,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                 );
               })}
             </Section>
+          </View>
           )}
 
           {/* ── ORDER SUMMARY (mobile/tablet inline) ─────────────────── */}
@@ -2138,7 +2154,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                   marginBottom: 12,
                   textAlign: "center"
                 }}>
-                  Selected Delivery Details
+                  {counterData && orderStatus === "accepted" ? "Counter Offer — Final Details" : "Selected Delivery Details"}
                 </Text>
 
                 {/* Delivery Time Row */}
@@ -2158,7 +2174,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                   </Text>
                 </View>
 
-                {/* Slot Row */}
+                {/* Slot Row — uses counter slot if accepted after counter, else original confirmedSlot */}
                 <View style={{
                   flexDirection: "row",
                   justifyContent: "space-between",
@@ -2169,16 +2185,18 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                   <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>Delivery Slot</Text>
                   <Text style={{ fontSize: 13, color: C.gray900, fontWeight: "700" }}>
                     {(() => {
-                      if (!confirmedSlot) return "As soon as possible";
-                      const startStr = new Date(confirmedSlot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                      const endStr = new Date(confirmedSlot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                      const dayStr = new Date(confirmedSlot.start).toDateString() === new Date().toDateString() ? "Today" : "Tomorrow";
+                      // After accepting a counter offer, show the counter's slot (already merged into confirmedSlot)
+                      const activeSlot = confirmedSlot;
+                      if (!activeSlot) return "As soon as possible";
+                      const startStr = new Date(activeSlot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      const endStr = new Date(activeSlot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      const dayStr = new Date(activeSlot.start).toDateString() === new Date().toDateString() ? "Today" : "Tomorrow";
                       return `${dayStr}, ${startStr} - ${endStr}`;
                     })()}
                   </Text>
                 </View>
 
-                {/* Delivery Charges Row */}
+                {/* Delivery Charges Row — show counter fee when available */}
                 <View style={{
                   flexDirection: "row",
                   justifyContent: "space-between",
@@ -2186,16 +2204,65 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                 }}>
                   <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>Delivery Charges</Text>
                   <Text style={{ fontSize: 13, color: C.greenDark, fontWeight: "800" }}>
-                    ₹{liveActiveFee}
+                    ₹{counterData && orderStatus === "accepted"
+                      ? (counterData.delivery_fee ?? activeFee)
+                      : activeFee}
                   </Text>
                 </View>
+
+                {/* Vendor phone row — shown when approved */}
+                {phoneStatus === "approved" && vendorPhone && (
+                  <View style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    paddingVertical: 8,
+                    borderTopWidth: 1,
+                    borderTopColor: "#F1F5F9",
+                    marginTop: 4,
+                  }}>
+                    <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>Vendor Phone</Text>
+                    <TouchableOpacity
+                      onPress={() => Linking.openURL(`tel:${vendorPhone}`)}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 6,
+                        backgroundColor: C.greenLight, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}
+                    >
+                      <Feather name="phone" size={13} color={C.green} />
+                      <Text style={{ fontSize: 13, fontWeight: "800", color: C.greenDark }}>{vendorPhone}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             )}
 
             {orderStatus === "accepted" && (
               <TouchableOpacity
                 style={negModal.proceedBtn}
-                onPress={() => { setNegotiationModalVisible(false); }}
+                onPress={() => {
+                  setNegotiationModalVisible(false);
+                  // Navigate to dedicated PaymentScreen with all final order data
+                  const finalSlot = counterData?.slot
+                    ? { start: counterData.slot.start, end: counterData.slot.end }
+                    : confirmedSlot;
+                  const finalFee = counterData?.delivery_fee != null
+                    ? counterData.delivery_fee
+                    : activeFee;
+                  const finalTotal = counterData?.total != null ? counterData.total : total;
+                  navigation.navigate("Payment", {
+                    orderId,
+                    orderNumber: `ORD-${orderId}`,
+                    vendorName,
+                    items: displayItems,
+                    subtotal,
+                    deliveryFee: finalFee,
+                    total: finalTotal,
+                    confirmedSlot: finalSlot,
+                    deliveryTypePref,
+                    vendorPhone,
+                    phoneStatus,
+                    preSelectedPay: selectedPay,
+                  });
+                }}
                 activeOpacity={0.85}
               >
                 <Feather name="credit-card" size={16} color={C.white} />

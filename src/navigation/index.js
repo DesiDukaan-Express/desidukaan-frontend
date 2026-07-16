@@ -15,6 +15,7 @@ import VendorTabs from "./VendorTabs";
 import DeliveryTabs from "./DeliveryTabs";
 import CheckoutScreen from "../apps/customer/Checkout";
 import OrderPlaced from "../apps/customer/OrderPlaced";
+import PaymentScreen from "../apps/customer/PaymentScreen";
 import VendorOnboardingScreen from "../apps/vendor/VendorOnboardingScreen";
 import DashboardScreen from "../apps/vendor/DashboardScreen";
 import DeliveryOnboardingScreen from "../apps/delivery/DeliveryOnboardingScreen";
@@ -191,6 +192,7 @@ export default function Navigation() {
                 <Stack.Screen name="CustomerApp" component={CustomerTabs} />
               )}
               <Stack.Screen name="Checkout" component={CheckoutScreen} />
+              <Stack.Screen name="Payment" component={PaymentScreen} />
               <Stack.Screen name="OrderPlaced" component={OrderPlaced} />
             </>
           )}

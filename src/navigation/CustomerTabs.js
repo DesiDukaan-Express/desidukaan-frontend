@@ -183,11 +183,44 @@ function PendingOrderMonitor() {
     const order = useOrderStore.getState().pendingOrder;
     if (!order?.id) return;
     const root = navigation.getParent?.() || navigation;
+    const effectiveStatus = statusOverride || order.status || 'pending';
+
+    // If accepted, go directly to PaymentScreen with all final order data
+    if (effectiveStatus === 'accepted') {
+      const counterOffer = order.counter_offer || null;
+      const finalSlot = counterOffer?.slot
+        ? { start: counterOffer.slot.start, end: counterOffer.slot.end }
+        : (order.confirmedSlot || order.slot || null);
+      const finalFee  = counterOffer?.delivery_fee != null
+        ? counterOffer.delivery_fee
+        : (order.confirmedFee ?? order.delivery_fee ?? null);
+      const finalTotal = counterOffer?.total != null
+        ? counterOffer.total
+        : (order.total ?? null);
+
+      root.navigate('Payment', {
+        orderId:          order.id,
+        orderNumber:      order.order_number || `ORD-${order.id}`,
+        vendorName:       order.vendorName || order.vendor?.shop_name || 'Store',
+        items:            order.snapshotItems || order.items || [],
+        subtotal:         order.snapshotSubtotal ?? order.subtotal ?? 0,
+        deliveryFee:      finalFee ?? 0,
+        total:            finalTotal ?? 0,
+        confirmedSlot:    finalSlot,
+        deliveryTypePref: order.deliveryTypePref || order.delivery_type_pref || 'standard',
+        vendorPhone:      order.vendorPhone || null,
+        phoneStatus:      order.phoneStatus  || null,
+        preSelectedPay:   order.selectedPay  || null,
+      });
+      return;
+    }
+
+    // For pending / countered — go back to Checkout
     root.navigate('Checkout', {
       resumePendingOrder: true,
       pendingOrder: order,
       orderId: order.id,
-      initialOrderStatus: statusOverride || order.status || 'pending',
+      initialOrderStatus: effectiveStatus,
       confirmedSlot:    order.confirmedSlot || order.slot || null,
       selectedPay:      order.selectedPay || null,
       snapshotItems:    order.snapshotItems || order.items || [],
@@ -309,7 +342,7 @@ function PendingOrderMonitor() {
 
   const status     = pendingOrder?.status;
   const vendor     = pendingOrder?.vendorName || pendingOrder?.vendor?.shop_name || 'Store';
-  const isPersist  = pendingOrder?.id && ['pending', 'countered', 'expired'].includes(status);
+  const isPersist  = pendingOrder?.id && ['pending', 'countered', 'expired', 'accepted'].includes(status);
 
   if (!isPersist && !toast) return null;
 
@@ -321,6 +354,7 @@ function PendingOrderMonitor() {
           style={[
             ms.banner,
             status === 'pending'   && ms.bPending,
+            status === 'accepted'  && ms.bAccepted,
             status === 'countered' && ms.bCountered,
             status === 'expired'   && ms.bExpired,
           ]}
@@ -328,10 +362,14 @@ function PendingOrderMonitor() {
           activeOpacity={0.88}
         >
           {/* Timer / icon bubble */}
-          {status === 'pending' ? (
+      {status === 'pending' ? (
             <Animated.View style={[ms.bubble, { transform: [{ scale: pulseAnim }] }]}>
               <Text style={ms.bubbleText}>{countdown}s</Text>
             </Animated.View>
+          ) : status === 'accepted' ? (
+            <View style={ms.bubble}>
+              <Feather name="credit-card" size={17} color="#fff" />
+            </View>
           ) : (
             <View style={ms.bubble}>
               <Feather
@@ -347,6 +385,8 @@ function PendingOrderMonitor() {
             <Text style={ms.bannerTitle} numberOfLines={1}>
               {status === 'pending'
                 ? `Waiting for ${vendor}…`
+                : status === 'accepted'
+                ? `Order Confirmed — Proceed to Pay`
                 : status === 'countered'
                 ? `${vendor} suggested changes`
                 : 'Request expired'}
@@ -354,6 +394,8 @@ function PendingOrderMonitor() {
             <Text style={ms.bannerSub}>
               {status === 'pending'
                 ? `${countdown}s remaining · tap to view`
+                : status === 'accepted'
+                ? 'Tap to complete payment'
                 : status === 'countered'
                 ? 'Tap to review & respond'
                 : 'Tap for details'}
@@ -431,6 +473,7 @@ const ms = StyleSheet.create({
     backgroundColor: C.orangeDark,
   },
   bPending:   { backgroundColor: C.orangeDark },
+  bAccepted:  { backgroundColor: C.green },
   bCountered: { backgroundColor: C.purple },
   bExpired:   { backgroundColor: C.gray600 },
 
