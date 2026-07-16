@@ -1078,8 +1078,8 @@ export default function VendorStoreScreen() {
         </ScrollView>
       </View>
 
-      {/* CATEGORY TABS — phones only */}
-      {!isWide && !search && categories.length > 0 && (
+      {/* CATEGORY TABS — hidden on wide screens where sidebar shows */}
+      {!search && categories.length > 0 && !(isWide && categories.length > 2) && (
         <View style={s.catTabsWrap}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.catTabsRow}>
             {categories.map(cat => (
