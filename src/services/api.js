@@ -71,7 +71,7 @@ export const authAPI = {
 
   sendOTP: (phone) => request("POST", "/auth/login", { phone }),
 
-  verifyOTP: (phone, code, role) => request("POST", "/auth/verify", { phone, code, role }),
+  verifyOTP: (phone, code) => request("POST", "/auth/verify", { phone, code }),
 };
 
 // ─── Upload ───────────────────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ export const adminCategoriesAPI = {
 
 // ─── Vendors ──────────────────────────────────────────────────────────────────
 export const vendorsAPI = {
-  getNearby: (latitude, longitude, radius_km = 10, store_category = null) => {
+  getNearby: (latitude, longitude, radius_km = 2, store_category = null) => {
     let url = `/vendors?latitude=${latitude}&longitude=${longitude}&radius_km=${radius_km}`;
     if (store_category) url += `&store_category=${encodeURIComponent(store_category)}`;
     return request("GET", url);
