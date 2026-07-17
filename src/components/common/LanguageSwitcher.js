@@ -11,7 +11,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { LANGUAGES, changeLanguage } from '../../i18n';
 
-export default function LanguageSwitcher({ triggerStyle, triggerTextStyle }) {
+export default function LanguageSwitcher({ triggerStyle, triggerTextStyle, inline = false }) {
   const { i18n, t } = useTranslation();
   const [visible, setVisible] = useState(false);
 
@@ -22,6 +22,42 @@ export default function LanguageSwitcher({ triggerStyle, triggerTextStyle }) {
     setVisible(false);
   };
 
+  // ── Inline mode: just render the language grid directly ────────────────────
+  if (inline) {
+    return (
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={s.headerTitle}>{t('common.selectLanguage')}</Text>
+        <View style={s.grid}>
+          {LANGUAGES.map((lang) => {
+            const isActive = i18n.language === lang.code;
+            return (
+              <TouchableOpacity
+                key={lang.code}
+                style={[s.langCard, isActive && s.langCardActive]}
+                onPress={() => handleSelect(lang.code)}
+                activeOpacity={0.8}
+              >
+                <Text style={s.langFlag}>{lang.flag}</Text>
+                <Text style={[s.langName, isActive && s.langNameActive]}>
+                  {lang.name}
+                </Text>
+                <Text style={[s.langNative, isActive && s.langNativeActive]}>
+                  {lang.nativeName}
+                </Text>
+                {isActive && (
+                  <View style={s.checkBadge}>
+                    <Text style={s.checkIcon}>✓</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </ScrollView>
+    );
+  }
+
+  // ── Default mode: trigger button + modal ───────────────────────────────────
   return (
     <>
       {/* Trigger Button */}

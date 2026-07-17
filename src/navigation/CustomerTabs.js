@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { io } from 'socket.io-client';
 import { View, Text, Platform, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import useCartStore from '../store/cartStore';
 import useAuthStore from '../store/authStore';
 import useOrderStore from '../store/orderStore';
@@ -103,22 +104,33 @@ const TabIcon = ({ iconName, label, focused, cartCount }) => {
 };
 
 // ─── Cart tab with live badge ──────────────────────────────────────────────────
-function CartTabIcon({ focused }) {
+function CartTabIcon({ focused, label }) {
   const cart = useCartStore();
   const cartCount = cart?.items?.reduce((s, i) => s + (i.qty || 1), 0) ?? 0;
-  return <TabIcon iconName={TAB_ICONS['Cart']} label="Cart" focused={focused} cartCount={cartCount} />;
+  return <TabIcon iconName={TAB_ICONS['Cart']} label={label} focused={focused} cartCount={cartCount} />;
 }
 
 // ─── Bottom tab navigator ──────────────────────────────────────────────────────
 function CustomerTabNavigator() {
+  const { t } = useTranslation();
+
+  const TAB_LABELS = {
+    Home:    t('home.tab'),
+    Search:  t('search.title'),
+    Cart:    t('cart.title_short'),
+    Orders:  t('orders.title'),
+    Profile: t('profile.title'),
+  };
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowLabel: false,
         tabBarIcon: ({ focused }) => {
-          if (route.name === 'Cart') return <CartTabIcon focused={focused} />;
-          return <TabIcon iconName={TAB_ICONS[route.name]} label={route.name} focused={focused} />;
+          const label = TAB_LABELS[route.name] || route.name;
+          if (route.name === 'Cart') return <CartTabIcon focused={focused} label={label} />;
+          return <TabIcon iconName={TAB_ICONS[route.name]} label={label} focused={focused} />;
         },
         tabBarStyle: {
           backgroundColor: C.surface,

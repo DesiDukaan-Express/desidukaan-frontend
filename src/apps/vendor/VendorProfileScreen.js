@@ -10,6 +10,7 @@ import {
   Switch,
   Alert,
   Modal,
+  Pressable,
   TextInput,
   ActivityIndicator,
   Platform,
@@ -18,9 +19,11 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useTranslation } from "react-i18next";
 import useAuthStore from "../../store/authStore";
 import * as ImagePicker from "expo-image-picker";
 import { uploadAPI } from "../../services/api";
+import LanguageSwitcher from "../../components/common/LanguageSwitcher";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -1125,17 +1128,38 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
 }
 
 function AccountSettingsCard({ rs, isWide }) {
+  const { t } = useTranslation();
+  const [showLanguage, setShowLanguage] = React.useState(false);
+
   const items = [
-    { icon: "account-balance", label: "Bank Account", sub: "Manage payout bank details", color: "#059669", bg: "#ECFDF5" },
-    { icon: "payments", label: "Payout Settings", sub: "UPI & withdrawal preferences", color: C.blue, bg: C.blueDim },
-    { icon: "verified-user", label: "KYC Verification", sub: "Documents & compliance", color: "#7C3AED", bg: "#EDE9FE", right: "Verified ✓" },
-    { icon: "help-outline", label: "Help & Support", sub: "FAQs, chat, call support", color: C.orange, bg: C.orangeDim },
-    { icon: "privacy-tip", label: "Privacy Policy", sub: "How we use your data", color: C.textSub, bg: C.bg },
-    { icon: "description", label: "Terms & Conditions", sub: "Platform usage terms", color: C.textSub, bg: C.bg },
+    { icon: "account-balance", label: t('profile.bankAccount'), sub: t('profile.bankAccountSub'), color: "#059669", bg: "#ECFDF5" },
+    { icon: "payments", label: t('profile.payoutSettings'), sub: t('profile.payoutSettingsSub'), color: C.blue, bg: C.blueDim },
+    { icon: "verified-user", label: t('profile.kycVerification'), sub: t('profile.kycVerificationSub'), color: "#7C3AED", bg: "#EDE9FE", right: t('profile.verified') },
+    { icon: "help-outline", label: t('profile.helpSupport'), sub: t('profile.helpSupportSub'), color: C.orange, bg: C.orangeDim },
+    { icon: "privacy-tip", label: t('auth.privacyPolicy'), sub: t('profile.privacySub'), color: C.textSub, bg: C.bg },
+    { icon: "description", label: t('profile.termsConditions'), sub: t('profile.termsSub'), color: C.textSub, bg: C.bg },
   ];
 
   return (
-    <SectionCard title="Account Settings" overline="SETTINGS" rs={rs} isWide={isWide}>
+    <SectionCard title={t('profile.accountSettings')} overline="SETTINGS" rs={rs} isWide={isWide}>
+      {/* Language row */}
+      <TouchableOpacity
+        style={styles.settingRow}
+        onPress={() => setShowLanguage(true)}
+        activeOpacity={0.6}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <View style={[styles.settingIconBox, { backgroundColor: "#EFF6FF" }]}>
+            <MaterialIcons name="language" size={18} color={C.blue} />
+          </View>
+          <View>
+            <Text style={styles.settingTitle}>{t('profile.language')}</Text>
+            <Text style={styles.settingSub}>{t('profile.languageSub')}</Text>
+          </View>
+        </View>
+        <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
+      </TouchableOpacity>
+
       {items.map((item, i) => (
         <TouchableOpacity
           key={item.label}
@@ -1158,6 +1182,27 @@ function AccountSettingsCard({ rs, isWide }) {
           )}
         </TouchableOpacity>
       ))}
+
+      {/* Language picker modal */}
+      <Modal
+        transparent
+        visible={showLanguage}
+        animationType="slide"
+        onRequestClose={() => setShowLanguage(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}
+          onPress={() => setShowLanguage(false)}
+        >
+          <Pressable
+            style={{ backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48 }}
+            onPress={() => {}}
+          >
+            <View style={{ width: 40, height: 4, backgroundColor: '#E5E7EB', borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
+            <LanguageSwitcher inline />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SectionCard>
   );
 }

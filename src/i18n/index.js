@@ -41,7 +41,7 @@ const i18nResources = Object.fromEntries(
 );
 
 const initI18n = async () => {
-  let savedLang = 'hi'; // Default to Hindi
+  let savedLang = 'en'; // Default to English
   try {
     const stored = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
     if (stored && resources[stored]) savedLang = stored;
@@ -52,7 +52,7 @@ const initI18n = async () => {
     .init({
       resources: i18nResources,
       lng: savedLang,
-      fallbackLng: 'hi',
+      fallbackLng: 'en',
       interpolation: {
         escapeValue: false, // React already escapes
       },

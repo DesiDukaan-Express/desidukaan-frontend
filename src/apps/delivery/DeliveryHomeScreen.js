@@ -14,6 +14,7 @@ import {
   PlusJakartaSans_700Bold,
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
+import { useTranslation } from 'react-i18next';
 import useAuthStore from '../../store/authStore';
 import IncomingOrderSheet from '../../components/IncomingOrderSheet';
 
@@ -195,6 +196,7 @@ function StatCol({ label, value, noBorder }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function DeliveryHomeScreen({ navigation }) {
   const { token, user } = useAuthStore();
+  const { t } = useTranslation();
 
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_500Medium,
@@ -408,7 +410,7 @@ export default function DeliveryHomeScreen({ navigation }) {
             </View>
 
             <Text style={s.heroName}>Partner {firstName}</Text>
-            <Text style={s.earningsLabel}>YOUR TOTAL EARNINGS</Text>
+            <Text style={s.earningsLabel}>{t('delivery.totalEarningsLabel')}</Text>
             <View style={s.earningsRow}>
               <Text style={s.earningsCurrency}>₹</Text>
               <Text style={s.earningsAmt}>{displayEarnings}</Text>
@@ -439,10 +441,10 @@ export default function DeliveryHomeScreen({ navigation }) {
             <View style={s.statusRow}>
               <View style={{ flex: 1 }}>
                 <Text style={s.statusTitle}>
-                  Status: {isAvailable ? 'Online' : 'Offline'}
+                  {isAvailable ? t('delivery.statusOnline') : t('delivery.statusOffline')}
                 </Text>
                 <Text style={s.statusSub}>
-                  {isAvailable ? 'Available for deliveries' : 'Go online to receive orders'}
+                  {isAvailable ? t('delivery.availableForDeliveries') : t('delivery.goOnlineToReceive')}
                 </Text>
               </View>
               <Switch
@@ -470,7 +472,7 @@ export default function DeliveryHomeScreen({ navigation }) {
               </View>
               <View style={{ flex: 1 }}>
                 <View style={s.activePill}>
-                  <Text style={s.activePillText}>ACTIVE ORDERS</Text>
+                  <Text style={s.activePillText}>{t('delivery.activeOrders')}</Text>
                   <Svg width={18} height={13} viewBox="0 0 20 14">
                     <Circle cx="4" cy="11" r="3" fill="#FF3B30" />
                     <Circle cx="16" cy="11" r="3" fill="#FF3B30" />
@@ -479,14 +481,14 @@ export default function DeliveryHomeScreen({ navigation }) {
                   </Svg>
                 </View>
                 <Text style={s.ordersCount}>
-                  {pendingOrders} Delivery Order{pendingOrders !== 1 ? 's' : ''} Found!
+                  {pendingOrders} {t('delivery.deliveryOrdersFound')}
                 </Text>
                 <TouchableOpacity
                   style={s.viewDetailsBtn}
                   onPress={() => navigation?.navigate('Queue')}
                   activeOpacity={0.8}
                 >
-                  <Text style={s.viewDetailsBtnText}>VIEW DETAILS</Text>
+                  <Text style={s.viewDetailsBtnText}>{t('delivery.viewDetails')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -494,27 +496,27 @@ export default function DeliveryHomeScreen({ navigation }) {
 
           {/* ── Performance stats ── */}
           <View style={s.card}>
-            <Text style={s.sectionLabel}>PERFORMANCE STATS</Text>
+            <Text style={s.sectionLabel}>{t('delivery.performanceStats')}</Text>
             <View style={s.statsGrid}>
-              <StatCol label={'Total\nDeliveries'}   value={String(totalDeliveries)} />
-              <StatCol label={'Completion\nRate'}    value={displayCompletionRate} />
-              <StatCol label={'Distance\nCovered'}   value={displayDistance} />
-              <StatCol label={'Profile\nRating'}     value={displayRating} noBorder />
+              <StatCol label={t('delivery.totalDeliveriesLabel')}   value={String(totalDeliveries)} />
+              <StatCol label={t('delivery.completionRateLabel')}    value={displayCompletionRate} />
+              <StatCol label={t('delivery.distanceCoveredLabel')}   value={displayDistance} />
+              <StatCol label={t('delivery.profileRatingLabel')}     value={displayRating} noBorder />
             </View>
           </View>
 
           {/* ── Recent transactions ── */}
           <View style={s.txHeader}>
-            <Text style={s.txTitle}>Recent Transactions</Text>
+            <Text style={s.txTitle}>{t('delivery.recentTransactions')}</Text>
             <TouchableOpacity onPress={() => navigation?.navigate('History')} activeOpacity={0.7}>
-              <Text style={s.txLink}>See all</Text>
+              <Text style={s.txLink}>{t('delivery.seeAll')}</Text>
             </TouchableOpacity>
           </View>
           <View style={s.txCard}>
             {recentDeliveries.length === 0 ? (
               <View style={{ alignItems: 'center', paddingVertical: 28 }}>
                 <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_500Medium', color: C.gray400 }}>
-                  No deliveries yet
+                  {t('delivery.noDeliveriesYet')}
                 </Text>
               </View>
             ) : (

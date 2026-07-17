@@ -1,6 +1,8 @@
+import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View, Platform, useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { colors } from '../styles/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,6 +20,8 @@ export default function DeliveryTabs() {
   const isSmall = height < 700;
   const isNarrow = width < 360;
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -40,11 +44,11 @@ export default function DeliveryTabs() {
 },
       })}
     >
-      <Tab.Screen name="Home"    component={DeliveryHomeScreen}   options={{ tabBarIcon: ({ color }) => <MaterialIcons name="home"             size={22} color={color} /> }} />
-      <Tab.Screen name="Queue"   component={QueueScreen}          options={{ tabBarIcon: ({ color }) => <MaterialIcons name="list-alt"         size={22} color={color} /> }} />
-      <Tab.Screen name="Active"  component={ActiveDeliveryScreen} options={{ tabBarIcon: ({ color }) => <MaterialIcons name="delivery-dining"  size={22} color={color} /> }} />
-      <Tab.Screen name="History" component={HistoryScreen}        options={{ tabBarIcon: ({ color }) => <MaterialIcons name="history"          size={22} color={color} /> }} />
-      <Tab.Screen name="Profile" component={DeliveryProfileScreen} options={{ tabBarIcon: ({ color }) => <MaterialIcons name="person" size={22} color={color} /> }} />
+      <Tab.Screen name="Home"    component={DeliveryHomeScreen}   options={{ tabBarLabel: t('delivery.home'),           tabBarIcon: ({ color }) => <MaterialIcons name="home"             size={22} color={color} /> }} />
+      <Tab.Screen name="Queue"   component={QueueScreen}          options={{ tabBarLabel: t('delivery.queue'),          tabBarIcon: ({ color }) => <MaterialIcons name="list-alt"         size={22} color={color} /> }} />
+      <Tab.Screen name="Active"  component={ActiveDeliveryScreen} options={{ tabBarLabel: t('delivery.activeDelivery'), tabBarIcon: ({ color }) => <MaterialIcons name="delivery-dining"  size={22} color={color} /> }} />
+      <Tab.Screen name="History" component={HistoryScreen}        options={{ tabBarLabel: t('delivery.history'),        tabBarIcon: ({ color }) => <MaterialIcons name="history"          size={22} color={color} /> }} />
+      <Tab.Screen name="Profile" component={DeliveryProfileScreen} options={{ tabBarLabel: t('profile.title'),          tabBarIcon: ({ color }) => <MaterialIcons name="person" size={22} color={color} /> }} />
     </Tab.Navigator>
   );
 }

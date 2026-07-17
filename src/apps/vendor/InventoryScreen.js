@@ -13,6 +13,7 @@ import {
   Platform,
   Animated,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { Feather, MaterialIcons } from "@expo/vector-icons";
 
@@ -124,6 +125,7 @@ function ProductCard({
   onToggleAvailability,
   onPressMenu,
 }) {
+  const { t } = useTranslation();
   const isAvailable = (product.inventory?.stock_qty ?? product.stock_qty ?? 0) > 0;
 
   return (
@@ -177,7 +179,7 @@ function ProductCard({
             style={[s.toggleBtn, isAvailable ? s.toggleBtnActive : s.toggleBtnInactive]}
           >
             <Text style={[s.toggleBtnText, isAvailable ? s.toggleBtnTextActive : s.toggleBtnTextInactive]}>
-              {isAvailable ? "Available" : "Unavailable"}
+              {isAvailable ? t('vendor.available') : t('vendor.unavailable')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -191,6 +193,7 @@ function ProductCard({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function InventoryScreen() {
+  const { t } = useTranslation();
   const inv = useInventory();
   const [selected, setSelected] = useState(new Set());
   const [modal, setModal] = useState(null); // null | 'add' | product object
@@ -230,12 +233,12 @@ export default function InventoryScreen() {
 
   const handleDelete = (id) => {
     Alert.alert(
-      "Delete Product",
-      "This will permanently remove the product. This cannot be undone.",
+      t('vendor.deleteProduct'),
+      t('vendor.deleteProductDesc'),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t('vendor.cancel'), style: "cancel" },
         {
-          text: "Delete",
+          text: t('vendor.delete'),
           style: "destructive",
           onPress: async () => {
             await inv.deleteProduct(id);
@@ -248,12 +251,12 @@ export default function InventoryScreen() {
 
   const handleDeleteCategory = (catName) => {
     Alert.alert(
-      "Delete Category",
-      `If you delete this category, all products inside "${catName}" will be deleted. This cannot be undone.`,
+      t('vendor.deleteCategory'),
+      t('vendor.deleteCategoryDesc', { category: catName }).replace('{{category}}', catName),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t('vendor.cancel'), style: "cancel" },
         {
-          text: "Delete Entire Category",
+          text: t('vendor.deleteEntireCategory'),
           style: "destructive",
           onPress: async () => {
             const matchingProd = (inv.rawProducts || []).find((p) => {
@@ -276,27 +279,27 @@ export default function InventoryScreen() {
   };
 
   const handleToggleAvailability = (product) => {
-  const currentQty = product.inventory?.stock_qty ?? product.stock_qty ?? 0;
-  const isCurrentlyAvailable = currentQty > 0;
-  setConfirmSheet({ product, makingAvailable: !isCurrentlyAvailable });
-};
+    const currentQty = product.inventory?.stock_qty ?? product.stock_qty ?? 0;
+    const isCurrentlyAvailable = currentQty > 0;
+    setConfirmSheet({ product, makingAvailable: !isCurrentlyAvailable });
+  };
 
-const confirmToggle = async () => {
-  if (!confirmSheet) return;
-  const { product, makingAvailable } = confirmSheet;
-  setConfirmSheet(null);
-  try {
-    await inv.toggleAvailability(product.id, makingAvailable);
-    showToast(
-      makingAvailable
-        ? `"${product.name}" is now available`
-        : `"${product.name}" marked unavailable`,
-      makingAvailable ? "success" : "error"
-    );
-  } catch (e) {
-    showToast("Failed to update availability", "error");
-  }
-};
+  const confirmToggle = async () => {
+    if (!confirmSheet) return;
+    const { product, makingAvailable } = confirmSheet;
+    setConfirmSheet(null);
+    try {
+      await inv.toggleAvailability(product.id, makingAvailable);
+      showToast(
+        makingAvailable
+          ? `"${product.name}" is now available`
+          : `"${product.name}" marked unavailable`,
+        makingAvailable ? "success" : "error"
+      );
+    } catch (e) {
+      showToast("Failed to update availability", "error");
+    }
+  };
 
   const handleBulkDelete = async () => {
     const ids = [...selected];
@@ -323,7 +326,7 @@ const confirmToggle = async () => {
     if (!inv.search || inv.search.trim() === "") return [];
     let data = inv.rawProducts || [];
     data = data.filter(p => String(p.name).toLowerCase().includes(inv.search.toLowerCase()));
-    
+
     // Sort
     if (inv.sortKey) {
       data = [...data].sort((a, b) => {
@@ -379,11 +382,11 @@ const confirmToggle = async () => {
   const handleProductPress = (product) => {
     Alert.alert(
       product.name,
-      "Choose an action",
+      t('vendor.chooseAction'),
       [
-        { text: "Cancel", style: "cancel" },
-        { text: "Edit Product", onPress: () => setModal(product) },
-        { text: "Delete Product", style: "destructive", onPress: () => handleDelete(product.id) },
+        { text: t('vendor.cancel'), style: "cancel" },
+        { text: t('vendor.editProduct'), onPress: () => setModal(product) },
+        { text: t('vendor.deleteProduct'), style: "destructive", onPress: () => handleDelete(product.id) },
       ]
     );
   };
@@ -404,17 +407,17 @@ const confirmToggle = async () => {
               style={s.backBtn}
               activeOpacity={0.8}
             >
-              <Text style={s.backBtnText}>← Back</Text>
+              <Text style={s.backBtnText}>← {t('vendor.back')}</Text>
             </TouchableOpacity>
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={s.heading} numberOfLines={1}>{selectedCategory}</Text>
-              <Text style={s.subheading}>Products in category</Text>
+              <Text style={s.subheading}>{t('vendor.productsInCategory')}</Text>
             </View>
           </>
         ) : (
           <View style={{ flex: 1 }}>
-            <Text style={s.heading}>Inventory</Text>
-            <Text style={s.subheading}>Manage categories & products</Text>
+            <Text style={s.heading}>{t('vendor.inventoryTitle')}</Text>
+            <Text style={s.subheading}>{t('vendor.manageCategoriesProducts')}</Text>
           </View>
         )}
         <TouchableOpacity
@@ -422,7 +425,7 @@ const confirmToggle = async () => {
           style={s.addBtn}
           activeOpacity={0.85}
         >
-          <Text style={s.addBtnText}>+ Add Product</Text>
+          <Text style={s.addBtnText}>+ {t('vendor.addProduct')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -440,8 +443,8 @@ const confirmToggle = async () => {
             onChangeText={inv.setSearch}
             placeholder={
               selectedCategory !== null
-                ? `Search in ${selectedCategory}…`
-                : "Search category or product…"
+                ? `${t('vendor.searchInCategoryPlaceholder')} ${selectedCategory}…`
+                : t('vendor.searchPlaceholderInventory')
             }
             placeholderTextColor={TEXT_XLIGHT}
             returnKeyType="search"
@@ -460,17 +463,17 @@ const confirmToggle = async () => {
         {selectedCategory === null && inv.search.length > 0 && (
           <>
             {/* Sort Options Bar */}
-            <Text style={s.filterSectionTitle}>⇅ Sort Products</Text>
+            <Text style={s.filterSectionTitle}>⇅ {t('vendor.sortProducts')}</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={s.filterRow}
             >
               {[
-                { label: "Price Low-High", key: "price", dir: "asc" },
-                { label: "Price High-Low", key: "price", dir: "desc" },
-                { label: "Stock Low-High", key: "stock", dir: "asc" },
-                { label: "Stock High-Low", key: "stock", dir: "desc" },
+                { label: t('vendor.priceLowHigh'), key: "price", dir: "asc" },
+                { label: t('vendor.priceHighLow'), key: "price", dir: "desc" },
+                { label: t('vendor.stockLowHigh'), key: "stock", dir: "asc" },
+                { label: t('vendor.stockHighLow'), key: "stock", dir: "desc" },
               ].map((opt) => {
                 const active = inv.sortKey === opt.key && inv.sortDir === opt.dir;
                 return (
@@ -492,19 +495,19 @@ const confirmToggle = async () => {
             </ScrollView>
 
             <View style={s.listHeader}>
-              <Text style={s.listTitle}>Matching Products</Text>
-              <Text style={s.listCount}>Showing {searchedProducts.length} items</Text>
+              <Text style={s.listTitle}>{t('vendor.matchingProducts')}</Text>
+              <Text style={s.listCount}>{t('vendor.showingItems')} {searchedProducts.length} {t('vendor.items')}</Text>
             </View>
 
             {inv.loading ? (
               <View style={s.centered}>
                 <Spinner size={32} color={GREEN} />
-                <Text style={s.loadingText}>Loading products…</Text>
+                <Text style={s.loadingText}>{t('vendor.loadingProducts')}</Text>
               </View>
             ) : searchedProducts.length === 0 ? (
               <View style={s.centered}>
                 <MaterialIcons name="search-off" size={48} color="#9CA3AF" style={{ marginBottom: 10 }} />
-                <Text style={s.emptyText}>No matching products found</Text>
+                <Text style={s.emptyText}>{t('vendor.noMatchingProducts')}</Text>
               </View>
             ) : (
               <View style={s.gridContainer}>
@@ -527,14 +530,14 @@ const confirmToggle = async () => {
         {selectedCategory === null && inv.search.length === 0 && (
           <>
             <View style={s.listHeader}>
-              <Text style={s.listTitle}>Categories</Text>
-              <Text style={s.listCount}>{parentCategoriesList.length} folders</Text>
+              <Text style={s.listTitle}>{t('vendor.categories')}</Text>
+              <Text style={s.listCount}>{parentCategoriesList.length} {t('vendor.foldersCount')}</Text>
             </View>
 
             {parentCategoriesList.length === 0 ? (
               <View style={s.centered}>
                 <MaterialIcons name="folder-open" size={48} color="#9CA3AF" style={{ marginBottom: 10 }} />
-                <Text style={s.emptyText}>No categories found</Text>
+                <Text style={s.emptyText}>{t('vendor.noCategoriesFound')}</Text>
               </View>
             ) : (
               <View style={s.gridContainer}>
@@ -566,17 +569,17 @@ const confirmToggle = async () => {
         {selectedCategory !== null && (
           <>
             {/* Sort Options Bar */}
-            <Text style={s.filterSectionTitle}>⇅ Sort Products</Text>
+            <Text style={s.filterSectionTitle}>⇅ {t('vendor.sortProducts')}</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={s.filterRow}
             >
               {[
-                { label: "Price Low-High", key: "price", dir: "asc" },
-                { label: "Price High-Low", key: "price", dir: "desc" },
-                { label: "Stock Low-High", key: "stock", dir: "asc" },
-                { label: "Stock High-Low", key: "stock", dir: "desc" },
+                { label: t('vendor.priceLowHigh'), key: "price", dir: "asc" },
+                { label: t('vendor.priceHighLow'), key: "price", dir: "desc" },
+                { label: t('vendor.stockLowHigh'), key: "stock", dir: "asc" },
+                { label: t('vendor.stockHighLow'), key: "stock", dir: "desc" },
               ].map((opt) => {
                 const active = inv.sortKey === opt.key && inv.sortDir === opt.dir;
                 return (
@@ -598,20 +601,20 @@ const confirmToggle = async () => {
             </ScrollView>
 
             <View style={s.listHeader}>
-              <Text style={s.listTitle}>Products</Text>
-              <Text style={s.listCount}>Showing {categoryProducts.length} items</Text>
+              <Text style={s.listTitle}>{t('vendor.products')}</Text>
+              <Text style={s.listCount}>{t('vendor.showingItems')} {categoryProducts.length} {t('vendor.items')}</Text>
             </View>
 
             {inv.loading ? (
               <View style={s.centered}>
                 <Spinner size={32} color={GREEN} />
-                <Text style={s.loadingText}>Loading products…</Text>
+                <Text style={s.loadingText}>{t('vendor.loadingProducts')}</Text>
               </View>
             ) : categoryProducts.length === 0 ? (
               <View style={s.centered}>
                 <Feather name="inbox" size={48} color="#9CA3AF" style={{ marginBottom: 12 }} />
-                <Text style={s.emptyText}>No products inside this category</Text>
-                <Text style={s.emptySubText}>Tap "+ Add Product" to create one here.</Text>
+                <Text style={s.emptyText}>{t('vendor.noProductsInCategory')}</Text>
+                <Text style={s.emptySubText}>{t('vendor.tapToAddProduct')}</Text>
               </View>
             ) : (
               <View style={s.gridContainer}>
@@ -655,63 +658,63 @@ const confirmToggle = async () => {
 
 
       {/* ── Confirm Sheet ── */}
-{confirmSheet && (
-  <View style={s.sheetOverlay}>
-    <TouchableOpacity
-      style={{ flex: 1 }}
-      activeOpacity={1}
-      onPress={() => setConfirmSheet(null)}
-    />
-    <View style={s.sheetCard}>
-      {/* Icon */}
-      <View style={[s.sheetIconBox, {
-        backgroundColor: confirmSheet.makingAvailable ? GREEN_LIGHT : RED_LIGHT,
-        alignItems: "center",
-        justifyContent: "center",
-      }]}>
-        <Feather
-          name={confirmSheet.makingAvailable ? "check-circle" : "slash"}
-          size={28}
-          color={confirmSheet.makingAvailable ? GREEN : RED}
-        />
-      </View>
+      {confirmSheet && (
+        <View style={s.sheetOverlay}>
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setConfirmSheet(null)}
+          />
+          <View style={s.sheetCard}>
+            {/* Icon */}
+            <View style={[s.sheetIconBox, {
+              backgroundColor: confirmSheet.makingAvailable ? GREEN_LIGHT : RED_LIGHT,
+              alignItems: "center",
+              justifyContent: "center",
+            }]}>
+              <Feather
+                name={confirmSheet.makingAvailable ? "check-circle" : "slash"}
+                size={28}
+                color={confirmSheet.makingAvailable ? GREEN : RED}
+              />
+            </View>
 
-      {/* Text */}
-      <Text style={s.sheetTitle}>
-        {confirmSheet.makingAvailable ? "Mark as Available?" : "Mark as Unavailable?"}
-      </Text>
-      <Text style={s.sheetSub}>
-        {confirmSheet.makingAvailable
-          ? `"${confirmSheet.product.name}" will be visible to customers and available for ordering.`
-          : `"${confirmSheet.product.name}" will be hidden from customers until you mark it available again.`}
-      </Text>
+            {/* Text */}
+            <Text style={s.sheetTitle}>
+              {confirmSheet.makingAvailable ? t('vendor.markAsAvailable') : t('vendor.markAsUnavailable')}
+            </Text>
+            <Text style={s.sheetSub}>
+              {confirmSheet.makingAvailable
+                ? t('vendor.markAsAvailableDesc', { productName: confirmSheet.product.name }).replace('{{productName}}', confirmSheet.product.name)
+                : t('vendor.markAsUnavailableDesc', { productName: confirmSheet.product.name }).replace('{{productName}}', confirmSheet.product.name)}
+            </Text>
 
-      {/* Buttons */}
-      <View style={s.sheetBtnRow}>
-        <TouchableOpacity
-          onPress={() => setConfirmSheet(null)}
-          style={s.sheetCancelBtn}
-          activeOpacity={0.8}
-        >
-          <Text style={s.sheetCancelText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={confirmToggle}
-          style={[s.sheetConfirmBtn, {
-            backgroundColor: confirmSheet.makingAvailable ? GREEN : RED
-          }]}
-          activeOpacity={0.85}
-        >
-          <Text style={s.sheetConfirmText}>
-            {confirmSheet.makingAvailable ? "Yes, Make Available" : "Yes, Mark Unavailable"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </View>
-)}
+            {/* Buttons */}
+            <View style={s.sheetBtnRow}>
+              <TouchableOpacity
+                onPress={() => setConfirmSheet(null)}
+                style={s.sheetCancelBtn}
+                activeOpacity={0.8}
+              >
+                <Text style={s.sheetCancelText}>{t('vendor.cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={confirmToggle}
+                style={[s.sheetConfirmBtn, {
+                  backgroundColor: confirmSheet.makingAvailable ? GREEN : RED
+                }]}
+                activeOpacity={0.85}
+              >
+                <Text style={s.sheetConfirmText}>
+                  {confirmSheet.makingAvailable ? t('vendor.yesMakeAvailable') : t('vendor.yesMarkUnavailable')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
 
-<ToastBanner message={toast.msg} visible={toast.show} type={toast.type} />
+      <ToastBanner message={toast.msg} visible={toast.show} type={toast.type} />
     </SafeAreaView>
   );
 }
@@ -1266,7 +1269,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 2,
   },
-  statusPillText: { fontSize: 11, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
+  statusPillText: { fontSize: 11, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" },
 
   // Actions
   cardActions: { alignItems: "flex-end", gap: 6 },
@@ -1276,7 +1279,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  editBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
+  editBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" },
   menuBtn: {
     width: 30,
     height: 26,
@@ -1305,21 +1308,21 @@ const s = StyleSheet.create({
 
   // Dropdown
   dropdownMenu: {
-  position: "absolute",
-  right: 0,
-  top: 30,
-  backgroundColor: "#fff",
-  borderRadius: 10,
-  borderWidth: 1,
-  borderColor: BORDER,
-  shadowColor: "#000",
-  shadowOpacity: 0.12,
-  shadowRadius: 8,
-  shadowOffset: { width: 0, height: 4 },
-  elevation: 8,
-  zIndex: 999,
-  minWidth: 140,
-},
+    position: "absolute",
+    right: 0,
+    top: 30,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: BORDER,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+    zIndex: 999,
+    minWidth: 140,
+  },
   dropdownItem: {
     paddingHorizontal: 16,
     paddingVertical: 12,
