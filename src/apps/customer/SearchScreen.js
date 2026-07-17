@@ -1370,24 +1370,5 @@ const s = StyleSheet.create({
     textAlign: "center",
     fontFamily: "PlusJakartaSans_700Bold",
   },
- 
-  // Loading
-  loadingWrap: { alignItems: "center", paddingTop: 60, gap: 12 },
-  loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" },
- 
-  // Results
-  resultNote: { fontSize: 12, color: C.gray400, fontWeight: "500", marginBottom: 14, fontFamily: "PlusJakartaSans_500Medium" },
-  itemsCard: { backgroundColor: C.white, borderRadius: 16, borderWidth: 1, borderColor: C.gray200, overflow: "hidden", marginBottom: 16 },
-  farHeader: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.amberLight, borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: "#FDE68A" },
-  farHeaderText: { fontSize: 13, color: C.amber, fontWeight: "600", flex: 1, fontFamily: "PlusJakartaSans_600SemiBold" },
- 
-  // Empty
-  emptyWrap: { alignItems: "center", paddingTop: 60, gap: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: "700", color: C.gray700, fontFamily: "PlusJakartaSans_700Bold" },
-  emptySub: { fontSize: 14, color: C.gray400, textAlign: "center", lineHeight: 20, fontFamily: "PlusJakartaSans_500Medium" },
 });
- 
-const sg = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  text: { flex: 1, fontSize: 14, color: C.gray700 },
-});
+

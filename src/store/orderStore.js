@@ -1,8 +1,7 @@
 import { create } from 'zustand';
 
-
 const useOrderStore = create((set, get) => ({
-    orders : [
+    orders: [
         {
             id: "1",
             name: "Gupta General Store",
@@ -33,11 +32,32 @@ const useOrderStore = create((set, get) => ({
         },
     ],
 
-    addOrder : (newOrder) => {
-        const {orders} = get();
+    pendingOrder: null,
 
-        set({orders : [newOrder , ...orders]});
-    }
+    addOrder: (newOrder) => {
+        const { orders } = get();
+
+        set({ orders: [newOrder, ...orders] });
+    },
+
+
+    setPendingOrder: (order) => {
+        set({ pendingOrder: { ...order, placedAt: order.placedAt || Date.now() } });
+    },
+
+
+    updatePendingOrder: (updatedData) => {
+        set((state) => ({
+            pendingOrder: state.pendingOrder
+                ? { ...state.pendingOrder, ...updatedData }
+                : updatedData,
+        }));
+    },
+
+
+    clearPendingOrder: () => {
+        set({ pendingOrder: null });
+    },
 }));
 
 export default useOrderStore;
