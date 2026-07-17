@@ -677,9 +677,15 @@ export default function CheckoutScreen() {
     : null;
 
   // Slot passed from CartScreen via navigation params or cartStore
-  const [confirmedSlot, setConfirmedSlot] = useState(
-    route.params?.confirmedSlot || resumeOrder?.confirmedSlot || resumeOrder?.slot || cart?.confirmedSlot || null
-  );
+  const [confirmedSlot, setConfirmedSlot] = useState(() => {
+    const raw = route.params?.confirmedSlot || resumeOrder?.confirmedSlot || resumeOrder?.slot || resumeOrder?.delivery_slot || cart?.confirmedSlot || null;
+    if (!raw) return null;
+    if (raw.start && raw.end) return { start: raw.start, end: raw.end };
+    const start = raw.vendor_slot_start || raw.slot_start || raw.start || null;
+    const end = raw.vendor_slot_end || raw.slot_end || raw.end || null;
+    if (start && end) return { start, end };
+    return null;
+  });
   const [slotId, setSlotId] = useState(
     route.params?.slotId || cart?.slotId || null
   );
@@ -717,8 +723,22 @@ export default function CheckoutScreen() {
     route.params?.initialOrderStatus || resumeOrder?.status || "idle"
   ); // idle, pending, accepted, rejected, expired, countered
   const [countdown, setCountdown] = useState(90);
-  const [counterData, setCounterData] = useState(null);
+  const [counterData, setCounterData] = useState(() => {
+    const rawCounter = resumeOrder?.counter_offer || null;
+    if (!rawCounter) return null;
+    const rawSlot = rawCounter.slot || rawCounter.delivery_slot || null;
+    const slot = rawSlot ? {
+      start: rawSlot.vendor_slot_start || rawSlot.slot_start || rawSlot.start,
+      end: rawSlot.vendor_slot_end || rawSlot.slot_end || rawSlot.end,
+    } : null;
+    return {
+      ...rawCounter,
+      slot,
+    };
+  });
   const timerRef = useRef(null);
+  const scrollViewRef = useRef(null);       // ref to main ScrollView
+  const paymentSectionY = useRef(0);        // Y-offset of payment section inside scroll
 
   // Slot management states
   const [vendor, setVendor] = useState(null);
@@ -991,6 +1011,60 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
     return () => socket.disconnect();
   }, [token, orderId]);
 
+  // ── Fetch order details on mount if resuming ───────────────────────────────
+  useEffect(() => {
+    if (orderId && token && (orderStatus === "pending" || orderStatus === "countered" || orderStatus === "accepted")) {
+      (async () => {
+        try {
+          const res = await fetch(`${BASE_URL}/orders/${orderId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const d = await res.json();
+          if (res.ok && (d.success || d.data)) {
+            const order = d.data?.order || d.order;
+            // Sync status
+            if (order.status) {
+              setOrderStatus(order.status);
+            }
+            
+            // Sync vendor phone/contact status
+            if (order.vendorPhone) {
+              setVendorPhone(order.vendorPhone);
+            }
+            if (order.phoneStatus) {
+              setPhoneStatus(order.phoneStatus);
+            }
+
+            // Sync slot
+            if (order.delivery_slot) {
+              const parsedSlot = {
+                start: order.delivery_slot.vendor_slot_start || order.delivery_slot.slot_start,
+                end: order.delivery_slot.vendor_slot_end || order.delivery_slot.slot_end,
+              };
+              setConfirmedSlot(parsedSlot);
+            }
+
+            // Sync counter data if countered
+            if (order.status === "countered") {
+              setCounterData({
+                items: order.counter_offer_items,
+                delivery_fee: order.delivery_fee,
+                total: order.total,
+                note: order.vendor_note,
+                slot: order.delivery_slot ? {
+                  start: order.delivery_slot.vendor_slot_start || order.delivery_slot.slot_start,
+                  end: order.delivery_slot.vendor_slot_end || order.delivery_slot.slot_end,
+                } : null,
+              });
+            }
+          }
+        } catch (e) {
+          console.error("Error fetching order details on mount:", e);
+        }
+      })();
+    }
+  }, [orderId, token]);
+
   // ── Negotiation Timer Logic ────────────────────────────────────────────────
   useEffect(() => {
     if (orderStatus === "pending") {
@@ -1058,11 +1132,11 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
     setErrorMsg(null);
     setPlacing(true);
     try {
-      let addrId = 0;
+      let addrId = null;
       if (selectedAddrId === "detected") {
         const allAddrs = addressStore?.addresses || [];
-        const existing = allAddrs.find(a => 
-          a.label === "Current Location" && 
+        const existing = allAddrs.find(a =>
+          a.label === "Current Location" &&
           (a.address_line === detectedAddr || a.address === detectedAddr)
         );
         if (existing) {
@@ -1075,12 +1149,18 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
           addrId = savedId;
         }
       } else if (selectedAddrId === "manual") {
-        // Fallback for manual or use a default if not saved
-        addrId = savedAddresses[0]?.id || 10;
+        addrId = savedAddresses[0]?.id || null;
       } else {
-        addrId = selectedAddrId || savedAddresses[0]?.id;
+        addrId = selectedAddrId || savedAddresses[0]?.id || null;
       }
-      addrId = parseInt(addrId, 10) || 10;
+
+      // Guard: ensure we have a real numeric address ID before proceeding
+      addrId = addrId ? parseInt(addrId, 10) : null;
+      if (!addrId || isNaN(addrId)) {
+        setErrorMsg("Please select or add a delivery address before placing your order.");
+        setPlacing(false);
+        return;
+      }
 
       const payload = {
         vendor_id: parseInt(vendorId, 10),
@@ -1135,21 +1215,15 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
       snapshotSubtotal: orderSubtotalSnapshot,
     });
 
-    setOrderId(null);
-    setOrderStatus("idle");
-    setNegotiationModalVisible(false);
+    // Keep customer on the screen so the countdown timer + counter-offer modal stays visible
+    setOrderId(order.id);
+    setOrderStatus("pending");  // triggers the 90s countdown & modal
+    setNegotiationModalVisible(true);
     setPlacing(false);
 
     cart?.clearCart?.();
 
-    showToast("Order sent to the store. You can keep browsing while they respond.", "success");
-
-    navigation.replace("CustomerApp", {
-        screen: "CustomerTabNavigator",
-        params: {
-            screen: "Home",
-        },
-    });
+    showToast("Order sent! Waiting for store to respond...", "success");
 } else {
         console.log("ORDER CREATION FAILED", data); // LOG ERROR DATA
         setErrorMsg(
@@ -1227,6 +1301,17 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
       const d = await res.json();
       if (res.ok) {
         if (action === "accept") {
+          // ── Apply counter offer details when customer accepts ──
+          if (counterData) {
+            // Update slot to the new one proposed by vendor (if any)
+            if (counterData.slot) {
+              setConfirmedSlot({ start: counterData.slot.start, end: counterData.slot.end });
+            }
+            // Lock the delivery fee to the counter-offered fee
+            if (counterData.delivery_fee != null) {
+              setProposedFee(counterData.delivery_fee);
+            }
+          }
           setOrderStatus("accepted");
         } else {
           setOrderStatus("rejected");
@@ -1334,6 +1419,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
       <View style={[s.pageBody, isDesktop && s.pageBodyDesktop]}>
         {/* ══ MAIN / LEFT COLUMN ══════════════════════════════════════════ */}
         <ScrollView
+          ref={scrollViewRef}
           style={s.mainCol}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingTop: 14, paddingBottom: 100 }}
@@ -1586,6 +1672,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
 
           {/* ── SECTION 5: PAYMENT METHOD (Only shown after acceptance) ── */}
           {orderStatus === "accepted" && (
+            <View onLayout={(e) => { paymentSectionY.current = e.nativeEvent.layout.y; }}>
             <Section
               num="5"
               title="Payment Method"
@@ -1934,6 +2021,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                 );
               })}
             </Section>
+          </View>
           )}
 
           {/* ── ORDER SUMMARY (mobile/tablet inline) ─────────────────── */}
@@ -2138,7 +2226,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                   marginBottom: 12,
                   textAlign: "center"
                 }}>
-                  Selected Delivery Details
+                  {counterData && orderStatus === "accepted" ? "Counter Offer — Final Details" : "Selected Delivery Details"}
                 </Text>
 
                 {/* Delivery Time Row */}
@@ -2158,7 +2246,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                   </Text>
                 </View>
 
-                {/* Slot Row */}
+                {/* Slot Row — uses counter slot if accepted after counter, else original confirmedSlot */}
                 <View style={{
                   flexDirection: "row",
                   justifyContent: "space-between",
@@ -2169,16 +2257,18 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                   <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>Delivery Slot</Text>
                   <Text style={{ fontSize: 13, color: C.gray900, fontWeight: "700" }}>
                     {(() => {
-                      if (!confirmedSlot) return "As soon as possible";
-                      const startStr = new Date(confirmedSlot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                      const endStr = new Date(confirmedSlot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                      const dayStr = new Date(confirmedSlot.start).toDateString() === new Date().toDateString() ? "Today" : "Tomorrow";
+                      // After accepting a counter offer, show the counter's slot (already merged into confirmedSlot)
+                      const activeSlot = confirmedSlot;
+                      if (!activeSlot) return "As soon as possible";
+                      const startStr = new Date(activeSlot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      const endStr = new Date(activeSlot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      const dayStr = new Date(activeSlot.start).toDateString() === new Date().toDateString() ? "Today" : "Tomorrow";
                       return `${dayStr}, ${startStr} - ${endStr}`;
                     })()}
                   </Text>
                 </View>
 
-                {/* Delivery Charges Row */}
+                {/* Delivery Charges Row — show counter fee when available */}
                 <View style={{
                   flexDirection: "row",
                   justifyContent: "space-between",
@@ -2186,16 +2276,65 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                 }}>
                   <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>Delivery Charges</Text>
                   <Text style={{ fontSize: 13, color: C.greenDark, fontWeight: "800" }}>
-                    ₹{liveActiveFee}
+                    ₹{counterData && orderStatus === "accepted"
+                      ? (counterData.delivery_fee ?? activeFee)
+                      : activeFee}
                   </Text>
                 </View>
+
+                {/* Vendor phone row — shown when approved */}
+                {phoneStatus === "approved" && vendorPhone && (
+                  <View style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    paddingVertical: 8,
+                    borderTopWidth: 1,
+                    borderTopColor: "#F1F5F9",
+                    marginTop: 4,
+                  }}>
+                    <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>Vendor Phone</Text>
+                    <TouchableOpacity
+                      onPress={() => Linking.openURL(`tel:${vendorPhone}`)}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 6,
+                        backgroundColor: C.greenLight, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}
+                    >
+                      <Feather name="phone" size={13} color={C.green} />
+                      <Text style={{ fontSize: 13, fontWeight: "800", color: C.greenDark }}>{vendorPhone}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             )}
 
             {orderStatus === "accepted" && (
               <TouchableOpacity
                 style={negModal.proceedBtn}
-                onPress={() => { setNegotiationModalVisible(false); }}
+                onPress={() => {
+                  setNegotiationModalVisible(false);
+                  // Navigate to dedicated PaymentScreen with all final order data
+                  const finalSlot = counterData?.slot
+                    ? { start: counterData.slot.start, end: counterData.slot.end }
+                    : confirmedSlot;
+                  const finalFee = counterData?.delivery_fee != null
+                    ? counterData.delivery_fee
+                    : activeFee;
+                  const finalTotal = counterData?.total != null ? counterData.total : total;
+                  navigation.navigate("Payment", {
+                    orderId,
+                    orderNumber: `ORD-${orderId}`,
+                    vendorName,
+                    items: displayItems,
+                    subtotal,
+                    deliveryFee: finalFee,
+                    total: finalTotal,
+                    confirmedSlot: finalSlot,
+                    deliveryTypePref,
+                    vendorPhone,
+                    phoneStatus,
+                    preSelectedPay: selectedPay,
+                  });
+                }}
                 activeOpacity={0.85}
               >
                 <Feather name="credit-card" size={16} color={C.white} />
@@ -2204,12 +2343,28 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             )}
 
             {orderStatus === "pending" && (
-              <View style={negModal.pendingNote}>
-                <Feather name="info" size={13} color={C.amber} />
-                <Text style={negModal.pendingNoteText}>
-                  You can keep browsing while the store responds. We will notify you here.
-                </Text>
-              </View>
+              <>
+                <View style={negModal.pendingNote}>
+                  <Feather name="info" size={13} color={C.amber} />
+                  <Text style={negModal.pendingNoteText}>
+                    Waiting for store response. Timer is running — we'll alert you here.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[negModal.proceedBtn, { backgroundColor: C.gray600, marginTop: 10 }]}
+                  onPress={() => {
+                    setNegotiationModalVisible(false);
+                    navigation.navigate("CustomerApp", {
+                      screen: "CustomerTabNavigator",
+                      params: { screen: "Home" },
+                    });
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Feather name="home" size={16} color={C.white} />
+                  <Text style={negModal.proceedBtnText}>Browse while waiting</Text>
+                </TouchableOpacity>
+              </>
             )}
           </Pressable>
         </Pressable>
