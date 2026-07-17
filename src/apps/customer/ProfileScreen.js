@@ -13,16 +13,14 @@ import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
- 
+
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
- 
+
 const C = {
-  orange: "#F97316", orangeDark: "#EA580C", orangeLight: "#FFF7ED",
+  orange: "#F97316", orangeDark: "#EA580C",
   green: "#16A34A", greenDark: "#15803D",
   greenLight: "#F0FDF4", greenBorder: "#BBF7D0",
   greenMid: "#DCFCE7",
-  blue: "#3B82F6", blueLight: "#EFF6FF",
-  purple: "#8B5CF6", purpleLight: "#F5F3FF",
   white: "#FFFFFF", bg: "#F8FAFC",
   gray100: "#F3F4F6", gray200: "#E5E7EB",
   gray300: "#D1D5DB", gray400: "#9CA3AF",
@@ -30,7 +28,7 @@ const C = {
   gray700: "#374151", gray900: "#111827",
   red: "#EF4444", redLight: "#FEF2F2",
 };
- 
+
 // ─── Avatar initials ──────────────────────────────────────────────────────
 function Avatar({ name, size = 64 }) {
   const initials = (name || "?")
@@ -48,12 +46,12 @@ function Avatar({ name, size = 64 }) {
     </LinearGradient>
   );
 }
- 
+
 // ─── Edit modal ───────────────────────────────────────────────────────────
 function EditModal({ visible, field, label, value, keyboardType = "default", onSave, onClose, saving }) {
   const [draft, setDraft] = useState(value || "");
   useEffect(() => { if (visible) setDraft(value || ""); }, [visible, value]);
- 
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={em.backdrop} onPress={onClose}>
@@ -107,14 +105,11 @@ const em = StyleSheet.create({
   saveOff: { backgroundColor: C.greenMid },
   saveText: { fontSize: 15, fontWeight: "800", color: C.white },
 });
- 
+
 // ─── Info row (tappable field) ────────────────────────────────────────────
-function InfoRow({ label, value, onEdit, editable = true, icon = "user" }) {
+function InfoRow({ label, value, onEdit, editable = true, icon }) {
   return (
     <View style={ir.row}>
-      <View style={[ir.fieldIconWrap, !editable && ir.fieldIconWrapOff]}>
-        <Feather name={icon} size={15} color={editable ? C.green : C.gray400} />
-      </View>
       <View style={ir.left}>
         <Text style={ir.label}>{label}</Text>
         <Text style={[ir.value, !value && ir.valuePlaceholder]}>
@@ -122,7 +117,7 @@ function InfoRow({ label, value, onEdit, editable = true, icon = "user" }) {
         </Text>
       </View>
       {editable && (
-        <TouchableOpacity style={ir.editBtn} onPress={onEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity style={ir.editBtn} onPress={onEdit}>
           <Feather name="edit-2" size={13} color={C.green} />
         </TouchableOpacity>
       )}
@@ -135,9 +130,7 @@ function InfoRow({ label, value, onEdit, editable = true, icon = "user" }) {
   );
 }
 const ir = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  fieldIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.greenMid, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  fieldIconWrapOff: { backgroundColor: C.gray100 },
+  row: { flexDirection: "row", alignItems: "center", paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.gray100 },
   left: { flex: 1 },
   label: { fontSize: 11, fontWeight: "700", color: C.gray400, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 5 },
   value: { fontSize: 16, fontWeight: "600", color: C.gray900 },
@@ -145,7 +138,7 @@ const ir = StyleSheet.create({
   editBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: C.greenMid, alignItems: "center", justifyContent: "center" },
   lockWrap: { width: 34, height: 34, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
 });
- 
+
 // ─── Address card ─────────────────────────────────────────────────────────
 function AddressCard({ addr, isSelected, onSelect, onRemove }) {
   const text = typeof addr.address === "string" ? addr.address : addr.address_line || "Saved address";
@@ -168,36 +161,24 @@ function AddressCard({ addr, isSelected, onSelect, onRemove }) {
   );
 }
 const adc = StyleSheet.create({
-  card: {
-    flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 16,
-    backgroundColor: C.white, marginBottom: 10, borderWidth: 1, borderColor: C.gray100,
-    shadowColor: "#0F172A", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
-  },
-  cardActive: { borderColor: C.greenBorder, backgroundColor: C.greenLight, shadowOpacity: 0.08 },
-  icon: { width: 32, height: 32, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  card: { flexDirection: "row", alignItems: "center", gap: 12, padding: 13, borderRadius: 14, borderWidth: 1.5, borderColor: C.gray200, backgroundColor: C.white, marginBottom: 8 },
+  cardActive: { borderColor: C.green, backgroundColor: C.greenLight },
+  icon: { width: 30, height: 30, borderRadius: 9, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   iconActive: { backgroundColor: C.green },
-  text: { flex: 1, fontSize: 13.5, color: C.gray700, fontWeight: "500", lineHeight: 19 },
+  text: { flex: 1, fontSize: 13, color: C.gray700, fontWeight: "500", lineHeight: 18 },
   textActive: { color: C.greenDark, fontWeight: "700" },
-  activeLabel: { fontSize: 11, color: C.green, fontWeight: "700", marginTop: 3 },
   tick: { width: 22, height: 22, borderRadius: 7, backgroundColor: C.green, alignItems: "center", justifyContent: "center", flexShrink: 0 },
 });
- 
+
 // ─── Row menu item ────────────────────────────────────────────────────────
-const TINTS = {
-  orange: { bg: C.orangeLight, fg: C.orangeDark },
-  green: { bg: C.greenMid, fg: C.greenDark },
-  blue: { bg: C.blueLight, fg: C.blue },
-  purple: { bg: C.purpleLight, fg: C.purple },
-};
-function MenuItem({ icon, label, onPress, danger, right, sub, tint }) {
-  const t = tint ? TINTS[tint] : null;
+function MenuItem({ icon, label, onPress, danger, right, sub }) {
   return (
     <TouchableOpacity
       style={[mi.row, danger && mi.rowDanger]}
       onPress={onPress} activeOpacity={0.75}
     >
-      <View style={[mi.iconWrap, danger && mi.iconDanger, t && { backgroundColor: t.bg }]}>
-        <Feather name={icon} size={16} color={danger ? C.red : (t ? t.fg : C.gray600)} />
+      <View style={[mi.iconWrap, danger && mi.iconDanger]}>
+        <Feather name={icon} size={16} color={danger ? C.red : C.gray600} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[mi.label, danger && mi.labelDanger]}>{label}</Text>
@@ -208,19 +189,15 @@ function MenuItem({ icon, label, onPress, danger, right, sub, tint }) {
   );
 }
 const mi = StyleSheet.create({
-  row: {
-    flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 15, paddingHorizontal: 16,
-    backgroundColor: C.white, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: C.gray100,
-    shadowColor: "#0F172A", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
-  },
-  rowDanger: { borderColor: "#FECACA", backgroundColor: C.redLight, shadowOpacity: 0 },
+  row: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 15, paddingHorizontal: 16, backgroundColor: C.white, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: C.gray200 },
+  rowDanger: { borderColor: "#FECACA", backgroundColor: C.redLight },
   iconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
   iconDanger: { backgroundColor: "#FEE2E2" },
-  label: { fontSize: 15, color: C.gray900, fontWeight: "600" },
+  label: { fontSize: 15, color: C.gray800, fontWeight: "600" },
   labelDanger: { color: C.red },
   sub: { fontSize: 12, color: C.gray400, marginTop: 2 },
 });
- 
+
 // ─── Address Detail Modal ─────────────────────────────────────────────────
 function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
   const [region, setRegion] = useState({
@@ -229,7 +206,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
- 
+
   useEffect(() => {
     if (addr?.lat && addr?.lng) {
       setRegion({
@@ -240,7 +217,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
       });
     }
   }, [addr]);
- 
+
   if (!addr) return null;
   const text = typeof addr.address === "string" ? addr.address : addr.address_line || "Saved address";
   return (
@@ -249,7 +226,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
         <Pressable style={adm.sheet} onPress={() => { }}>
           <View style={adm.handle} />
           <Text style={adm.title}>Address details</Text>
- 
+
           {/* Map Preview */}
           {addr.lat && addr.lng && (
             <View style={adm.mapWrapper}>
@@ -261,7 +238,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
               />
             </View>
           )}
- 
+
           {/* Address text */}
           <View style={adm.addrBox}>
             <View style={[adm.addrIcon, isSelected && adm.addrIconActive]}>
@@ -269,7 +246,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
             </View>
             <Text style={adm.addrText}>{text}</Text>
           </View>
- 
+
           {/* Coordinates if available */}
           {addr.lat && addr.lng && (
             <View style={adm.coordRow}>
@@ -279,7 +256,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
               </Text>
             </View>
           )}
- 
+
           {/* Active badge */}
           {isSelected && (
             <View style={adm.activeBadge}>
@@ -287,7 +264,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
               <Text style={adm.activeBadgeText}>This is your active delivery address</Text>
             </View>
           )}
- 
+
           {/* Actions */}
           <View style={adm.actions}>
             {!isSelected && (
@@ -322,7 +299,7 @@ const adm = StyleSheet.create({
   addrBox: { flexDirection: "row", alignItems: "flex-start", gap: 14, backgroundColor: C.gray100, borderRadius: 14, padding: 16, marginBottom: 12 },
   addrIcon: { width: 38, height: 38, borderRadius: 11, backgroundColor: C.gray200, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   addrIconActive: { backgroundColor: C.green },
-  addrText: { flex: 1, fontSize: 15, color: C.gray800 ?? C.gray900, fontWeight: "500", lineHeight: 22 },
+  addrText: { flex: 1, fontSize: 15, color: C.gray800, fontWeight: "500", lineHeight: 22 },
   coordRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, marginBottom: 12 },
   coordText: { fontSize: 12, color: C.gray400, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
   activeBadge: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.greenLight, borderRadius: 12, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: C.greenBorder },
@@ -333,22 +310,12 @@ const adm = StyleSheet.create({
   removeBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.redLight, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: "#FECACA" },
   removeBtnText: { fontSize: 14, fontWeight: "700", color: C.red },
 });
- 
+
 // ─── Section header ───────────────────────────────────────────────────────
 function SectionLabel({ title }) {
-  return (
-    <View style={secStyles.wrap}>
-      <View style={secStyles.tick} />
-      <Text style={secStyles.text}>{title}</Text>
-    </View>
-  );
+  return <Text style={{ fontSize: 11, fontWeight: "800", color: C.gray400, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 12, marginTop: 28 }}>{title}</Text>;
 }
-const secStyles = StyleSheet.create({
-  wrap: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14, marginTop: 30 },
-  tick: { width: 3, height: 14, borderRadius: 2, backgroundColor: C.green },
-  text: { fontSize: 12, fontWeight: "800", color: C.gray500, letterSpacing: 0.8, textTransform: "uppercase" },
-});
- 
+
 // ─── Logout modal ─────────────────────────────────────────────────────────
 function LogoutModal({ visible, onConfirm, onCancel }) {
   return (
@@ -385,7 +352,7 @@ const lm = StyleSheet.create({
   confirm: { flex: 1, paddingVertical: 14, borderRadius: 13, backgroundColor: C.red, alignItems: "center" },
   confirmText: { fontSize: 15, fontWeight: "700", color: C.white },
 });
- 
+
 // ─── Payment placeholder modal ────────────────────────────────────────────
 function PaymentModal({ visible, onClose }) {
   return (
@@ -418,7 +385,7 @@ const pm2 = StyleSheet.create({
   closeBtn: { backgroundColor: C.gray100, paddingVertical: 14, borderRadius: 14, alignItems: "center" },
   closeBtnText: { fontSize: 15, fontWeight: "700", color: C.gray600 },
 });
- 
+
 // ═════════════════════════════════════════════════════════════════════════
 export default function ProfileScreen() {
   const navigation = useNavigation();
@@ -429,32 +396,32 @@ export default function ProfileScreen() {
   const isWide = winW > 600;
   const contentMaxW = Math.min(winW, 640);
   const hPad = isWide ? Math.max(24, Math.floor((winW - contentMaxW) / 2)) : 20;
- 
+
   const [showLogout, setShowLogout] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
   const [editField, setEditField] = useState(null);
   const [saving, setSaving] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [detailAddr, setDetailAddr] = useState(null);
- 
+
   // Load notification preference from AsyncStorage
   useEffect(() => {
     AsyncStorage.getItem("notif_enabled")
       .then(v => { if (v !== null) setNotifEnabled(v === "true" || v === true); })
       .catch(() => { });
   }, []);
- 
+
   // Animations
   const fadeO = useRef(new Animated.Value(0)).current;
   const slideY = useRef(new Animated.Value(18)).current;
- 
+
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeO, { toValue: 1, duration: 350, useNativeDriver: true }),
       Animated.spring(slideY, { toValue: 0, tension: 70, friction: 10, useNativeDriver: true }),
     ]).start();
   }, []);
- 
+
   // ── Save field ─────────────────────────────────────────────────────────
   const handleSave = async (value) => {
     if (!value || !editField) return;
@@ -478,13 +445,13 @@ export default function ProfileScreen() {
       setSaving(false);
     }
   };
- 
+
   // ── Toggle notifications ───────────────────────────────────────────────
   const handleNotifToggle = async (val) => {
     setNotifEnabled(val);
     await AsyncStorage.setItem("notif_enabled", String(val));
   };
- 
+
   // ── Invite ─────────────────────────────────────────────────────────────
   const handleInvite = async () => {
     try {
@@ -493,7 +460,7 @@ export default function ProfileScreen() {
       });
     } catch { }
   };
- 
+
   // ── Logout ─────────────────────────────────────────────────────────────
   const handleLogout = () => {
     clearCart();
@@ -501,11 +468,11 @@ export default function ProfileScreen() {
     logout();
     setShowLogout(false);
   };
- 
+
   const memberSince = user?.created_at
     ? new Date(user.created_at).toLocaleDateString("en-IN", { month: "long", year: "numeric" })
     : null;
- 
+
   return (
     <SafeAreaView style={s.root}>
       <Animated.ScrollView
@@ -513,7 +480,7 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 60 }}
       >
- 
+
         {/* ── Hero header ─────────────────────────────────────────────── */}
         <Animated.View style={{ transform: [{ translateY: slideY }] }}>
           <LinearGradient
@@ -521,23 +488,17 @@ export default function ProfileScreen() {
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={[s.hero, { paddingHorizontal: hPad }]}
           >
-            {/* Decorative accents */}
-            <View style={s.heroDecorCircle1} pointerEvents="none" />
-            <View style={s.heroDecorCircle2} pointerEvents="none" />
- 
             {/* Top row */}
             <View style={s.heroTop}>
               <Text style={s.heroLabel}>My Profile</Text>
             </View>
- 
+
             {/* Avatar + name */}
             <View style={s.heroMain}>
-              <View style={s.avatarRing}>
-                <View style={s.avatarOuter}>
-                  <Avatar name={user?.name} size={72} />
-                  <View style={s.verifiedDot}>
-                    <Feather name="check" size={9} color={C.white} />
-                  </View>
+              <View style={s.avatarOuter}>
+                <Avatar name={user?.name} size={72} />
+                <View style={s.verifiedDot}>
+                  <Feather name="check" size={9} color={C.white} />
                 </View>
               </View>
               <View style={s.heroInfo}>
@@ -549,64 +510,46 @@ export default function ProfileScreen() {
                 {memberSince && <Text style={s.heroSince}>Member since {memberSince}</Text>}
               </View>
             </View>
-          </LinearGradient>
- 
-          {/* Stats — sits OUTSIDE the hero's overflow:hidden box so the
-              overlap isn't clipped; it overlaps upward via negative marginTop
-              on statsWrap instead, and paints on top since it's a later sibling */}
-          <View style={[s.statsWrap, { paddingHorizontal: hPad }]}>
+
+            {/* Stats */}
             <View style={s.stats}>
               <View style={s.statItem}>
-                <View style={[s.statIconWrap, { backgroundColor: C.greenMid }]}>
-                  <Feather name="map-pin" size={13} color={C.greenDark} />
-                </View>
                 <Text style={s.statNum}>{addressStore?.addresses?.length ?? 0}</Text>
                 <Text style={s.statLabel}>Addresses</Text>
               </View>
               <View style={s.statSep} />
               <View style={s.statItem}>
-                <View style={[s.statIconWrap, { backgroundColor: C.orangeLight }]}>
-                  <Text style={{ fontSize: 12, fontWeight: "900", color: C.orangeDark }}>₹</Text>
-                </View>
-                <Text style={s.statNum}>150</Text>
+                <Text style={s.statNum}>₹150</Text>
                 <Text style={s.statLabel}>Credits</Text>
               </View>
               <View style={s.statSep} />
               <View style={s.statItem}>
-                <View style={[s.statIconWrap, { backgroundColor: C.blueLight }]}>
-                  <Feather name="user" size={13} color={C.blue} />
-                </View>
-                <Text style={[s.statNum, { fontSize: 12.5 }]} numberOfLines={1}>
+                <Text style={[s.statNum, { fontSize: 13 }]}>
                   {(user?.role || "customer").toUpperCase()}
                 </Text>
                 <Text style={s.statLabel}>Account</Text>
               </View>
             </View>
-          </View>
+          </LinearGradient>
         </Animated.View>
- 
+
         {/* ── Body ────────────────────────────────────────────────────── */}
         <View style={{ paddingHorizontal: hPad }}>
- 
+
           {/* Personal info */}
           <SectionLabel title="Personal info" />
           <View style={s.card}>
             <InfoRow
-              icon="user"
               label="Full name"
               value={user?.name}
               onEdit={() => setEditField({ field: "name", label: "Full name", value: user?.name })}
             />
             <InfoRow
-              icon="mail"
               label="Email address"
               value={user?.email}
               onEdit={() => setEditField({ field: "email", label: "Email address", value: user?.email, keyboardType: "email-address" })}
             />
             <View style={[ir.row, { borderBottomWidth: 0 }]}>
-              <View style={[ir.fieldIconWrap, ir.fieldIconWrapOff]}>
-                <Feather name="phone" size={15} color={C.gray400} />
-              </View>
               <View style={ir.left}>
                 <Text style={ir.label}>Phone number</Text>
                 <Text style={ir.value}>{user?.phone || "—"}</Text>
@@ -616,7 +559,7 @@ export default function ProfileScreen() {
               </View>
             </View>
           </View>
- 
+
           {/* Delivery addresses */}
           <SectionLabel title="Delivery addresses" />
           {addressStore?.addresses?.length === 0 ? (
@@ -650,31 +593,28 @@ export default function ProfileScreen() {
               ))}
             </>
           )}
- 
+
           {/* Activity */}
           <SectionLabel title="Activity" />
           <MenuItem
             icon="shopping-bag"
             label="Order history"
             sub="View all your past orders"
-            tint="orange"
             onPress={() => navigation.navigate("Orders")}
           />
           <MenuItem
             icon="gift"
             label="Invite friends"
             sub="Earn ₹150 credit per referral"
-            tint="green"
             onPress={handleInvite}
           />
- 
+
           {/* App */}
           <SectionLabel title="App" />
           <MenuItem
             icon="bell"
             label="Push notifications"
             sub={notifEnabled ? "Enabled" : "Disabled"}
-            tint="blue"
             onPress={() => handleNotifToggle(!notifEnabled)}
             right={
               <Switch
@@ -690,7 +630,6 @@ export default function ProfileScreen() {
             icon="credit-card"
             label="Payment methods"
             sub="Manage UPI & cards"
-            tint="purple"
             onPress={() => setShowPayments(true)}
           />
           <MenuItem
@@ -703,7 +642,7 @@ export default function ProfileScreen() {
             label="Terms & conditions"
             onPress={() => navigation.navigate("Terms")}
           />
- 
+
           {/* Account */}
           <SectionLabel title="Account" />
           <MenuItem
@@ -713,10 +652,10 @@ export default function ProfileScreen() {
             danger
             right={null}
           />
- 
+
         </View>
       </Animated.ScrollView>
- 
+
       {/* Modals */}
       <AddressDetailModal
         addr={detailAddr}
@@ -744,24 +683,16 @@ export default function ProfileScreen() {
     </SafeAreaView>
   );
 }
- 
+
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
- 
-  // Hero — rounded bottom edge + decorative circles for depth
-  hero: {
-    paddingTop: Platform.OS === "android" ? 32 : 24, paddingBottom: 44,
-    borderBottomLeftRadius: 28, borderBottomRightRadius: 28,
-    overflow: "hidden",
-  },
-  heroDecorCircle1: { position: "absolute", top: -50, right: -40, width: 150, height: 150, borderRadius: 75, backgroundColor: "rgba(255,255,255,0.08)" },
-  heroDecorCircle2: { position: "absolute", top: 70, right: 50, width: 56, height: 56, borderRadius: 28, backgroundColor: "rgba(255,255,255,0.07)" },
- 
+
+  // Hero — more vertical breathing room
+  hero: { paddingTop: Platform.OS === "android" ? 28 : 20, paddingBottom: 0 },
   heroTop: { marginBottom: 24 },
   heroLabel: { fontSize: 13, fontWeight: "800", color: "rgba(255,255,255,0.7)", letterSpacing: 1, textTransform: "uppercase" },
   heroMain: { flexDirection: "row", alignItems: "center", gap: 18, marginBottom: 28 },
- 
-  avatarRing: { padding: 4, borderRadius: 26, backgroundColor: "rgba(255,255,255,0.22)" },
+
   avatarOuter: { position: "relative" },
   verifiedDot: {
     position: "absolute", bottom: -2, right: -2,
@@ -769,43 +700,25 @@ const s = StyleSheet.create({
     backgroundColor: C.green, borderWidth: 2.5, borderColor: C.white,
     alignItems: "center", justifyContent: "center",
   },
- 
+
   heroInfo: { flex: 1 },
   heroName: { fontSize: 24, fontWeight: "900", color: C.white, letterSpacing: -0.3, flexWrap: "wrap" },
   heroPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.white, alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, marginTop: 8 },
   heroPillText: { fontSize: 13, fontWeight: "700", color: C.green },
   heroSince: { fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 6 },
- 
-  // Stats wrapper — a plain sibling AFTER the hero (not inside its
-  // overflow:hidden box), pulled up with a negative marginTop so it overlaps
-  // the green area. Because it paints after the hero, the overlap renders on
-  // top instead of being clipped.
-  statsWrap: { marginTop: -64 },
-  stats: {
-    flexDirection: "row", backgroundColor: C.white, borderRadius: 22, paddingVertical: 20,
-    shadowColor: "#0F172A", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.12, shadowRadius: 18, elevation: 6,
-    borderWidth: 1, borderColor: C.gray100,
-  },
-  statItem: { flex: 1, alignItems: "center", gap: 6 },
-  statIconWrap: { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center", marginBottom: 2 },
-  statNum: { fontSize: 19, fontWeight: "900", color: C.gray900 },
-  statLabel: { fontSize: 11.5, color: C.gray400, fontWeight: "600" },
+
+  // Stats — more vertical padding so numbers have room
+  stats: { flexDirection: "row", backgroundColor: C.white, borderRadius: 20, paddingVertical: 20, marginBottom: -22, zIndex: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4, borderWidth: 1, borderColor: C.gray100 },
+  statItem: { flex: 1, alignItems: "center", gap: 4 },
+  statNum: { fontSize: 20, fontWeight: "900", color: C.gray900 },
+  statLabel: { fontSize: 12, color: C.gray400, fontWeight: "600" },
   statSep: { width: 1, backgroundColor: C.gray200 },
- 
-  // Cards — soft shadow instead of a flat border
-  card: {
-    backgroundColor: C.white, borderRadius: 18, paddingHorizontal: 18, marginTop: 8,
-    borderWidth: 1, borderColor: C.gray100,
-    shadowColor: "#0F172A", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 2,
-  },
- 
+
+  // Cards — more top margin to clear the stats overlap
+  card: { backgroundColor: C.white, borderRadius: 16, paddingHorizontal: 16, borderWidth: 1, borderColor: C.gray200, marginTop: 42 },
+
   // Empty address
   emptyBox: { alignItems: "center", paddingVertical: 32, gap: 8, backgroundColor: C.white, borderRadius: 16, borderWidth: 1.5, borderColor: C.gray200, ...Platform.select({ web: { borderStyle: "dashed" }, default: { borderStyle: "solid" } }) },
   emptyTitle: { fontSize: 15, fontWeight: "700", color: C.gray500 },
   emptySub: { fontSize: 13, color: C.gray400, textAlign: "center", paddingHorizontal: 24, lineHeight: 19 },
 });
- 
-
-
-
-

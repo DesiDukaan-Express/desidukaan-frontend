@@ -327,13 +327,11 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
     const token = useAuthStore((state) => state.token);
     const login = useAuthStore((state) => state.login);
 
-    const [form, setForm]             = useState(INITIAL_FORM);
-    const [errors, setErrors]         = useState({});
-    const [errorMsg, setErrorMsg]     = useState(null);  // top-level error banner
-    const [successMsg, setSuccessMsg] = useState(null);  // success banner
+    const [form, setForm]           = useState(INITIAL_FORM);
+    const [errors, setErrors]       = useState({});
     const [submitting, setSubmitting] = useState(false);
     // uploading: null | 'profile' | 'license' | 'rc'
-    const [uploading, setUploading]   = useState(null);
+    const [uploading, setUploading] = useState(null);
 
     // Generic nested field setter — also clears that field's error
     const setField = (section, key, value) => {
@@ -379,8 +377,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                 setField('rc', 'photoName', asset.fileName || 'photo');
             }
         } catch (err) {
-            console.error('Upload failed:', err);
-            setErrorMsg(err.message || 'Upload failed. Please try again.');
+            Alert.alert('Upload failed', err.message || 'Please try again.');
         } finally {
             setUploading(null);
         }
@@ -409,8 +406,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
             setField('rc', 'photoMime',     mimeType);
             setField('rc', 'photoName',     name);
         } catch (err) {
-            console.error('Document upload failed:', err);
-            setErrorMsg(err.message || 'Upload failed. Please try again.');
+            Alert.alert('Upload failed', err.message || 'Please try again.');
         } finally {
             setUploading(null);
         }
@@ -418,22 +414,19 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
 
     // ── Form submit ───────────────────────────────────────────────────────────
     const handleSubmit = async () => {
-        console.log('submit pressed');
-        setErrorMsg(null);
+        console.log('submit pressed')
         const validationErrors = validate(form);
-        console.log('validation errors:', validationErrors);
+        console.log('validation errors:', validationErrors)
         if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
-            setErrorMsg('Please fill all required fields marked with *');
+            Alert.alert('Missing details', 'Please fill all required fields.');
             return;
         }
 
         try {
             setSubmitting(true);
             const payload = buildPayload(form);
-            console.log('Submitting payload:', JSON.stringify(payload, null, 2));
             const res     = await deliveryAPI.onboard(payload, token);
-            console.log('Onboard response:', res);
 
             // Update the auth store with fresh user data returned from onboard
             const partner = res.data?.partner;
@@ -444,24 +437,28 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
             // Check if auto-approved
             const autoApproved = res.data?.auto_approved === true;
 
-            // Show success inline (works on web AND native)
-            setSuccessMsg(
+            // Trigger success flow with appropriate message
+            Alert.alert(
+                autoApproved ? '✅ Instantly Approved!' : '🎉 Application Submitted!',
                 autoApproved
-                    ? "✅ Instantly Approved! You can start accepting delivery orders right away."
-                    : "🎉 Application Submitted! We'll verify your documents within 24 hours. You'll receive an SMS once approved."
+                    ? "You've been instantly approved! You can start accepting delivery orders right away."
+                    : "We'll verify your documents within 24 hours. You'll receive an SMS once approved.",
+                [
+                    {
+                        text: autoApproved ? 'Start Earning →' : 'OK',
+                        onPress: () => {
+                            if (onComplete) {
+                                onComplete();
+                            } else {
+                                // Fallback if onComplete wasn't provided
+                                navigation?.navigate('DeliveryApp');
+                            }
+                        }
+                    }
+                ]
             );
-
-            // Navigate after a short delay so user sees the message
-            setTimeout(() => {
-                if (onComplete) {
-                    onComplete();
-                } else {
-                    navigation?.navigate('DeliveryApp');
-                }
-            }, 2500);
         } catch (err) {
-            console.error('Onboarding submission failed:', err);
-            setErrorMsg(err.message || 'Submission failed. Please try again.');
+            Alert.alert('Submission failed', err.message || 'Please try again.');
         } finally {
             setSubmitting(false);
         }
@@ -806,29 +803,6 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
     </View>
 </View>
 
-                {/* ── Error Banner ── */}
-                {errorMsg && (
-                    <View style={s.errorBanner}>
-                        <Text style={s.errorBannerIcon}>⚠️</Text>
-                        <View style={{ flex: 1 }}>
-                            <Text style={s.errorBannerText}>{errorMsg}</Text>
-                        </View>
-                        <TouchableOpacity onPress={() => setErrorMsg(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                            <Text style={{ fontSize: 16, color: C.red }}>✕</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-
-                {/* ── Success Banner ── */}
-                {successMsg && (
-                    <View style={s.successBanner}>
-                        <Text style={s.successBannerText}>{successMsg}</Text>
-                        <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 4 }}>
-                            Redirecting you shortly…
-                        </Text>
-                    </View>
-                )}
-
                 {/* Submit Button */}
                 <TouchableOpacity
                     style={[s.submitBtn, (submitting || uploading !== null) && { opacity: 0.7 }]}
@@ -957,20 +931,4 @@ submitBtn:      { backgroundColor: C.green, borderRadius: 16, paddingVertical: 1
 submitBtnTxt:   { fontSize: 15, fontWeight: '900', color: '#fff', letterSpacing: 0.2 },
 submitBtnArrow: { fontSize: 16, color: '#fff', fontWeight: '900' },
 bottomNote:     { textAlign: 'center', fontSize: 11, color: C.textXLight, lineHeight: 17, marginBottom: 4 },
-
-    errorBanner: {
-        flexDirection: 'row', alignItems: 'center', gap: 10,
-        backgroundColor: '#FEF2F2', borderRadius: 12, padding: 14,
-        borderWidth: 1.5, borderColor: '#FCA5A5', marginBottom: 12,
-    },
-    errorBannerIcon: { fontSize: 18 },
-    errorBannerText: { fontSize: 13, fontWeight: '700', color: C.red, lineHeight: 19 },
-
-    successBanner: {
-        backgroundColor: C.green, borderRadius: 14, padding: 16,
-        marginBottom: 12, alignItems: 'center',
-        shadowColor: C.green, shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3, shadowRadius: 10, elevation: 6,
-    },
-    successBannerText: { fontSize: 15, fontWeight: '800', color: '#fff', textAlign: 'center', lineHeight: 22 },
 });

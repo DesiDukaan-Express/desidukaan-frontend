@@ -22,9 +22,9 @@ const useAddressStore = create((set, get) => ({
         body: JSON.stringify({
           label:       address.label    || "Home",
           address_line: address.address || address.address_line,
-          city:        address.city     || null,
-          state:       address.state    || null,
-          pincode:     address.pincode  || null,
+          city:        address.city     || "Kolkata",
+          state:       address.state    || "West Bengal",
+          pincode:     address.pincode  || "700001",
           latitude:    address.lat      || null,
           longitude:   address.lng      || null,
         }),

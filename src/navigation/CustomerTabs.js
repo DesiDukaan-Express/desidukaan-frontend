@@ -3,8 +3,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { io } from 'socket.io-client';
-import { View, Text, Platform, TouchableOpacity, StyleSheet, Animated } from 'react-native';
-import { MaterialIcons, Feather } from '@expo/vector-icons';
+import { View, Text, Platform, TouchableOpacity, StyleSheet } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import useCartStore from '../store/cartStore';
 import useAuthStore from '../store/authStore';
 import useOrderStore from '../store/orderStore';
@@ -27,8 +27,6 @@ const C = {
   green:       '#16A34A',
   greenLight:  '#F0FDF4',
   orange:      '#F97316',
-  orangeDark:  '#EA580C',
-  purple:      '#7C3AED',
   surface:     '#FFFFFF',
   surfaceLow:  '#F8FAFC',
   border:      '#E5E7EB',
@@ -36,9 +34,9 @@ const C = {
   gray600:     '#4B5563',
   gray900:     '#111827',
   greenDark:   '#15803D',
-  red:         '#DC2626',
 };
 
+// Icon names per tab
 const TAB_ICONS = {
   Home:    'home',
   Search:  'search',
@@ -50,6 +48,7 @@ const TAB_ICONS = {
 // ─── Tab icon component ────────────────────────────────────────────────────────
 const TabIcon = ({ iconName, label, focused, cartCount }) => {
   const isCart = label === 'Cart';
+
   return (
     <View
       style={{
@@ -59,11 +58,17 @@ const TabIcon = ({ iconName, label, focused, cartCount }) => {
         paddingVertical: 4,
         borderRadius: 20,
         minWidth: 56,
+        // Active: green pill-like highlight
         backgroundColor: focused ? C.greenLight : 'transparent',
       }}
     >
+      {/* Icon + optional cart badge */}
       <View style={{ position: 'relative' }}>
-        <MaterialIcons name={iconName} size={24} color={focused ? C.green : C.gray400} />
+        <MaterialIcons
+          name={iconName}
+          size={24}
+          color={focused ? C.green : C.gray400}
+        />
         {isCart && cartCount > 0 && (
           <View
             style={{
@@ -87,6 +92,8 @@ const TabIcon = ({ iconName, label, focused, cartCount }) => {
           </View>
         )}
       </View>
+
+      {/* Label */}
       <Text
         style={{
           fontSize: 10,
@@ -102,11 +109,18 @@ const TabIcon = ({ iconName, label, focused, cartCount }) => {
   );
 };
 
-// ─── Cart tab with live badge ──────────────────────────────────────────────────
+// ─── Tab bar with cart count from store ───────────────────────────────────────
 function CartTabIcon({ focused }) {
   const cart = useCartStore();
   const cartCount = cart?.items?.reduce((s, i) => s + (i.qty || 1), 0) ?? 0;
-  return <TabIcon iconName={TAB_ICONS['Cart']} label="Cart" focused={focused} cartCount={cartCount} />;
+  return (
+    <TabIcon
+      iconName={TAB_ICONS['Cart']}
+      label="Cart"
+      focused={focused}
+      cartCount={cartCount}
+    />
+  );
 }
 
 // ─── Bottom tab navigator ──────────────────────────────────────────────────────
@@ -117,8 +131,16 @@ function CustomerTabNavigator() {
         headerShown: false,
         tabBarShowLabel: false,
         tabBarIcon: ({ focused }) => {
-          if (route.name === 'Cart') return <CartTabIcon focused={focused} />;
-          return <TabIcon iconName={TAB_ICONS[route.name]} label={route.name} focused={focused} />;
+          if (route.name === 'Cart') {
+            return <CartTabIcon focused={focused} />;
+          }
+          return (
+            <TabIcon
+              iconName={TAB_ICONS[route.name]}
+              label={route.name}
+              focused={focused}
+            />
+          );
         },
         tabBarStyle: {
           backgroundColor: C.surface,
@@ -127,17 +149,30 @@ function CustomerTabNavigator() {
           height: Platform.OS === 'ios' ? 82 : 64,
           paddingBottom: Platform.OS === 'ios' ? 20 : 4,
           paddingTop: 4,
+          // Rounded top corners like the HTML design
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
+          // Soft shadow going up
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -3 },
           shadowOpacity: 0.06,
           shadowRadius: 10,
           elevation: 16,
+          // Clip for rounded corners
           overflow: Platform.OS === 'android' ? 'hidden' : 'visible',
         },
-        tabBarIconStyle: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
-        tabBarItemStyle: { justifyContent: 'center', alignItems: 'center', height: '100%' },
+        tabBarIconStyle: {
+          width: '100%',
+          height: '100%',
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100%',
+        },
+        // Disable the default active indicator highlight on web
         tabBarActiveTintColor: C.green,
         tabBarInactiveTintColor: C.gray400,
       })}
@@ -151,307 +186,158 @@ function CustomerTabNavigator() {
   );
 }
 
-// ─── Persistent Pending Order Notification ─────────────────────────────────────
-// Stays visible above the tab bar while customer browses after sending an order.
-// Shows a live countdown. Tap → back to Checkout (re-opens modal).
+// Stack wrapping tabs — allows pushing full screens like VendorStore
 function PendingOrderMonitor() {
   const navigation = useNavigation();
   const { token } = useAuthStore();
-  const pendingOrder  = useOrderStore((s) => s.pendingOrder);
-  const updatePending = useOrderStore((s) => s.updatePendingOrder);
-  const clearPending  = useOrderStore((s) => s.clearPendingOrder);
+  const pendingOrder = useOrderStore((s) => s.pendingOrder);
+  const updatePendingOrder = useOrderStore((s) => s.updatePendingOrder);
+  const clearPendingOrder = useOrderStore((s) => s.clearPendingOrder);
+  const [banner, setBanner] = useState(null);
+  const bannerTimer = useRef(null);
+  const handledStatusRef = useRef({});
 
-  const ORDER_TIMEOUT = 90; // seconds — must match Checkout.js
-  const [countdown, setCountdown] = useState(ORDER_TIMEOUT);
-  const timerRef     = useRef(null);
-  const startRef     = useRef(null);
-  const pulseAnim    = useRef(new Animated.Value(1)).current;
-
-  // Transient toast for accepted / rejected / countered alerts
-  const [toast, setToast] = useState(null);
-  const toastTimerRef  = useRef(null);
-  const handledRef     = useRef({});
-
-  // ── Helpers ────────────────────────────────────────────────────────────
-  const showToast = (message, type = 'info', onPress = null, duration = 8000) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ message, type, onPress });
-    if (duration) toastTimerRef.current = setTimeout(() => setToast(null), duration);
+  const showBanner = (message, type = 'info', onPress = null, duration = 6000) => {
+    if (bannerTimer.current) clearTimeout(bannerTimer.current);
+    setBanner({ message, type, onPress });
+    if (duration) {
+      bannerTimer.current = setTimeout(() => setBanner(null), duration);
+    }
   };
 
-  const openCheckout = (statusOverride) => {
-    const order = useOrderStore.getState().pendingOrder;
-    if (!order?.id) return;
-    const root = navigation.getParent?.() || navigation;
-    const effectiveStatus = statusOverride || order.status || 'pending';
-
-    // If accepted, go directly to PaymentScreen with all final order data
-    if (effectiveStatus === 'accepted') {
-      const counterOffer = order.counter_offer || null;
-      const rawSlot = counterOffer?.slot || order.confirmedSlot || order.slot || order.delivery_slot || null;
-      const finalSlot = rawSlot ? {
-        start: rawSlot.vendor_slot_start || rawSlot.slot_start || rawSlot.start,
-        end: rawSlot.vendor_slot_end || rawSlot.slot_end || rawSlot.end
-      } : null;
-      const finalFee  = counterOffer?.delivery_fee != null
-        ? counterOffer.delivery_fee
-        : (order.confirmedFee ?? order.delivery_fee ?? null);
-      const finalTotal = counterOffer?.total != null
-        ? counterOffer.total
-        : (order.total ?? null);
-
-      root.navigate('Payment', {
-        orderId:          order.id,
-        orderNumber:      order.order_number || `ORD-${order.id}`,
-        vendorName:       order.vendorName || order.vendor?.shop_name || 'Store',
-        items:            order.snapshotItems || order.items || [],
-        subtotal:         order.snapshotSubtotal ?? order.subtotal ?? 0,
-        deliveryFee:      finalFee ?? 0,
-        total:            finalTotal ?? 0,
-        confirmedSlot:    finalSlot,
-        deliveryTypePref: order.deliveryTypePref || order.delivery_type_pref || 'standard',
-        vendorPhone:      order.vendorPhone || null,
-        phoneStatus:      order.phoneStatus  || null,
-        preSelectedPay:   order.selectedPay  || null,
-      });
-      return;
-    }
-
-    // For pending / countered — go back to Checkout
-    root.navigate('Checkout', {
+  const openPayment = (orderData = pendingOrder) => {
+    if (!orderData?.id) return;
+    const rootNavigation = navigation.getParent?.() || navigation;
+    rootNavigation.navigate('Checkout', {
       resumePendingOrder: true,
-      pendingOrder: order,
-      orderId: order.id,
-      initialOrderStatus: effectiveStatus,
-      confirmedSlot:    order.confirmedSlot || order.slot || null,
-      selectedPay:      order.selectedPay || null,
-      snapshotItems:    order.snapshotItems || order.items || [],
-      snapshotSubtotal: order.snapshotSubtotal ?? order.subtotal ?? 0,
-      vendorId:         order.vendor_id || order.vendorId,
-      vendorName:       order.vendorName || order.vendor?.shop_name || 'Store',
-      deliveryTypePref: order.deliveryTypePref || order.delivery_type_pref || 'standard',
-      proposedFee:      order.proposedFee ?? null,
-      confirmedFee:     order.confirmedFee ?? order.delivery_fee ?? null,
+      pendingOrder: orderData,
+      orderId: orderData.id,
+      initialOrderStatus: 'accepted',
+      confirmedSlot: orderData.confirmedSlot || orderData.slot || null,
+      selectedPay: orderData.selectedPay || null,
+      snapshotItems: orderData.snapshotItems || orderData.items || [],
+      snapshotSubtotal: orderData.snapshotSubtotal ?? orderData.subtotal ?? 0,
+      vendorId: orderData.vendor_id || orderData.vendorId,
+      vendorName: orderData.vendorName || orderData.vendor?.shop_name || 'Store',
+      deliveryTypePref: orderData.deliveryTypePref || orderData.delivery_type_pref || 'standard',
+      proposedFee: orderData.proposedFee ?? null,
+      confirmedFee: orderData.confirmedFee ?? orderData.delivery_fee ?? null,
     });
   };
 
-  // ── Countdown timer ────────────────────────────────────────────────────
-  useEffect(() => {
-    if (pendingOrder?.status === 'pending') {
-      // Use placedAt from store so countdown is accurate even after re-mounts
-      const placedAt = pendingOrder.placedAt || Date.now();
-      startRef.current = placedAt;
+  const handleOrderUpdate = (data) => {
+    const activeOrder = useOrderStore.getState().pendingOrder;
+    const activeId = activeOrder?.id || activeOrder?.order_id;
+    if (!activeId || String(data.order_id) !== String(activeId)) return;
 
-      const tick = () => {
-        const elapsed   = Math.floor((Date.now() - placedAt) / 1000);
-        const remaining = Math.max(0, ORDER_TIMEOUT - elapsed);
-        setCountdown(remaining);
-        if (remaining <= 0) {
-          clearInterval(timerRef.current);
-          updatePending({ status: 'expired' });
-        }
-      };
-      tick(); // fire immediately so display is right on mount
-      if (timerRef.current) clearInterval(timerRef.current);
-      timerRef.current = setInterval(tick, 1000);
-    } else {
-      startRef.current = null;
-      if (timerRef.current) clearInterval(timerRef.current);
+    const nextOrder = {
+      ...activeOrder,
+      id: activeOrder.id || data.order_id,
+      status: data.status,
+      order_number: data.order_number || activeOrder.order_number,
+      cancellation_reason: data.reason || activeOrder.cancellation_reason,
+    };
+    updatePendingOrder(nextOrder);
+
+    const handledKey = `${data.order_id}:${data.status}`;
+    if (handledStatusRef.current[handledKey]) return;
+    handledStatusRef.current[handledKey] = true;
+
+    if (data.status === 'accepted') {
+      showBanner('Your order was accepted. Tap to continue to payment.', 'success', () => openPayment(nextOrder), null);
+    } else if (data.status === 'rejected') {
+      showBanner(data.reason || 'The store declined your order.', 'danger');
+      clearPendingOrder();
     }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [pendingOrder?.status, pendingOrder?.id, pendingOrder?.placedAt]);
+  };
 
-  // ── Pulse animation ────────────────────────────────────────────────────
   useEffect(() => {
-    if (pendingOrder?.status === 'pending') {
-      const loop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.14, duration: 650, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1.0,  duration: 650, useNativeDriver: true }),
-        ])
-      );
-      loop.start();
-      return () => loop.stop();
-    } else {
-      pulseAnim.setValue(1);
-    }
-  }, [pendingOrder?.status]);
+    return () => {
+      if (bannerTimer.current) clearTimeout(bannerTimer.current);
+    };
+  }, []);
 
-  // ── Socket listener ────────────────────────────────────────────────────
   useEffect(() => {
-    if (!token) return;
-
-    const socket = io(SOCKET_URL, { auth: { token }, transports: ['websocket'] });
-
-    socket.on('order:update', (data) => {
-      const current = useOrderStore.getState().pendingOrder;
-      if (!current?.id || String(data.order_id) !== String(current.id)) return;
-      const key = `${data.order_id}:${data.status}`;
-      if (handledRef.current[key]) return;
-      handledRef.current[key] = true;
-
-      updatePending({ status: data.status, order_number: data.order_number });
-
-      if (data.status === 'accepted') {
-        showToast('✅ Order accepted! Tap to pay.', 'success', () => openCheckout('accepted'), null);
-      } else if (data.status === 'rejected') {
-        showToast(data.reason || '❌ Store declined your order.', 'danger', null, 8000);
-        setTimeout(() => clearPending(), 8000);
-      }
+    if (!token || !pendingOrder?.id || !['pending', 'countered'].includes(pendingOrder.status)) return;
+    const socket = io(SOCKET_URL, {
+      auth: { token },
+      transports: ['websocket'],
     });
 
+    socket.on('order:update', handleOrderUpdate);
     socket.on('order:countered', (data) => {
-      const current = useOrderStore.getState().pendingOrder;
-      if (!current?.id || String(data.order_id) !== String(current.id)) return;
-      const key = `${data.order_id}:countered`;
-      if (handledRef.current[key]) return;
-      handledRef.current[key] = true;
-
-      updatePending({ status: 'countered', counter_offer: data.counter_offer });
-      showToast('🔄 Store suggested changes. Tap to review.', 'countered', () => openCheckout('countered'), null);
-    });
-
-    socket.on('delivery_assigned', (data) => {
-      console.log('[CustomerTabs WS] delivery_assigned received', data);
-      const partnerName = data.partner?.user?.name || 'A delivery partner';
-      const orderId = data.order_id || data.orderId;
-
-      showToast(
-        `🛵 ${partnerName} has been assigned as your delivery partner! Tap to track.`,
-        'success',
-        () => {
-          const root = navigation.getParent?.() || navigation;
-          root.navigate('TrackOrder', { orderId, orderNumber: `ORD-${orderId}` });
-        },
-        10000
-      );
+      if (String(data.order_id) !== String(pendingOrder.id)) return;
+      updatePendingOrder({
+        ...pendingOrder,
+        status: 'countered',
+        counter_offer: data.counter_offer,
+      });
+      showBanner('The store suggested changes to your order.', 'info');
     });
 
     return () => socket.disconnect();
-  }, [token]);
+  }, [token, pendingOrder?.id, pendingOrder?.status]);
 
-  // ── Polling fallback ───────────────────────────────────────────────────
   useEffect(() => {
-    if (!token || !pendingOrder?.id) return;
-    if (!['pending', 'countered'].includes(pendingOrder?.status)) return;
+    if (!pendingOrder?.id) return;
+    const handledKey = `${pendingOrder.id}:${pendingOrder.status}:local`;
+    if (handledStatusRef.current[handledKey]) return;
+    handledStatusRef.current[handledKey] = true;
 
+    if (pendingOrder.status === 'pending') {
+      showBanner('Order request sent. You can keep browsing while the store responds.', 'info');
+    } else if (pendingOrder.status === 'accepted') {
+      showBanner('Your order was accepted. Tap to continue to payment.', 'success', () => openPayment(pendingOrder), null);
+    }
+  }, [pendingOrder?.id, pendingOrder?.status]);
+
+  useEffect(() => {
+    if (!token || !pendingOrder?.id || !['pending', 'countered'].includes(pendingOrder.status)) return;
     const poll = setInterval(async () => {
       try {
         const res = await fetch(`${BASE_URL}/orders/${pendingOrder.id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const d = await res.json();
-        const order = d.data?.order || d.order;
+        const data = await res.json();
+        const order = data.data?.order || data.order;
         if (order?.status && order.status !== pendingOrder.status) {
-          updatePending({ status: order.status });
+          handleOrderUpdate({
+            order_id: order.id,
+            order_number: order.order_number,
+            status: order.status,
+            reason: order.cancellation_reason,
+          });
         }
-      } catch (_) { /* silent */ }
+      } catch (e) {
+        // Socket is primary; polling is only a silent fallback.
+      }
     }, 10000);
 
     return () => clearInterval(poll);
   }, [token, pendingOrder?.id, pendingOrder?.status]);
 
-  // ── Cleanup ────────────────────────────────────────────────────────────
-  useEffect(() => () => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    if (timerRef.current)      clearInterval(timerRef.current);
-  }, []);
-
-  const status     = pendingOrder?.status;
-  const vendor     = pendingOrder?.vendorName || pendingOrder?.vendor?.shop_name || 'Store';
-  const isPersist  = pendingOrder?.id && ['pending', 'countered', 'expired', 'accepted'].includes(status);
-
-  if (!isPersist && !toast) return null;
+  if (!banner) return null;
 
   return (
-    <>
-      {/* ── Persistent live-timer banner ─────────────────────────────── */}
-      {isPersist && (
-        <TouchableOpacity
-          style={[
-            ms.banner,
-            status === 'pending'   && ms.bPending,
-            status === 'accepted'  && ms.bAccepted,
-            status === 'countered' && ms.bCountered,
-            status === 'expired'   && ms.bExpired,
-          ]}
-          onPress={() => openCheckout(status)}
-          activeOpacity={0.88}
-        >
-          {/* Timer / icon bubble */}
-      {status === 'pending' ? (
-            <Animated.View style={[ms.bubble, { transform: [{ scale: pulseAnim }] }]}>
-              <Text style={ms.bubbleText}>{countdown}s</Text>
-            </Animated.View>
-          ) : status === 'accepted' ? (
-            <View style={ms.bubble}>
-              <Feather name="credit-card" size={17} color="#fff" />
-            </View>
-          ) : (
-            <View style={ms.bubble}>
-              <Feather
-                name={status === 'countered' ? 'edit-3' : 'clock'}
-                size={17}
-                color="#fff"
-              />
-            </View>
-          )}
-
-          {/* Text */}
-          <View style={{ flex: 1 }}>
-            <Text style={ms.bannerTitle} numberOfLines={1}>
-              {status === 'pending'
-                ? `Waiting for ${vendor}…`
-                : status === 'accepted'
-                ? `Order Confirmed — Proceed to Pay`
-                : status === 'countered'
-                ? `${vendor} suggested changes`
-                : 'Request expired'}
-            </Text>
-            <Text style={ms.bannerSub}>
-              {status === 'pending'
-                ? `${countdown}s remaining · tap to view`
-                : status === 'accepted'
-                ? 'Tap to complete payment'
-                : status === 'countered'
-                ? 'Tap to review & respond'
-                : 'Tap for details'}
-            </Text>
-          </View>
-
-          <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.75)" />
-        </TouchableOpacity>
-      )}
-
-      {/* ── Transient toast (accepted / rejected / countered flash) ──── */}
-      {toast && (
-        <TouchableOpacity
-          style={[
-            ms.toast,
-            toast.type === 'success'   && ms.tSuccess,
-            toast.type === 'danger'    && ms.tDanger,
-            toast.type === 'countered' && ms.tCountered,
-            isPersist && { bottom: BOTTOM + 74 }, // stack above banner
-          ]}
-          onPress={toast.onPress || (() => setToast(null))}
-          activeOpacity={0.9}
-        >
-          <MaterialIcons
-            name={toast.type === 'danger' ? 'error-outline' : 'check-circle'}
-            size={18}
-            color="#fff"
-          />
-          <Text style={ms.toastText}>{toast.message}</Text>
-          <TouchableOpacity onPress={() => setToast(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Feather name="x" size={15} color="rgba(255,255,255,0.65)" />
-          </TouchableOpacity>
-        </TouchableOpacity>
-      )}
-    </>
+    <TouchableOpacity
+      style={[
+        monitorStyles.banner,
+        banner.type === 'success' && monitorStyles.success,
+        banner.type === 'danger' && monitorStyles.danger,
+      ]}
+      onPress={banner.onPress || (() => setBanner(null))}
+      activeOpacity={0.9}
+    >
+      <MaterialIcons
+        name={banner.type === 'danger' ? 'error-outline' : 'check-circle'}
+        size={18}
+        color="#fff"
+      />
+      <Text style={monitorStyles.text}>{banner.message}</Text>
+    </TouchableOpacity>
   );
 }
 
-// ─── Root export ───────────────────────────────────────────────────────────────
 export default function CustomerTabs() {
   return (
     <View style={{ flex: 1 }}>
@@ -465,76 +351,27 @@ export default function CustomerTabs() {
   );
 }
 
-// ─── Styles ────────────────────────────────────────────────────────────────────
-const BOTTOM = Platform.OS === 'ios' ? 98 : 76;
-
-const ms = StyleSheet.create({
-  // Persistent banner
+const monitorStyles = StyleSheet.create({
   banner: {
-    position:        'absolute',
-    left:            12,
-    right:           12,
-    bottom:          BOTTOM,
-    zIndex:          9999,
-    elevation:       20,
-    borderRadius:    18,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    flexDirection:   'row',
-    alignItems:      'center',
-    gap:             12,
-    shadowColor:     '#000',
-    shadowOffset:    { width: 0, height: 6 },
-    shadowOpacity:   0.25,
-    shadowRadius:    14,
-    backgroundColor: C.orangeDark,
-  },
-  bPending:   { backgroundColor: C.orangeDark },
-  bAccepted:  { backgroundColor: C.green },
-  bCountered: { backgroundColor: C.purple },
-  bExpired:   { backgroundColor: C.gray600 },
-
-  bubble: {
-    width:            46,
-    height:           46,
-    borderRadius:     23,
-    backgroundColor:  'rgba(255,255,255,0.2)',
-    borderWidth:      2,
-    borderColor:      'rgba(255,255,255,0.38)',
-    alignItems:       'center',
-    justifyContent:   'center',
-  },
-  bubbleText: {
-    fontSize:    14,
-    fontWeight:  '900',
-    color:       '#fff',
-    letterSpacing: -0.5,
-  },
-  bannerTitle: { fontSize: 14, fontWeight: '800', color: '#fff' },
-  bannerSub:   { fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 2, fontWeight: '500' },
-
-  // Transient toast
-  toast: {
-    position:        'absolute',
-    left:            12,
-    right:           12,
-    bottom:          BOTTOM,
-    zIndex:          10000,
-    elevation:       21,
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: Platform.OS === 'ios' ? 96 : 76,
+    zIndex: 9999,
+    elevation: 20,
     backgroundColor: C.gray900,
-    borderRadius:    14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    flexDirection:   'row',
-    alignItems:      'center',
-    gap:             10,
-    shadowColor:     '#000',
-    shadowOffset:    { width: 0, height: 4 },
-    shadowOpacity:   0.2,
-    shadowRadius:    10,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
   },
-  tSuccess:   { backgroundColor: C.green },
-  tDanger:    { backgroundColor: C.red },
-  tCountered: { backgroundColor: C.purple },
-  toastText:  { flex: 1, color: '#fff', fontSize: 13, fontWeight: '700', lineHeight: 19 },
+  success: { backgroundColor: C.green },
+  danger: { backgroundColor: '#DC2626' },
+  text: { flex: 1, color: '#fff', fontSize: 14, fontWeight: '700', lineHeight: 20 },
 });
