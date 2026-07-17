@@ -1,7 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl, StatusBar, Platform, Alert,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  StatusBar,
+  Modal,
+  Pressable,
 } from 'react-native';
 import {
   useFonts,
@@ -11,6 +19,10 @@ import {
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import useAuthStore from '../../store/authStore';
+import AccountManagerModal from '../../components/common/AccountManagerModal';
+import { Platform } from "react-native";
+import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 
@@ -71,9 +83,33 @@ function SectionCard({ title, children }) {
   );
 }
 
+function LogoutModal({ visible, onConfirm, onCancel }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <Pressable style={lm.backdrop} onPress={onCancel}>
+        <Pressable style={lm.card} onPress={() => { }}>
+          <LinearGradient colors={["#FEF2F2", "#FFF"]} style={lm.iconWrap}>
+            <Feather name="log-out" size={26} color={C.red} />
+          </LinearGradient>
+          <Text style={lm.title}>Log out?</Text>
+          <Text style={lm.sub}>You will be signed out of your delivery account.</Text>
+          <View style={lm.btns}>
+            <TouchableOpacity style={lm.cancel} onPress={onCancel}>
+              <Text style={lm.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={lm.confirm} onPress={onConfirm}>
+              <Text style={lm.confirmText}>Log out</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 export default function DeliveryProfileScreen({ navigation }) {
   const { token, user, logout } = useAuthStore();
-
+  
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_500Medium,
     PlusJakartaSans_600SemiBold,
@@ -85,6 +121,8 @@ export default function DeliveryProfileScreen({ navigation }) {
   const [stats,   setStats]   = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showAccountManager, setShowAccountManager] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -107,12 +145,10 @@ export default function DeliveryProfileScreen({ navigation }) {
   useEffect(() => { fetchData(); }, [fetchData]);
   const onRefresh = () => { setRefreshing(true); fetchData(); };
 
-  const handleLogout = () => {
-    Alert.alert('Log out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: () => logout?.() },
-    ]);
-  };
+const handleLogout = async () => {
+  setShowLogout(false);
+  await logout();
+};
 
   if (loading || !fontsLoaded) {
     return (
@@ -248,8 +284,13 @@ export default function DeliveryProfileScreen({ navigation }) {
             </TouchableOpacity>
           )}
 
+          {/* ── Manage Accounts ── */}
+          <TouchableOpacity style={p.manageBtn} onPress={() => setShowAccountManager(true)} activeOpacity={0.8}>
+            <Text style={p.manageText}>Manage Accounts</Text>
+          </TouchableOpacity>
+
           {/* ── Log out ── */}
-          <TouchableOpacity style={p.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+          <TouchableOpacity style={p.logoutBtn} onPress={() => setShowLogout(true)} activeOpacity={0.8}>
             <Text style={p.logoutText}>Log out</Text>
           </TouchableOpacity>
 
@@ -257,6 +298,17 @@ export default function DeliveryProfileScreen({ navigation }) {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      <AccountManagerModal
+        visible={showAccountManager}
+        onClose={() => setShowAccountManager(false)}
+      />
+
+      <LogoutModal
+  visible={showLogout}
+  onConfirm={handleLogout}
+  onCancel={() => setShowLogout(false)}
+/>
     </View>
   );
 }
@@ -321,4 +373,23 @@ const p = StyleSheet.create({
     marginTop: 4,
   },
   logoutText: { fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: C.red },
+  manageBtn: {
+    borderRadius: 16, paddingVertical: 14, alignItems: 'center',
+    borderWidth: 1.5, borderColor: '#50C878' + '40', backgroundColor: C.white,
+    marginTop: 12,
+  },
+  manageText: { fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: C.greenDark },
+});
+
+const lm = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },
+  card: { backgroundColor: C.white, borderRadius: 24, padding: 28, width: "82%", alignItems: "center", gap: 8 },
+  iconWrap: { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  title: { fontSize: 20, fontWeight: "900", color: C.gray900 },
+  sub: { fontSize: 13, color: C.gray400, textAlign: "center", lineHeight: 20 },
+  btns: { flexDirection: "row", gap: 10, marginTop: 12, width: "100%" },
+  cancel: { flex: 1, paddingVertical: 14, borderRadius: 13, backgroundColor: C.gray100, alignItems: "center" },
+  cancelText: { fontSize: 15, fontWeight: "700", color: C.gray700 },
+  confirm: { flex: 1, paddingVertical: 14, borderRadius: 13, backgroundColor: C.red, alignItems: "center" },
+  confirmText: { fontSize: 15, fontWeight: "700", color: C.white },
 });

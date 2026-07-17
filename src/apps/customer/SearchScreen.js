@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, FlatList, Image,
   TouchableOpacity, TextInput, ActivityIndicator,
   Animated, Platform, StatusBar, Keyboard,
-  KeyboardAvoidingView, Dimensions,
+  KeyboardAvoidingView, Dimensions, Modal,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -18,7 +18,31 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const NEARBY_RADIUS = 10;   // km — stores within this are shown normally
 const FAR_RADIUS = 10;   // km — backend validation max is 10
 const MAX_HISTORY = 8;
+<<<<<<< HEAD
  
+=======
+
+const TRENDING_SEARCHES = [
+  { label: "Amul Milk", icon: "🥛" },
+  { label: "Fortune Oil", icon: "🌶️" },
+  { label: "Aashirvaad Atta", icon: "🌾" },
+  { label: "Maggi Noodles", icon: "🥣" },
+  { label: "Fresh Eggs", icon: "🥚" },
+  { label: "Cheetos", icon: "🍿" },
+  { label: "Coca Cola", icon: "🥤" },
+];
+
+const VOICE_SUGGESTIONS = [
+  "Amul Gold Milk",
+  "Fortune Mustard Oil",
+  "Aashirvaad Atta 5kg",
+  "Maggi 2-Minute Noodles",
+  "Coca Cola Can",
+  "Fresh Brown Eggs",
+  "Lays Potato Chips",
+];
+
+>>>>>>> origin/vedant-background-order-tracking
 // ─── Palette (matches app design system) ─────────────────────────────────────
 const C = {
   orange: "#F97316", orangeDark: "#EA580C",
@@ -455,7 +479,19 @@ export default function SearchScreen() {
   const [activeTab, setActiveTab] = useState("places");
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+<<<<<<< HEAD
  
+=======
+
+  // Voice Search states
+  const [voiceModalVisible, setVoiceModalVisible] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState("Listening...");
+  const [voiceText, setVoiceText] = useState("");
+  const voicePulse = useRef(new Animated.Value(1)).current;
+  const pulseTimer = useRef(null);
+  const recognitionRef = useRef(null);
+
+>>>>>>> origin/vedant-background-order-tracking
   // Autocomplete & correction
   const [apiSuggestions, setApiSuggestions] = useState([]); // from server
   const [didYouMean, setDidYouMean] = useState(null); // typo correction
@@ -502,7 +538,142 @@ export default function SearchScreen() {
     } catch { setStoreCatVendors([]); }
     finally { setLoadingStoreCat(false); }
   };
+<<<<<<< HEAD
  
+=======
+
+  const startVoiceSearch = () => {
+    setVoiceModalVisible(true);
+    setVoiceStatus("Listening...");
+    setVoiceText("");
+    
+    // Start pulsing animation loop
+    voicePulse.setValue(1);
+    const startPulse = () => {
+      Animated.sequence([
+        Animated.timing(voicePulse, {
+          toValue: 1.2,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(voicePulse, {
+          toValue: 1.0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        if (pulseTimer.current) startPulse();
+      });
+    };
+    pulseTimer.current = true;
+    startPulse();
+
+    // Check for web speech recognition support (Chrome, Safari, Edge)
+    const SpeechRecognition = Platform.OS === "web" 
+      ? (window.SpeechRecognition || window.webkitSpeechRecognition) 
+      : null;
+
+    if (SpeechRecognition) {
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.lang = 'en-IN'; // Indian English / general English
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onresult = (event) => {
+          const resultText = event.results[0][0].transcript;
+          console.log("Speech recognized successfully:", resultText);
+          
+          // Disable restart and stop pulsing animation
+          pulseTimer.current = null;
+          
+          setVoiceText(resultText);
+          setVoiceStatus("Searching...");
+          
+          setTimeout(() => {
+            setVoiceModalVisible(false);
+            setQuery(resultText);
+            doSearch(resultText);
+          }, 1000);
+        };
+
+        recognition.onerror = (event) => {
+          console.log("Speech recognition error:", event.error);
+          if (event.error === "no-speech") {
+            setVoiceStatus("Listening... Speak now");
+          } else if (event.error === "not-allowed") {
+            // Permission denied -> Fall back to simulation
+            pulseTimer.current = null;
+            setVoiceStatus("Permission denied. Using simulation...");
+            fallbackMockVoiceSearch();
+          } else {
+            // Other errors -> Fall back to simulation
+            pulseTimer.current = null;
+            setVoiceStatus("Voice error: " + event.error);
+            fallbackMockVoiceSearch();
+          }
+        };
+
+        recognition.onend = () => {
+          // If modal is still active and no result was captured, keep listening
+          if (pulseTimer.current) {
+            try {
+              recognition.start();
+            } catch (err) {
+              console.log("Error restarting speech recognition:", err);
+            }
+          } else {
+            recognitionRef.current = null;
+          }
+        };
+
+        recognition.start();
+        recognitionRef.current = recognition;
+      } catch (err) {
+        console.log("Failed to start SpeechRecognition instance:", err);
+        fallbackMockVoiceSearch();
+      }
+    } else {
+      // Fallback for native devices or unsupported browsers
+      fallbackMockVoiceSearch();
+    }
+  };
+
+  const fallbackMockVoiceSearch = () => {
+    // Simulate voice detection steps
+    setTimeout(() => {
+      if (!pulseTimer.current) return;
+      setVoiceStatus("Processing...");
+      const randomWord = VOICE_SUGGESTIONS[Math.floor(Math.random() * VOICE_SUGGESTIONS.length)];
+      setVoiceText(randomWord);
+
+      setTimeout(() => {
+        if (!pulseTimer.current) return;
+        setVoiceStatus("Searching...");
+        setTimeout(() => {
+          if (!pulseTimer.current) return;
+          setVoiceModalVisible(false);
+          pulseTimer.current = null;
+          setQuery(randomWord);
+          doSearch(randomWord);
+        }, 600);
+      }, 900);
+    }, 1800);
+  };
+
+  const cancelVoiceSearch = () => {
+    pulseTimer.current = null;
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (e) {}
+      recognitionRef.current = null;
+    }
+    setVoiceModalVisible(false);
+  };
+
+>>>>>>> origin/vedant-background-order-tracking
   const dbCategories = useMemo(() => {
     const seen = new Set();
     const cats = [];
@@ -918,9 +1089,13 @@ export default function SearchScreen() {
               selectionColor={C.green}
               underlineColorAndroid="transparent"
             />
-            {query.length > 0 && (
-              <TouchableOpacity onPress={() => { setQuery(""); setCommitted(false); inputRef.current?.focus(); }}>
+            {query.length > 0 ? (
+              <TouchableOpacity onPress={() => { setQuery(""); setCommitted(false); inputRef.current?.focus(); }} style={{ padding: 4 }}>
                 <Feather name="x" size={15} color={C.gray400} />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity onPress={startVoiceSearch} style={{ padding: 4 }}>
+                <Feather name="mic" size={16} color={C.green} />
               </TouchableOpacity>
             )}
           </View>
@@ -996,8 +1171,13 @@ export default function SearchScreen() {
                 </TouchableOpacity>
               </View>
             )}
+<<<<<<< HEAD
  
             {/* ── IDLE: categories + history ────────────────────────── */}
+=======
+
+            {/* ── IDLE: categories + trending + history ────────────────── */}
+>>>>>>> origin/vedant-background-order-tracking
             {isIdle && (
               <View style={{ paddingHorizontal: px, paddingTop: 16 }}>
  
@@ -1009,6 +1189,7 @@ export default function SearchScreen() {
                       horizontal showsHorizontalScrollIndicator={false}
                       contentContainerStyle={{ paddingRight: 8, paddingBottom: 8, gap: 20 }}
                     >
+<<<<<<< HEAD
                       {dbCategories.map(cat => (
                         <TouchableOpacity
                           key={cat.label}
@@ -1030,6 +1211,41 @@ export default function SearchScreen() {
                 {history.length > 0 && (
                   <>
                     <SectionHeading title="Recent Searches" action="Clear all" onAction={() => setHistory([])} />
+=======
+                      <View style={[s.catImgWrap, { backgroundColor: cat.bg }]}>
+                        <Image source={{ uri: cat.img }} style={s.catImg} resizeMode="cover" />
+                      </View>
+                      <Text style={s.catChipLabel}>{cat.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                {/* Trending Searches */}
+                <Text style={[s.sectionTitle, { marginTop: 24 }]}>Trending Searches 🔥</Text>
+                <View style={s.trendingContainer}>
+                  {TRENDING_SEARCHES.map((item, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={s.trendChip}
+                      onPress={() => { setQuery(item.label); doSearch(item.label); }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={s.trendIcon}>{item.icon}</Text>
+                      <Text style={s.trendText}>{item.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* History */}
+                {history.length > 0 && (
+                  <View style={{ marginTop: 24 }}>
+                    <View style={s.sectionRow}>
+                      <Text style={s.sectionTitle}>Recent Searches</Text>
+                      <TouchableOpacity onPress={() => setHistory([])}>
+                        <Text style={s.sectionAction}>Clear all</Text>
+                      </TouchableOpacity>
+                    </View>
+>>>>>>> origin/vedant-background-order-tracking
                     {history.map((h, i) => (
                       <TouchableOpacity
                         key={i}
@@ -1044,7 +1260,7 @@ export default function SearchScreen() {
                         </TouchableOpacity>
                       </TouchableOpacity>
                     ))}
-                  </>
+                  </View>
                 )}
               </View>
             )}
@@ -1269,6 +1485,68 @@ export default function SearchScreen() {
           </TouchableOpacity>
         </Animated.View>
       )}
+
+      {/* ── VOICE SEARCH MODAL ────────────────────────────────────────── */}
+      <Modal
+        visible={voiceModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={cancelVoiceSearch}
+      >
+        <View style={s.voiceModalContainer}>
+          <TouchableOpacity style={s.voiceCloseBtn} onPress={cancelVoiceSearch}>
+            <Feather name="x" size={24} color={C.white} />
+          </TouchableOpacity>
+
+          <View style={s.voiceContent}>
+            <Text style={s.voiceHintText}>
+              {voiceStatus === "Listening..." ? "Listening for products/stores..." : "Processing audio..."}
+            </Text>
+
+            <Animated.View
+              style={[
+                s.voiceMicOuter,
+                {
+                  transform: [{ scale: voicePulse }],
+                },
+              ]}
+            >
+              <LinearGradient
+                colors={["#10B981", "#059669"]}
+                style={s.voiceMicGradient}
+              >
+                <Feather name="mic" size={40} color={C.white} />
+              </LinearGradient>
+            </Animated.View>
+
+            {voiceText ? (
+              <View style={s.voiceTranscriptCard}>
+                <Text style={s.voiceTranscriptLabel}>Recognized Speech</Text>
+                <Text style={s.voiceTranscriptText}>"{voiceText}"</Text>
+              </View>
+            ) : (
+              <Text style={s.voiceSubText}>Go ahead, say something like:</Text>
+            )}
+
+            <View style={s.voiceSuggestionsRail}>
+              {VOICE_SUGGESTIONS.slice(0, 3).map((sugg, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={s.voiceSuggChip}
+                  onPress={() => {
+                    cancelVoiceSearch();
+                    setQuery(sugg);
+                    doSearch(sugg);
+                  }}
+                >
+                  <Feather name="search" size={11} color="rgba(255,255,255,0.6)" />
+                  <Text style={s.voiceSuggText}>{sugg}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1325,9 +1603,74 @@ const s = StyleSheet.create({
   catChipLabel: { fontSize: 13, color: C.gray900, fontWeight: "700", textAlign: "center", fontFamily: "PlusJakartaSans_700Bold" },
   histRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.gray100 },
   histText: { flex: 1, fontSize: 14, color: C.gray700, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" },
+<<<<<<< HEAD
  
   // Store category browse chips (moved here from the unrelated `dym` stylesheet,
   // where they were defined but never applied — that was the "tiny Grocery chip" bug)
+=======
+
+  // Loading
+  loadingWrap: { alignItems: "center", paddingTop: 60, gap: 12 },
+  loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" },
+
+  // Results
+  resultNote: { fontSize: 12, color: C.gray400, fontWeight: "500", marginBottom: 14, fontFamily: "PlusJakartaSans_500Medium" },
+  itemsCard: { backgroundColor: C.white, borderRadius: 16, borderWidth: 1, borderColor: C.gray200, overflow: "hidden", marginBottom: 16 },
+  farHeader: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.amberLight, borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: "#FDE68A" },
+  farHeaderText: { fontSize: 13, color: C.amber, fontWeight: "600", flex: 1, fontFamily: "PlusJakartaSans_600SemiBold" },
+
+  // Empty
+  emptyWrap: { alignItems: "center", paddingTop: 60, gap: 12 },
+  emptyTitle: { fontSize: 18, fontWeight: "700", color: C.gray700, fontFamily: "PlusJakartaSans_700Bold" },
+  emptySub: { fontSize: 14, color: C.gray400, textAlign: "center", lineHeight: 20, fontFamily: "PlusJakartaSans_500Medium" },
+
+  // Trending & Voice search styles
+  trendingContainer: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 8, marginBottom: 4 },
+  trendChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.gray100, borderWidth: 1, borderColor: C.gray200, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 2, elevation: 1 },
+  trendIcon: { fontSize: 14 },
+  trendText: { fontSize: 13, color: C.gray700, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold" },
+
+  voiceModalContainer: { flex: 1, backgroundColor: "rgba(9, 30, 18, 0.95)", justifyContent: "center", alignItems: "center" },
+  voiceCloseBtn: { position: "absolute", top: Platform.OS === "ios" ? 60 : 30, right: 24, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.1)", justifyContent: "center", alignItems: "center" },
+  voiceContent: { width: "90%", maxWidth: 400, alignItems: "center", justifyContent: "center", gap: 32 },
+  voiceHintText: { fontSize: 20, fontWeight: "800", color: C.white, textAlign: "center", fontFamily: "PlusJakartaSans_800ExtraBold", letterSpacing: -0.5 },
+  voiceMicOuter: { width: 140, height: 140, borderRadius: 70, backgroundColor: "rgba(16, 185, 129, 0.15)", justifyContent: "center", alignItems: "center" },
+  voiceMicGradient: { width: 100, height: 100, borderRadius: 50, justifyContent: "center", alignItems: "center", shadowColor: "#10B981", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 15, elevation: 8 },
+  voiceSubText: { fontSize: 14, color: "rgba(255,255,255,0.6)", fontFamily: "PlusJakartaSans_500Medium" },
+  voiceTranscriptCard: { backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 18, paddingVertical: 18, paddingHorizontal: 22, width: "100%", alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" },
+  voiceTranscriptLabel: { fontSize: 10, fontWeight: "700", color: "#10B981", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6, fontFamily: "PlusJakartaSans_700Bold" },
+  voiceTranscriptText: { fontSize: 22, fontWeight: "800", color: C.white, textAlign: "center", fontFamily: "PlusJakartaSans_800ExtraBold" },
+  voiceSuggestionsRail: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8, marginTop: 10 },
+  voiceSuggChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 16, paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
+  voiceSuggText: { fontSize: 12, color: C.white, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold" },
+});
+
+const sg = StyleSheet.create({
+  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  text: { flex: 1, fontSize: 14, color: C.gray700 },
+});
+
+// ─── Did You Mean styles ──────────────────────────────────────────────────────
+const dym = StyleSheet.create({
+  banner: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    marginHorizontal: 16, marginBottom: 12, marginTop: 4,
+    backgroundColor: C.amberLight,
+    borderWidth: 1, borderColor: "#FDE68A",
+    borderRadius: 16, padding: 14,
+  },
+  iconWrap: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: "#FEF3C7",
+    alignItems: "center", justifyContent: "center",
+  },
+  label: { fontSize: 11, color: C.amber, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", textTransform: "uppercase", letterSpacing: 0.4 },
+  suggestion: { fontSize: 17, fontWeight: "800", color: C.gray900, fontFamily: "PlusJakartaSans_800ExtraBold", marginTop: 1 },
+  ctaChip: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.orange, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
+  ctaText: { fontSize: 13, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
+
+  // Store category browse chips
+>>>>>>> origin/vedant-background-order-tracking
   storeCatBrowseChip: {
     flexDirection: "column",
     alignItems: "center",

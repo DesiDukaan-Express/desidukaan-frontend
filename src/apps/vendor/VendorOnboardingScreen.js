@@ -11,6 +11,7 @@ import useAuthStore from '../../store/authStore';
 import AddressMapView from "../../components/AddressMapView";
 import { uploadAPI } from '../../services/api';
 import { MaterialIcons } from '@expo/vector-icons';
+import AccountManagerModal from '../../components/common/AccountManagerModal';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const PRIMARY = '#1ca049';
@@ -205,8 +206,29 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const [geocoding, setGeocoding] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [autoApproved, setAutoApproved] = useState(false);
+  const [accountModalVisible, setAccountModalVisible] = useState(false);
+  const [hasOtherProfiles, setHasOtherProfiles] = useState(false);
 
   const scrollRef = useRef(null);
+
+  // Check if user has other profiles to switch to (only show switcher if yes)
+  useEffect(() => {
+    const checkProfiles = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/auth/profiles`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (res.ok) {
+          const others = (data.profiles || []).filter(
+            (p) => p.role !== (user?.role || 'vendor')
+          );
+          setHasOtherProfiles(others.length > 0);
+        }
+      } catch (_) { /* silently fail */ }
+    };
+    checkProfiles();
+  }, [token]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -620,6 +642,14 @@ export default function VendorOnboardingScreen({ onComplete }) {
   return (
     <View style={styles.container}>
 
+      {/* Account Switcher Modal — only if other profiles exist */}
+      {hasOtherProfiles && (
+        <AccountManagerModal
+          visible={accountModalVisible}
+          onClose={() => setAccountModalVisible(false)}
+        />
+      )}
+
       {/* ── SUCCESS POPUP ── */}
       <Modal visible={showSuccess} transparent animationType="fade">
         <View style={styles.successOverlay}>
@@ -689,10 +719,13 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
             <TouchableOpacity
               style={styles.successBtn}
-              onPress={() => { setShowSuccess(false); navigation.navigate('Dashboard'); }}
+              onPress={() => {
+                setShowSuccess(false);
+                if (onComplete) onComplete();
+              }}
               activeOpacity={0.88}
             >
-              <Text style={styles.successBtnText}>Go to Dashboard →</Text>
+              <Text style={styles.successBtnText}>Continue →</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -700,13 +733,26 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
       {/* Top bar */}
       <View style={styles.topBar}>
-        <View style={styles.brandRow}>
-          <MaterialIcons name="storefront" size={24} color={PRIMARY} style={{ marginRight: 6 }} />
+        {/* Account Switcher pill — only visible when user has other profiles to switch to */}
+        {hasOtherProfiles && (
+          <TouchableOpacity
+            onPress={() => setAccountModalVisible(true)}
+            style={styles.switchAccountBtn}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="account-circle" size={16} color={PRIMARY} />
+            <Text style={styles.switchAccountTxt}>Switch</Text>
+          </TouchableOpacity>
+        )}
+
+        <View style={[styles.brandRow, { flex: 1, justifyContent: 'center' }]}>
+          <MaterialIcons name="storefront" size={20} color={PRIMARY} style={{ marginRight: 5 }} />
           <View>
-            <Text style={styles.brandName}>DesiDukaan</Text>
-            <Text style={styles.brandSub}>Seller Registration</Text>
+            <Text style={[styles.brandName, { fontSize: 13 }]}>DesiDukaan</Text>
+            <Text style={[styles.brandSub, { fontSize: 10 }]}>Vendor Account • Setup</Text>
           </View>
         </View>
+
         <Text style={styles.stepCount}>{currentStep} of {STEPS.length}</Text>
       </View>
 
@@ -1410,6 +1456,14 @@ const styles = StyleSheet.create({
   brandName: { fontSize: 17, fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#fff' },
   brandSub: { fontSize: 11, color: 'rgba(255,255,255,0.75)' },
   stepCount: { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" },
+  switchAccountBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)',
+    marginRight: 4,
+  },
+  switchAccountTxt: { fontSize: 11, color: '#fff', fontWeight: '700', letterSpacing: 0.3 },
 
   progressTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.25)' },
   progressFill: { height: 3, backgroundColor: '#fff' },

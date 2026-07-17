@@ -143,6 +143,60 @@ const useAuthStore = create((set, get) => ({
     });
   },
 
+  // ── Switch Role: switches active profile/role ──────────────────────────────
+  switchRole: async (targetRole) => {
+    const token = get().token;
+    if (!token) throw new Error("No session found");
+
+    const res = await fetch(`${BASE_URL}/auth/switch-role`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ role: targetRole }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.msg || "Failed to switch account");
+
+    // Re-use login to store new token, update role and session cache
+    await get().login(data.user, data.accessToken, data.refreshToken);
+    
+    // Clear and reload addresses for the new profile
+    const addrStore = useAddressStore.getState();
+    addrStore.clearAddresses?.();
+    await addrStore.loadAddresses(data.accessToken);
+    return data.user;
+  },
+
+  // ── Add Profile: creates and switches to a new profile/role ─────────────────
+  addProfile: async (targetRole) => {
+    const token = get().token;
+    if (!token) throw new Error("No session found");
+
+    const res = await fetch(`${BASE_URL}/auth/add-profile`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ role: targetRole }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.msg || "Failed to add profile");
+
+    // Re-use login to store new token, update role and session cache
+    await get().login(data.user, data.accessToken, data.refreshToken);
+    
+    // Clear and reload addresses for the new profile
+    const addrStore = useAddressStore.getState();
+    addrStore.clearAddresses?.();
+    await addrStore.loadAddresses(data.accessToken);
+    return data.user;
+  },
+
   // ── Logout: revoke refresh token on server + clear local state ────────────
   logout: async () => {
     try {

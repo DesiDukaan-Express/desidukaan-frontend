@@ -21,6 +21,7 @@ import useAuthStore from "../../store/authStore";
 import { LineChart } from "react-native-chart-kit";
 import { useNavigation } from "@react-navigation/native";
 import { TextInput } from "react-native";
+import AccountManagerModal from "../../components/common/AccountManagerModal";
 
 import { io } from "socket.io-client";
 import useOrderSound from "../../hooks/useOrderSound";
@@ -120,6 +121,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
   const [searchLoading, setSearchLoading] = useState(false);
   const [locModalVisible, setLocModalVisible] = useState(false);
   const [locInput, setLocInput] = useState("");
+  const [accountModalVisible, setAccountModalVisible] = useState(false);
 
   // Animations
   const greetFadeAnim = useRef(new Animated.Value(0)).current;
@@ -599,6 +601,12 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
     <View style={[styles.root, { backgroundColor: C.bg }]}>
       <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
 
+      {/* ── ACCOUNT MANAGER MODAL ───────────────────────────── */}
+      <AccountManagerModal
+        visible={accountModalVisible}
+        onClose={() => setAccountModalVisible(false)}
+      />
+
       {/* ── NAVBAR ──────────────────────────────────────────── */}
       <View
         style={{
@@ -706,7 +714,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 paddingHorizontal: 10,
                 paddingVertical: 6,
               }}
-              onPress={() => navigation.navigate("Profile")}
+              onPress={() => setAccountModalVisible(true)}
               activeOpacity={0.8}
             >
               <View
@@ -844,7 +852,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                     paddingHorizontal: rs(8, 10, 10),
                     paddingVertical: rs(5, 6, 6),
                   }}
-                  onPress={() => navigation.navigate("Profile")}
+                  onPress={() => setAccountModalVisible(true)}
                   activeOpacity={0.8}
                 >
                   <View
