@@ -360,6 +360,11 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         <View style={styles.loadingCard}>
           <ActivityIndicator size="large" color={C.primary} />
           <Text style={styles.loadingText}>{t('vendor.loadingDashboard')}</Text>
+        </View>
+      </View>
+    );
+  }
+
 
   if (noProfile) {
     return (
@@ -1008,106 +1013,12 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           <Text
             style={{ fontSize: rs(11, 12, 13), color: "rgba(255,255,255,0.85)", fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold" }}
           >
-            {/* Background accent blobs */}
-            <View style={styles.greetingBlobTop} />
-            <View style={styles.greetingBlobBot} />
-
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: rs(12, 14, 16),
-              }}
-            >
-              {/* Emoji bubble */}
-              <View
-                style={[
-                  styles.greetingEmojiBubble,
-                  {
-                    width: rs(52, 58, 64),
-                    height: rs(52, 58, 64),
-                    borderRadius: rs(16, 18, 20),
-                    backgroundColor: greeting.iconBg + "20",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  },
-                ]}
-              >
-                <MaterialIcons name={greeting.icon} size={rs(26, 28, 32)} color={greeting.iconBg} />
-              </View>
-
-              <View style={{ flex: 1 }}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: 2,
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.greetingTimeText,
-                      { fontSize: rs(12, 13, 13), color: C.textSub },
-                    ]}
-                  >
-                    {greeting.text}
-                  </Text>
-                  <View
-                    style={[
-                      styles.greetingBadge,
-                      { backgroundColor: greeting.iconBg + "18" },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.greetingBadgeText,
-                        { color: greeting.iconBg, fontSize: rs(9, 10, 10) },
-                      ]}
-                    >
-                      {greeting.badge}
-                    </Text>
-                  </View>
-                </View>
-                <Text
-                  style={[styles.greetingName, { fontSize: rs(19, 22, 24) }]}
-                >
-                  {vendorName.split(" ")[0]}
-                </Text>
-                <Text
-                  style={[
-                    styles.greetingSub,
-                    { fontSize: rs(11, 12, 12), color: greeting.iconBg },
-                  ]}
-                >
-                  {greeting.sub}
-                </Text>
-              </View>
-            </View>
-
-            {/* Mini stat strip */}
-            <View style={styles.greetingStrip}>
-              <View style={styles.greetingStripItem}>
-                <Text style={[styles.greetingStripVal, { color: C.primary }]}>
-                  {stats.today.totalOrders}
-                </Text>
-                <Text style={styles.greetingStripLabel}>{t('vendor.todayOrders')}</Text>
-              </View>
-              <View style={styles.greetingStripDivider} />
-              <View style={styles.greetingStripItem}>
-                <Text style={[styles.greetingStripVal, { color: C.blue }]}>
-                  ₹{Number(stats.today.revenue).toLocaleString("en-IN")}
-                </Text>
-                <Text style={styles.greetingStripLabel}>{t('vendor.todayRevenue')}</Text>
-              </View>
-              <View style={styles.greetingStripDivider} />
-              <View style={styles.greetingStripItem}>
-                <Text style={[styles.greetingStripVal, { color: C.orange }]}>
-                  {stats.today.avgPrepTime}m
-                </Text>
-                <Text style={styles.greetingStripLabel}>{t('vendor.avgPrep')}</Text>
-              </View>
-            </View>
+            {greeting.text}
+          </Text>
+          <View style={{ backgroundColor: "rgba(255,255,255,0.25)", paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999 }}>
+            <Text style={{ color: "#fff", fontSize: rs(9, 10, 10), fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" }}>
+              {greeting.badge}
+            </Text>
           </View>
         </View>
         <Text style={{ fontSize: rs(24, 27, 30), fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff" }}>
