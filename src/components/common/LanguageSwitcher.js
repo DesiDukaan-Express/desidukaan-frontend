@@ -11,7 +11,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { LANGUAGES, changeLanguage } from '../../i18n';
 
-export default function LanguageSwitcher({ triggerStyle, triggerTextStyle, inline = false }) {
+export default function LanguageSwitcher({ triggerStyle, triggerTextStyle, inline = false, onClose }) {
   const { i18n, t } = useTranslation();
   const [visible, setVisible] = useState(false);
 
@@ -20,13 +20,21 @@ export default function LanguageSwitcher({ triggerStyle, triggerTextStyle, inlin
   const handleSelect = async (code) => {
     await changeLanguage(code);
     setVisible(false);
+    if (onClose) onClose();
   };
 
   // ── Inline mode: just render the language grid directly ────────────────────
   if (inline) {
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={s.headerTitle}>{t('common.selectLanguage')}</Text>
+        <View style={[s.header, { marginBottom: 16 }]}>
+          <Text style={s.headerTitle}>{t('common.selectLanguage')}</Text>
+          {onClose && (
+            <TouchableOpacity style={s.closeBtn} onPress={onClose}>
+              <Text style={s.closeBtnText}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <View style={s.grid}>
           {LANGUAGES.map((lang) => {
             const isActive = i18n.language === lang.code;

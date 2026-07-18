@@ -1,3 +1,5 @@
+import { deliveryAPI } from "../../services/api";
+
 // Hindi (हिन्दी)
 export default {
   // ── Common ──
@@ -176,6 +178,15 @@ export default {
     verified: "सत्यापित ✓",
     helpSupport: "सहायता",
     helpSupportSub: "FAQ, चैट, कॉल सपोर्ट",
+    // Vendor profile extra
+    shopName: "दुकान का नाम",
+    ownerName: "मालिक का नाम",
+    address: "पता",
+    memberSinceLabel: "सदस्य बने",
+    rating: "रेटिंग",
+    earnings: "कमाई",
+    kyc: "KYC",
+    pending: "लंबित",
   },
 
   // ── Checkout ──
@@ -343,6 +354,7 @@ export default {
     // Earnings Screen
     earningsTitle: "कमाई",
     vendorEarnings: "विक्रेता की कमाई",
+    deliveryMethod: "डिलीवरी का तरीका",
     todayTab: "आज",
     weekTab: "इस सप्ताह",
     monthTab: "इस महीने",
@@ -374,7 +386,55 @@ export default {
     payoutNote: "भुगतान हर सोमवार को संसाधित किए जाते हैं। यूपीआई / बैंक हस्तांतरण समर्थित।",
     recentTransactions: "हाल के लेनदेन",
     noTransactions: "अभी तक कोई लेनदेन नहीं।",
-    inventoryTitle: "भंडार"
+    inventoryTitle: "भंडार",
+    // Profile screen
+    myProfile: "मेरी प्रोफ़ाइल",
+    vendorSince: "विक्रेता {{date}} से",
+    storeOpen: "खुला",
+    storeClosed: "बंद",
+    storeInfo: "स्टोर जानकारी",
+    storeDetails: "विवरण",
+    storeSettings: "स्टोर सेटिंग्स",
+    operations: "संचालन",
+    storeStatus: "स्टोर स्थिति",
+    storeOpenSub: "आपका स्टोर ऑर्डर स्वीकार कर रहा है",
+    storeClosedSub: "स्टोर अभी बंद है",
+    openingTime: "खुलने का समय",
+    closingTime: "बंद होने का समय",
+    minOrderValue: "न्यूनतम ऑर्डर राशि",
+    flatQuickDeliveryFee: "फ्लैट क्विक डिलीवरी शुल्क",
+    flatQuickDeliveryFeeSub: "(0 = % सर्ज उपयोग करें)",
+    badWeatherSurcharge: "खराब मौसम सरचार्ज",
+    activeBadWeather: "खराब मौसम सक्रिय",
+    activeBadWeatherSub: "ऑर्डर पर मौसम शुल्क लागू करें",
+    baseDeliveryDistance: "आधार डिलीवरी दूरी",
+    baseDeliveryFee: "आधार डिलीवरी शुल्क",
+    extraFeePerKm: "प्रति KM अतिरिक्त शुल्क",
+    selfDelivery: "स्वयं डिलीवरी",
+    selfDeliverySub: "आप स्वयं डिलीवरी करते हैं",
+    partnerDelivery: "पार्टनर डिलीवरी",
+    partnerDeliverySub: "KwikPik पार्टनर डिलीवरी करते हैं",
+    changeShopPhoto: "दुकान की फोटो बदलें",
+    uploadFromGallery: "गैलरी से अपलोड करें",
+    choosePhoto: "अपने डिवाइस से फोटो चुनें",
+    pasteImageUrl: "इमेज URL डालें",
+    saveUrl: "URL सहेजें",
+    storeCategoryTitle: "स्टोर श्रेणी",
+    logoutSub: "विक्रेता डैशबोर्ड तक पहुंचने के लिए फिर से लॉगिन करना होगा।",
+    loadingProfile: "प्रोफ़ाइल लोड हो रही है…",
+    profileLoadError: "प्रोफ़ाइल लोड नहीं हो सकी।",
+    notSet: "सेट नहीं",
+    description: "विवरण",
+    fssaiNumber: "FSSAI नंबर",
+    gstNumber: "GST नंबर",
+    cat_grocery: "किराना स्टोर",
+    cat_medical: "मेडिकल / फार्मेसी",
+    cat_bakery: "बेकरी",
+    cat_dairy: "डेयरी और अंडे",
+    cat_electronics: "इलेक्ट्रॉनिक्स",
+    cat_stationery: "स्टेशनरी",
+    cat_restaurant: "रेस्टोरेंट / खाना",
+    cat_general: "जनरल स्टोर",
   },
 
   // ── Delivery ──

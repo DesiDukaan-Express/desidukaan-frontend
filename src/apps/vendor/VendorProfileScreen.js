@@ -52,6 +52,7 @@ const C = {
 
 export default function VendorProfileScreen() {
   const { token, logout } = useAuthStore();
+  const { t } = useTranslation();
   const { width: SCREEN_W } = useWindowDimensions();
 
   // Responsive helpers
@@ -234,7 +235,7 @@ export default function VendorProfileScreen() {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={C.green} />
-        <Text style={{ color: C.textSub, marginTop: 12 }}>Loading profile…</Text>
+        <Text style={{ color: C.textSub, marginTop: 12 }}>{t('vendor.loadingProfile')}</Text>
       </View>
     );
   }
@@ -243,7 +244,7 @@ export default function VendorProfileScreen() {
     return (
       <View style={styles.centered}>
         <MaterialIcons name="error-outline" size={40} color={C.textLight} />
-        <Text style={{ color: C.textSub, marginTop: 12 }}>Could not load profile.</Text>
+        <Text style={{ color: C.textSub, marginTop: 12 }}>{t('vendor.profileLoadError')}</Text>
       </View>
     );
   }
@@ -269,7 +270,7 @@ export default function VendorProfileScreen() {
             { fontSize: isWide ? 11 : rs(10, 11, 11) },
           ]}
         >
-          MY PROFILE
+          {t('vendor.myProfile').toUpperCase()}
         </Text>
 
         <View
@@ -339,7 +340,7 @@ export default function VendorProfileScreen() {
                 { fontSize: isWide ? 12 : rs(10, 11, 12) },
               ]}
             >
-              Vendor since {memberSince}
+              {t('vendor.vendorSince', { date: memberSince })}
             </Text>
           </View>
 
@@ -366,7 +367,7 @@ export default function VendorProfileScreen() {
                 { color: storeOpen ? C.primary : "#94a3b8", fontSize: rs(11, 12, 12) },
               ]}
             >
-              {storeOpen ? "Open" : "Closed"}
+              {storeOpen ? t('vendor.storeOpen') : t('vendor.storeClosed')}
             </Text>
           </View>
         </View>
@@ -384,7 +385,7 @@ export default function VendorProfileScreen() {
         >
           <StatStripItem
             value={vendor.total_orders ?? 0}
-            label="Total Orders"
+            label={t('vendor.totalOrders')}
             color="#fff"
             rs={rs}
             isWide={isWide}
@@ -392,7 +393,7 @@ export default function VendorProfileScreen() {
           <View style={styles.statsStripDivider} />
           <StatStripItem
             value={`${vendor.rating ?? 0} ⭐`}
-            label="Rating"
+            label={t('profile.rating')}
             color="#fff"
             rs={rs}
             isWide={isWide}
@@ -400,15 +401,15 @@ export default function VendorProfileScreen() {
           <View style={styles.statsStripDivider} />
           <StatStripItem
             value={`₹${Number(vendor.earnings ?? 0).toLocaleString("en-IN")}`}
-            label="Earnings"
+            label={t('profile.earnings')}
             color={C.primary}
             rs={rs}
             isWide={isWide}
           />
           <View style={styles.statsStripDivider} />
           <StatStripItem
-            value={vendor.onboarding_status === "approved" ? "✓" : "Pending"}
-            label="KYC"
+            value={vendor.onboarding_status === "approved" ? "✓" : t('profile.pending')}
+            label={t('profile.kyc')}
             color={vendor.onboarding_status === "approved" ? C.primary : "#F59E0B"}
             rs={rs}
             isWide={isWide}
@@ -435,8 +436,9 @@ export default function VendorProfileScreen() {
                 onEdit={openEdit}
                 rs={rs}
                 isWide={isWide}
+                t={t}
               />
-              <StoreInfoCard vendor={vendor} onEdit={openEdit} onCategoryPress={() => setCategoryModal(true)} rs={rs} isWide={isWide} />
+              <StoreInfoCard vendor={vendor} onEdit={openEdit} onCategoryPress={() => setCategoryModal(true)} rs={rs} isWide={isWide} t={t} />
             </View>
             <View style={{ flex: 1, gap: 16 }}>
               <StoreSettingsCard
@@ -449,9 +451,10 @@ export default function VendorProfileScreen() {
                 onDeliveryPress={() => setDeliveryModal(true)}
                 rs={rs}
                 isWide={isWide}
+                t={t}
               />
               <AccountSettingsCard rs={rs} isWide={isWide} />
-              <LogoutButton onPress={() => setLogoutModal(true)} rs={rs} isWide={isWide} />
+              <LogoutButton onPress={() => setLogoutModal(true)} rs={rs} isWide={isWide} t={t} />
             </View>
           </View>
         ) : (
@@ -462,8 +465,9 @@ export default function VendorProfileScreen() {
               onEdit={openEdit}
               rs={rs}
               isWide={isWide}
+              t={t}
             />
-            <StoreInfoCard vendor={vendor} onEdit={openEdit} onCategoryPress={() => setCategoryModal(true)} rs={rs} isWide={isWide} />
+            <StoreInfoCard vendor={vendor} onEdit={openEdit} onCategoryPress={() => setCategoryModal(true)} rs={rs} isWide={isWide} t={t} />
             <StoreSettingsCard
               vendor={vendor}
               storeOpen={storeOpen}
@@ -474,9 +478,10 @@ export default function VendorProfileScreen() {
               onDeliveryPress={() => setDeliveryModal(true)}
               rs={rs}
               isWide={isWide}
+              t={t}
             />
             <AccountSettingsCard rs={rs} isWide={isWide} />
-            <LogoutButton onPress={() => setLogoutModal(true)} rs={rs} isWide={isWide} />
+            <LogoutButton onPress={() => setLogoutModal(true)} rs={rs} isWide={isWide} t={t} />
           </View>
         )}
       </View>
@@ -500,7 +505,7 @@ export default function VendorProfileScreen() {
         <View style={styles.overlay}>
           <View style={[styles.modalBox, { width: isWide ? 440 : "90%" }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit {activeLabel}</Text>
+              <Text style={styles.modalTitle}>{t('common.edit')} {activeLabel}</Text>
               <TouchableOpacity onPress={() => setEditModal(false)} style={styles.modalClose}>
                 <MaterialIcons name="close" size={20} color={C.text} />
               </TouchableOpacity>
@@ -511,7 +516,7 @@ export default function VendorProfileScreen() {
               value={editValue}
               onChangeText={setEditValue}
               autoFocus
-              placeholder={`Enter ${activeLabel.toLowerCase()}…`}
+              placeholder={`${activeLabel}…`}
               placeholderTextColor={C.textLight}
             />
             <View style={styles.modalActions}>
@@ -519,10 +524,10 @@ export default function VendorProfileScreen() {
                 onPress={() => setEditModal(false)}
                 style={styles.modalCancelBtn}
               >
-                <Text style={{ color: C.textSub, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}>Cancel</Text>
+                <Text style={{ color: C.textSub, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={saveEdit} style={styles.modalSaveBtn}>
-                <Text style={{ color: "#000", fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"}}>Save</Text>
+                <Text style={{ color: "#000", fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"}}>{t('common.save')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -544,7 +549,7 @@ export default function VendorProfileScreen() {
         <View style={[styles.sheet, { paddingBottom: Platform.OS === "ios" ? 34 : 20 }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Change Shop Photo</Text>
+            <Text style={styles.sheetTitle}>{t('vendor.changeShopPhoto')}</Text>
             <TouchableOpacity onPress={() => setImageModal(false)} style={styles.modalClose}>
               <MaterialIcons name="close" size={20} color={C.text} />
             </TouchableOpacity>
@@ -563,8 +568,8 @@ export default function VendorProfileScreen() {
               )}
             </View>
             <View>
-              <Text style={styles.sheetOptionTitle}>Upload from Gallery</Text>
-              <Text style={styles.sheetOptionSub}>Choose a photo from your device</Text>
+              <Text style={styles.sheetOptionTitle}>{t('vendor.uploadFromGallery')}</Text>
+              <Text style={styles.sheetOptionSub}>{t('vendor.choosePhoto')}</Text>
             </View>
           </TouchableOpacity>
 
@@ -573,7 +578,7 @@ export default function VendorProfileScreen() {
               <View style={[styles.sheetOptionIcon, { backgroundColor: C.blueDim }]}>
                 <MaterialIcons name="link" size={20} color={C.blue} />
               </View>
-              <Text style={styles.sheetOptionTitle}>Paste Image URL</Text>
+              <Text style={styles.sheetOptionTitle}>{t('vendor.pasteImageUrl')}</Text>
             </View>
             <TextInput
               style={styles.modalInput}
@@ -593,7 +598,7 @@ export default function VendorProfileScreen() {
                 }
               }}
             >
-              <Text style={{ color: "#000", fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"}}>Save URL</Text>
+              <Text style={{ color: "#000", fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"}}>{t('vendor.saveUrl')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -614,14 +619,14 @@ export default function VendorProfileScreen() {
         <View style={[styles.sheet, { paddingBottom: Platform.OS === "ios" ? 34 : 20 }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Delivery Method</Text>
+            <Text style={styles.sheetTitle}>{t('vendor.deliveryMethod')}</Text>
             <TouchableOpacity onPress={() => setDeliveryModal(false)} style={styles.modalClose}>
               <MaterialIcons name="close" size={20} color={C.text} />
             </TouchableOpacity>
           </View>
           {[
-            { value: "self", label: "Self Delivery", sub: "You manage deliveries yourself", icon: "moped" },
-            { value: "partner", label: "Partner Delivery", sub: "KwikPik delivery partners handle it", icon: "local-shipping" },
+            { value: "self", label: t('vendor.selfDelivery'), sub: t('vendor.selfDeliverySub'), icon: "moped" },
+            { value: "partner", label: t('vendor.partnerDelivery'), sub: t('vendor.partnerDeliverySub'), icon: "local-shipping" },
           ].map((opt) => (
             <TouchableOpacity
               key={opt.value}
@@ -663,22 +668,22 @@ export default function VendorProfileScreen() {
             <View style={[styles.logoutIconWrap]}>
               <MaterialIcons name="logout" size={28} color={C.red} />
             </View>
-            <Text style={styles.logoutModalTitle}>Log out?</Text>
+            <Text style={styles.logoutModalTitle}>{t('profile.logout')}?</Text>
             <Text style={styles.logoutModalSub}>
-              You'll need to sign in again to access your vendor dashboard.
+              {t('vendor.logoutSub')}
             </Text>
             <View style={styles.modalActions}>
               <TouchableOpacity
                 onPress={() => setLogoutModal(false)}
                 style={[styles.modalCancelBtn, { flex: 1 }]}
               >
-                <Text style={{ color: C.textSub, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}>Cancel</Text>
+                <Text style={{ color: C.textSub, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => { setLogoutModal(false); logout(); }}
                 style={[styles.logoutConfirmBtn, { flex: 1 }]}
               >
-                <Text style={{ color: "#fff", fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"}}>Log out</Text>
+                <Text style={{ color: "#fff", fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"}}>{t('profile.logout')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -700,7 +705,7 @@ export default function VendorProfileScreen() {
         <View style={[styles.sheet, { paddingBottom: Platform.OS === "ios" ? 34 : 20 }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Store Category</Text>
+            <Text style={styles.sheetTitle}>{t('vendor.storeCategoryTitle')}</Text>
             <TouchableOpacity onPress={() => setCategoryModal(false)} style={styles.modalClose}>
               <MaterialIcons name="close" size={20} color={C.text} />
             </TouchableOpacity>
@@ -818,32 +823,32 @@ function InfoRow({ icon, label, value, onEdit, editable = true, rs, isWide }) {
   );
 }
 
-function PersonalInfoCard({ vendor, onEdit, rs, isWide }) {
+function PersonalInfoCard({ vendor, onEdit, rs, isWide, t }) {
   return (
-    <SectionCard title="Personal Info" overline="ACCOUNT" rs={rs} isWide={isWide}>
+    <SectionCard title={t('profile.personalInfo')} overline={t('profile.account').toUpperCase()} rs={rs} isWide={isWide}>
       <InfoRow
-        label="Shop Name"
+        label={t('profile.shopName')}
         value={vendor.shop_name}
-        onEdit={() => onEdit("shop_name", "Shop Name", vendor.shop_name)}
+        onEdit={() => onEdit("shop_name", t('profile.shopName'), vendor.shop_name)}
         rs={rs}
         isWide={isWide}
       />
       <InfoRow
-        label="Owner Name"
+        label={t('profile.ownerName')}
         value={vendor.owner_name || vendor.user?.name}
-        onEdit={() => onEdit("owner_name", "Owner Name", vendor.owner_name || vendor.user?.name)}
+        onEdit={() => onEdit("owner_name", t('profile.ownerName'), vendor.owner_name || vendor.user?.name)}
         rs={rs}
         isWide={isWide}
       />
       <InfoRow
-        label="Email Address"
+        label={t('profile.email')}
         value={vendor.user?.email}
-        onEdit={() => onEdit("email", "Email Address", vendor.user?.email)}
+        onEdit={() => onEdit("email", t('profile.email'), vendor.user?.email)}
         rs={rs}
         isWide={isWide}
       />
       <InfoRow
-        label="Phone Number"
+        label={t('profile.phone')}
         value={vendor.user?.phone}
         editable={false}
         rs={rs}
@@ -853,52 +858,46 @@ function PersonalInfoCard({ vendor, onEdit, rs, isWide }) {
   );
 }
 
-function StoreInfoCard({ vendor, onEdit, onCategoryPress, rs, isWide }) {
-  const CATEGORY_LABELS = {
-    grocery: "Grocery Store", medical: "Medical / Pharmacy",
-    bakery: "Bakery", dairy: "Dairy & Eggs",
-    electronics: "Electronics", stationery: "Stationery",
-    restaurant: "Restaurant / Food", general: "General Store",
-  };
+function StoreInfoCard({ vendor, onEdit, onCategoryPress, rs, isWide, t }) {
   return (
-    <SectionCard title="Store Info" overline="DETAILS" rs={rs} isWide={isWide}>
+    <SectionCard title={t('vendor.storeInfo')} overline={t('vendor.storeDetails').toUpperCase()} rs={rs} isWide={isWide}>
       <InfoRow
-        label="Address"
+        label={t('profile.address')}
         value={`${vendor.address_line}${vendor.pincode ? ", " + vendor.pincode : ""}`}
-        onEdit={() => onEdit("address_line", "Address", vendor.address_line)}
+        onEdit={() => onEdit("address_line", t('profile.address'), vendor.address_line)}
         rs={rs}
         isWide={isWide}
       />
       <InfoRow
-        label="Store Category"
-        value={CATEGORY_LABELS[vendor.store_category] || "Not set"}
+        label={t('vendor.category')}
+        value={vendor.store_category ? t(`vendor.cat_${vendor.store_category}`, { defaultValue: vendor.store_category }) : t('vendor.notSet')}
         onEdit={onCategoryPress}
         rs={rs}
         isWide={isWide}
       />
       <InfoRow
-        label="Description"
+        label={t('vendor.description')}
         value={vendor.description}
-        onEdit={() => onEdit("description", "Description", vendor.description)}
+        onEdit={() => onEdit("description", t('vendor.description'), vendor.description)}
         rs={rs}
         isWide={isWide}
       />
       <InfoRow
-        label="FSSAI Number"
+        label={t('vendor.fssaiNumber')}
         value={vendor.fssai_number}
-        onEdit={() => onEdit("fssai_number", "FSSAI Number", vendor.fssai_number)}
+        onEdit={() => onEdit("fssai_number", t('vendor.fssaiNumber'), vendor.fssai_number)}
         rs={rs}
         isWide={isWide}
       />
       <InfoRow
-        label="GST Number"
+        label={t('vendor.gstNumber')}
         value={vendor.gst_number}
-        onEdit={() => onEdit("gst_number", "GST Number", vendor.gst_number)}
+        onEdit={() => onEdit("gst_number", t('vendor.gstNumber'), vendor.gst_number)}
         rs={rs}
         isWide={isWide}
       />
       <InfoRow
-        label="Member Since"
+        label={t('profile.memberSinceLabel')}
         value={new Date(vendor.created_at).toDateString()}
         editable={false}
         rs={rs}
@@ -908,9 +907,9 @@ function StoreInfoCard({ vendor, onEdit, onCategoryPress, rs, isWide }) {
   );
 }
 
-function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBadWeather, onEdit, onDeliveryPress, rs, isWide }) {
+function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBadWeather, onEdit, onDeliveryPress, rs, isWide, t }) {
   return (
-    <SectionCard title="Store Settings" overline="OPERATIONS" rs={rs} isWide={isWide}>
+    <SectionCard title={t('vendor.storeSettings')} overline={t('vendor.operations').toUpperCase()} rs={rs} isWide={isWide}>
       {/* Store toggle */}
       <View style={styles.settingRow}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -922,9 +921,9 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
             />
           </View>
           <View>
-            <Text style={styles.settingTitle}>Store Status</Text>
+            <Text style={styles.settingTitle}>{t('vendor.storeStatus')}</Text>
             <Text style={styles.settingSub}>
-              {storeOpen ? "Your store is accepting orders" : "Store is currently closed"}
+              {storeOpen ? t('vendor.storeOpenSub') : t('vendor.storeClosedSub')}
             </Text>
           </View>
         </View>
@@ -939,7 +938,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
       {/* Opening time */}
       <TouchableOpacity
         style={styles.settingRow}
-        onPress={() => onEdit("opening_time", "Opening Time", vendor.opening_time)}
+        onPress={() => onEdit("opening_time", t('vendor.openingTime'), vendor.opening_time)}
         activeOpacity={0.6}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -947,8 +946,8 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
             <MaterialIcons name="wb-sunny" size={18} color={C.orange} />
           </View>
           <View>
-            <Text style={styles.settingTitle}>Opening Time</Text>
-            <Text style={styles.settingSub}>{vendor.opening_time || "Not set"}</Text>
+            <Text style={styles.settingTitle}>{t('vendor.openingTime')}</Text>
+            <Text style={styles.settingSub}>{vendor.opening_time || t('vendor.notSet')}</Text>
           </View>
         </View>
         <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
@@ -957,7 +956,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
       {/* Closing time */}
       <TouchableOpacity
         style={styles.settingRow}
-        onPress={() => onEdit("closing_time", "Closing Time", vendor.closing_time)}
+        onPress={() => onEdit("closing_time", t('vendor.closingTime'), vendor.closing_time)}
         activeOpacity={0.6}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -965,8 +964,8 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
             <MaterialIcons name="nights-stay" size={18} color="#7C3AED" />
           </View>
           <View>
-            <Text style={styles.settingTitle}>Closing Time</Text>
-            <Text style={styles.settingSub}>{vendor.closing_time || "Not set"}</Text>
+            <Text style={styles.settingTitle}>{t('vendor.closingTime')}</Text>
+            <Text style={styles.settingSub}>{vendor.closing_time || t('vendor.notSet')}</Text>
           </View>
         </View>
         <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
@@ -975,7 +974,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
       {/* Minimum Order Value */}
       <TouchableOpacity
         style={styles.settingRow}
-        onPress={() => onEdit("min_order_value", "Minimum Order Value", vendor.min_order_value)}
+        onPress={() => onEdit("min_order_value", t('vendor.minOrderValue'), vendor.min_order_value)}
         activeOpacity={0.6}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -983,7 +982,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
             <MaterialIcons name="shopping-basket" size={18} color="#D97706" />
           </View>
           <View>
-            <Text style={styles.settingTitle}>Minimum Order Value</Text>
+            <Text style={styles.settingTitle}>{t('vendor.minOrderValue')}</Text>
             <Text style={styles.settingSub}>₹{vendor.min_order_value ?? 0}</Text>
           </View>
         </View>
@@ -993,7 +992,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
       {/* Flat Quick Delivery Fee */}
       <TouchableOpacity
         style={styles.settingRow}
-        onPress={() => onEdit("quick_delivery_fee", "Flat Quick Delivery Fee", vendor.quick_delivery_fee)}
+        onPress={() => onEdit("quick_delivery_fee", t('vendor.flatQuickDeliveryFee'), vendor.quick_delivery_fee)}
         activeOpacity={0.6}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -1001,8 +1000,8 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
             <MaterialIcons name="flash-on" size={18} color="#2563EB" />
           </View>
           <View>
-            <Text style={styles.settingTitle}>Flat Quick Delivery Fee</Text>
-            <Text style={styles.settingSub}>₹{vendor.quick_delivery_fee ?? 0} (0 to use % surge)</Text>
+            <Text style={styles.settingTitle}>{t('vendor.flatQuickDeliveryFee')}</Text>
+            <Text style={styles.settingSub}>₹{vendor.quick_delivery_fee ?? 0} {t('vendor.flatQuickDeliveryFeeSub')}</Text>
           </View>
         </View>
         <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
@@ -1011,7 +1010,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
       {/* Bad Weather Surcharge */}
       <TouchableOpacity
         style={styles.settingRow}
-        onPress={() => onEdit("weather_surcharge", "Bad Weather Surcharge", vendor.weather_surcharge)}
+        onPress={() => onEdit("weather_surcharge", t('vendor.badWeatherSurcharge'), vendor.weather_surcharge)}
         activeOpacity={0.6}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -1019,7 +1018,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
             <MaterialIcons name="umbrella" size={18} color="#DB2777" />
           </View>
           <View>
-            <Text style={styles.settingTitle}>Bad Weather Surcharge</Text>
+            <Text style={styles.settingTitle}>{t('vendor.badWeatherSurcharge')}</Text>
             <Text style={styles.settingSub}>₹{vendor.weather_surcharge ?? 0}</Text>
           </View>
         </View>
@@ -1033,8 +1032,8 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
             <MaterialIcons name="cloudy-snowing" size={18} color={badWeather ? "#EF4444" : C.textLight} />
           </View>
           <View>
-            <Text style={styles.settingTitle}>Active Bad Weather</Text>
-            <Text style={styles.settingSub}>Apply weather fee surcharge to orders</Text>
+            <Text style={styles.settingTitle}>{t('vendor.activeBadWeather')}</Text>
+            <Text style={styles.settingSub}>{t('vendor.activeBadWeatherSub')}</Text>
           </View>
         </View>
         <Switch
@@ -1059,7 +1058,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
                 <MaterialIcons name="edit-road" size={18} color="#0369A1" />
               </View>
               <View>
-                <Text style={styles.settingTitle}>Base Delivery Distance</Text>
+                <Text style={styles.settingTitle}>{t('vendor.baseDeliveryDistance')}</Text>
                 <Text style={styles.settingSub}>{vendor.delivery_base_km ?? 2} km</Text>
               </View>
             </View>
@@ -1077,7 +1076,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
                 <MaterialIcons name="payments" size={18} color="#0369A1" />
               </View>
               <View>
-                <Text style={styles.settingTitle}>Base Delivery Fee</Text>
+                <Text style={styles.settingTitle}>{t('vendor.baseDeliveryFee')}</Text>
                 <Text style={styles.settingSub}>₹{vendor.delivery_fee_base ?? 20}</Text>
               </View>
             </View>
@@ -1095,7 +1094,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
                 <MaterialIcons name="add-road" size={18} color="#0369A1" />
               </View>
               <View>
-                <Text style={styles.settingTitle}>Extra Delivery Fee per KM</Text>
+                <Text style={styles.settingTitle}>{t('vendor.extraFeePerKm')}</Text>
                 <Text style={styles.settingSub}>₹{vendor.delivery_fee_per_km ?? 5} / km</Text>
               </View>
             </View>
@@ -1115,9 +1114,9 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
             <MaterialIcons name="local-shipping" size={18} color={C.blue} />
           </View>
           <View>
-            <Text style={styles.settingTitle}>Delivery Method</Text>
+            <Text style={styles.settingTitle}>{t('vendor.deliveryMethod')}</Text>
             <Text style={styles.settingSub}>
-              {vendor.delivery_type === "self" ? "Self Delivery" : "Partner Delivery"}
+              {vendor.delivery_type === "self" ? t('vendor.selfDelivery') : t('vendor.partnerDelivery')}
             </Text>
           </View>
         </View>
@@ -1199,7 +1198,7 @@ function AccountSettingsCard({ rs, isWide }) {
             onPress={() => {}}
           >
             <View style={{ width: 40, height: 4, backgroundColor: '#E5E7EB', borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
-            <LanguageSwitcher inline />
+            <LanguageSwitcher inline onClose={() => setShowLanguage(false)} />
           </Pressable>
         </Pressable>
       </Modal>
@@ -1207,7 +1206,7 @@ function AccountSettingsCard({ rs, isWide }) {
   );
 }
 
-function LogoutButton({ onPress, rs, isWide }) {
+function LogoutButton({ onPress, rs, isWide, t }) {
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -1219,7 +1218,7 @@ function LogoutButton({ onPress, rs, isWide }) {
     >
       <MaterialIcons name="logout" size={isWide ? 20 : rs(16, 18, 18)} color={C.red} />
       <Text style={[styles.logoutText, { fontSize: isWide ? 15 : rs(13, 14, 15) }]}>
-        Log out
+        {t('profile.logout')}
       </Text>
     </TouchableOpacity>
   );
