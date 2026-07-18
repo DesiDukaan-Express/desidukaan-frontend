@@ -13,12 +13,7 @@ import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
-<<<<<<< HEAD
- 
-=======
 import AccountManagerModal from "../../components/common/AccountManagerModal";
-
->>>>>>> origin/vedant-background-order-tracking
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
  
 const C = {
