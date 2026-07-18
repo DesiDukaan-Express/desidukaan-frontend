@@ -16,13 +16,16 @@ import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
 import LanguageSwitcher from "../../components/common/LanguageSwitcher";
 
+
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 const C = {
-  orange: "#F97316", orangeDark: "#EA580C",
+  orange: "#F97316", orangeDark: "#EA580C", orangeLight: "#FFF7ED",
   green: "#16A34A", greenDark: "#15803D",
   greenLight: "#F0FDF4", greenBorder: "#BBF7D0",
   greenMid: "#DCFCE7",
+  blue: "#3B82F6", blueLight: "#EFF6FF",
+  purple: "#8B5CF6", purpleLight: "#F5F3FF",
   white: "#FFFFFF", bg: "#F8FAFC",
   gray100: "#F3F4F6", gray200: "#E5E7EB",
   gray300: "#D1D5DB", gray400: "#9CA3AF",
@@ -109,9 +112,12 @@ const em = StyleSheet.create({
 });
 
 // ─── Info row (tappable field) ────────────────────────────────────────────
-function InfoRow({ label, value, onEdit, editable = true, icon }) {
+function InfoRow({ label, value, onEdit, editable = true, icon = "user" }) {
   return (
     <View style={ir.row}>
+      <View style={[ir.fieldIconWrap, !editable && ir.fieldIconWrapOff]}>
+        <Feather name={icon} size={15} color={editable ? C.green : C.gray400} />
+      </View>
       <View style={ir.left}>
         <Text style={ir.label}>{label}</Text>
         <Text style={[ir.value, !value && ir.valuePlaceholder]}>
@@ -119,7 +125,7 @@ function InfoRow({ label, value, onEdit, editable = true, icon }) {
         </Text>
       </View>
       {editable && (
-        <TouchableOpacity style={ir.editBtn} onPress={onEdit}>
+        <TouchableOpacity style={ir.editBtn} onPress={onEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="edit-2" size={13} color={C.green} />
         </TouchableOpacity>
       )}
@@ -132,7 +138,9 @@ function InfoRow({ label, value, onEdit, editable = true, icon }) {
   );
 }
 const ir = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  row: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  fieldIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.greenMid, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  fieldIconWrapOff: { backgroundColor: C.gray100 },
   left: { flex: 1 },
   label: { fontSize: 11, fontWeight: "700", color: C.gray400, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 5 },
   value: { fontSize: 16, fontWeight: "600", color: C.gray900 },
@@ -163,24 +171,36 @@ function AddressCard({ addr, isSelected, onSelect, onRemove }) {
   );
 }
 const adc = StyleSheet.create({
-  card: { flexDirection: "row", alignItems: "center", gap: 12, padding: 13, borderRadius: 14, borderWidth: 1.5, borderColor: C.gray200, backgroundColor: C.white, marginBottom: 8 },
-  cardActive: { borderColor: C.green, backgroundColor: C.greenLight },
-  icon: { width: 30, height: 30, borderRadius: 9, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  card: {
+    flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 16,
+    backgroundColor: C.white, marginBottom: 10, borderWidth: 1, borderColor: C.gray100,
+    shadowColor: "#0F172A", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
+  },
+  cardActive: { borderColor: C.greenBorder, backgroundColor: C.greenLight, shadowOpacity: 0.08 },
+  icon: { width: 32, height: 32, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   iconActive: { backgroundColor: C.green },
-  text: { flex: 1, fontSize: 13, color: C.gray700, fontWeight: "500", lineHeight: 18 },
+  text: { flex: 1, fontSize: 13.5, color: C.gray700, fontWeight: "500", lineHeight: 19 },
   textActive: { color: C.greenDark, fontWeight: "700" },
+  activeLabel: { fontSize: 11, color: C.green, fontWeight: "700", marginTop: 3 },
   tick: { width: 22, height: 22, borderRadius: 7, backgroundColor: C.green, alignItems: "center", justifyContent: "center", flexShrink: 0 },
 });
 
 // ─── Row menu item ────────────────────────────────────────────────────────
-function MenuItem({ icon, label, onPress, danger, right, sub }) {
+const TINTS = {
+  orange: { bg: C.orangeLight, fg: C.orangeDark },
+  green: { bg: C.greenMid, fg: C.greenDark },
+  blue: { bg: C.blueLight, fg: C.blue },
+  purple: { bg: C.purpleLight, fg: C.purple },
+};
+function MenuItem({ icon, label, onPress, danger, right, sub, tint }) {
+  const t = tint ? TINTS[tint] : null;
   return (
     <TouchableOpacity
       style={[mi.row, danger && mi.rowDanger]}
       onPress={onPress} activeOpacity={0.75}
     >
-      <View style={[mi.iconWrap, danger && mi.iconDanger]}>
-        <Feather name={icon} size={16} color={danger ? C.red : C.gray600} />
+      <View style={[mi.iconWrap, danger && mi.iconDanger, t && { backgroundColor: t.bg }]}>
+        <Feather name={icon} size={16} color={danger ? C.red : (t ? t.fg : C.gray600)} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[mi.label, danger && mi.labelDanger]}>{label}</Text>
@@ -191,11 +211,15 @@ function MenuItem({ icon, label, onPress, danger, right, sub }) {
   );
 }
 const mi = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 15, paddingHorizontal: 16, backgroundColor: C.white, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: C.gray200 },
-  rowDanger: { borderColor: "#FECACA", backgroundColor: C.redLight },
+  row: {
+    flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 15, paddingHorizontal: 16,
+    backgroundColor: C.white, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: C.gray100,
+    shadowColor: "#0F172A", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
+  },
+  rowDanger: { borderColor: "#FECACA", backgroundColor: C.redLight, shadowOpacity: 0 },
   iconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
   iconDanger: { backgroundColor: "#FEE2E2" },
-  label: { fontSize: 15, color: C.gray800, fontWeight: "600" },
+  label: { fontSize: 15, color: C.gray900, fontWeight: "600" },
   labelDanger: { color: C.red },
   sub: { fontSize: 12, color: C.gray400, marginTop: 2 },
 });
@@ -301,7 +325,7 @@ const adm = StyleSheet.create({
   addrBox: { flexDirection: "row", alignItems: "flex-start", gap: 14, backgroundColor: C.gray100, borderRadius: 14, padding: 16, marginBottom: 12 },
   addrIcon: { width: 38, height: 38, borderRadius: 11, backgroundColor: C.gray200, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   addrIconActive: { backgroundColor: C.green },
-  addrText: { flex: 1, fontSize: 15, color: C.gray800, fontWeight: "500", lineHeight: 22 },
+  addrText: { flex: 1, fontSize: 15, color: C.gray800 ?? C.gray900, fontWeight: "500", lineHeight: 22 },
   coordRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, marginBottom: 12 },
   coordText: { fontSize: 12, color: C.gray400, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
   activeBadge: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.greenLight, borderRadius: 12, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: C.greenBorder },
@@ -315,8 +339,18 @@ const adm = StyleSheet.create({
 
 // ─── Section header ───────────────────────────────────────────────────────
 function SectionLabel({ title }) {
-  return <Text style={{ fontSize: 11, fontWeight: "800", color: C.gray400, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 12, marginTop: 28 }}>{title}</Text>;
+  return (
+    <View style={secStyles.wrap}>
+      <View style={secStyles.tick} />
+      <Text style={secStyles.text}>{title}</Text>
+    </View>
+  );
 }
+const secStyles = StyleSheet.create({
+  wrap: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14, marginTop: 30 },
+  tick: { width: 3, height: 14, borderRadius: 2, backgroundColor: C.green },
+  text: { fontSize: 12, fontWeight: "800", color: C.gray500, letterSpacing: 0.8, textTransform: "uppercase" },
+});
 
 // ─── Logout modal ─────────────────────────────────────────────────────────
 function LogoutModal({ visible, onConfirm, onCancel }) {
@@ -492,6 +526,10 @@ export default function ProfileScreen() {
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={[s.hero, { paddingHorizontal: hPad }]}
           >
+            {/* Decorative accents */}
+            <View style={s.heroDecorCircle1} pointerEvents="none" />
+            <View style={s.heroDecorCircle2} pointerEvents="none" />
+
             {/* Top row */}
             <View style={s.heroTop}>
               <Text style={s.heroLabel}>{t('profile.myProfile')}</Text>
@@ -499,10 +537,12 @@ export default function ProfileScreen() {
 
             {/* Avatar + name */}
             <View style={s.heroMain}>
-              <View style={s.avatarOuter}>
-                <Avatar name={user?.name} size={72} />
-                <View style={s.verifiedDot}>
-                  <Feather name="check" size={9} color={C.white} />
+              <View style={s.avatarRing}>
+                <View style={s.avatarOuter}>
+                  <Avatar name={user?.name} size={72} />
+                  <View style={s.verifiedDot}>
+                    <Feather name="check" size={9} color={C.white} />
+                  </View>
                 </View>
               </View>
               <View style={s.heroInfo}>
@@ -514,10 +554,17 @@ export default function ProfileScreen() {
                 {memberSince && <Text style={s.heroSince}>{t('profile.memberSince', { date: memberSince })}</Text>}
               </View>
             </View>
+          </LinearGradient>
 
-            {/* Stats */}
+          {/* Stats — sits OUTSIDE the hero's overflow:hidden box so the
+              overlap isn't clipped; it overlaps upward via negative marginTop
+              on statsWrap instead, and paints on top since it's a later sibling */}
+          <View style={[s.statsWrap, { paddingHorizontal: hPad }]}>
             <View style={s.stats}>
               <View style={s.statItem}>
+                <View style={[s.statIconWrap, { backgroundColor: C.greenMid }]}>
+                  <Feather name="map-pin" size={13} color={C.greenDark} />
+                </View>
                 <Text style={s.statNum}>{addressStore?.addresses?.length ?? 0}</Text>
                 <Text style={s.statLabel}>{t('profile.savedAddresses')}</Text>
               </View>
@@ -528,13 +575,16 @@ export default function ProfileScreen() {
               </View>
               <View style={s.statSep} />
               <View style={s.statItem}>
-                <Text style={[s.statNum, { fontSize: 13 }]}>
+                <View style={[s.statIconWrap, { backgroundColor: C.blueLight }]}>
+                  <Feather name="user" size={13} color={C.blue} />
+                </View>
+                <Text style={[s.statNum, { fontSize: 12.5 }]} numberOfLines={1}>
                   {(user?.role || "customer").toUpperCase()}
                 </Text>
                 <Text style={s.statLabel}>{t('profile.account')}</Text>
               </View>
             </View>
-          </LinearGradient>
+          </View>
         </Animated.View>
 
         {/* ── Body ────────────────────────────────────────────────────── */}
@@ -554,6 +604,9 @@ export default function ProfileScreen() {
               onEdit={() => setEditField({ field: "email", label: t('profile.email'), value: user?.email, keyboardType: "email-address" })}
             />
             <View style={[ir.row, { borderBottomWidth: 0 }]}>
+              <View style={[ir.fieldIconWrap, ir.fieldIconWrapOff]}>
+                <Feather name="phone" size={15} color={C.gray400} />
+              </View>
               <View style={ir.left}>
                 <Text style={ir.label}>{t('profile.phone')}</Text>
                 <Text style={ir.value}>{user?.phone || "—"}</Text>
@@ -698,7 +751,7 @@ export default function ProfileScreen() {
         onRequestClose={() => setShowLanguage(false)}
       >
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }} onPress={() => setShowLanguage(false)}>
-          <Pressable style={{ backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48 }} onPress={() => {}}>
+          <Pressable style={{ backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48 }} onPress={() => { }}>
             <View style={{ width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
             <LanguageSwitcher inline />
           </Pressable>
@@ -711,12 +764,20 @@ export default function ProfileScreen() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
 
-  // Hero — more vertical breathing room
-  hero: { paddingTop: Platform.OS === "android" ? 28 : 20, paddingBottom: 0 },
+  // Hero — rounded bottom edge + decorative circles for depth
+  hero: {
+    paddingTop: Platform.OS === "android" ? 32 : 24, paddingBottom: 44,
+    borderBottomLeftRadius: 28, borderBottomRightRadius: 28,
+    overflow: "hidden",
+  },
+  heroDecorCircle1: { position: "absolute", top: -50, right: -40, width: 150, height: 150, borderRadius: 75, backgroundColor: "rgba(255,255,255,0.08)" },
+  heroDecorCircle2: { position: "absolute", top: 70, right: 50, width: 56, height: 56, borderRadius: 28, backgroundColor: "rgba(255,255,255,0.07)" },
+
   heroTop: { marginBottom: 24 },
   heroLabel: { fontSize: 13, fontWeight: "800", color: "rgba(255,255,255,0.7)", letterSpacing: 1, textTransform: "uppercase" },
   heroMain: { flexDirection: "row", alignItems: "center", gap: 18, marginBottom: 28 },
 
+  avatarRing: { padding: 4, borderRadius: 26, backgroundColor: "rgba(255,255,255,0.22)" },
   avatarOuter: { position: "relative" },
   verifiedDot: {
     position: "absolute", bottom: -2, right: -2,
@@ -731,18 +792,36 @@ const s = StyleSheet.create({
   heroPillText: { fontSize: 13, fontWeight: "700", color: C.green },
   heroSince: { fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 6 },
 
-  // Stats — more vertical padding so numbers have room
-  stats: { flexDirection: "row", backgroundColor: C.white, borderRadius: 20, paddingVertical: 20, marginBottom: -22, zIndex: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4, borderWidth: 1, borderColor: C.gray100 },
-  statItem: { flex: 1, alignItems: "center", gap: 4 },
-  statNum: { fontSize: 20, fontWeight: "900", color: C.gray900 },
-  statLabel: { fontSize: 12, color: C.gray400, fontWeight: "600" },
+  // Stats wrapper — a plain sibling AFTER the hero (not inside its
+  // overflow:hidden box), pulled up with a negative marginTop so it overlaps
+  // the green area. Because it paints after the hero, the overlap renders on
+  // top instead of being clipped.
+  statsWrap: { marginTop: -64 },
+  stats: {
+    flexDirection: "row", backgroundColor: C.white, borderRadius: 22, paddingVertical: 20,
+    shadowColor: "#0F172A", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.12, shadowRadius: 18, elevation: 6,
+    borderWidth: 1, borderColor: C.gray100,
+  },
+  statItem: { flex: 1, alignItems: "center", gap: 6 },
+  statIconWrap: { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center", marginBottom: 2 },
+  statNum: { fontSize: 19, fontWeight: "900", color: C.gray900 },
+  statLabel: { fontSize: 11.5, color: C.gray400, fontWeight: "600" },
   statSep: { width: 1, backgroundColor: C.gray200 },
 
-  // Cards — more top margin to clear the stats overlap
-  card: { backgroundColor: C.white, borderRadius: 16, paddingHorizontal: 16, borderWidth: 1, borderColor: C.gray200, marginTop: 42 },
+  // Cards — soft shadow instead of a flat border
+  card: {
+    backgroundColor: C.white, borderRadius: 18, paddingHorizontal: 18, marginTop: 8,
+    borderWidth: 1, borderColor: C.gray100,
+    shadowColor: "#0F172A", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 2,
+  },
 
   // Empty address
   emptyBox: { alignItems: "center", paddingVertical: 32, gap: 8, backgroundColor: C.white, borderRadius: 16, borderWidth: 1.5, borderColor: C.gray200, ...Platform.select({ web: { borderStyle: "dashed" }, default: { borderStyle: "solid" } }) },
   emptyTitle: { fontSize: 15, fontWeight: "700", color: C.gray500 },
   emptySub: { fontSize: 13, color: C.gray400, textAlign: "center", paddingHorizontal: 24, lineHeight: 19 },
 });
+
+
+
+
+

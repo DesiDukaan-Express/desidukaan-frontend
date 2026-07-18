@@ -13,12 +13,12 @@ import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { categoriesAPI, searchAPI, vendorsAPI } from "../../services/api";
-
+ 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const NEARBY_RADIUS = 10;   // km — stores within this are shown normally
 const FAR_RADIUS = 10;   // km — backend validation max is 10
 const MAX_HISTORY = 8;
-
+ 
 // ─── Palette (matches app design system) ─────────────────────────────────────
 const C = {
   orange: "#F97316", orangeDark: "#EA580C",
@@ -33,7 +33,7 @@ const C = {
   amber: "#D97706", amberLight: "#FEF3C7",
   red: "#DC2626", redLight: "#FEF2F2",
 };
-
+ 
 const CAT_FALLBACK_IMGS = {
   "Dairy, Bread & Eggs": "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80",
   "Fruits & Vegetables": "https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=400&q=80",
@@ -51,7 +51,7 @@ const CAT_FALLBACK_IMGS = {
   "Home & Office": "https://images.unsplash.com/photo-1586075010633-2445c9ff093b?w=400&q=80",
   _default: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&q=80",
 };
-
+ 
 // ─── Category accent colours (top-level) ──────────────────────────────────────
 const CAT_ACCENT = {
   "Dairy, Bread & Eggs": { bg: "#EFF6FF", accent: "#2563EB", icon: "🥛" },
@@ -74,7 +74,7 @@ const CAT_ACCENT = {
   "Rice": { bg: "#FEFCE8", accent: "#EAB308", icon: "🌾" },
   _default: { bg: "#F3F4F6", accent: "#6B7280", icon: "📦" },
 };
-
+ 
 // ─── Store category metadata ───────────────────────────────────────────────────
 const STORE_CAT_META = {
   grocery:     { icon: "🛒", label: "Grocery",    color: "#16A34A", bg: "#F0FDF4" },
@@ -87,7 +87,7 @@ const STORE_CAT_META = {
   general:     { icon: "🏪", label: "General",    color: "#6B7280", bg: "#F3F4F6" },
   _default:    { icon: "🏪", label: "Store",      color: "#6B7280", bg: "#F3F4F6" },
 };
-
+ 
 // ─── Haversine distance ───────────────────────────────────────────────────────
 function distKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
@@ -100,7 +100,7 @@ function distKm(lat1, lng1, lat2, lng2) {
     Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-
+ 
 // ─── useBreakpoint ────────────────────────────────────────────────────────────
 function useBreakpoint() {
   const [w, setW] = React.useState(Dimensions.get("window").width);
@@ -112,27 +112,27 @@ function useBreakpoint() {
   if (w >= 640) return { isDesktop: false, isTablet: true, isMobile: false };
   return { isDesktop: false, isTablet: false, isMobile: true };
 }
-
+ 
 // ─── Add/Qty button (uses real cartStore) ─────────────────────────────────────
 function AddBtn({ product, vendorId, vendorName, outOfStock }) {
   const cart = useCartStore();
   const items = cart?.items || [];
   const cartItem = items.find(i => i.id === product.id);
   const qty = cartItem?.qty ?? cartItem?.quantity ?? 0;
-
+ 
   const sc = useRef(new Animated.Value(1)).current;
   const pop = () => Animated.sequence([
     Animated.spring(sc, { toValue: 0.85, useNativeDriver: true, tension: 400 }),
     Animated.spring(sc, { toValue: 1, useNativeDriver: true, tension: 200 }),
   ]).start();
-
+ 
   const doAdd = () => {
     pop();
     const isLoose = product.item_type === "loose";
     const finalPrice = isLoose
       ? calculateProportionalPrice(product.price, product.unit || "1kg", product.unit || "1kg")
       : product.price;
-
+ 
     cart?.addItem?.({
       id: product.id, name: product.name, price: finalPrice,
       image: product.image_url, unit: product.unit,
@@ -143,7 +143,7 @@ function AddBtn({ product, vendorId, vendorName, outOfStock }) {
     pop();
     cart?.removeItem?.(product.id);
   };
-
+ 
   if (outOfStock) {
     return (
       <View style={ab.oosBtn}>
@@ -151,7 +151,7 @@ function AddBtn({ product, vendorId, vendorName, outOfStock }) {
       </View>
     );
   }
-
+ 
   return (
     <Animated.View style={{ transform: [{ scale: sc }] }}>
       {qty === 0 ? (
@@ -181,13 +181,13 @@ const ab = StyleSheet.create({
   oosBtn: { backgroundColor: C.gray100, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: C.gray200 },
   oosTxt: { fontSize: 11, fontWeight: "700", color: C.gray400, fontFamily: "PlusJakartaSans_700Bold" },
 });
-
+ 
 // ─── Product card (items tab) ─────────────────────────────────────────────────
 function ProductCard({ product, vendorId, vendorName, onSeeStores }) {
   const disc = product.mrp && product.mrp > product.price
     ? Math.round((1 - product.price / product.mrp) * 100) : null;
   const outOfStock = (product.stock_qty != null && product.stock_qty <= 0);
-
+ 
   return (
     <View style={[pc.card, outOfStock && pc.cardOos]}>
       <View style={pc.imgWrap}>
@@ -248,7 +248,7 @@ const pc = StyleSheet.create({
   storeBtnText: { fontSize: 11, color: C.green, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold" },
   ctaWrap: { paddingTop: 16 },
 });
-
+ 
 // ─── Vendor card (places tab) ─────────────────────────────────────────────────
 function VendorCard({ vendor, distKm: dist, matchCount, onPress, tooFar }) {
   const isOpen = vendor.is_open;
@@ -265,12 +265,12 @@ function VendorCard({ vendor, distKm: dist, matchCount, onPress, tooFar }) {
           style={vc.img} resizeMode="cover"
         />
         <LinearGradient colors={["transparent", "rgba(0,0,0,0.4)"]} style={vc.imgGrad} />
-
+ 
         {/* Open/Closed */}
         <View style={[vc.openBadge, { backgroundColor: isOpen ? C.green : C.red }]}>
           <Text style={vc.openText}>{isOpen ? "Open" : "Closed"}</Text>
         </View>
-
+ 
         {/* Distance */}
         {dist != null && (
           <View style={vc.distBadge}>
@@ -280,14 +280,14 @@ function VendorCard({ vendor, distKm: dist, matchCount, onPress, tooFar }) {
             </Text>
           </View>
         )}
-
+ 
         {/* Match count */}
         {matchCount > 0 && !tooFar && (
           <View style={vc.matchBadge}>
             <Text style={vc.matchText}>{matchCount} item{matchCount > 1 ? "s" : ""} found</Text>
           </View>
         )}
-
+ 
         {/* Too far overlay */}
         {tooFar && (
           <View style={vc.farOverlay}>
@@ -296,7 +296,7 @@ function VendorCard({ vendor, distKm: dist, matchCount, onPress, tooFar }) {
           </View>
         )}
       </View>
-
+ 
       <View style={vc.info}>
         <View style={vc.topRow}>
           <Text style={vc.name} numberOfLines={1}>{vendor.shop_name}</Text>
@@ -353,7 +353,7 @@ const vc = StyleSheet.create({
   metaChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.gray100, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   metaText: { fontSize: 11, color: C.gray600, fontFamily: "PlusJakartaSans_500Medium" },
 });
-
+ 
 // ─── Stores for item modal ────────────────────────────────────────────────────
 function ItemStoresSheet({ product, stores, userCoords, onClose, onSelectStore }) {
   if (!product || !stores) return null;
@@ -370,7 +370,7 @@ function ItemStoresSheet({ product, stores, userCoords, onClose, onSelectStore }
             <Feather name="x" size={16} color={C.gray600} />
           </TouchableOpacity>
         </View>
-
+ 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
           {stores.map(store => {
             const dist = (userCoords && store.latitude && store.longitude)
@@ -423,7 +423,24 @@ const iss = StyleSheet.create({
   storeAddr: { fontSize: 12, color: C.gray400, marginTop: 2, fontFamily: "PlusJakartaSans_500Medium" },
   storeDist: { fontSize: 11, color: C.green, fontWeight: "600", marginTop: 2, fontFamily: "PlusJakartaSans_600SemiBold" },
 });
-
+ 
+// ─── Section heading (accent tick, matches ProfileScreen's SectionLabel) ──────
+function SectionHeading({ title, action, onAction }) {
+  return (
+    <View style={s.sectionHeadWrap}>
+      <View style={s.sectionHeadLeft}>
+        <View style={s.sectionTick} />
+        <Text style={s.sectionTitle}>{title}</Text>
+      </View>
+      {action ? (
+        <TouchableOpacity onPress={onAction} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={s.sectionAction}>{action}</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+}
+ 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function SearchScreen() {
   const navigation = useNavigation();
@@ -431,49 +448,49 @@ export default function SearchScreen() {
   const { token } = useAuthStore();
   const addressStore = useAddressStore();
   const { isDesktop, isTablet } = useBreakpoint();
-
+ 
   // ── State ─────────────────────────────────────────────────────────────────
   const [query, setQuery] = useState("");
   const [committed, setCommitted] = useState(false);
   const [activeTab, setActiveTab] = useState("places");
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
-
+ 
   // Autocomplete & correction
   const [apiSuggestions, setApiSuggestions] = useState([]); // from server
   const [didYouMean, setDidYouMean] = useState(null); // typo correction
   const autocompleteTimer = useRef(null);
-
+ 
   // Search results
   const [vendors, setVendors] = useState([]);   // all nearby vendors
   const [products, setProducts] = useState([]);   // matched products (items tab)
   const [matchedVendors, setMatchedVendors] = useState([]); // vendors with matched items
-
+ 
   // Item stores sheet
   const [sheetProduct, setSheetProduct] = useState(null);
   const [sheetStores, setSheetStores] = useState([]);
-
+ 
   // Database-fetched categories
   const [apiCategories, setApiCategories] = useState([]);
-
+ 
   useEffect(() => {
     categoriesAPI.getAll()
       .then(res => setApiCategories(res.data?.categories || []))
       .catch(() => setApiCategories([]));
   }, []);
-
+ 
   // Store category filter
   const [storeCategories, setStoreCategories] = useState([]);
   const [selectedStoreCategory, setSelectedStoreCategory] = useState(null);
   const [storeCatVendors, setStoreCatVendors] = useState([]);
   const [loadingStoreCat, setLoadingStoreCat] = useState(false);
-
+ 
   useEffect(() => {
     vendorsAPI.getStoreCategories()
       .then(res => setStoreCategories(res.data?.categories || []))
       .catch(() => setStoreCategories([]));
   }, []);
-
+ 
   const handleStoreCatSelect = async (cat) => {
     const newCat = selectedStoreCategory === cat ? null : cat;
     setSelectedStoreCategory(newCat);
@@ -485,12 +502,12 @@ export default function SearchScreen() {
     } catch { setStoreCatVendors([]); }
     finally { setLoadingStoreCat(false); }
   };
-
+ 
   const dbCategories = useMemo(() => {
     const seen = new Set();
     const cats = [];
     const topLevelCats = apiCategories.filter(c => !c.parent_id);
-
+ 
     topLevelCats.forEach(c => {
       if (c.name && !seen.has(c.name)) {
         seen.add(c.name);
@@ -508,10 +525,10 @@ export default function SearchScreen() {
     });
     return cats.sort((a, b) => a.label.localeCompare(b.label));
   }, [apiCategories]);
-
+ 
   const inputRef = useRef(null);
   const px = isDesktop ? 40 : isTablet ? 24 : 16;
-
+ 
   // ── Debounced autocomplete from API ──────────────────────────────────────
   useEffect(() => {
     if (committed) return; // don't fire when results are shown
@@ -535,7 +552,7 @@ export default function SearchScreen() {
       if (autocompleteTimer.current) clearTimeout(autocompleteTimer.current);
     };
   }, [query, committed]);
-
+ 
   // ── User location ─────────────────────────────────────────────────────────
   const selectedAddr = addressStore?.addresses?.find(a => a.id === addressStore?.selectedId)
     || addressStore?.addresses?.[0];
@@ -545,7 +562,7 @@ export default function SearchScreen() {
       : (selectedAddr?.latitude && selectedAddr?.longitude)
         ? { lat: selectedAddr.latitude, lng: selectedAddr.longitude }
         : null;
-
+ 
   // ── Handle category filter from HomeScreen ────────────────────────────────
   useEffect(() => {
     const cat = route.params?.category;
@@ -555,7 +572,7 @@ export default function SearchScreen() {
     }
     setTimeout(() => inputRef.current?.focus(), 300);
   }, []);
-
+ 
   // ── Fetch all nearby vendors on mount ────────────────────────────────────
   useEffect(() => {
     if (!userCoords) return;
@@ -569,7 +586,7 @@ export default function SearchScreen() {
       })
       .catch(() => { });
   }, [userCoords?.lat, userCoords?.lng]);
-
+ 
   // ── Search — uses inventory endpoint which already exists ───────────────────
   const doSearch = useCallback(async (q) => {
     const trimmed = (q ?? query).trim();
@@ -580,19 +597,19 @@ export default function SearchScreen() {
     setDidYouMean(null);      // reset correction on new search
     setApiSuggestions([]);    // clear dropdown
     Keyboard.dismiss();
-
+ 
     // Save to history
     setHistory(prev => {
       const deduped = prev.filter(h => h.toLowerCase() !== trimmed.toLowerCase());
       return [trimmed, ...deduped].slice(0, MAX_HISTORY);
     });
-
+ 
     // Track this search (fire-and-forget)
     searchAPI.track(trimmed);
-
+ 
     try {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
+ 
       // Always read coords fresh via getState() — never stale
       const addrState = useAddressStore.getState();
       const currentAddr =
@@ -600,7 +617,7 @@ export default function SearchScreen() {
         || addrState.addresses?.[0];
       let lat = currentAddr?.lat || currentAddr?.latitude || null;
       let lng = currentAddr?.lng || currentAddr?.longitude || null;
-
+ 
       // If address has no coords, try geocoding, then fall back to device GPS
       if (!lat || !lng) {
         const addrText = currentAddr?.address_line || currentAddr?.address;
@@ -618,7 +635,7 @@ export default function SearchScreen() {
           } catch { }
         }
       }
-
+ 
       // Last resort — use device GPS
       if (!lat || !lng) {
         try {
@@ -631,16 +648,16 @@ export default function SearchScreen() {
           }
         } catch { }
       }
-
+ 
       console.log("Search coords:", lat, lng, "addr:", currentAddr?.address_line);
-
+ 
       if (!lat || !lng) {
         setProducts([]);
         setMatchedVendors([]);
         setLoading(false);
         return;
       }
-
+ 
       // Step 1: Fetch vendors at current location and correction suggestion in parallel
       const [vRes, corrData] = await Promise.all([
         fetch(
@@ -649,20 +666,20 @@ export default function SearchScreen() {
         ),
         searchAPI.correct(trimmed).catch(() => null)
       ]);
-
+ 
       const vData = await vRes.json();
       let vendorList = Array.isArray(vData) ? vData : vData.data || vData.vendors || [];
       setVendors(vendorList);
-
+ 
       const suggestion = corrData?.data?.suggestion || corrData?.suggestion || null;
       const hasSuggestion = suggestion && suggestion.toLowerCase() !== trimmed.toLowerCase();
       setDidYouMean(hasSuggestion ? suggestion : null);
-
+ 
       // Step 2: Search across all vendor inventories in parallel
       // Each vendor's inventory endpoint already exists: GET /inventory/vendor/:id
       const q_lower = trimmed.toLowerCase();
       const sugg_lower = hasSuggestion ? suggestion.toLowerCase() : null;
-
+ 
       const inventoryResults = await Promise.all(
         vendorList.map(v =>
           fetch(`${BASE_URL}/inventory/vendor/${v.id}`, { headers })
@@ -682,14 +699,14 @@ export default function SearchScreen() {
                   catName.toLowerCase().includes(q_lower) ||
                   p.unit?.toLowerCase().includes(q_lower)
                 );
-
+ 
                 const matchesSuggestion = sugg_lower ? (
                   p.name?.toLowerCase().includes(sugg_lower) ||
                   p.description?.toLowerCase().includes(sugg_lower) ||
                   catName.toLowerCase().includes(sugg_lower) ||
                   p.unit?.toLowerCase().includes(sugg_lower)
                 ) : false;
-
+ 
                 return matchesOriginal || matchesSuggestion;
               });
               return { vendor: v, matched };
@@ -697,11 +714,11 @@ export default function SearchScreen() {
             .catch(() => ({ vendor: v, matched: [] }))
         )
       );
-
+ 
       // Step 3: Build products list (unique by product name, keeping cheapest in-stock first)
       const productMap = new Map(); // key = product name, value = best product
       const vendorMatchMap = new Map(); // vendorId -> matchCount
-
+ 
       for (const { vendor, matched } of inventoryResults) {
         if (matched.length > 0) {
           vendorMatchMap.set(vendor.id, matched.length);
@@ -734,7 +751,7 @@ export default function SearchScreen() {
           }
         }
       }
-
+ 
       // Also collect OOS-only products (not already in map as in-stock)
       for (const { vendor, matched } of inventoryResults) {
         for (const inv of matched) {
@@ -753,7 +770,7 @@ export default function SearchScreen() {
           }
         }
       }
-
+ 
       const prodList = Array.from(productMap.values())
         .map(p => ({ ...p, _storeCount: p._allVendorIds?.length || 1 }))
         // In-stock first, then OOS; within each group sort by name
@@ -761,24 +778,24 @@ export default function SearchScreen() {
           if (a._inStock !== b._inStock) return a._inStock ? -1 : 1;
           return a.name.localeCompare(b.name);
         });
-
+ 
       setProducts(prodList);
-
+ 
       // Step 4: Build matched vendors list for places tab
       const matched = vendorList
          .filter(v => vendorMatchMap.has(v.id))
          .map(v => ({ ...v, matchCount: vendorMatchMap.get(v.id) }))
          .sort((a, b) => b.matchCount - a.matchCount);
-
+ 
       setMatchedVendors(matched);
-
+ 
     } catch (e) {
       console.error("Search error:", e.message);
     } finally {
       setLoading(false);
     }
   }, [query, token]);
-
+ 
   // ── Navigate to vendor store ──────────────────────────────────────────────
   const goToStore = useCallback((vendor) => {
     navigation.navigate("VendorStore", {
@@ -786,7 +803,7 @@ export default function SearchScreen() {
       vendorName: vendor.shop_name,
     });
   }, [navigation]);
-
+ 
   // ── Item "see stores" ─────────────────────────────────────────────────────
   const handleSeeStores = useCallback(async (product) => {
     setSheetProduct(product);
@@ -804,7 +821,7 @@ export default function SearchScreen() {
       setSheetStores(carrying);
     }
   }, [vendors, token]);
-
+ 
   // ── Back ──────────────────────────────────────────────────────────────────
   const handleBack = () => {
     if (committed || query.length > 0) {
@@ -817,7 +834,7 @@ export default function SearchScreen() {
       navigation.goBack();
     }
   };
-
+ 
   // ── Compute distances ─────────────────────────────────────────────────────
   const vendorsWithDist = useMemo(() =>
     matchedVendors.map(v => ({
@@ -831,36 +848,36 @@ export default function SearchScreen() {
       _tooFar: v._dist != null && v._dist > NEARBY_RADIUS,
     })),
     [matchedVendors, userCoords]);
-
+ 
   const nearbyVendors = vendorsWithDist.filter(v => !v._tooFar);
   const farVendors = vendorsWithDist.filter(v => v._tooFar);
-
+ 
   // Products with store count
   const productsWithCount = useMemo(() =>
     products.map(p => ({ ...p, _storeCount: products.filter(x => x.name === p.name).length })),
     [products]);
-
+ 
   // ── Suggestions: API-first, fall back to local history ──────────────────
   const trimmed = query.trim();
   const isIdle = !committed && trimmed.length === 0;
   const isTyping = !committed && trimmed.length > 0;
-
+ 
   // Merge API suggestions with local history (API takes priority)
   const suggestions = isTyping
     ? (() => {
       // API suggestions come with { text, type } shape
       const apiTexts = apiSuggestions.map(s => ({ text: s.text, type: s.type }));
       const apiTextSet = new Set(apiTexts.map(s => s.text.toLowerCase()));
-
+ 
       // Local history fallback — only items not already in API results
       const localFallback = history
         .filter(h => h.toLowerCase().includes(trimmed.toLowerCase()) && !apiTextSet.has(h.toLowerCase()))
         .map(h => ({ text: h, type: 'local' }));
-
+ 
       return [...apiTexts, ...localFallback].slice(0, 7);
     })()
     : [];
-
+ 
   // ── Floating cart ─────────────────────────────────────────────────────────
   const cart = useCartStore();
   const cartItems = cart?.items || [];
@@ -873,12 +890,12 @@ export default function SearchScreen() {
       tension: 70, friction: 12, useNativeDriver: true,
     }).start();
   }, [cartCount]);
-
+ 
   return (
     <View style={{ flex: 1 }}>
       <View style={[s.root, { backgroundColor: isDesktop ? C.bg : C.white }]}>
         <StatusBar barStyle="dark-content" />
-
+ 
         {/* ── SEARCH BAR ─────────────────────────────────────────────── */}
         <View style={[s.topBar, { paddingHorizontal: px }]}>
           <TouchableOpacity style={s.backBtn} onPress={handleBack} activeOpacity={0.8}>
@@ -913,7 +930,7 @@ export default function SearchScreen() {
             </TouchableOpacity>
           )}
         </View>
-
+ 
         {/* ── TABS (shown after search) ─────────────────────────────── */}
         {committed && (
           <View style={s.tabs}>
@@ -941,14 +958,14 @@ export default function SearchScreen() {
             ))}
           </View>
         )}
-
+ 
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <ScrollView
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingBottom: 80 }}
           >
-
+ 
             {/* ── SUGGESTIONS while typing ─────────────────────────── */}
             {isTyping && (
               <View style={s.suggBox}>
@@ -979,41 +996,40 @@ export default function SearchScreen() {
                 </TouchableOpacity>
               </View>
             )}
-
+ 
             {/* ── IDLE: categories + history ────────────────────────── */}
             {isIdle && (
               <View style={{ paddingHorizontal: px, paddingTop: 16 }}>
-
+ 
                 {/* Categories */}
-                <Text style={s.sectionTitle}>Shop by Category</Text>
-                <ScrollView
-                  horizontal showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingRight: 8, paddingBottom: 8, gap: 20 }}
-                >
-                  {dbCategories.map(cat => (
-                    <TouchableOpacity
-                      key={cat.label}
-                      style={s.catChip}
-                      onPress={() => { setQuery(cat.label); doSearch(cat.label); }}
-                      activeOpacity={0.8}
+                {dbCategories.length > 0 && (
+                  <>
+                    <SectionHeading title="Shop by Category" />
+                    <ScrollView
+                      horizontal showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ paddingRight: 8, paddingBottom: 8, gap: 20 }}
                     >
-                      <View style={[s.catImgWrap, { backgroundColor: cat.bg }]}>
-                        <Image source={{ uri: cat.img }} style={s.catImg} resizeMode="cover" />
-                      </View>
-                      <Text style={s.catChipLabel}>{cat.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-
+                      {dbCategories.map(cat => (
+                        <TouchableOpacity
+                          key={cat.label}
+                          style={s.catChip}
+                          onPress={() => { setQuery(cat.label); doSearch(cat.label); }}
+                          activeOpacity={0.8}
+                        >
+                          <View style={[s.catImgWrap, { backgroundColor: cat.bg }]}>
+                            <Image source={{ uri: cat.img }} style={s.catImg} resizeMode="cover" />
+                          </View>
+                          <Text style={s.catChipLabel}>{cat.label}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </>
+                )}
+ 
                 {/* History */}
                 {history.length > 0 && (
                   <>
-                    <View style={s.sectionRow}>
-                      <Text style={s.sectionTitle}>Recent Searches</Text>
-                      <TouchableOpacity onPress={() => setHistory([])}>
-                        <Text style={s.sectionAction}>Clear all</Text>
-                      </TouchableOpacity>
-                    </View>
+                    <SectionHeading title="Recent Searches" action="Clear all" onAction={() => setHistory([])} />
                     {history.map((h, i) => (
                       <TouchableOpacity
                         key={i}
@@ -1032,11 +1048,11 @@ export default function SearchScreen() {
                 )}
               </View>
             )}
-
+ 
             {/* ── Browse Stores by Type ─────────────────────────────── */}
             {isIdle && storeCategories.length > 0 && (
               <View style={{ paddingHorizontal: px, paddingTop: 20 }}>
-                <Text style={s.sectionTitle}>Browse Stores by Type</Text>
+                <SectionHeading title="Browse Stores by Type" />
                 <ScrollView
                   horizontal showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ paddingRight: 8, paddingBottom: 12, gap: 12 }}
@@ -1072,7 +1088,7 @@ export default function SearchScreen() {
                     );
                   })}
                 </ScrollView>
-
+ 
                 {/* Category vendor results */}
                 {loadingStoreCat && (
                   <View style={s.loadingWrap}>
@@ -1107,18 +1123,18 @@ export default function SearchScreen() {
                 )}
               </View>
             )}
-
+ 
             {loading && (
               <View style={s.loadingWrap}>
                 <ActivityIndicator size="large" color={C.green} />
                 <Text style={s.loadingText}>Searching…</Text>
               </View>
             )}
-
+ 
             {/* ── RESULTS ──────────────────────────────────────────── */}
             {committed && !loading && (
               <View style={{ paddingHorizontal: px, paddingTop: 12 }}>
-
+ 
                 {/* ── PLACES TAB ── */}
                 {activeTab === "places" && (
                   <>
@@ -1149,7 +1165,7 @@ export default function SearchScreen() {
                             ))}
                           </>
                         )}
-
+ 
                         {/* Far stores section */}
                         {farVendors.length > 0 && (
                           <>
@@ -1175,7 +1191,7 @@ export default function SearchScreen() {
                     )}
                   </>
                 )}
-
+ 
                 {/* ── ITEMS TAB ── */}
                 {activeTab === "items" && (
                   <>
@@ -1209,11 +1225,11 @@ export default function SearchScreen() {
                 )}
               </View>
             )}
-
+ 
           </ScrollView>
         </KeyboardAvoidingView>
       </View>
-
+ 
       {/* ── Item stores bottom sheet ──────────────────────────────────── */}
       {sheetProduct && (
         <ItemStoresSheet
@@ -1228,7 +1244,7 @@ export default function SearchScreen() {
           }}
         />
       )}
-
+ 
       {/* ── FLOATING CART (mirrors VendorStoreScreen) ─────────────────── */}
       {cartCount > 0 && (
         <Animated.View style={[s.floatingCart, { transform: [{ translateY: floatingY }] }]}>
@@ -1256,11 +1272,11 @@ export default function SearchScreen() {
     </View>
   );
 }
-
+ 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   root: { flex: 1, paddingTop: Platform.OS === "ios" ? 52 : 32 },
-
+ 
   // Floating cart
   floatingCart: { position: "absolute", bottom: 20, left: 16, right: 16, backgroundColor: C.green, borderRadius: 18, shadowColor: C.green, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 14, zIndex: 100 },
   floatingInner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14, paddingHorizontal: 18, borderRadius: 18 },
@@ -1271,7 +1287,7 @@ const s = StyleSheet.create({
   floatingTotal: { fontSize: 12, color: "rgba(255,255,255,0.82)", marginTop: 1, fontFamily: "PlusJakartaSans_500Medium" },
   floatingCTA: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 16, paddingVertical: 9, borderRadius: 12 },
   floatingCTAText: { fontSize: 14, fontWeight: "800", color: C.white, fontFamily: "PlusJakartaSans_800ExtraBold" },
-
+ 
   // Header
   topBar: { flexDirection: "row", alignItems: "center", gap: 10, paddingBottom: 12 },
   backBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
@@ -1280,7 +1296,7 @@ const s = StyleSheet.create({
   input: { flex: 1, fontSize: 15, color: C.gray900, fontFamily: "PlusJakartaSans_500Medium", outlineStyle: "none" },
   searchBtn: { backgroundColor: C.green, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11 },
   searchBtnText: { fontSize: 14, fontWeight: "800", color: C.white, fontFamily: "PlusJakartaSans_800ExtraBold" },
-
+ 
   // Tabs
   tabs: { flexDirection: "row", borderBottomWidth: 1.5, borderBottomColor: C.gray200, backgroundColor: C.white },
   tab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, paddingVertical: 13 },
@@ -1291,14 +1307,17 @@ const s = StyleSheet.create({
   tabBubbleActive: { backgroundColor: C.greenMid },
   tabBubbleText: { fontSize: 11, fontWeight: "700", color: C.gray500, fontFamily: "PlusJakartaSans_700Bold" },
   tabBubbleTextActive: { color: C.green, fontFamily: "PlusJakartaSans_700Bold" },
-
+ 
   // Suggestions
   suggBox: { backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-
-  // Idle
-  sectionTitle: { fontSize: 16, fontWeight: "800", color: C.gray900, marginBottom: 12, marginTop: 4, fontFamily: "PlusJakartaSans_800ExtraBold" },
-  sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 20, marginBottom: 12 },
+ 
+  // Section heading — small accent tick, mirrors ProfileScreen's SectionLabel
+  sectionHeadWrap: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4, marginBottom: 14 },
+  sectionHeadLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
+  sectionTick: { width: 3, height: 14, borderRadius: 2, backgroundColor: C.green },
+  sectionTitle: { fontSize: 16, fontWeight: "800", color: C.gray900, fontFamily: "PlusJakartaSans_800ExtraBold" },
   sectionAction: { fontSize: 13, color: C.green, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" },
+ 
   // Category chips — matches HomeScreen style exactly
   catChip: { alignItems: "center", width: 100 },
   catImgWrap: { width: 86, height: 86, borderRadius: 22, overflow: "hidden", marginBottom: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3 },
@@ -1306,60 +1325,22 @@ const s = StyleSheet.create({
   catChipLabel: { fontSize: 13, color: C.gray900, fontWeight: "700", textAlign: "center", fontFamily: "PlusJakartaSans_700Bold" },
   histRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.gray100 },
   histText: { flex: 1, fontSize: 14, color: C.gray700, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" },
-
-  // Loading
-  loadingWrap: { alignItems: "center", paddingTop: 60, gap: 12 },
-  loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" },
-
-  // Results
-  resultNote: { fontSize: 12, color: C.gray400, fontWeight: "500", marginBottom: 14, fontFamily: "PlusJakartaSans_500Medium" },
-  itemsCard: { backgroundColor: C.white, borderRadius: 16, borderWidth: 1, borderColor: C.gray200, overflow: "hidden", marginBottom: 16 },
-  farHeader: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.amberLight, borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: "#FDE68A" },
-  farHeaderText: { fontSize: 13, color: C.amber, fontWeight: "600", flex: 1, fontFamily: "PlusJakartaSans_600SemiBold" },
-
-  // Empty
-  emptyWrap: { alignItems: "center", paddingTop: 60, gap: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: "700", color: C.gray700, fontFamily: "PlusJakartaSans_700Bold" },
-  emptySub: { fontSize: 14, color: C.gray400, textAlign: "center", lineHeight: 20, fontFamily: "PlusJakartaSans_500Medium" },
-});
-
-const sg = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  text: { flex: 1, fontSize: 14, color: C.gray700 },
-});
-
-// ─── Did You Mean styles ──────────────────────────────────────────────────────
-const dym = StyleSheet.create({
-  banner: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    marginHorizontal: 16, marginBottom: 12, marginTop: 4,
-    backgroundColor: C.amberLight,
-    borderWidth: 1, borderColor: "#FDE68A",
-    borderRadius: 16, padding: 14,
-  },
-  iconWrap: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: "#FEF3C7",
-    alignItems: "center", justifyContent: "center",
-  },
-  label: { fontSize: 11, color: C.amber, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", textTransform: "uppercase", letterSpacing: 0.4 },
-  suggestion: { fontSize: 17, fontWeight: "800", color: C.gray900, fontFamily: "PlusJakartaSans_800ExtraBold", marginTop: 1 },
-  ctaChip: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.orange, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
-  ctaText: { fontSize: 13, fontWeight: "700", color: C.white, fontFamily: "PlusJakartaSans_700Bold" },
-
-  // Store category browse chips
+ 
+  // Store category browse chips (moved here from the unrelated `dym` stylesheet,
+  // where they were defined but never applied — that was the "tiny Grocery chip" bug)
   storeCatBrowseChip: {
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    width: 90,
+    width: 92,
     height: 108,
     borderRadius: 18,
     borderWidth: 1.5,
     paddingVertical: 12,
     paddingHorizontal: 8,
+    shadowColor: "#0F172A",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.05,
     shadowRadius: 6,
     elevation: 2,
     marginVertical: 4,
@@ -1367,7 +1348,7 @@ const dym = StyleSheet.create({
   storeCatBrowseChipActive: {
     borderWidth: 1.5,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.16,
     shadowRadius: 10,
     elevation: 6,
   },

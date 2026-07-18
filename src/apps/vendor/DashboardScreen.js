@@ -15,6 +15,7 @@ import {
   StatusBar,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import Svg, { Polyline } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTranslation } from "react-i18next";
 import useAuthStore from "../../store/authStore";
@@ -359,10 +360,6 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         <View style={styles.loadingCard}>
           <ActivityIndicator size="large" color={C.primary} />
           <Text style={styles.loadingText}>{t('vendor.loadingDashboard')}</Text>
-        </View>
-      </View>
-    );
-  }
 
   if (noProfile) {
     return (
@@ -586,7 +583,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
       <View
         style={{
           paddingTop: Platform.OS === "ios" ? 52 : 40,
-          paddingHorizontal: rs(12, 16, 20),
+          paddingHorizontal: rs(20, 24, 28),
           backgroundColor: C.surface,
           paddingBottom: rs(10, 12, 12),
           borderBottomWidth: 1,
@@ -674,6 +671,11 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             {/* Avatar pill */}
             <TouchableOpacity
               style={{
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04,
+                shadowRadius: 3,
+                elevation: 1,
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 6,
@@ -807,6 +809,11 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 {/* Avatar pill */}
                 <TouchableOpacity
                   style={{
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.04,
+                    shadowRadius: 3,
+                    elevation: 1,
                     flexDirection: "row",
                     alignItems: "center",
                     gap: rs(5, 6, 6),
@@ -924,25 +931,82 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120, paddingTop: 4 }}
+        contentContainerStyle={{ paddingBottom: 130, paddingTop: 4 }}
       >
         {/* ── GREETING ──────────────────────────────────────── */}
         <Animated.View
-          style={{
-            opacity: greetFadeAnim,
-            transform: [{ translateY: greetSlideAnim }],
-            marginHorizontal: rs(12, 14, 16),
-            marginTop: rs(12, 14, 16),
-          }}
-        >
-          <View
-            style={[
-              styles.greetingCard,
-              {
-                paddingHorizontal: rs(16, 18, 20),
-                paddingVertical: rs(16, 18, 20),
-              },
-            ]}
+  style={{
+    opacity: greetFadeAnim,
+    transform: [{ translateY: greetSlideAnim }],
+    marginHorizontal: rs(20, 24, 28),
+    marginTop: rs(24, 28, 32),
+  }}
+>
+  <LinearGradient
+    // colors={["#14B87A", "#0F9B5F", "#0A6B42", "#053D26"]}
+    // colors={["#14B87A", "#0F9B5F", "#0A6B42", "#053D26"]}
+    // colors={["#2ECC71", "#0F9B5F", "#1B5E3F", "#0A3D26"]}
+    colors={["#58b468", "#48BF59", "#2F9645", "#1E6B31"]}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+    style={[
+      styles.greetingCard,
+      {
+        paddingHorizontal: rs(22, 26, 30),
+        paddingVertical: rs(26, 30, 34),
+      },
+    ]}
+  >
+    {/* Background accent blobs — lighter on green */}
+    <View style={[styles.greetingBlobTop, { backgroundColor: "rgba(255,255,255,0.06)" }]} />
+    <View style={[styles.greetingBlobBot, { backgroundColor: "rgba(255,255,255,0.04)" }]} />
+
+    <View
+      style={{
+        position: "absolute",
+        top: -20,
+        left: -40,
+        width: "70%",
+        height: 200,
+        backgroundColor: "rgba(255,255,255,0.10)",
+        transform: [{ rotate: "-20deg" }],
+        borderRadius: 100,
+      }}
+    />
+    <View
+      style={{
+        position: "absolute",
+        top: 10,
+        left: -10,
+        width: "40%",
+        height: 140,
+        backgroundColor: "rgba(255,255,255,0.06)",
+        transform: [{ rotate: "-20deg" }],
+        borderRadius: 100,
+      }}
+    />
+
+    <View style={{ flexDirection: "row", alignItems: "center", gap: rs(12, 14, 16) }}>
+      {/* Emoji bubble — white glass on green */}
+      <View
+        style={{
+          width: rs(56, 60, 66),
+          height: rs(56, 60, 66),
+          borderRadius: rs(18, 19, 20),
+          backgroundColor: "rgba(255,255,255,0.2)",
+          alignItems: "center",
+          justifyContent: "center",
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.45)",
+        }}
+      >
+        <MaterialIcons name={greeting.icon} size={rs(24, 26, 30)} color="#fff" />
+      </View>
+
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3, flexWrap: "nowrap" }}>
+          <Text
+            style={{ fontSize: rs(11, 12, 13), color: "rgba(255,255,255,0.85)", fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold" }}
           >
             {/* Background accent blobs */}
             <View style={styles.greetingBlobTop} />
@@ -1045,16 +1109,64 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               </View>
             </View>
           </View>
-        </Animated.View>
+        </View>
+        <Text style={{ fontSize: rs(24, 27, 30), fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff" }}>
+          {vendorName.split(" ")[0]}
+        </Text>
+        <Text style={{ fontSize: rs(11, 12, 12), color: "rgba(255,255,255,0.9)", fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", marginTop: 2 }}>
+          {greeting.sub}
+        </Text>
+      </View>
+    </View>
+
+    {/* Mini stat strip — glass effect on green */}
+    <View
+      style={{
+        flexDirection: "row",
+        backgroundColor: "rgba(255,255,255,0.15)",
+        borderRadius: 18,
+        marginTop: 20,
+        padding: 16,
+      }}
+    >
+      <View style={styles.greetingStripItem}>
+        <Text style={{ fontSize: 17, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff" }}>
+          {stats.today.totalOrders}
+        </Text>
+        <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.8)", marginTop: 2, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" }}>
+          Today's Orders
+        </Text>
+      </View>
+      <View style={{ width: 1, backgroundColor: "rgba(255,255,255,0.45)", marginHorizontal: 8 }} />
+      <View style={styles.greetingStripItem}>
+        <Text style={{ fontSize: 17, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff" }}>
+          ₹{Number(stats.today.revenue).toLocaleString("en-IN")}
+        </Text>
+        <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.8)", marginTop: 2, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" }}>
+          Today's Revenue
+        </Text>
+      </View>
+      <View style={{ width: 1, backgroundColor: "rgba(255,255,255,0.45)", marginHorizontal: 8 }} />
+      <View style={styles.greetingStripItem}>
+        <Text style={{ fontSize: 17, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff" }}>
+          {stats.today.avgPrepTime}m
+        </Text>
+        <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.8)", marginTop: 2, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" }}>
+          Avg. Prep
+        </Text>
+      </View>
+    </View>
+  </LinearGradient>
+</Animated.View>
 
         {/* ── HERO STAT ROW ─────────────────────────────────── */}
         <Animated.View
           style={{
             transform: [{ scale: heroScaleAnim }],
-            paddingHorizontal: rs(12, 14, 16),
-            marginTop: rs(10, 12, 14),
+            paddingHorizontal: rs(20, 24, 28),
+            marginTop: rs(20, 22, 24),
             flexDirection: "row",
-            gap: rs(8, 10, 12),
+            gap: rs(10, 12, 14),
           }}
         >
           {/* Big dark card */}
@@ -1063,8 +1175,8 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               styles.heroCard,
               {
                 flex: 1.5,
-                padding: rs(14, 16, 18),
-                borderRadius: rs(16, 18, 20),
+                padding: rs(18, 20, 22),
+                borderRadius: rs(18, 20, 22),
               },
             ]}
           >
@@ -1128,7 +1240,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           </View>
 
           {/* Right mini cards */}
-          <View style={{ flex: 1, gap: rs(8, 10, 12) }}>
+          <View style={{ flex: 1, gap: rs(12, 14, 16) }}>
             <MiniMetricCard
               label={t('vendor.weeklyOrders')}
               value={stats.weekly.totalOrders.toString()}
@@ -1160,10 +1272,10 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         <View
           style={[
             styles.card,
-            { marginHorizontal: rs(12, 14, 16), marginTop: rs(10, 12, 14) },
+            { marginHorizontal: rs(20, 24, 28), marginTop: rs(18, 20, 22) },
           ]}
         >
-          <View style={styles.cardHeader}>
+          <View style={[styles.cardHeader, { flexWrap: "wrap", gap: 8 }]}>
             <View>
               <Text style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}>
                 {t('vendor.salesOverview')}
@@ -1172,7 +1284,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 {t('vendor.revenueChart')}
               </Text>
             </View>
-            <View style={styles.tabRow}>
+            <View style={[styles.tabRow, { flexShrink: 0 }]}>
               {STAT_TABS.map((t, i) => (
                 <TouchableOpacity
                   key={t}
@@ -1181,7 +1293,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                     styles.tabPill,
                     currIndex === i && styles.tabPillActive,
                     {
-                      paddingHorizontal: rs(8, 10, 12),
+                      paddingHorizontal: rs(20, 24, 28),
                       paddingVertical: rs(4, 5, 6),
                     },
                   ]}
@@ -1265,9 +1377,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           style={[
             styles.twoCol,
             {
-              marginHorizontal: rs(12, 14, 16),
-              marginTop: rs(10, 12, 14),
-              gap: rs(8, 10, 12),
+              marginHorizontal: rs(20, 24, 28),
+              marginTop: rs(20, 22, 24),
+              gap: rs(10, 12, 14),
             },
           ]}
         >
@@ -1276,6 +1388,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             style={[
               styles.card,
               { flex: 1, marginHorizontal: 0, marginTop: 0 },
+              SCREEN_W < 768 && { alignItems: "center" },
             ]}
           >
             <Text style={[styles.cardTitle, { fontSize: rs(13, 14, 15), marginBottom: 12 }]}>
@@ -1298,8 +1411,8 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 </Text>
               </View>
             </View>
-            <View style={{ gap: 8, marginTop: 12 }}>
-              <View style={styles.goalRow}>
+            <View style={{ gap: 8, marginTop: 12, alignItems: SCREEN_W >= 768 ? "stretch" : "center" }}>
+              <View style={[styles.goalRow, SCREEN_W < 768 && { justifyContent: "center" }]}>
                 <View
                   style={[styles.goalDot, { backgroundColor: C.primary }]}
                 />
@@ -1310,7 +1423,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                   {stats.monthly.totalOrders}
                 </Text>
               </View>
-              <View style={styles.goalRow}>
+              <View style={[styles.goalRow, SCREEN_W < 768 && { justifyContent: "center" }]}>
                 <View style={[styles.goalDot, { backgroundColor: C.blue }]} />
                 <Text style={[styles.goalLabel, { fontSize: rs(10, 11, 11) }]}>
                   Today
@@ -1327,6 +1440,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             style={[
               styles.card,
               { flex: 1, marginHorizontal: 0, marginTop: 0 },
+              SCREEN_W < 768 && { alignItems: "center" },
             ]}
           >
             <Text
@@ -1407,7 +1521,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         <View
           style={[
             styles.card,
-            { marginHorizontal: rs(12, 14, 16), marginTop: rs(10, 12, 14) },
+            { marginHorizontal: rs(20, 24, 28), marginTop: rs(20, 22, 24) },
           ]}
         >
           <View style={styles.cardHeader}>
@@ -1460,7 +1574,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         <View
           style={[
             styles.card,
-            { marginHorizontal: rs(12, 14, 16), marginTop: rs(10, 12, 14) },
+            { marginHorizontal: rs(20, 24, 28), marginTop: rs(20, 22, 24) },
           ]}
         >
           <View style={styles.cardHeader}>
@@ -1497,7 +1611,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         <View
           style={[
             styles.card,
-            { marginHorizontal: rs(12, 14, 16), marginTop: rs(10, 12, 14) },
+            { marginHorizontal: rs(20, 24, 28), marginTop: rs(20, 22, 24) },
           ]}
         >
           <View style={styles.cardHeader}>
@@ -1742,7 +1856,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             </View>
 
             {searchLoading ? (
-              <ActivityIndicator color={C.primary} style={{ marginTop: 40 }} />
+              <ActivityIndicator color={C.primary} style={{ marginTop: rs(20, 22, 24) }} />
             ) : searchResults.length > 0 ? (
               <FlatList
                 data={searchResults}
@@ -1944,7 +2058,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                             style={{
                               fontSize: 11,
                               color: C.textSub,
-                              marginTop: 2,
+                              marginTop: 8,
                             }}
                             numberOfLines={1}
                           >
@@ -2050,7 +2164,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           <TouchableOpacity
             style={[
               styles.ctaBtn,
-              { marginTop: 16, alignSelf: "stretch", justifyContent: "center" },
+              { marginTop: 20, alignSelf: "stretch", justifyContent: "center" },
             ]}
             onPress={() => {
               setLocModalVisible(false);
@@ -2061,7 +2175,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             <Text style={styles.ctaBtnText}>Edit in Store Settings</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={{ marginTop: 12, alignSelf: "center" }}
+            style={{ marginTop: 18, alignSelf: "center" }}
             onPress={() => setLocModalVisible(false)}
           >
             <Text style={{ color: C.textSub, fontSize: 14 }}>Close</Text>
@@ -2154,39 +2268,41 @@ function MiniMetricCard({ label, value, icon, iconColor, iconBg, rs }) {
     <View
       style={[
         styles.miniCard,
-        { padding: rs(10, 11, 12), borderRadius: rs(12, 13, 14) },
+        { padding: rs(12, 14, 16), borderRadius: rs(14, 16, 18) },
       ]}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
         <View
           style={[
             styles.miniIcon,
             {
-              width: rs(28, 30, 32),
-              height: rs(28, 30, 32),
-              borderRadius: rs(8, 9, 10),
+              width: rs(24, 26, 28),
+              height: rs(24, 26, 28),
+              borderRadius: rs(12, 13, 14),
               backgroundColor: iconBg,
+              flexShrink: 0,
             },
           ]}
         >
-          <MaterialIcons name={icon} size={rs(14, 15, 16)} color={iconColor} />
+          <MaterialIcons name={icon} size={rs(12, 13, 14)} color={iconColor} />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.miniLabel, { fontSize: rs(9, 10, 10) }]}>
-            {label}
-          </Text>
-          <Text
-            style={[
-              styles.miniValue,
-              { fontSize: rs(13, 14, 15), color: iconColor },
-            ]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-          >
-            {value}
-          </Text>
-        </View>
+        <Text
+          style={[styles.miniLabel, { fontSize: rs(9, 9.5, 10), flex: 1 }]}
+          numberOfLines={2}
+        >
+          {label}
+        </Text>
       </View>
+      <Text
+        style={[
+          styles.miniValue,
+          { fontSize: rs(14, 15, 16), color: iconColor },
+        ]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+      >
+        {value}
+      </Text>
     </View>
   );
 }
@@ -2204,7 +2320,7 @@ function ProductRow({ rank, name, sold, revenue, tag, image, rs }) {
           {
             width: rs(38, 42, 46),
             height: rs(38, 42, 46),
-            borderRadius: rs(10, 11, 12),
+            borderRadius: rs(14, 16, 18),
           },
         ]}
       />
@@ -2219,7 +2335,7 @@ function ProductRow({ rank, name, sold, revenue, tag, image, rs }) {
           {sold} units sold
         </Text>
       </View>
-      <View style={{ alignItems: "flex-end", gap: 4 }}>
+      <View style={{ alignItems: "flex-end", gap: rs(10, 12, 14) }}>
         <Text style={[styles.productRevenue, { fontSize: rs(12, 13, 14) }]}>
           ₹{Number(revenue).toLocaleString()}
         </Text>
@@ -2643,12 +2759,12 @@ const styles = StyleSheet.create({
   // ── Greeting ──
   greetingCard: {
     backgroundColor: C.surface,
-    borderRadius: 20,
+    borderRadius: 24,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
-    shadowRadius: 16,
+    shadowRadius: 20,
     elevation: 4,
   },
   greetingBlobTop: {
@@ -2703,6 +2819,7 @@ const styles = StyleSheet.create({
   // ── Hero ──
   heroCard: {
     backgroundColor: C.accent,
+    borderRadius: 22,
     shadowColor: C.accent,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
@@ -2793,8 +2910,8 @@ const styles = StyleSheet.create({
   // ── Card ──
   card: {
     backgroundColor: C.surface,
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 22,
+    padding: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
@@ -2805,7 +2922,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 4,
+    marginBottom: 8,
   },
   cardOverline: {
     color: C.textLight,
@@ -3037,8 +3154,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     backgroundColor: C.primary,
-    paddingVertical: 15,
-    paddingHorizontal: 32,
+    paddingVertical: 16,
+    paddingHorizontal: 34,
     borderRadius: 999,
   },
   ctaBtnText: { color: "#000", fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", fontSize: 15 },

@@ -5,7 +5,7 @@ const webShadow = (shadow) => Platform.OS === 'web' ? shadow : {};
 export const shadows = {
   sm: {
     ...Platform.select({
-      web: { boxShadow: '0px 1px 4px rgba(0,0,0,0.05)' },
+      web: { boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.05)' },
       default: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
