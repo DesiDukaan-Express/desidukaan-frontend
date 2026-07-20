@@ -22,7 +22,6 @@ import { MaterialIcons, Feather } from "@expo/vector-icons";
 import { io } from "socket.io-client";
 import useOrderSound from "../../hooks/useOrderSound";
 import { useRoute } from "@react-navigation/native";
-import { useTranslation } from "react-i18next";
 
 const { width } = Dimensions.get("window");
 
@@ -33,7 +32,6 @@ const SOCKET_URL =
   process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
 export default function VendorOrdersScreen() {
-  const { t } = useTranslation();
   const { token } = useAuthStore();
   const { playOrderSound } = useOrderSound();
 
@@ -467,13 +465,6 @@ export default function VendorOrdersScreen() {
     fetchHistory();
   }, [token]);
 
-  // ── Timer: force re-render every 60s so isOlderThan1Min moves pending orders ──
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 60000);
-    return () => clearInterval(id);
-  }, []);
-
   // Socket setup for real-time negotiation
   useEffect(() => {
     if (!token) return;
@@ -629,7 +620,7 @@ export default function VendorOrdersScreen() {
 
       if (res.ok && result.success) {
         // ── 1. Instantly update the orders LIST so the card re-renders NOW ──
-        if (status === "rejected" || status === "cancelled" || status === "delivered") {
+        if (status === "rejected" || status === "cancelled" || status === "delivered" || status === "expired") {
           // Remove from active list immediately — these go to history
           setOrders((prev) => {
             console.log('[updateOrderStatus] removing order from list, prev length:', prev.length);
@@ -838,30 +829,16 @@ export default function VendorOrdersScreen() {
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
-  // Groups a flat order array by customer name, sorted by most recent activity
+  // Groups a flat order array by customer name
   const groupByCustomer = (orders) => {
     const map = {};
     orders.forEach((order) => {
       const key = order.customer?.name || `Customer #${order.customer_id}`;
-      if (!map[key]) map[key] = { name: key, orders: [], total: 0, latestAt: null };
+      if (!map[key]) map[key] = { name: key, orders: [], total: 0 };
       map[key].orders.push(order);
       map[key].total += order.total || 0;
-      // Track the most recent order timestamp for this customer group
-      const orderTime = order.created_at ? new Date(order.created_at) : null;
-      if (orderTime && (!map[key].latestAt || orderTime > new Date(map[key].latestAt))) {
-        map[key].latestAt = order.created_at;
-      }
     });
-    return Object.values(map)
-      .map(group => ({
-        ...group,
-        // Sort individual orders within each group by most recent first
-        orders: [...group.orders].sort((a, b) =>
-          new Date(b.created_at || 0) - new Date(a.created_at || 0)
-        ),
-      }))
-      // Sort customer groups by the most recent order across all their orders
-      .sort((a, b) => new Date(b.latestAt || 0) - new Date(a.latestAt || 0));
+    return Object.values(map).sort((a, b) => b.orders.length - a.orders.length);
   };
 
   const groupPhoneRequestsByCustomer = (phones) => {
@@ -925,7 +902,7 @@ export default function VendorOrdersScreen() {
       {/* ── HEADER ── */}
       <View style={styles.screenHeader}>
         <View>
-          <Text style={styles.screenTitle}>{t('vendor.orders')}</Text>
+          <Text style={styles.screenTitle}>Orders</Text>
           <Text style={styles.screenSubtitle}>
             Manage incoming & active orders
           </Text>
@@ -999,7 +976,7 @@ export default function VendorOrdersScreen() {
               activeTab === "orders" && styles.activeTabText,
             ]}
           >
-            {t('vendor.activeOrders')}
+            Active
           </Text>
           {orders.length > 0 && (
             <View style={styles.badge}>
@@ -1018,12 +995,12 @@ export default function VendorOrdersScreen() {
               activeTab === "requests" && styles.activeTabText,
             ]}
           >
-            {t('vendor.requests')}
+            Requests
           </Text>
-          {requests.phones.length + requests.slots.length > 0 && (
+          {(orders.filter((o) => o.status === "pending" || o.status === "countered").length + requests.phones.filter((p) => p.status === "pending").length + requests.slots.filter((s) => s.status === "pending").length) > 0 && (
             <View style={[styles.badge, { backgroundColor: "#D97706" }]}>
               <Text style={styles.badgeText}>
-                {requests.phones.length + requests.slots.length}
+                {orders.filter((o) => o.status === "pending" || o.status === "countered").length + requests.phones.filter((p) => p.status === "pending").length + requests.slots.filter((s) => s.status === "pending").length}
               </Text>
             </View>
           )}
@@ -1039,7 +1016,7 @@ export default function VendorOrdersScreen() {
               activeTab === "history" && styles.activeTabText,
             ]}
           >
-            {t('vendor.history')}
+            History
           </Text>
           {historyTotal > 0 && (
             <View style={[styles.badge, { backgroundColor: "#6B7280" }]}>
@@ -1060,15 +1037,20 @@ export default function VendorOrdersScreen() {
               ? [
                   ...orders
                     .filter((o) => o.status === "pending" || o.status === "countered")
-                    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
                     .map((o) => ({ ...o, type: "order_request" })),
-                  ...groupPhoneRequestsByCustomer(requests.phones).map((g) => ({
+                  ...groupPhoneRequestsByCustomer(
+                    requests.phones.filter((p) => p.status === "pending")
+                  ).map((g) => ({
                     ...g,
                     type: "phone_group",
                   })),
-                  ...requests.slots.map((s) => ({ ...s, type: "slot" })),
+                  ...requests.slots
+                    .filter((s) => s.status === "pending")
+                    .map((s) => ({ ...s, type: "slot" })),
                 ]
-              : groupByCustomer(history)
+              : groupByCustomer([
+                  ...history,
+                ])
         }
         contentContainerStyle={{
           paddingHorizontal: 16,
@@ -1104,7 +1086,7 @@ export default function VendorOrdersScreen() {
               <Text
                 style={{ marginTop: 12, color: "#6B7280", fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}
               >
-                {t('vendor.noRequests')}
+                No pending requests
               </Text>
             </View>
           ) : activeTab === "history" ? (
@@ -1143,12 +1125,15 @@ export default function VendorOrdersScreen() {
                 </View>
               </View>
 
-              {item.orders.map((order, idx) => (
+              {item.orders.map((order, idx) => {
+                const isOldPending = order._oldPending || order.status === "pending" || order.status === "countered";
+                return (
                 <View
                   key={order.id}
                   style={[
                     styles.historyOrderRow,
                     idx === item.orders.length - 1 && { borderBottomWidth: 0 },
+                    isOldPending && { backgroundColor: "#FFFBEB" },
                   ]}
                 >
                   <View style={{ flex: 1 }}>
@@ -1174,6 +1159,9 @@ export default function VendorOrdersScreen() {
                           order.status === "rejected" && {
                             backgroundColor: "#FEE2E2",
                           },
+                          isOldPending && {
+                            backgroundColor: "#FEF3C7",
+                          },
                         ]}
                       >
                         <Text
@@ -1186,9 +1174,10 @@ export default function VendorOrdersScreen() {
                               color: "#DC2626",
                             },
                             order.status === "rejected" && { color: "#DC2626" },
+                            isOldPending && { color: "#D97706" },
                           ]}
                         >
-                          {formatStatus(order.status)}
+                          {isOldPending ? "Awaiting Response" : formatStatus(order.status)}
                         </Text>
                       </View>
                     </View>
@@ -1201,9 +1190,30 @@ export default function VendorOrdersScreen() {
                       {formatOrderTime(order.created_at)}
                     </Text>
                   </View>
-                  <Text style={styles.historyOrderTotal}>₹{order.total}</Text>
+                  <View style={{ alignItems: "flex-end", gap: 6 }}>
+                    <Text style={styles.historyOrderTotal}>₹{order.total}</Text>
+                    {isOldPending && (
+                      <View style={{ flexDirection: "row", gap: 6 }}>
+                        <TouchableOpacity
+                          style={[styles.actionBtn, styles.rejectBtn, { paddingHorizontal: 10, paddingVertical: 6 }]}
+                          onPress={() => updateOrderStatus(order.id, "rejected")}
+                        >
+                          <Text style={[styles.rejectBtnText, { fontSize: 11 }]}>Reject</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.actionBtn, styles.approveBtn, { paddingHorizontal: 10, paddingVertical: 6 }]}
+                          onPress={() => {
+                            updateOrderStatus(order.id, "accepted");
+                          }}
+                        >
+                          <Text style={[styles.approveBtnText, { fontSize: 11 }]}>Accept</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
                 </View>
-              ))}
+                );
+              })}
             </View>
           ) : activeTab === "orders" ? (
             <View style={styles.customerGroupCard}>
@@ -1510,6 +1520,80 @@ export default function VendorOrdersScreen() {
                   )}
                 </View>
               ))}
+            </View>
+          ) : item.type === "phone_request" ? (
+            <View style={[styles.requestCard, { backgroundColor: "#FFFBEB" }]}>
+              <View style={styles.requestHeader}>
+                <View style={[styles.requestIcon, { backgroundColor: "#FEF3C7" }]}>
+                  <MaterialIcons name="phone" size={20} color="#D97706" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.requestTitle, { color: "#D97706" }]}>
+                    Phone Request (Expired)
+                  </Text>
+                  <Text style={styles.requestCustomer}>
+                    {item.customer?.name || `Customer #${item.customer_id}`}
+                  </Text>
+                </View>
+                <Text style={styles.orderTime}>
+                  {formatOrderTime(item.created_at)}
+                </Text>
+              </View>
+              <View style={styles.requestActions}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.rejectBtn, { paddingHorizontal: 10, paddingVertical: 6 }]}
+                  onPress={() => handlePhoneRequest(item.id, "rejected")}
+                >
+                  <Text style={[styles.rejectBtnText, { fontSize: 11 }]}>Reject</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.approveBtn, { paddingHorizontal: 10, paddingVertical: 6 }]}
+                  onPress={() => handlePhoneRequest(item.id, "approved")}
+                >
+                  <Text style={[styles.approveBtnText, { fontSize: 11 }]}>Approve</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : item.type === "slot_request" ? (
+            <View style={[styles.requestCard, { backgroundColor: "#FFFBEB" }]}>
+              <View style={styles.requestHeader}>
+                <View style={[styles.requestIcon, { backgroundColor: "#FEF3C7" }]}>
+                  <MaterialIcons name="schedule" size={20} color="#D97706" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.requestTitle, { color: "#D97706" }]}>
+                    Slot Request (Expired)
+                  </Text>
+                  <Text style={styles.requestCustomer}>
+                    {item.customer?.name || `Customer #${item.customer_id}`}
+                  </Text>
+                </View>
+                <Text style={styles.orderTime}>
+                  {formatOrderTime(item.created_at)}
+                </Text>
+              </View>
+              {item.slot_start && (
+                <View style={styles.requestDetails}>
+                  <Text style={styles.slotRange}>
+                    {new Date(item.slot_start || item.start).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{" - "}
+                    {new Date(item.slot_end || item.end).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.requestActions}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.rejectBtn, { paddingHorizontal: 10, paddingVertical: 6 }]}
+                  onPress={() => handleSlotRequest(item.id, "reject")}
+                >
+                  <Text style={[styles.rejectBtnText, { fontSize: 11 }]}>Reject</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.approveBtn, { paddingHorizontal: 10, paddingVertical: 6 }]}
+                  onPress={() => handleSlotRequest(item.id, "confirm")}
+                >
+                  <Text style={[styles.approveBtnText, { fontSize: 11 }]}>Approve</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : (
             <View style={styles.requestCard}>
