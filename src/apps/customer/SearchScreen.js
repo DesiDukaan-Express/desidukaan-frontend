@@ -12,7 +12,7 @@ import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
-import { categoriesAPI, searchAPI, vendorsAPI } from "../../services/api";
+import { categoriesAPI, searchAPI, vendorsAPI, inventoryAPI, productsAPI } from "../../services/api";
  
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const NEARBY_RADIUS = 10;   // km — stores within this are shown normally

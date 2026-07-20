@@ -72,6 +72,8 @@ export const authAPI = {
   sendOTP: (phone) => request("POST", "/auth/login", { phone }),
 
   verifyOTP: (phone, code, role) => request("POST", "/auth/verify", { phone, code, role }),
+
+  updateProfile: (data, token) => request("PUT", "/auth/me", data, token),
 };
 
 // ─── Upload ───────────────────────────────────────────────────────────────────
@@ -127,6 +129,34 @@ export const uploadAPI = {
   },
 };
 
+// ─── Products ─────────────────────────────────────────────────────────────────
+export const productsAPI = {
+  getPopular: (lat, lng, radius_km = 10, limit = 12, token) =>
+    request("GET", `/products/popular?lat=${lat}&lng=${lng}&radius_km=${radius_km}&limit=${limit}`, null, token),
+  getVendors: (productId, token) =>
+    request("GET", `/products/${productId}/vendors`, null, token),
+};
+
+// ─── Inventory ────────────────────────────────────────────────────────────────
+export const inventoryAPI = {
+  getVendorInventory: (vendorId, token) =>
+    request("GET", `/inventory/vendor/${vendorId}`, null, token),
+};
+
+// ─── Slots ────────────────────────────────────────────────────────────────────
+export const slotsAPI = {
+  getDeliveryInfo: (params, token) =>
+    request("GET", `/slots/delivery-info?${params}`, null, token),
+  requestPhone: (vendorId, token) =>
+    request("POST", "/slots/phone-request", { vendor_id: vendorId }, token),
+};
+
+// ─── Payments ─────────────────────────────────────────────────────────────────
+export const paymentsAPI = {
+  verifyUpi: (upiId, token) =>
+    request("POST", "/payments/verify-upi", { upi_id: upiId }, token),
+};
+
 // ─── Categories ───────────────────────────────────────────────────────────────
 export const categoriesAPI = {
   getAll: () => request("GET", "/products/categories"),
@@ -164,7 +194,9 @@ export const ordersAPI = {
   getById:         (id, token)                    => request("GET",   `/orders/${id}`,           null,    token),
   getVendorActive: (token)                        => request("GET",   "/orders/vendor/active",   null,    token),
   getVendorHistory:(token)                        => request("GET",   "/orders/vendor/history",  null,    token),
-  updateStatus:    (id, status, token, reason="") => request("PATCH", `/orders/${id}/status`, { status, reason }, token),
+  updateStatus:      (id, status, token, reason="") => request("PATCH", `/orders/${id}/status`, { status, reason }, token),
+  respondCounter:    (id, action, token)            => request("PATCH", `/orders/${id}/respond-counter`, { action }, token),
+  submitReview:      (id, rating, comment, token)   => request("POST",  `/orders/${id}/review`, { vendor_rating: rating, comment }, token),
 };
 
 // ─── Delivery ─────────────────────────────────────────────────────────────────

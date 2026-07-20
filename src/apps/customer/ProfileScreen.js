@@ -13,6 +13,7 @@ import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
+import { authAPI } from "../../services/api";
  
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
  

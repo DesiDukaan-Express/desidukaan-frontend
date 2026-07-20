@@ -27,7 +27,7 @@ import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import { useNavigation } from "@react-navigation/native";
-import { vendorsAPI, ordersAPI, categoriesAPI } from "../../services/api";
+import { vendorsAPI, ordersAPI, categoriesAPI, productsAPI, inventoryAPI } from "../../services/api";
 import ChatWidget from "./ChatWidget";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 

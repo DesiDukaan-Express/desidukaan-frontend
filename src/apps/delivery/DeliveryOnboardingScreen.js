@@ -327,13 +327,13 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
     const token = useAuthStore((state) => state.token);
     const login = useAuthStore((state) => state.login);
 
-    const [form, setForm]             = useState(INITIAL_FORM);
-    const [errors, setErrors]         = useState({});
-    const [errorMsg, setErrorMsg]     = useState(null);  // top-level error banner
-    const [successMsg, setSuccessMsg] = useState(null);  // success banner
+    const [form, setForm]           = useState(INITIAL_FORM);
+    const [errors, setErrors]       = useState({});
     const [submitting, setSubmitting] = useState(false);
     // uploading: null | 'profile' | 'license' | 'rc'
-    const [uploading, setUploading]   = useState(null);
+    const [uploading, setUploading] = useState(null);
+    const [errorMsg, setErrorMsg]     = useState(null);
+    const [successMsg, setSuccessMsg] = useState(null);
 
     // Generic nested field setter — also clears that field's error
     const setField = (section, key, value) => {

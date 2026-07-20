@@ -24,6 +24,7 @@ import useAuthStore from "../../store/authStore";
 import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
 import useOrderStore from "../../store/orderStore";
+import { vendorsAPI, ordersAPI, slotsAPI, paymentsAPI } from "../../services/api";
 
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";

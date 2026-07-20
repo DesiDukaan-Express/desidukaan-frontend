@@ -21,6 +21,7 @@ import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import { TextInput, Alert } from "react-native";
+import { ordersAPI } from "../../services/api";
 
 const SOCKET_URL =
   process.env.EXPO_PUBLIC_SOCKET_URL ||

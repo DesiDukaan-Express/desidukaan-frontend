@@ -54,7 +54,7 @@ export default function VendorOrdersScreen() {
 
   const route = useRoute?.() || {};
   const [activeTab, setActiveTab] = useState(
-    route.params?.initialTab || "orders",
+    route.params?.initialTab || "requests",
   );
   const [requests, setRequests] = useState({ phones: [], slots: [] });
   const [loadingRequests, setLoadingRequests] = useState(false);
@@ -434,8 +434,8 @@ export default function VendorOrdersScreen() {
       );
       const result = await res.json();
       if (result.success) {
-        const orders = result.data?.data || result.data?.orders || [];
-        setHistoryTotal(result.data?.total || 0);
+        const orders = Array.isArray(result.data) ? result.data : (result.data?.orders || []);
+        setHistoryTotal(result.pagination?.total || 0);
         if (page === 1) {
           setHistory(orders);
         } else {
@@ -459,9 +459,17 @@ export default function VendorOrdersScreen() {
   }, [fetchRequests]);
 
   useEffect(() => {
+    if (!token) return;
     fetchOrders();
     fetchRequests();
     fetchHistory();
+  }, [token]);
+
+  // ── Timer: force re-render every 60s so isOlderThan1Min moves pending orders ──
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(id);
   }, []);
 
   // Socket setup for real-time negotiation

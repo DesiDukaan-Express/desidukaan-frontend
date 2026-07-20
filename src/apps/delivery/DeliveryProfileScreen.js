@@ -72,7 +72,9 @@ function SectionCard({ title, children }) {
 }
 
 export default function DeliveryProfileScreen({ navigation }) {
-  const { token, user, logout } = useAuthStore();
+  const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
 
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_500Medium,

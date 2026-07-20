@@ -120,7 +120,7 @@ export default function DeliveryPendingScreen({ onRefresh, refreshing }) {
         </TouchableOpacity>
 
         {/* Logout */}
-        <TouchableOpacity onPress={logout} activeOpacity={0.7} style={s.logoutBtn}>
+        <TouchableOpacity onPress={() => logout?.()} activeOpacity={0.7} style={s.logoutBtn}>
           <Text style={s.logoutTxt}>Sign out</Text>
         </TouchableOpacity>
 

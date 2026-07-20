@@ -8,6 +8,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
+import { ordersAPI, deliveryAPI } from "../../services/api";
 
 const BASE_URL   = process.env.EXPO_PUBLIC_API_URL    || "http://localhost:3000/api";
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || (BASE_URL.includes('/api') ? BASE_URL.split('/api')[0] : "http://localhost:3000");

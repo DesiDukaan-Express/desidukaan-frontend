@@ -255,6 +255,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               body: "Tap to go to Orders and respond.",
               time: "Just now",
               read: false,
+              action: "requests",
             });
           }
 
@@ -265,6 +266,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               body: "Check your inventory before accepting more orders.",
               time: "Today",
               read: false,
+              action: "inventory",
             });
           }
 
@@ -275,6 +277,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               body: `${s.today_orders} orders completed successfully.`,
               time: "Today",
               read: true,
+              action: "orders",
             });
           }
         }
@@ -1653,7 +1656,11 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                   item={item}
                   onPress={(action) => {
                     setNotifVisible(false);
-                    navigation.navigate("Orders", { initialTab: action });
+                    if (action === "inventory") {
+                      navigation.navigate("Inventory");
+                    } else {
+                      navigation.navigate("Orders", { initialTab: action });
+                    }
                   }}
                 />
               )}
