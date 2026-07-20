@@ -17,6 +17,21 @@ import useAuthStore from '../../store/authStore';
 const API_BASE   = process.env.EXPO_PUBLIC_API_URL    || 'http://localhost:3000/api';
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3000';
 
+// ── Relative time helper ("2m ago", "30m ago", "1h ago") ─────────────────────
+function timeAgo(dateString) {
+  if (!dateString) return '';
+  const now = Date.now();
+  const then = new Date(dateString).getTime();
+  const diffSec = Math.floor((now - then) / 1000);
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay}d ago`;
+}
+
 const C = {
   bg:           '#F2F2F7',
   white:        '#FFFFFF',
@@ -115,6 +130,7 @@ const sp = StyleSheet.create({
 function QueueCard({ order, onAccept, onDecline, isAccepting }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
+  const [elapsed, setElapsed] = useState(timeAgo(order.queuedAt));
 
   useEffect(() => {
     Animated.parallel([
@@ -122,6 +138,12 @@ function QueueCard({ order, onAccept, onDecline, isAccepting }) {
       Animated.spring(slideAnim, { toValue: 0, tension: 60, friction: 10, useNativeDriver: true }),
     ]).start();
   }, []);
+
+  // Update elapsed time every 15 seconds
+  useEffect(() => {
+    const id = setInterval(() => setElapsed(timeAgo(order.queuedAt)), 15000);
+    return () => clearInterval(id);
+  }, [order.queuedAt]);
 
   return (
     <Animated.View style={[qc.card, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
@@ -131,9 +153,16 @@ function QueueCard({ order, onAccept, onDecline, isAccepting }) {
           <Text style={qc.orderNum}>{order.orderNumber}</Text>
           <Text style={qc.orderSub}>New delivery request</Text>
         </View>
-        <View style={qc.newPill}>
-          <View style={qc.newDot} />
-          <Text style={qc.newPillText}>LIVE</Text>
+        <View style={qc.headerRight}>
+          {elapsed ? (
+            <View style={qc.timePill}>
+              <Text style={qc.timePillText}>{elapsed}</Text>
+            </View>
+          ) : null}
+          <View style={qc.newPill}>
+            <View style={qc.newDot} />
+            <Text style={qc.newPillText}>LIVE</Text>
+          </View>
         </View>
       </View>
 
@@ -216,6 +245,9 @@ const qc = StyleSheet.create({
   header:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
   orderNum:      { fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray900 },
   orderSub:      { fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: C.gray400, marginTop: 2 },
+  headerRight:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  timePill:      { flexDirection: 'row', alignItems: 'center', backgroundColor: C.amberLight, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
+  timePillText:  { fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', color: C.amberText },
   newPill:       { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.greenLight, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
   newDot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green },
   newPillText:   { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.greenText, letterSpacing: 0.8 },
@@ -350,6 +382,20 @@ export default function QueueScreen({ navigation }) {
 
     return () => { socket.disconnect(); socketRef.current = null; };
   }, [token]);
+
+  // Auto-expire queued orders after 5 minutes
+  useEffect(() => {
+    if (queue.length === 0) return;
+    const QUEUE_EXPIRY_MS = 5 * 60 * 1000;
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setQueue(prev => prev.filter(o => {
+        const age = now - new Date(o.queuedAt || Date.now()).getTime();
+        return age < QUEUE_EXPIRY_MS;
+      }));
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [queue.length]);
 
   const handleAccept = async (orderId) => {
     setAcceptingId(orderId);
