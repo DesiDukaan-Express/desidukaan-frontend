@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import NetInfo, { useNetInfo } from "@react-native-community/netinfo";
 import { View, StyleSheet, Platform, AppState } from "react-native";
-import OfflineScreen from "../components/OfflineScreen.jsx";
+import OfflineScreen from "../components/OfflineScreen";
 
 if (Platform.OS !== "web") {
   NetInfo.configure({
