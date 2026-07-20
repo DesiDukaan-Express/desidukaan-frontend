@@ -801,7 +801,81 @@ function AvailableOrderCard({ order, onAccept }) {
   );
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ── Queued Order Card ──
+function QueuedOrderCard({ order, onAccept, isAccepting }) {
+  const [elapsed, setElapsed] = useState('');
+
+  useEffect(() => {
+    const updateElapsed = () => {
+      if (!order.assignedAt) return '';
+      const diff = Math.floor((Date.now() - new Date(order.assignedAt).getTime()) / 1000);
+      if (diff < 60) return `${diff}s ago`;
+      const min = Math.floor(diff / 60);
+      if (min < 60) return `${min}m ago`;
+      const hr = Math.floor(min / 60);
+      return `${hr}h ago`;
+    };
+    setElapsed(updateElapsed());
+    const id = setInterval(() => setElapsed(updateElapsed()), 15000);
+    return () => clearInterval(id);
+  }, [order.assignedAt]);
+
+  return (
+    <View style={qoc.card}>
+      <View style={qoc.top}>
+        <View style={qoc.topLeft}>
+          <Text style={qoc.orderId}>{order.orderNumber}</Text>
+          <Text style={qoc.timeText}>{elapsed}</Text>
+        </View>
+        <View style={qoc.badge}>
+          <Text style={qoc.badgeText}>Queued</Text>
+        </View>
+      </View>
+      <View style={qoc.routeRow}>
+        <View style={[qoc.dot, { backgroundColor: C.blue }]} />
+        <Text style={qoc.routeText} numberOfLines={1}>{order.pickup?.shop_name || '\u2014'}</Text>
+        <View style={qoc.routeLine} />
+        <View style={[qoc.dot, { backgroundColor: C.red }]} />
+        <Text style={qoc.routeText} numberOfLines={1}>{order.dropoff?.city || order.dropoff?.address_line || '\u2014'}</Text>
+      </View>
+      <View style={qoc.bottom}>
+        <Text style={qoc.meta}>{'\u20B9'}{order.total} · {order.itemCount} items</Text>
+        <TouchableOpacity
+          style={[qoc.btn, isAccepting && { opacity: 0.6 }]}
+          onPress={() => onAccept(order.orderId)}
+          disabled={isAccepting}
+          activeOpacity={0.85}
+        >
+          {isAccepting ? (
+            <ActivityIndicator size="small" color={C.white} />
+          ) : (
+            <Text style={qoc.btnText}>Accept</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const qoc = StyleSheet.create({
+  card: { backgroundColor: C.white, borderRadius: 16, padding: 14, marginHorizontal: 16, marginBottom: 10, borderWidth: 1, borderColor: C.border },
+  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  topLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  orderId: { fontSize: 13, fontWeight: '700', color: C.textPrimary },
+  timeText: { fontSize: 11, fontWeight: '600', color: '#F59E0B' },
+  badge: { backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
+  badgeText: { fontSize: 10, fontWeight: '700', color: '#92400E' },
+  routeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  dot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
+  routeText: { fontSize: 12, fontWeight: '500', color: C.textPrimary, flexShrink: 1, maxWidth: '38%' },
+  routeLine: { flex: 1, height: 1, backgroundColor: C.border },
+  bottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  meta: { fontSize: 11, fontWeight: '500', color: C.textLight, flex: 1 },
+  btn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, backgroundColor: C.primary },
+  btnText: { fontSize: 12, color: C.white, fontWeight: '700' },
+});
+
+// ── Main Component ──
 export default function ActiveDeliveryScreen({ navigation }) {
   const { token, user } = useAuthStore();
 
@@ -815,7 +889,17 @@ export default function ActiveDeliveryScreen({ navigation }) {
   const [earnings, setEarnings]               = useState(0);
   const [incomingOrder, setIncomingOrder]     = useState(null);
   const [step, setStep]                       = useState(0);
+  const [queuedOrders, setQueuedOrders]       = useState([]);
+  const [flashMsg, setFlashMsg]               = useState(null);
+  const flashTimeoutRef = useRef(null);
   const socketRef = useRef(null);
+
+  // Flash toast auto-hide
+  const showFlash = (msg) => {
+    if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+    setFlashMsg(msg);
+    flashTimeoutRef.current = setTimeout(() => setFlashMsg(null), 4000);
+  };
 
 
   // -- AsyncStorage helpers: persist the local UI step per delivery --
@@ -832,7 +916,20 @@ export default function ActiveDeliveryScreen({ navigation }) {
   const clearStep = async (id) => {
     try { await AsyncStorage.removeItem(STEP_KEY(id)); } catch (_) {}
   };
-  // â”€â”€ Fetch & parse orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Fetch queued orders ──
+  const fetchQueuedOrders = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/delivery/queued`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.success && data.data.orders) {
+        setQueuedOrders(data.data.orders);
+      }
+    } catch (err) {
+      console.log('fetchQueuedOrders error', err);
+    }
+  };
+
+  // ── Fetch & parse orders ──
   const fetchOrders = async () => {
     try {
       const [actRes, avlRes] = await Promise.all([
@@ -884,7 +981,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
     }
   };
 
-  useFocusEffect(React.useCallback(() => { fetchOrders(); }, [token]));
+  useFocusEffect(React.useCallback(() => { fetchOrders(); fetchQueuedOrders(); }, [token]));
 
   useEffect(() => {
     if (user) {
@@ -895,17 +992,42 @@ export default function ActiveDeliveryScreen({ navigation }) {
       });
     }
     fetchOrders();
+    fetchQueuedOrders();
   }, [user]);
 
   useEffect(() => {
     if (!token) return;
     const socket = io(SOCKET_URL, { auth: { token }, transports: ['websocket'] });
     socketRef.current = socket;
-    socket.on('order:new', fetchOrders);
+    socket.on('order:new', () => { fetchOrders(); fetchQueuedOrders(); });
     socket.on('order:incoming', (data) => setIncomingOrder(data));
-    socket.on('delivery_status_update', fetchOrders);
+    socket.on('delivery_status_update', () => { fetchOrders(); fetchQueuedOrders(); });
+    socket.on('order:assigned_flash', (data) => {
+      const msg = data.isQueued
+        ? `Queued: ${data.shopName} \u00B7 ${data.itemCount} items \u00B7 \u20B9${data.total}`
+        : `New order: ${data.shopName} \u00B7 ${data.itemCount} items \u00B7 \u20B9${data.total}`;
+      showFlash(msg);
+      fetchQueuedOrders();
+    });
     return () => { socket.disconnect(); socketRef.current = null; };
   }, [token]);
+
+  // Auto-expire queued orders client-side (5 min timer)
+  useEffect(() => {
+    if (queuedOrders.length === 0) return;
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const QUEUE_EXPIRY_MS = 5 * 60 * 1000;
+      setQueuedOrders(prev => {
+        const stillValid = prev.filter(o => {
+          const age = now - new Date(o.assignedAt).getTime();
+          return age < QUEUE_EXPIRY_MS;
+        });
+        return stillValid;
+      });
+    }, 10000); // check every 10s
+    return () => clearInterval(interval);
+  }, [queuedOrders.length]);
 
   useEffect(() => {
   let sub; let active = true;
@@ -934,7 +1056,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
     try {
       const res  = await fetch(`${API_BASE}/delivery/accept/${orderId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
-      if (data.success) { fetchOrders(); }
+      if (data.success) { fetchOrders(); fetchQueuedOrders(); }
       else Alert.alert('Error', data.message);
     } catch (e) { console.log(e); }
   };
@@ -1093,6 +1215,14 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
         onDecline={() => setIncomingOrder(null)}
       />
 
+      {/* Flash Toast */}
+      {flashMsg ? (
+        <View style={flashStyles.toast}>
+          <MaterialIcons name="notifications-active" size={18} color="#fff" />
+          <Text style={flashStyles.text}>{flashMsg}</Text>
+        </View>
+      ) : null}
+
       <ScrollView
         style={styles.screen}
         contentContainerStyle={styles.content}
@@ -1135,6 +1265,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
 
         {/* â”€â”€ Active delivery stepper â”€â”€ */}
         {activeOrder ? (
+          <>
           <View style={styles.stepperWrap}>
             {/* Header */}
             <View style={styles.stepperHeader}>
@@ -1188,6 +1319,24 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
               />
             </View>
           </View>
+
+          {/* ── Queued Orders Section ── */}
+          {queuedOrders.length > 0 && (
+            <View style={{ marginTop: 12 }}>
+              <Text style={styles.sectionTitle}>
+                Queued orders ({queuedOrders.length})
+              </Text>
+              {queuedOrders.map(order => (
+                <QueuedOrderCard
+                  key={order.orderId}
+                  order={order}
+                  onAccept={handleAccept}
+                  isAccepting={false}
+                />
+              ))}
+            </View>
+          )}
+          </>
         ) : (
           <>
             <View style={styles.mapBox}>
@@ -1314,4 +1463,15 @@ const styles = StyleSheet.create({
   emptyBox:     { alignItems: 'center', paddingVertical: 40 },
   emptyEmoji:   { fontSize: 40, marginBottom: 10 },
   emptyText:    { fontSize: 14, fontWeight: '500', color: C.textLight },
+});
+
+const flashStyles = StyleSheet.create({
+  toast: {
+    position: 'absolute', top: Platform.OS === 'android' ? 40 : 60, left: 16, right: 16, zIndex: 999,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: '#1B5E20', paddingHorizontal: 16, paddingVertical: 14,
+    borderRadius: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2, shadowRadius: 8, elevation: 8,
+  },
+  text: { fontSize: 13, fontWeight: '700', color: '#fff', flex: 1 },
 });

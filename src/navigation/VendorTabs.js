@@ -2,6 +2,7 @@ import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { View, Text, StyleSheet, Platform } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
 
 import DashboardScreen from "../apps/vendor/DashboardScreen";
 import InventoryScreen from "../apps/vendor/InventoryScreen";
@@ -11,15 +12,17 @@ import VendorProfileScreen from "../apps/vendor/VendorProfileScreen";
 
 const Tab = createBottomTabNavigator();
 
-const TABS = [
-  { name: "Dashboard", icon: "bar-chart",    label: "Dashboard", component: DashboardScreen },
-  { name: "Inventory", icon: "inventory",    label: "Inventory", component: InventoryScreen },
-  { name: "Orders",    icon: "receipt-long", label: "Orders",    component: VendorOrdersScreen },
-  { name: "Earnings",  icon: "payments",     label: "Earnings",  component: EarningsScreen },
-  { name: "Profile",   icon: "person",       label: "Profile",   component: VendorProfileScreen },
-];
-
 export default function VendorTabs() {
+  const { t } = useTranslation();
+
+  const TABS = [
+    { name: "Dashboard", icon: "bar-chart",    label: t('vendor.dashboard'), component: DashboardScreen },
+    { name: "Inventory", icon: "inventory",    label: t('vendor.inventory'), component: InventoryScreen },
+    { name: "Orders",    icon: "receipt-long", label: t('vendor.orders'),    component: VendorOrdersScreen },
+    { name: "Earnings",  icon: "payments",     label: t('vendor.earnings'),  component: EarningsScreen },
+    { name: "Profile",   icon: "person",       label: t('profile.title'),    component: VendorProfileScreen },
+  ];
+
   return (
     <Tab.Navigator
   lazy={false}
@@ -34,8 +37,8 @@ export default function VendorTabs() {
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name={tab?.icon} size={22} color={color} />
           ),
-          tabBarLabel: ({ color, children }) => (
-            <Text style={[styles.label, { color }]}>{children}</Text>
+          tabBarLabel: ({ color }) => (
+            <Text style={[styles.label, { color }]}>{tab?.label}</Text>
           ),
         };
       }}

@@ -22,6 +22,7 @@ import { MaterialIcons, Feather } from "@expo/vector-icons";
 import { io } from "socket.io-client";
 import useOrderSound from "../../hooks/useOrderSound";
 import { useRoute } from "@react-navigation/native";
+import { useTranslation } from "react-i18next";
 
 const { width } = Dimensions.get("window");
 
@@ -32,6 +33,7 @@ const SOCKET_URL =
   process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
 export default function VendorOrdersScreen() {
+  const { t } = useTranslation();
   const { token } = useAuthStore();
   const { playOrderSound } = useOrderSound();
 
@@ -923,7 +925,7 @@ export default function VendorOrdersScreen() {
       {/* ── HEADER ── */}
       <View style={styles.screenHeader}>
         <View>
-          <Text style={styles.screenTitle}>Orders</Text>
+          <Text style={styles.screenTitle}>{t('vendor.orders')}</Text>
           <Text style={styles.screenSubtitle}>
             Manage incoming & active orders
           </Text>
@@ -997,7 +999,7 @@ export default function VendorOrdersScreen() {
               activeTab === "orders" && styles.activeTabText,
             ]}
           >
-            Active
+            {t('vendor.activeOrders')}
           </Text>
           {orders.length > 0 && (
             <View style={styles.badge}>
@@ -1016,7 +1018,7 @@ export default function VendorOrdersScreen() {
               activeTab === "requests" && styles.activeTabText,
             ]}
           >
-            Requests
+            {t('vendor.requests')}
           </Text>
           {requests.phones.length + requests.slots.length > 0 && (
             <View style={[styles.badge, { backgroundColor: "#D97706" }]}>
@@ -1037,7 +1039,7 @@ export default function VendorOrdersScreen() {
               activeTab === "history" && styles.activeTabText,
             ]}
           >
-            History
+            {t('vendor.history')}
           </Text>
           {historyTotal > 0 && (
             <View style={[styles.badge, { backgroundColor: "#6B7280" }]}>
@@ -1102,7 +1104,7 @@ export default function VendorOrdersScreen() {
               <Text
                 style={{ marginTop: 12, color: "#6B7280", fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}
               >
-                No pending requests
+                {t('vendor.noRequests')}
               </Text>
             </View>
           ) : activeTab === "history" ? (
