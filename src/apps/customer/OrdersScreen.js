@@ -2015,6 +2015,7 @@ const s = StyleSheet.create({
     color: C.gray900,
     fontWeight: "600",
     padding: 0,
+    outlineStyle: "none",
   },
   clearBtn: {
     padding: 4,
