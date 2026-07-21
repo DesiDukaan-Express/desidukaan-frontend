@@ -2063,6 +2063,10 @@ const dm = StyleSheet.create({
 export default function HomeScreen() {
   const { token, user } = useAuthStore();
   const navigation = useNavigation();
+  const goToSearch = () => {
+  const root = navigation.getParent?.() || navigation;
+  root.navigate('Search');
+};
   const addressStore = useAddressStore();
   const cart = useCartStore();
 
@@ -2423,9 +2427,9 @@ export default function HomeScreen() {
 
   // ── Address Handlers ────────────────────────────────────────────────────────
   const openAddressPicker = () => {
-    if (!selectedAddrId && addressStore?.addresses?.length > 0) {
-      setSelectedAddrId(addressStore.addresses[0].id);
-    }
+    // if (!selectedAddrId && addressStore?.addresses?.length > 0) {
+    //   setSelectedAddrId(addressStore.addresses[0].id);
+    // }
     setAddrPickerVisible(true);
   };
 
@@ -2441,8 +2445,10 @@ export default function HomeScreen() {
 
   const handleUseCurrentLocation = async () => {
     setAddrPickerVisible(false);
+    setSelectedAddrId(null);
+    addressStore?.setSelectedId?.(null);
     if (triggerRefetch) await triggerRefetch(true);
-  };
+};
 
 
   // ── Cart helpers — reads from cartStore, no local qty state ───────────────
@@ -2566,8 +2572,8 @@ export default function HomeScreen() {
     },
   ];
   const quickActions = [
-    { icon: "search", label: "Find Stores", onPress: () => navigation.navigate("Search") },
-    { icon: "shopping-bag", label: "Open Stores", onPress: () => navigation.navigate("Search") },
+    { icon: "search", label: "Find Stores", onPress: goToSearch },
+    { icon: "shopping-bag", label: "Open Stores", onPress: goToSearch },
     // { icon: "receipt-long", label: "Orders", onPress: () => navigation.navigate("Orders") },
     // { icon: "location-on", label: "Address", onPress: openAddressPicker },
   ];
@@ -2647,7 +2653,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={s.webSearch}
-              onPress={() => navigation.navigate("Search")}
+              onPress={goToSearch}
               activeOpacity={0.8}
             >
               <MaterialIcons name="search" size={16} color={C.gray400} />
@@ -2758,7 +2764,7 @@ export default function HomeScreen() {
             {/* ── Rounded pill search bar with mic ── */}
             <TouchableOpacity
               style={[s.mobileSearch, { marginHorizontal: hPad }]}
-              onPress={() => navigation.navigate("Search")}
+              onPress={goToSearch}
               activeOpacity={0.9}
             >
               <MaterialIcons name="search" size={18} color={C.gray400} />
@@ -2831,7 +2837,7 @@ export default function HomeScreen() {
               {/* <View style={s.heroActions}>
                 <TouchableOpacity
                   style={s.heroCTA}
-                  onPress={() => navigation.navigate("Search")}
+                  onPress={goToSearch}
                   activeOpacity={0.85}
                 >
                   <MaterialIcons name="search" size={16} color={C.white} />
@@ -2891,7 +2897,7 @@ export default function HomeScreen() {
             <Text style={s.sectionTitle}>Nearby Stores</Text>
             <Text style={s.sectionSub}>Delivering to your location</Text>
           </View>
-          <TouchableOpacity onPress={() => navigation.navigate("Search")}>
+          <TouchableOpacity onPress={goToSearch}>
             <Text style={s.viewAll}>Explore</Text>
           </TouchableOpacity>
         </View>
@@ -3093,7 +3099,7 @@ export default function HomeScreen() {
               ]}
             >
               <Text style={s.sectionTitle}>Shop by Category</Text>
-              <TouchableOpacity onPress={() => navigation.navigate("Search")}>
+              <TouchableOpacity onPress={goToSearch}>
                 <Text style={s.viewAll}>View All</Text>
               </TouchableOpacity>
             </View>
@@ -3167,7 +3173,7 @@ export default function HomeScreen() {
               ]}
             >
               <Text style={s.sectionTitle}>Popular Items</Text>
-              <TouchableOpacity onPress={() => navigation.navigate("Search")}>
+              <TouchableOpacity onPress={goToSearch}>
                 <Text style={s.viewAll}>See all</Text>
               </TouchableOpacity>
             </View>
@@ -3427,7 +3433,8 @@ const s = StyleSheet.create({
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingBottom: 14,
+    paddingBottom: 20,
+    paddingTop: 4,
     gap: 0,
   },
   brandSection: {
@@ -3437,9 +3444,9 @@ const s = StyleSheet.create({
     flexShrink: 0,
   },
   miniLogoWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
+    width: 46,
+    height: 46,
+    borderRadius: 14,
     overflow: "hidden",
     backgroundColor: C.white,
     borderWidth: 1,
@@ -3447,7 +3454,7 @@ const s = StyleSheet.create({
   },
   miniLogo: { flex: 1, alignItems: "center", justifyContent: "center" },
   brandName: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "900",
     letterSpacing: 0,
     color: C.gray900,
@@ -3463,22 +3470,22 @@ const s = StyleSheet.create({
   },
   locationBtn: {
     flexShrink: 0,
-    minWidth: 100,
-    maxWidth: 180,
+    minWidth: 120,
+    maxWidth: 220,
     justifyContent: "center",
-    marginRight: 12,
+    marginRight: 16,
   },
   locLoadRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   locLoadText: { fontSize: 12, color: C.gray500 },
   locationTop: {
-    fontSize: 11,
+    fontSize: 12,
     color: C.gray500,
     fontWeight: "500",
     lineHeight: 15,
   },
   locationBottomRow: { flexDirection: "row", alignItems: "center", gap: 3 },
   locationBottom: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: "800",
     color: C.gray900,
     flexShrink: 1,
@@ -3489,47 +3496,47 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     backgroundColor: C.gray100,
-    borderRadius: 10,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: C.gray200,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     marginRight: 10,
     minWidth: 80,
   },
-  webSearchText: { flex: 1, fontSize: 13, color: C.gray400 },
+  webSearchText: { flex: 1, fontSize: 15, color: C.gray400 },
   accountBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: C.gray200,
     marginRight: 8,
     flexShrink: 0,
   },
   accountBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "700",
     color: C.gray700,
-    maxWidth: 80,
+    maxWidth: 90,
   },
   cartBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    borderRadius: 10,
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: C.gray200,
     backgroundColor: C.gray100,
     flexShrink: 0,
   },
   cartBtnActive: { backgroundColor: C.green, borderColor: C.green },
-  cartBtnText: { fontSize: 13, fontWeight: "700", color: C.gray700 },
+  cartBtnText: { fontSize: 14, fontWeight: "700", color: C.gray700 },
   cartBtnBadge: {
     backgroundColor: "rgba(255,255,255,0.25)",
     paddingHorizontal: 6,
@@ -3541,20 +3548,20 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingBottom: 10,
-    paddingTop: 2,
+    paddingBottom: 14,
+    paddingTop: 4,
   },
   mobileLocBtn: { flex: 1, marginRight: 8 },
-  mobileLocBottom: { fontSize: 16, fontWeight: "700", color: C.gray900, flexShrink: 1 },
+  mobileLocBottom: { fontSize: 18, fontWeight: "700", color: C.gray900, flexShrink: 1 },
   mobileProfileBtn: {
     alignItems: "center",
     justifyContent: "center",
     padding: 2,
   },
   mobileBrandBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
+    width: 44,
+    height: 44,
+    borderRadius: 15,
     marginRight: 8,
     overflow: "hidden",
     shadowColor: C.green,
@@ -3582,20 +3589,20 @@ const s = StyleSheet.create({
   mobileSearch: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     backgroundColor: C.gray100,
     borderRadius: 9999,
     borderWidth: 0,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    marginBottom: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    marginBottom: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 3,
     elevation: 1,
   },
-  mobileSearchText: { flex: 1, fontSize: 14, color: C.gray400 },
+  mobileSearchText: { flex: 1, fontSize: 15, color: C.gray400 },
   scroll: { paddingBottom: 40 },
   legacyGreetingRow: { display: "none" },
   greetingRow: { paddingTop: 14, paddingBottom: 12 },
