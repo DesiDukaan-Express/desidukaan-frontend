@@ -1444,7 +1444,7 @@ const styles = StyleSheet.create({
   hintText: { fontSize: 11, color: '#999', marginTop: -4, marginBottom: 6 },
   input: {
     backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e0e0e0',
-    borderRadius: 10, padding: 13, fontSize: 14, color: '#333', marginBottom: 6,
+    borderRadius: 10, padding: 13, fontSize: 14, color: '#333', marginBottom: 6, placeholderTextColor:"#999"
   },
   textArea: { height: 80, textAlignVertical: 'top' },
   row: { flexDirection: 'row' },
