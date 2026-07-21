@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { LineChart } from "react-native-chart-kit";
+import { useTranslation } from "react-i18next";
 import useAuthStore from "../../store/authStore";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
@@ -41,14 +42,15 @@ heroGrad2: "#0F2318",
 bg: "#F4F7F5",
 };
 
-const PERIOD_TABS = ["Today", "Week", "Month"];
-
 export default function VendorEarningsScreen() {
+  const { t } = useTranslation();
   const { token } = useAuthStore();
   const { width: SCREEN_W } = useWindowDimensions();
   const [loading, setLoading] = React.useState(true);
   const [stats, setStats] = React.useState(null);
   const [periodIndex, setPeriodIndex] = React.useState(1); // default: Week
+
+  const PERIOD_TABS = [t('vendor.todayTab'), t('vendor.weekTab'), t('vendor.monthTab')];
 
   // Responsive helpers
   const isSmall = SCREEN_W < 360;
@@ -96,7 +98,7 @@ export default function VendorEarningsScreen() {
   // ── Derived values ────────────────────────────────────────────
   const periods = [
     {
-      label: "Today",
+      label: t('vendor.todayTab'),
       revenue: Number(stats.today_revenue ?? 0),
       orders: Number(stats.today_orders ?? 0),
       avgOrder:
@@ -105,7 +107,7 @@ export default function VendorEarningsScreen() {
           : 0,
     },
     {
-      label: "This Week",
+      label: t('vendor.weekTab'),
       revenue: Number(stats.weekly_revenue ?? 0),
       orders: Number(stats.weekly_orders ?? 0),
       avgOrder:
@@ -114,7 +116,7 @@ export default function VendorEarningsScreen() {
           : 0,
     },
     {
-      label: "This Month",
+      label: t('vendor.monthTab'),
       revenue: Number(stats.monthly_revenue ?? 0),
       orders: Number(stats.monthly_orders ?? 0),
       avgOrder:
@@ -157,10 +159,10 @@ export default function VendorEarningsScreen() {
       >
         <View>
           <Text style={[styles.headerOverline, { fontSize: rs(10, 11, 11) }]}>
-            VENDOR EARNINGS
+            {t('vendor.vendorEarnings')}
           </Text>
           <Text style={[styles.headerTitle, { fontSize: rs(20, 22, 24) }]}>
-            Earnings
+            {t('vendor.earningsTitle')}
           </Text>
         </View>
         <View
@@ -171,7 +173,7 @@ export default function VendorEarningsScreen() {
         >
           <View style={styles.liveDot} />
           <Text style={[styles.headerBadgeText, { fontSize: rs(11, 12, 12) }]}>
-            Live
+            {t('vendor.live')}
           </Text>
         </View>
       </View>
@@ -219,7 +221,7 @@ export default function VendorEarningsScreen() {
         >
           <View style={styles.heroGlow} />
           <Text style={[styles.heroLabel, { fontSize: rs(11, 12, 12) }]}>
-            {curr.label.toUpperCase()} REVENUE
+            {curr.label.toUpperCase()} {t('vendor.revenueLabel')}
           </Text>
           <Text style={[styles.heroAmount, { fontSize: rs(34, 40, 46) }]}>
             ₹{curr.revenue.toLocaleString("en-IN")}
@@ -228,7 +230,7 @@ export default function VendorEarningsScreen() {
             <View style={styles.heroChangeBadge}>
               <MaterialIcons name="trending-up" size={12} color={C.primary} />
               <Text style={[styles.heroChangeText, { fontSize: rs(10, 11, 11) }]}>
-                +24% vs last period
+                +24% {t('vendor.vsLastPeriod')}
               </Text>
             </View>
           </View>
@@ -242,7 +244,7 @@ export default function VendorEarningsScreen() {
           >
             <HeroStatPill
               icon="receipt-long"
-              label="Orders"
+              label={t('vendor.ordersStats')}
               value={curr.orders}
               color={C.blue}
               bg={C.blueDim}
@@ -250,7 +252,7 @@ export default function VendorEarningsScreen() {
             />
             <HeroStatPill
               icon="shopping-bag"
-              label="Avg Order"
+              label={t('vendor.avgOrderStats')}
               value={`₹${curr.avgOrder}`}
               color={C.orange}
               bg={C.orangeDim}
@@ -258,7 +260,7 @@ export default function VendorEarningsScreen() {
             />
             <HeroStatPill
               icon="schedule"
-              label="Prep Avg"
+              label={t('vendor.prepAvgStats')}
               value={`${stats.delivery_efficiency?.avg_prep_time ?? 0}m`}
               color={C.purple}
               bg={C.purpleDim}
@@ -281,10 +283,10 @@ export default function VendorEarningsScreen() {
           <View style={styles.cardHeader}>
             <View>
               <Text style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}>
-                TREND
+                {t('vendor.trend')}
               </Text>
               <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 16) }]}>
-                Weekly Revenue
+                {t('vendor.weeklyRevenueLabel')}
               </Text>
             </View>
             <View
@@ -336,7 +338,7 @@ export default function VendorEarningsScreen() {
           ) : (
             <View style={styles.emptyChart}>
               <MaterialIcons name="show-chart" size={32} color={C.border} />
-              <Text style={styles.emptyText}>No data this week</Text>
+              <Text style={styles.emptyText}>{t('vendor.noDataThisWeek')}</Text>
             </View>
           )}
 
@@ -382,18 +384,18 @@ export default function VendorEarningsScreen() {
         >
           <SummaryCard
             icon="payments"
-            label="Monthly Revenue"
+            label={t('vendor.monthlyRevenueLabel')}
             value={`₹${Number(stats.monthly_revenue ?? 0).toLocaleString("en-IN")}`}
-            sub={`${stats.monthly_orders ?? 0} orders`}
+            sub={`${stats.monthly_orders ?? 0} ${t('vendor.ordersStats').toLowerCase()}`}
             iconColor={C.primaryDark}
             iconBg={C.primaryDim}
             rs={rs}
           />
           <SummaryCard
             icon="account-balance-wallet"
-            label="Pending Payout"
+            label={t('vendor.pendingPayout')}
             value={`₹${pendingPayout.toLocaleString("en-IN")}`}
-            sub="Next: Scheduled"
+            sub={t('vendor.nextScheduled')}
             iconColor={C.blue}
             iconBg={C.blueDim}
             rs={rs}
@@ -412,7 +414,7 @@ export default function VendorEarningsScreen() {
         >
           <SummaryCard
             icon="trending-up"
-            label="Avg Order Value"
+            label={t('vendor.avgOrderValue')}
             value={`₹${curr.avgOrder}`}
             sub={curr.label}
             iconColor={C.orange}
@@ -421,9 +423,9 @@ export default function VendorEarningsScreen() {
           />
           <SummaryCard
             icon="moped"
-            label="Delivery Avg"
+            label={t('vendor.deliveryAvg')}
             value={`${stats.delivery_efficiency?.avg_delivery_time ?? 0}m`}
-            sub="Monthly avg"
+            sub={t('vendor.monthlyAvg')}
             iconColor={C.purple}
             iconBg={C.purpleDim}
             rs={rs}
@@ -444,30 +446,30 @@ export default function VendorEarningsScreen() {
           <View style={styles.cardHeader}>
             <View>
               <Text style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}>
-                BREAKDOWN
+                {t('vendor.breakdown')}
               </Text>
               <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 16) }]}>
-                Revenue Split
+                {t('vendor.revenueSplit')}
               </Text>
             </View>
           </View>
 
           <BreakdownRow
-            label="Order Revenue"
+            label={t('vendor.orderRevenue')}
             value={`₹${curr.revenue.toLocaleString("en-IN")}`}
             pct={100}
             color={C.primary}
             rs={rs}
           />
           <BreakdownRow
-            label="Platform Fee (est.)"
+            label={t('vendor.platformFee')}
             value={`-₹${(curr.revenue * 0.02).toFixed(0)}`}
             pct={2}
             color={C.orange}
             rs={rs}
           />
           <BreakdownRow
-            label="Net Earnings"
+            label={t('vendor.netEarnings')}
             value={`₹${(curr.revenue * 0.98).toFixed(0)}`}
             pct={98}
             color={C.blue}
@@ -493,10 +495,10 @@ export default function VendorEarningsScreen() {
                 <Text
                   style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}
                 >
-                  PERFORMANCE
+                  {t('vendor.performance')}
                 </Text>
                 <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 16) }]}>
-                  Top Earning Products
+                  {t('vendor.topEarningProducts')}
                 </Text>
               </View>
               <View
@@ -522,7 +524,7 @@ export default function VendorEarningsScreen() {
             </View>
 
             {topProducts.slice(0, 5).map((p, i) => (
-              <TopProductRow key={i} rank={i + 1} product={p} rs={rs} />
+              <TopProductRow key={i} rank={i + 1} product={p} rs={rs} t={t} />
             ))}
           </View>
         )}
@@ -545,7 +547,7 @@ export default function VendorEarningsScreen() {
               <Text
                 style={[styles.payoutLabel, { fontSize: rs(11, 12, 12) }]}
               >
-                CURRENT BALANCE
+                {t('vendor.currentBalance')}
               </Text>
               <Text
                 style={[styles.payoutAmount, { fontSize: rs(24, 28, 32) }]}
@@ -557,7 +559,7 @@ export default function VendorEarningsScreen() {
               <Text
                 style={[styles.payoutLabel, { fontSize: rs(11, 12, 12) }]}
               >
-                NEXT PAYOUT
+                {t('vendor.nextPayout')}
               </Text>
               <View style={styles.payoutScheduledRow}>
                 <MaterialIcons
@@ -571,7 +573,7 @@ export default function VendorEarningsScreen() {
                     { fontSize: rs(13, 14, 15) },
                   ]}
                 >
-                  Scheduled
+                  {t('vendor.scheduled')}
                 </Text>
               </View>
             </View>
@@ -590,7 +592,7 @@ export default function VendorEarningsScreen() {
               color="#000"
             />
             <Text style={[styles.withdrawText, { fontSize: rs(13, 14, 15) }]}>
-              Withdraw to Bank
+              {t('vendor.withdrawToBank')}
             </Text>
           </TouchableOpacity>
 
@@ -600,7 +602,7 @@ export default function VendorEarningsScreen() {
               { fontSize: rs(10, 11, 11), marginTop: rs(8, 10, 10) },
             ]}
           >
-            Payouts are processed every Monday. UPI / Bank transfer supported.
+            {t('vendor.payoutNote')}
           </Text>
         </View>
 
@@ -618,14 +620,14 @@ export default function VendorEarningsScreen() {
           <View style={styles.cardHeader}>
             <View>
               <Text style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}>
-                HISTORY
+                {t('vendor.history')}
               </Text>
               <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 16) }]}>
-                Recent Transactions
+                {t('vendor.recentTransactions')}
               </Text>
             </View>
           </View>
-          <RecentTransactions token={token} rs={rs} />
+          <RecentTransactions token={token} rs={rs} t={t} />
         </View>
       </ScrollView>
     </View>
@@ -722,7 +724,7 @@ function BreakdownRow({ label, value, pct, color, rs, bold }) {
   );
 }
 
-function TopProductRow({ rank, product, rs }) {
+function TopProductRow({ rank, product, rs, t }) {
   const name = product.name || "Product";
   const sold = product.sold ?? 0;
   const revenue = Number(product.revenue ?? 0);
@@ -759,7 +761,7 @@ function TopProductRow({ rank, product, rs }) {
             />
           </View>
           <Text style={[styles.topSold, { fontSize: rs(10, 10, 11) }]}>
-            {sold} sold
+            {sold} {t('vendor.sold')}
           </Text>
         </View>
       </View>
@@ -767,7 +769,7 @@ function TopProductRow({ rank, product, rs }) {
   );
 }
 
-function RecentTransactions({ token, rs }) {
+function RecentTransactions({ token, rs, t }) {
   const [txns, setTxns] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -801,7 +803,7 @@ function RecentTransactions({ token, rs }) {
     return (
       <View style={styles.emptyChart}>
         <MaterialIcons name="receipt-long" size={32} color={C.border} />
-        <Text style={styles.emptyText}>No recent transactions</Text>
+        <Text style={styles.emptyText}>{t('vendor.noTransactions')}</Text>
       </View>
     );
 

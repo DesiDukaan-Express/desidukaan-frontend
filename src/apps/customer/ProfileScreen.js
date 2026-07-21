@@ -9,13 +9,16 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
+import { useTranslation } from "react-i18next";
 import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
 import AccountManagerModal from "../../components/common/AccountManagerModal";
+import LanguageSwitcher from "../../components/common/LanguageSwitcher";
+
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
- 
+
 const C = {
   orange: "#F97316", orangeDark: "#EA580C", orangeLight: "#FFF7ED",
   green: "#16A34A", greenDark: "#15803D",
@@ -30,7 +33,7 @@ const C = {
   gray700: "#374151", gray900: "#111827",
   red: "#EF4444", redLight: "#FEF2F2",
 };
- 
+
 // ─── Avatar initials ──────────────────────────────────────────────────────
 function Avatar({ name, size = 64 }) {
   const initials = (name || "?")
@@ -48,12 +51,12 @@ function Avatar({ name, size = 64 }) {
     </LinearGradient>
   );
 }
- 
+
 // ─── Edit modal ───────────────────────────────────────────────────────────
 function EditModal({ visible, field, label, value, keyboardType = "default", onSave, onClose, saving }) {
   const [draft, setDraft] = useState(value || "");
   useEffect(() => { if (visible) setDraft(value || ""); }, [visible, value]);
- 
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={em.backdrop} onPress={onClose}>
@@ -107,7 +110,7 @@ const em = StyleSheet.create({
   saveOff: { backgroundColor: C.greenMid },
   saveText: { fontSize: 15, fontWeight: "800", color: C.white },
 });
- 
+
 // ─── Info row (tappable field) ────────────────────────────────────────────
 function InfoRow({ label, value, onEdit, editable = true, icon = "user" }) {
   return (
@@ -145,7 +148,7 @@ const ir = StyleSheet.create({
   editBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: C.greenMid, alignItems: "center", justifyContent: "center" },
   lockWrap: { width: 34, height: 34, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
 });
- 
+
 // ─── Address card ─────────────────────────────────────────────────────────
 function AddressCard({ addr, isSelected, onSelect, onRemove }) {
   const text = typeof addr.address === "string" ? addr.address : addr.address_line || "Saved address";
@@ -181,7 +184,7 @@ const adc = StyleSheet.create({
   activeLabel: { fontSize: 11, color: C.green, fontWeight: "700", marginTop: 3 },
   tick: { width: 22, height: 22, borderRadius: 7, backgroundColor: C.green, alignItems: "center", justifyContent: "center", flexShrink: 0 },
 });
- 
+
 // ─── Row menu item ────────────────────────────────────────────────────────
 const TINTS = {
   orange: { bg: C.orangeLight, fg: C.orangeDark },
@@ -220,7 +223,7 @@ const mi = StyleSheet.create({
   labelDanger: { color: C.red },
   sub: { fontSize: 12, color: C.gray400, marginTop: 2 },
 });
- 
+
 // ─── Address Detail Modal ─────────────────────────────────────────────────
 function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
   const [region, setRegion] = useState({
@@ -229,7 +232,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
- 
+
   useEffect(() => {
     if (addr?.lat && addr?.lng) {
       setRegion({
@@ -240,7 +243,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
       });
     }
   }, [addr]);
- 
+
   if (!addr) return null;
   const text = typeof addr.address === "string" ? addr.address : addr.address_line || "Saved address";
   return (
@@ -249,7 +252,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
         <Pressable style={adm.sheet} onPress={() => { }}>
           <View style={adm.handle} />
           <Text style={adm.title}>Address details</Text>
- 
+
           {/* Map Preview */}
           {addr.lat && addr.lng && (
             <View style={adm.mapWrapper}>
@@ -261,7 +264,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
               />
             </View>
           )}
- 
+
           {/* Address text */}
           <View style={adm.addrBox}>
             <View style={[adm.addrIcon, isSelected && adm.addrIconActive]}>
@@ -269,7 +272,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
             </View>
             <Text style={adm.addrText}>{text}</Text>
           </View>
- 
+
           {/* Coordinates if available */}
           {addr.lat && addr.lng && (
             <View style={adm.coordRow}>
@@ -279,7 +282,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
               </Text>
             </View>
           )}
- 
+
           {/* Active badge */}
           {isSelected && (
             <View style={adm.activeBadge}>
@@ -287,7 +290,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
               <Text style={adm.activeBadgeText}>This is your active delivery address</Text>
             </View>
           )}
- 
+
           {/* Actions */}
           <View style={adm.actions}>
             {!isSelected && (
@@ -333,7 +336,7 @@ const adm = StyleSheet.create({
   removeBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.redLight, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: "#FECACA" },
   removeBtnText: { fontSize: 14, fontWeight: "700", color: C.red },
 });
- 
+
 // ─── Section header ───────────────────────────────────────────────────────
 function SectionLabel({ title }) {
   return (
@@ -348,7 +351,7 @@ const secStyles = StyleSheet.create({
   tick: { width: 3, height: 14, borderRadius: 2, backgroundColor: C.green },
   text: { fontSize: 12, fontWeight: "800", color: C.gray500, letterSpacing: 0.8, textTransform: "uppercase" },
 });
- 
+
 // ─── Logout modal ─────────────────────────────────────────────────────────
 function LogoutModal({ visible, onConfirm, onCancel }) {
   return (
@@ -385,7 +388,7 @@ const lm = StyleSheet.create({
   confirm: { flex: 1, paddingVertical: 14, borderRadius: 13, backgroundColor: C.red, alignItems: "center" },
   confirmText: { fontSize: 15, fontWeight: "700", color: C.white },
 });
- 
+
 // ─── Payment placeholder modal ────────────────────────────────────────────
 function PaymentModal({ visible, onClose }) {
   return (
@@ -418,18 +421,20 @@ const pm2 = StyleSheet.create({
   closeBtn: { backgroundColor: C.gray100, paddingVertical: 14, borderRadius: 14, alignItems: "center" },
   closeBtnText: { fontSize: 15, fontWeight: "700", color: C.gray600 },
 });
- 
+
 // ═════════════════════════════════════════════════════════════════════════
 export default function ProfileScreen() {
   const navigation = useNavigation();
+  const { t } = useTranslation();
   const { user, token, logout, updateUser } = useAuthStore();
   const { clearCart } = useCartStore();
   const addressStore = useAddressStore();
   const { width: winW } = useWindowDimensions();
   const isWide = winW > 600;
+  const [showLanguage, setShowLanguage] = useState(false);
   const contentMaxW = Math.min(winW, 640);
   const hPad = isWide ? Math.max(24, Math.floor((winW - contentMaxW) / 2)) : 20;
- 
+
   const [showLogout, setShowLogout] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
   const [showAccountManager, setShowAccountManager] = useState(false);
@@ -437,25 +442,25 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [detailAddr, setDetailAddr] = useState(null);
- 
+
   // Load notification preference from AsyncStorage
   useEffect(() => {
     AsyncStorage.getItem("notif_enabled")
       .then(v => { if (v !== null) setNotifEnabled(v === "true" || v === true); })
       .catch(() => { });
   }, []);
- 
+
   // Animations
   const fadeO = useRef(new Animated.Value(0)).current;
   const slideY = useRef(new Animated.Value(18)).current;
- 
+
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeO, { toValue: 1, duration: 350, useNativeDriver: true }),
       Animated.spring(slideY, { toValue: 0, tension: 70, friction: 10, useNativeDriver: true }),
     ]).start();
   }, []);
- 
+
   // ── Save field ─────────────────────────────────────────────────────────
   const handleSave = async (value) => {
     if (!value || !editField) return;
@@ -479,13 +484,13 @@ export default function ProfileScreen() {
       setSaving(false);
     }
   };
- 
+
   // ── Toggle notifications ───────────────────────────────────────────────
   const handleNotifToggle = async (val) => {
     setNotifEnabled(val);
     await AsyncStorage.setItem("notif_enabled", String(val));
   };
- 
+
   // ── Invite ─────────────────────────────────────────────────────────────
   const handleInvite = async () => {
     try {
@@ -494,7 +499,7 @@ export default function ProfileScreen() {
       });
     } catch { }
   };
- 
+
   // ── Logout ─────────────────────────────────────────────────────────────
   const handleLogout = () => {
     clearCart();
@@ -502,11 +507,11 @@ export default function ProfileScreen() {
     logout();
     setShowLogout(false);
   };
- 
+
   const memberSince = user?.created_at
     ? new Date(user.created_at).toLocaleDateString("en-IN", { month: "long", year: "numeric" })
     : null;
- 
+
   return (
     <SafeAreaView style={s.root}>
       <Animated.ScrollView
@@ -514,7 +519,7 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 60 }}
       >
- 
+
         {/* ── Hero header ─────────────────────────────────────────────── */}
         <Animated.View style={{ transform: [{ translateY: slideY }] }}>
           <LinearGradient
@@ -525,12 +530,12 @@ export default function ProfileScreen() {
             {/* Decorative accents */}
             <View style={s.heroDecorCircle1} pointerEvents="none" />
             <View style={s.heroDecorCircle2} pointerEvents="none" />
- 
+
             {/* Top row */}
             <View style={s.heroTop}>
-              <Text style={s.heroLabel}>My Profile</Text>
+              <Text style={s.heroLabel}>{t('profile.myProfile')}</Text>
             </View>
- 
+
             {/* Avatar + name */}
             <View style={s.heroMain}>
               <View style={s.avatarRing}>
@@ -547,11 +552,11 @@ export default function ProfileScreen() {
                   <Feather name="phone" size={11} color={C.green} />
                   <Text style={s.heroPillText}>{user?.phone || "—"}</Text>
                 </View>
-                {memberSince && <Text style={s.heroSince}>Member since {memberSince}</Text>}
+                {memberSince && <Text style={s.heroSince}>{t('profile.memberSince', { date: memberSince })}</Text>}
               </View>
             </View>
           </LinearGradient>
- 
+
           {/* Stats — sits OUTSIDE the hero's overflow:hidden box so the
               overlap isn't clipped; it overlaps upward via negative marginTop
               on statsWrap instead, and paints on top since it's a later sibling */}
@@ -562,15 +567,12 @@ export default function ProfileScreen() {
                   <Feather name="map-pin" size={13} color={C.greenDark} />
                 </View>
                 <Text style={s.statNum}>{addressStore?.addresses?.length ?? 0}</Text>
-                <Text style={s.statLabel}>Addresses</Text>
+                <Text style={s.statLabel}>{t('profile.savedAddresses')}</Text>
               </View>
               <View style={s.statSep} />
               <View style={s.statItem}>
-                <View style={[s.statIconWrap, { backgroundColor: C.orangeLight }]}>
-                  <Text style={{ fontSize: 12, fontWeight: "900", color: C.orangeDark }}>₹</Text>
-                </View>
-                <Text style={s.statNum}>150</Text>
-                <Text style={s.statLabel}>Credits</Text>
+                <Text style={s.statNum}>₹150</Text>
+                <Text style={s.statLabel}>{t('profile.credits')}</Text>
               </View>
               <View style={s.statSep} />
               <View style={s.statItem}>
@@ -580,36 +582,34 @@ export default function ProfileScreen() {
                 <Text style={[s.statNum, { fontSize: 12.5 }]} numberOfLines={1}>
                   {(user?.role || "customer").toUpperCase()}
                 </Text>
-                <Text style={s.statLabel}>Account</Text>
+                <Text style={s.statLabel}>{t('profile.account')}</Text>
               </View>
             </View>
           </View>
         </Animated.View>
- 
+
         {/* ── Body ────────────────────────────────────────────────────── */}
         <View style={{ paddingHorizontal: hPad }}>
- 
+
           {/* Personal info */}
-          <SectionLabel title="Personal info" />
+          <SectionLabel title={t('profile.personalInfo')} />
           <View style={s.card}>
             <InfoRow
-              icon="user"
-              label="Full name"
+              label={t('profile.name')}
               value={user?.name}
-              onEdit={() => setEditField({ field: "name", label: "Full name", value: user?.name })}
+              onEdit={() => setEditField({ field: "name", label: t('profile.name'), value: user?.name })}
             />
             <InfoRow
-              icon="mail"
-              label="Email address"
+              label={t('profile.email')}
               value={user?.email}
-              onEdit={() => setEditField({ field: "email", label: "Email address", value: user?.email, keyboardType: "email-address" })}
+              onEdit={() => setEditField({ field: "email", label: t('profile.email'), value: user?.email, keyboardType: "email-address" })}
             />
             <View style={[ir.row, { borderBottomWidth: 0 }]}>
               <View style={[ir.fieldIconWrap, ir.fieldIconWrapOff]}>
                 <Feather name="phone" size={15} color={C.gray400} />
               </View>
               <View style={ir.left}>
-                <Text style={ir.label}>Phone number</Text>
+                <Text style={ir.label}>{t('profile.phone')}</Text>
                 <Text style={ir.value}>{user?.phone || "—"}</Text>
               </View>
               <View style={ir.lockWrap}>
@@ -617,14 +617,14 @@ export default function ProfileScreen() {
               </View>
             </View>
           </View>
- 
+
           {/* Delivery addresses */}
-          <SectionLabel title="Delivery addresses" />
+          <SectionLabel title={t('profile.deliveryAddresses')} />
           {addressStore?.addresses?.length === 0 ? (
             <View style={s.emptyBox}>
               <Feather name="map-pin" size={24} color={C.gray300} />
-              <Text style={s.emptyTitle}>No saved addresses</Text>
-              <Text style={s.emptySub}>Addresses you save on the home screen appear here</Text>
+              <Text style={s.emptyTitle}>{t('profile.noAddresses')}</Text>
+              <Text style={s.emptySub}>{t('profile.noAddressesSub')}</Text>
             </View>
           ) : (
             <>
@@ -651,31 +651,28 @@ export default function ProfileScreen() {
               ))}
             </>
           )}
- 
+
           {/* Activity */}
-          <SectionLabel title="Activity" />
+          <SectionLabel title={t('profile.activity')} />
           <MenuItem
             icon="shopping-bag"
-            label="Order history"
-            sub="View all your past orders"
-            tint="orange"
+            label={t('profile.orderHistory')}
+            sub={t('profile.orderHistorySub')}
             onPress={() => navigation.navigate("Orders")}
           />
           <MenuItem
             icon="gift"
-            label="Invite friends"
-            sub="Earn ₹150 credit per referral"
-            tint="green"
+            label={t('profile.inviteFriends')}
+            sub={t('profile.inviteFriendsSub')}
             onPress={handleInvite}
           />
- 
+
           {/* App */}
-          <SectionLabel title="App" />
+          <SectionLabel title={t('profile.app')} />
           <MenuItem
             icon="bell"
-            label="Push notifications"
-            sub={notifEnabled ? "Enabled" : "Disabled"}
-            tint="blue"
+            label={t('profile.pushNotifications')}
+            sub={notifEnabled ? t('profile.enabled') : t('profile.disabled')}
             onPress={() => handleNotifToggle(!notifEnabled)}
             right={
               <Switch
@@ -688,25 +685,30 @@ export default function ProfileScreen() {
             }
           />
           <MenuItem
+            icon="globe"
+            label={t('profile.language')}
+            sub={t('profile.languageSub')}
+            onPress={() => setShowLanguage(true)}
+          />
+          <MenuItem
             icon="credit-card"
-            label="Payment methods"
-            sub="Manage UPI & cards"
-            tint="purple"
+            label={t('profile.paymentMethods')}
+            sub={t('profile.paymentMethodsSub')}
             onPress={() => setShowPayments(true)}
           />
           <MenuItem
             icon="shield"
-            label="Privacy policy"
+            label={t('auth.privacyPolicy')}
             onPress={() => navigation.navigate("Privacy")}
           />
           <MenuItem
             icon="file-text"
-            label="Terms & conditions"
+            label={t('profile.termsConditions')}
             onPress={() => navigation.navigate("Terms")}
           />
- 
+
           {/* Account */}
-          <SectionLabel title="Account" />
+          <SectionLabel title={t('profile.accountSection')} />
           <MenuItem
             icon="users"
             label="Manage Accounts"
@@ -715,15 +717,15 @@ export default function ProfileScreen() {
           />
           <MenuItem
             icon="log-out"
-            label="Log out"
+            label={t('profile.logout')}
             onPress={() => setShowLogout(true)}
             danger
             right={null}
           />
- 
+
         </View>
       </Animated.ScrollView>
- 
+
       {/* Modals */}
       <AddressDetailModal
         addr={detailAddr}
@@ -752,13 +754,29 @@ export default function ProfileScreen() {
         visible={showAccountManager}
         onClose={() => setShowAccountManager(false)}
       />
+
+      {/* Language Picker Modal */}
+      <Modal
+        visible={showLanguage}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowLanguage(false)}
+      >
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }} onPress={() => setShowLanguage(false)}>
+          <Pressable style={{ backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48 }} onPress={() => { }}>
+            <View style={{ width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
+            <LanguageSwitcher inline />
+          </Pressable>
+        </Pressable>
+      </Modal>
+
     </SafeAreaView>
   );
 }
- 
+
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
- 
+
   // Hero — rounded bottom edge + decorative circles for depth
   hero: {
     paddingTop: Platform.OS === "android" ? 32 : 24, paddingBottom: 44,
@@ -767,11 +785,11 @@ const s = StyleSheet.create({
   },
   heroDecorCircle1: { position: "absolute", top: -50, right: -40, width: 150, height: 150, borderRadius: 75, backgroundColor: "rgba(255,255,255,0.08)" },
   heroDecorCircle2: { position: "absolute", top: 70, right: 50, width: 56, height: 56, borderRadius: 28, backgroundColor: "rgba(255,255,255,0.07)" },
- 
+
   heroTop: { marginBottom: 24 },
   heroLabel: { fontSize: 13, fontWeight: "800", color: "rgba(255,255,255,0.7)", letterSpacing: 1, textTransform: "uppercase" },
   heroMain: { flexDirection: "row", alignItems: "center", gap: 18, marginBottom: 28 },
- 
+
   avatarRing: { padding: 4, borderRadius: 26, backgroundColor: "rgba(255,255,255,0.22)" },
   avatarOuter: { position: "relative" },
   verifiedDot: {
@@ -780,13 +798,13 @@ const s = StyleSheet.create({
     backgroundColor: C.green, borderWidth: 2.5, borderColor: C.white,
     alignItems: "center", justifyContent: "center",
   },
- 
+
   heroInfo: { flex: 1 },
   heroName: { fontSize: 24, fontWeight: "900", color: C.white, letterSpacing: -0.3, flexWrap: "wrap" },
   heroPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.white, alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, marginTop: 8 },
   heroPillText: { fontSize: 13, fontWeight: "700", color: C.green },
   heroSince: { fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 6 },
- 
+
   // Stats wrapper — a plain sibling AFTER the hero (not inside its
   // overflow:hidden box), pulled up with a negative marginTop so it overlaps
   // the green area. Because it paints after the hero, the overlap renders on
@@ -802,20 +820,20 @@ const s = StyleSheet.create({
   statNum: { fontSize: 19, fontWeight: "900", color: C.gray900 },
   statLabel: { fontSize: 11.5, color: C.gray400, fontWeight: "600" },
   statSep: { width: 1, backgroundColor: C.gray200 },
- 
+
   // Cards — soft shadow instead of a flat border
   card: {
     backgroundColor: C.white, borderRadius: 18, paddingHorizontal: 18, marginTop: 8,
     borderWidth: 1, borderColor: C.gray100,
     shadowColor: "#0F172A", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 2,
   },
- 
+
   // Empty address
   emptyBox: { alignItems: "center", paddingVertical: 32, gap: 8, backgroundColor: C.white, borderRadius: 16, borderWidth: 1.5, borderColor: C.gray200, ...Platform.select({ web: { borderStyle: "dashed" }, default: { borderStyle: "solid" } }) },
   emptyTitle: { fontSize: 15, fontWeight: "700", color: C.gray500 },
   emptySub: { fontSize: 13, color: C.gray400, textAlign: "center", paddingHorizontal: 24, lineHeight: 19 },
 });
- 
+
 
 
 

@@ -727,11 +727,14 @@ function OrderDetailModal({ order, onClose }) {
                   <View style={{ flex: 1 }}>
                     <Text style={od.addressLbl}>Delivery address</Text>
                     <Text style={od.addressVal}>
-                      {displayOrder.delivery_address?.address_line ||
-                        displayOrder.delivery_address}
-                      {displayOrder.delivery_address?.city
-                        ? `, ${displayOrder.delivery_address.city}`
-                        : ""}
+                      {(() => {
+                        const line = displayOrder.delivery_address?.address_line ||
+                          (typeof displayOrder.delivery_address === "string" ? displayOrder.delivery_address : "");
+                        const city = displayOrder.delivery_address?.city || "";
+                        // Only show city if it's not already mentioned in the address line
+                        const shouldAppendCity = city && !line.toLowerCase().includes(city.toLowerCase());
+                        return shouldAppendCity ? `${line}, ${city}` : line;
+                      })()}
                     </Text>
                   </View>
                 </View>

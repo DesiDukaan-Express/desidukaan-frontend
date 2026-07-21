@@ -22,6 +22,7 @@ import { MaterialIcons, Feather } from "@expo/vector-icons";
 import { io } from "socket.io-client";
 import useOrderSound from "../../hooks/useOrderSound";
 import { useRoute } from "@react-navigation/native";
+import { useTranslation } from "react-i18next";
 
 const { width } = Dimensions.get("window");
 
@@ -32,6 +33,7 @@ const SOCKET_URL =
   process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
 export default function VendorOrdersScreen() {
+  const { t } = useTranslation();
   const { token } = useAuthStore();
   const { playOrderSound } = useOrderSound();
 
@@ -828,16 +830,30 @@ export default function VendorOrdersScreen() {
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
-  // Groups a flat order array by customer name
+  // Groups a flat order array by customer name, sorted by most recent activity
   const groupByCustomer = (orders) => {
     const map = {};
     orders.forEach((order) => {
       const key = order.customer?.name || `Customer #${order.customer_id}`;
-      if (!map[key]) map[key] = { name: key, orders: [], total: 0 };
+      if (!map[key]) map[key] = { name: key, orders: [], total: 0, latestAt: null };
       map[key].orders.push(order);
       map[key].total += order.total || 0;
+      // Track the most recent order timestamp for this customer group
+      const orderTime = order.created_at ? new Date(order.created_at) : null;
+      if (orderTime && (!map[key].latestAt || orderTime > new Date(map[key].latestAt))) {
+        map[key].latestAt = order.created_at;
+      }
     });
-    return Object.values(map).sort((a, b) => b.orders.length - a.orders.length);
+    return Object.values(map)
+      .map(group => ({
+        ...group,
+        // Sort individual orders within each group by most recent first
+        orders: [...group.orders].sort((a, b) =>
+          new Date(b.created_at || 0) - new Date(a.created_at || 0)
+        ),
+      }))
+      // Sort customer groups by the most recent order across all their orders
+      .sort((a, b) => new Date(b.latestAt || 0) - new Date(a.latestAt || 0));
   };
 
   const groupPhoneRequestsByCustomer = (phones) => {
@@ -901,7 +917,7 @@ export default function VendorOrdersScreen() {
       {/* ── HEADER ── */}
       <View style={styles.screenHeader}>
         <View>
-          <Text style={styles.screenTitle}>Orders</Text>
+          <Text style={styles.screenTitle}>{t('vendor.orders')}</Text>
           <Text style={styles.screenSubtitle}>
             Manage incoming & active orders
           </Text>
@@ -975,7 +991,7 @@ export default function VendorOrdersScreen() {
               activeTab === "orders" && styles.activeTabText,
             ]}
           >
-            Active
+            {t('vendor.activeOrders')}
           </Text>
           {orders.length > 0 && (
             <View style={styles.badge}>
@@ -994,7 +1010,7 @@ export default function VendorOrdersScreen() {
               activeTab === "requests" && styles.activeTabText,
             ]}
           >
-            Requests
+            {t('vendor.requests')}
           </Text>
           {requests.phones.length + requests.slots.length > 0 && (
             <View style={[styles.badge, { backgroundColor: "#D97706" }]}>
@@ -1015,7 +1031,7 @@ export default function VendorOrdersScreen() {
               activeTab === "history" && styles.activeTabText,
             ]}
           >
-            History
+            {t('vendor.history')}
           </Text>
           {historyTotal > 0 && (
             <View style={[styles.badge, { backgroundColor: "#6B7280" }]}>
@@ -1036,6 +1052,7 @@ export default function VendorOrdersScreen() {
               ? [
                   ...orders
                     .filter((o) => o.status === "pending" || o.status === "countered")
+                    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
                     .map((o) => ({ ...o, type: "order_request" })),
                   ...groupPhoneRequestsByCustomer(requests.phones).map((g) => ({
                     ...g,
@@ -1079,7 +1096,7 @@ export default function VendorOrdersScreen() {
               <Text
                 style={{ marginTop: 12, color: "#6B7280", fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}
               >
-                No pending requests
+                {t('vendor.noRequests')}
               </Text>
             </View>
           ) : activeTab === "history" ? (

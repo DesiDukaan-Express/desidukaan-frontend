@@ -17,6 +17,7 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import Svg, { Polyline } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
+import { useTranslation } from "react-i18next";
 import useAuthStore from "../../store/authStore";
 import { LineChart } from "react-native-chart-kit";
 import { useNavigation } from "@react-navigation/native";
@@ -59,38 +60,39 @@ const C = {
 };
 
 // ─── Greeting config ────────────────────────────────────────────
-const getGreetingConfig = () => {
+const getGreetingConfig = (t) => {
   const h = new Date().getHours();
   if (h < 12)
     return {
-      text: "Good Morning",
+      text: t('vendor.goodMorning'),
       icon: "wb-sunny",
       gradient: ["#FEF3C7", "#FDE68A"],
       iconBg: "#F59E0B",
-      sub: "Your store is ready to serve!",
-      badge: "Morning Boost",
+      sub: t('vendor.morningBoostSub'),
+      badge: t('vendor.morningBoost'),
     };
   if (h < 17)
     return {
-      text: "Good Afternoon",
+      text: t('vendor.goodAfternoon'),
       icon: "wb-cloudy",
       gradient: ["#DBEAFE", "#BFDBFE"],
       iconBg: "#3B82F6",
-      sub: "Keep the momentum going!",
-      badge: "Peak Hours",
+      sub: t('vendor.afternoonSub'),
+      badge: t('vendor.peakHours'),
     };
   return {
-    text: "Good Evening",
+    text: t('vendor.goodEvening'),
     icon: "nights-stay",
     gradient: ["#EDE9FE", "#DDD6FE"],
     iconBg: "#7C3AED",
-    sub: "Wrapping up strong today!",
-    badge: "Wind Down",
+    sub: t('vendor.eveningSub'),
+    badge: t('vendor.windDown'),
   };
 };
 
 export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
   const { token, user } = useAuthStore();
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const { width: SCREEN_W } = useWindowDimensions();
   const [newOrderBanner, setNewOrderBanner] = useState(null);
@@ -129,7 +131,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
   const heroScaleAnim = useRef(new Animated.Value(0.95)).current;
 
   const vendorName = user?.name || "Vendor";
-  const greeting = getGreetingConfig();
+  const greeting = getGreetingConfig(t);
 
   // ─── Banner Handlers (defined before early-returns so socket effect can use them) ───
   const showNewOrderBanner = (data) => {
@@ -355,45 +357,30 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
 
   // ─── Loading ─────────────────────────────────────────────────
   if (loading) {
-  return (
-    <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: 60, paddingHorizontal: 18 }}>
-      {/* Greeting skeleton */}
-      <View style={{ height: 170, borderRadius: 24, backgroundColor: "#E2E8F0", marginBottom: 20 }} />
-      {/* Hero row skeleton */}
-      <View style={{ flexDirection: "row", gap: 12, marginBottom: 20 }}>
-        <View style={{ flex: 1.5, height: 140, borderRadius: 20, backgroundColor: "#E2E8F0" }} />
-        <View style={{ flex: 1, gap: 12 }}>
-          <View style={{ flex: 1, borderRadius: 16, backgroundColor: "#E2E8F0" }} />
-          <View style={{ flex: 1, borderRadius: 16, backgroundColor: "#E2E8F0" }} />
-          <View style={{ flex: 1, borderRadius: 16, backgroundColor: "#E2E8F0" }} />
+    return (
+      <View style={[styles.centered, { backgroundColor: C.bg }]}>
+        <View style={styles.loadingCard}>
+          <ActivityIndicator size="large" color={C.primary} />
+          <Text style={styles.loadingText}>{t('vendor.loadingDashboard')}</Text>
         </View>
       </View>
-      {/* Chart skeleton */}
-      <View style={{ height: 220, borderRadius: 22, backgroundColor: "#E2E8F0" }} />
-    </View>
-  );
-}
+    );
+  }
+
 
   if (noProfile) {
     return (
       <View style={[styles.centered, { backgroundColor: C.bg, padding: 24 }]}>
         <View style={styles.emptyIconWrap}>
-          <MaterialIcons
-            name="store-mall-directory"
-            size={52}
-            color={C.primary}
-          />
+          <MaterialIcons name="store-mall-directory" size={52} color={C.primary} />
         </View>
-        <Text style={styles.emptyTitle}>Welcome to KwikPik!</Text>
-        <Text style={styles.emptySubtitle}>
-          You haven't completed your shop registration yet. Complete it now to
-          start selling!
-        </Text>
+        <Text style={styles.emptyTitle}>{t('vendor.welcomeTitle')}</Text>
+        <Text style={styles.emptySubtitle}>{t('vendor.welcomeSub')}</Text>
         <TouchableOpacity
           style={styles.ctaBtn}
           onPress={() => navigation.navigate("VendorOnboarding")}
         >
-          <Text style={styles.ctaBtnText}>Complete Registration</Text>
+          <Text style={styles.ctaBtnText}>{t('vendor.completeRegistration')}</Text>
           <MaterialIcons name="arrow-forward" size={16} color="#000" />
         </TouchableOpacity>
       </View>
@@ -403,9 +390,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
   if (!stats) {
     return (
       <View style={[styles.centered, { backgroundColor: C.bg }]}>
-        <Text style={{ color: C.textSub }}>
-          Something went wrong loading your dashboard.
-        </Text>
+        <Text style={{ color: C.textSub }}>{t('common.error')}</Text>
       </View>
     );
   }
@@ -429,7 +414,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         )
       : 0;
 
-  const STAT_TABS = ["Today", "Week", "Month"];
+  const STAT_TABS = [t('vendor.tabToday'), t('vendor.tabWeek'), t('vendor.tabMonth')];
 
   const handleSearch = async (query) => {
     setSearchQuery(query);
@@ -938,8 +923,8 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
       {/* ── STATUS BANNERS ──────────────────────────────────── */}
       {vendorStatus === "pending" && (
         <StatusBanner
-          title="⏳ Verification Pending"
-          message="Your shop is under admin review. You'll be notified once approved (24–48 hrs)."
+          title={`⏳ ${t('vendor.verificationPending')}`}
+          message={t('vendor.verificationPendingMsg')}
           bg={C.warn}
           border={C.warnBorder}
           textColor={C.warnText}
@@ -948,8 +933,8 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
       )}
       {vendorStatus === "rejected" && (
         <StatusBanner
-          title="Application Rejected"
-          message="Your application was rejected. Please re-submit with correct documents."
+          title={t('vendor.applicationRejected')}
+          message={t('vendor.applicationRejectedMsg')}
           bg={C.danger}
           border={C.dangerBorder}
           textColor={C.dangerText}
@@ -1125,7 +1110,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             >
               <View style={styles.heroPulse} />
               <Text style={[styles.heroTopLabel, { fontSize: rs(10, 11, 11) }]}>
-                MONTHLY ORDERS
+                {t('vendor.monthlyOrders')}
               </Text>
             </View>
             <Text style={[styles.heroValue, { fontSize: rs(28, 32, 36) }]}>
@@ -1141,27 +1126,21 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             >
               <View style={styles.heroChangeBadge}>
                 <MaterialIcons name="trending-up" size={10} color={C.primary} />
-                <Text
-                  style={[styles.heroChangeTxt, { fontSize: rs(9, 10, 10) }]}
-                >
+                <Text style={[styles.heroChangeTxt, { fontSize: rs(9, 10, 10) }]}>
                   +24%
                 </Text>
               </View>
               <Text style={[styles.heroSubTxt, { fontSize: rs(10, 10, 11) }]}>
-                vs last month
+                {t('vendor.vsLastMonth')}
               </Text>
             </View>
             <View style={styles.heroDivider} />
             <View style={{ flexDirection: "row", gap: rs(12, 14, 16) }}>
               <View>
-                <Text
-                  style={[styles.heroSmallLabel, { fontSize: rs(9, 10, 10) }]}
-                >
-                  Revenue
+                <Text style={[styles.heroSmallLabel, { fontSize: rs(9, 10, 10) }]}>
+                  {t('vendor.revenue')}
                 </Text>
-                <Text
-                  style={[styles.heroSmallVal, { fontSize: rs(13, 14, 15) }]}
-                >
+                <Text style={[styles.heroSmallVal, { fontSize: rs(13, 14, 15) }]}>
                   ₹
                   {Number(stats.monthly.revenue).toLocaleString("en-IN", {
                     notation: "compact",
@@ -1169,14 +1148,10 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 </Text>
               </View>
               <View>
-                <Text
-                  style={[styles.heroSmallLabel, { fontSize: rs(9, 10, 10) }]}
-                >
-                  Prep Avg
+                <Text style={[styles.heroSmallLabel, { fontSize: rs(9, 10, 10) }]}>
+                  {t('vendor.prepAvg')}
                 </Text>
-                <Text
-                  style={[styles.heroSmallVal, { fontSize: rs(13, 14, 15) }]}
-                >
+                <Text style={[styles.heroSmallVal, { fontSize: rs(13, 14, 15) }]}>
                   {stats.monthly.avgPrepTime}m
                 </Text>
               </View>
@@ -1186,7 +1161,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           {/* Right mini cards */}
           <View style={{ flex: 1, gap: rs(12, 14, 16) }}>
             <MiniMetricCard
-              label="Weekly Orders"
+              label={t('vendor.weeklyOrders')}
               value={stats.weekly.totalOrders.toString()}
               icon="receipt-long"
               iconColor={C.blue}
@@ -1194,7 +1169,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               rs={rs}
             />
             <MiniMetricCard
-              label="Weekly Revenue"
+              label={t('vendor.weeklyRevenue')}
               value={`₹${Number(stats.weekly.revenue).toLocaleString("en-IN", { notation: "compact" })}`}
               icon="payments"
               iconColor={C.orange}
@@ -1202,7 +1177,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               rs={rs}
             />
             <MiniMetricCard
-              label="Delivery Time"
+              label={t('vendor.deliveryTime')}
               value={`${stats.monthly.deliveryTime}m`}
               icon="moped"
               iconColor={C.purple}
@@ -1222,10 +1197,10 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           <View style={[styles.cardHeader, { flexWrap: "wrap", gap: 8 }]}>
             <View>
               <Text style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}>
-                SALES OVERVIEW
+                {t('vendor.salesOverview')}
               </Text>
-              <Text style={[styles.cardTitle, { fontSize: rs(13, 14, 16) }]}>
-                Revenue Chart
+              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 16) }]}>
+                {t('vendor.revenueChart')}
               </Text>
             </View>
             <View style={[styles.tabRow, { flexShrink: 0 }]}>
@@ -1259,48 +1234,27 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           {/* Active period stats */}
           <View style={styles.chartStatRow}>
             <View style={styles.chartStatItem}>
-              <Text
-                style={[
-                  styles.chartStatVal,
-                  { fontSize: rs(16, 18, 20), color: C.primary },
-                ]}
-              >
+              <Text style={[styles.chartStatVal, { fontSize: rs(16, 18, 20), color: C.primary }]}>
                 {currStats.totalOrders}
               </Text>
-              <Text
-                style={[styles.chartStatLabel, { fontSize: rs(10, 11, 11) }]}
-              >
-                Orders
+              <Text style={[styles.chartStatLabel, { fontSize: rs(10, 11, 11) }]}>
+                {t('vendor.orders')}
               </Text>
             </View>
             <View style={styles.chartStatItem}>
-              <Text
-                style={[
-                  styles.chartStatVal,
-                  { fontSize: rs(16, 18, 20), color: C.blue },
-                ]}
-              >
+              <Text style={[styles.chartStatVal, { fontSize: rs(16, 18, 20), color: C.blue }]}>
                 ₹{Number(currStats.revenue).toLocaleString("en-IN")}
               </Text>
-              <Text
-                style={[styles.chartStatLabel, { fontSize: rs(10, 11, 11) }]}
-              >
-                Revenue
+              <Text style={[styles.chartStatLabel, { fontSize: rs(10, 11, 11) }]}>
+                {t('vendor.revenue')}
               </Text>
             </View>
             <View style={styles.chartStatItem}>
-              <Text
-                style={[
-                  styles.chartStatVal,
-                  { fontSize: rs(16, 18, 20), color: C.orange },
-                ]}
-              >
+              <Text style={[styles.chartStatVal, { fontSize: rs(16, 18, 20), color: C.orange }]}>
                 {currStats.avgPrepTime}m
               </Text>
-              <Text
-                style={[styles.chartStatLabel, { fontSize: rs(10, 11, 11) }]}
-              >
-                Avg. Prep
+              <Text style={[styles.chartStatLabel, { fontSize: rs(10, 11, 11) }]}>
+                {t('vendor.avgPrep')}
               </Text>
             </View>
           </View>
@@ -1356,13 +1310,8 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               SCREEN_W < 768 && { alignItems: "center" },
             ]}
           >
-            <Text
-              style={[
-                styles.cardTitle,
-                { fontSize: rs(13, 14, 15), marginBottom: 12 },
-              ]}
-            >
-              Goal Overview
+            <Text style={[styles.cardTitle, { fontSize: rs(13, 14, 15), marginBottom: 12 }]}>
+              {t('vendor.goalOverview')}
             </Text>
             <View style={styles.goalRingWrap}>
               <View
@@ -1419,7 +1368,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 { fontSize: rs(13, 14, 15), marginBottom: 12 },
               ]}
             >
-              Efficiency
+              {t('vendor.efficiency')}
             </Text>
             <View style={styles.effBlock}>
               <View
@@ -1440,7 +1389,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 />
               </View>
               <Text style={[styles.effLabel, { fontSize: rs(10, 10, 11) }]}>
-                Avg. Prep Time
+                {t('vendor.avgPrepTime')}
               </Text>
               <Text
                 style={[
@@ -1472,7 +1421,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 />
               </View>
               <Text style={[styles.effLabel, { fontSize: rs(10, 10, 11) }]}>
-                Avg. Delivery
+                {t('vendor.avgDelivery')}
               </Text>
               <Text
                 style={[
@@ -1497,10 +1446,10 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           <View style={styles.cardHeader}>
             <View>
               <Text style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}>
-                PERFORMANCE
+                {t('vendor.performance')}
               </Text>
               <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 16) }]}>
-                Top Selling Products
+                {t('vendor.topSellingProducts')}
               </Text>
             </View>
             <View style={[styles.badgePill, { backgroundColor: C.primaryDim }]}>
@@ -1515,7 +1464,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                   { color: C.primaryDark, fontSize: rs(9, 10, 10) },
                 ]}
               >
-                Live
+                {t('vendor.live')}
               </Text>
             </View>
           </View>
@@ -1527,7 +1476,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 name={p.name}
                 sold={p.sold}
                 revenue={p.revenue}
-                tag={i === 0 ? "Best Seller" : i < 3 ? "Trending" : null}
+                tag={i === 0 ? t('vendor.bestSeller') : i < 3 ? t('vendor.trending') : null}
                 image={
                   p.image ||
                   "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&q=80"
@@ -1536,7 +1485,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               />
             ))
           ) : (
-            <EmptyState icon="bar-chart" message="No sales data yet" />
+            <EmptyState icon="bar-chart" message={t('vendor.noSalesData')} />
           )}
         </View>
 
@@ -1550,10 +1499,10 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           <View style={styles.cardHeader}>
             <View>
               <Text style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}>
-                FEEDBACK
+                {t('vendor.feedback')}
               </Text>
               <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 16) }]}>
-                Latest Reviews
+                {t('vendor.latestReviews')}
               </Text>
             </View>
             <TouchableOpacity
@@ -1561,7 +1510,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               onPress={() => setReviewsModal(true)}
             >
               <Text style={[styles.viewMoreText, { fontSize: rs(11, 12, 12) }]}>
-                View all
+                {t('vendor.viewAll')}
               </Text>
               <MaterialIcons
                 name="arrow-forward-ios"
@@ -1587,10 +1536,10 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           <View style={styles.cardHeader}>
             <View>
               <Text style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}>
-                NETWORK
+                {t('vendor.network')}
               </Text>
               <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 16) }]}>
-                Delivery Partners
+                {t('vendor.deliveryPartners')}
               </Text>
             </View>
             <TouchableOpacity
@@ -1598,7 +1547,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               onPress={() => setPartnersModal(true)}
             >
               <Text style={[styles.viewMoreText, { fontSize: rs(11, 12, 12) }]}>
-                See all
+                {t('vendor.seeAll')}
               </Text>
               <MaterialIcons
                 name="arrow-forward-ios"

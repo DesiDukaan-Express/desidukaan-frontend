@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   StatusBar,
+  Platform,
+  Alert,
   Modal,
   Pressable,
 } from 'react-native';
@@ -18,11 +20,15 @@ import {
   PlusJakartaSans_700Bold,
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
+import { useTranslation } from 'react-i18next';
 import useAuthStore from '../../store/authStore';
+
 import AccountManagerModal from '../../components/common/AccountManagerModal';
-import { Platform } from "react-native";
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+
+import LanguageSwitcher from '../../components/common/LanguageSwitcher';
+
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 
@@ -109,7 +115,11 @@ function LogoutModal({ visible, onConfirm, onCancel }) {
 
 export default function DeliveryProfileScreen({ navigation }) {
   const { token, user, logout } = useAuthStore();
-  
+
+
+  const { t } = useTranslation();
+  const [showLanguage, setShowLanguage] = useState(false);
+
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_500Medium,
     PlusJakartaSans_600SemiBold,
@@ -293,12 +303,25 @@ const handleLogout = async () => {
           <TouchableOpacity style={p.logoutBtn} onPress={() => setShowLogout(true)} activeOpacity={0.8}>
             <Text style={p.logoutText}>Log out</Text>
           </TouchableOpacity>
-
+          {/* ── Language setting ── */}
+          <TouchableOpacity
+            style={p.langBtn}
+            onPress={() => setShowLanguage(true)}
+            activeOpacity={0.8}
+          >
+            <View style={p.langBtnLeft}>
+              <Text style={p.langBtnIcon}>🌐</Text>
+              <View>
+                <Text style={p.langBtnLabel}>{t('profile.language')}</Text>
+                <Text style={p.langBtnSub}>{t('profile.languageSub')}</Text>
+              </View>
+            </View>
+            <Text style={p.langBtnArrow}>›</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={{ height: 100 }} />
       </ScrollView>
-
       <AccountManagerModal
         visible={showAccountManager}
         onClose={() => setShowAccountManager(false)}
@@ -309,6 +332,27 @@ const handleLogout = async () => {
   onConfirm={handleLogout}
   onCancel={() => setShowLogout(false)}
 />
+
+      {/* Language Picker Modal */}
+      <Modal
+        visible={showLanguage}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowLanguage(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+          onPress={() => setShowLanguage(false)}
+        >
+          <Pressable
+            style={{ backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48 }}
+            onPress={() => {}}
+          >
+            <View style={{ width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
+            <LanguageSwitcher inline />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -392,4 +436,17 @@ const lm = StyleSheet.create({
   cancelText: { fontSize: 15, fontWeight: "700", color: C.gray700 },
   confirm: { flex: 1, paddingVertical: 14, borderRadius: 13, backgroundColor: C.red, alignItems: "center" },
   confirmText: { fontSize: 15, fontWeight: "700", color: C.white },
+
+
+  langBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: C.white, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 16,
+    borderWidth: 1.5, borderColor: C.gray200, marginTop: 4,
+  },
+  langBtnLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  langBtnIcon: { fontSize: 20 },
+  langBtnLabel: { fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: C.gray900 },
+  langBtnSub:   { fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: C.gray400, marginTop: 2 },
+  langBtnArrow: { fontSize: 22, color: C.gray300, fontFamily: 'PlusJakartaSans_500Medium' },
+
 });

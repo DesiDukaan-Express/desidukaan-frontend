@@ -42,7 +42,7 @@ const useOrderStore = create((set, get) => ({
 
 
     setPendingOrder: (order) => {
-        set({ pendingOrder: order });
+        set({ pendingOrder: { ...order, placedAt: order.placedAt || Date.now() } });
     },
 
 
