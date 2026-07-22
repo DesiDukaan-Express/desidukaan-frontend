@@ -9,6 +9,7 @@ import * as Location from 'expo-location';
 import { io } from 'socket.io-client';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 
 // Helper to open telephone dialer on both Native (Expo/React Native) and Web
 const openPhoneCall = (phone) => {
@@ -804,6 +805,7 @@ function AvailableOrderCard({ order, onAccept }) {
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 export default function ActiveDeliveryScreen({ navigation }) {
   const { token, user } = useAuthStore();
+  const { t } = useTranslation();
 
 
 

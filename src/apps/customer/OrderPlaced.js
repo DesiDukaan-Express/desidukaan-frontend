@@ -8,6 +8,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
+import { useTranslation } from "react-i18next";
 
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
@@ -28,6 +29,7 @@ const C = {
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function OrderPlaced() {
+  const { t }       = useTranslation();
   const navigation  = useNavigation();
   const route       = useRoute();
   const { token }   = useAuthStore();
@@ -113,10 +115,10 @@ export default function OrderPlaced() {
   // ── Helper for status UI ────────────────────────────────────────────────────
   const getStatusConfig = () => {
     switch(status) {
-      case "accepted": return { title: "Order Confirmed!", sub: "The store has accepted your order.", icon: "check-circle", color: C.green, bg: C.greenLight };
-      case "rejected": return { title: "Order Declined", sub: "The store couldn't fulfill your order.", icon: "x-circle", color: C.red, bg: C.redLight };
-      case "expired":  return { title: "Request Expired", sub: "The store didn't respond in time.", icon: "clock", color: C.orange, bg: "#FFF7ED" };
-      default:         return { title: "Order Sent! 🚀", sub: "Waiting for store confirmation...", icon: "loader", color: C.orange, bg: "#FEF3C7" };
+      case "accepted": return { title: t('orders.orderConfirmed') || "Order Confirmed!", sub: t('orders.storeAccepted') || "The store has accepted your order.", icon: "check-circle", color: C.green, bg: C.greenLight };
+      case "rejected": return { title: t('orders.orderDeclined') || "Order Declined", sub: t('orders.storeDeclinedSub') || "The store couldn't fulfill your order.", icon: "x-circle", color: C.red, bg: C.redLight };
+      case "expired":  return { title: t('orders.requestExpired') || "Request Expired", sub: t('orders.storeExpiredSub') || "The store didn't respond in time.", icon: "clock", color: C.orange, bg: "#FFF7ED" };
+      default:         return { title: t('orders.orderSent') || "Order Sent! 🚀", sub: t('orders.waitingConfirmation') || "Waiting for store confirmation...", icon: "loader", color: C.orange, bg: "#FEF3C7" };
     }
   };
   const cfg = getStatusConfig();
@@ -163,7 +165,7 @@ export default function OrderPlaced() {
           )}
 
           <Text style={s.subtitle}>
-            Order with <Text style={s.subtitleBold}>{vendorName}</Text>.{"\n"}
+            {t('orders.orderWith', { name: vendorName }) || `Order with ${vendorName}.`}{"\n"}
             {cfg.sub}
           </Text>
         </Animated.View>
@@ -177,8 +179,8 @@ export default function OrderPlaced() {
               <Feather name="shopping-bag" size={15} color={C.green} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.infoLabel}>Estimated Delivery</Text>
-              <Text style={s.infoValue}>~30 minutes</Text>
+              <Text style={s.infoLabel}>{t('orders.estimatedDelivery') || "Estimated Delivery"}</Text>
+              <Text style={s.infoValue}>{t('orders.estimatedDeliveryVal') || "~30 minutes"}</Text>
             </View>
           </View>
 
@@ -189,8 +191,8 @@ export default function OrderPlaced() {
               <Feather name={cfg.icon} size={15} color={cfg.color} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.infoLabel}>Current Status</Text>
-              <Text style={[s.infoValue, { color: cfg.color }]}>{status === 'waiting' ? 'Waiting for store…' : status.toUpperCase()}</Text>
+              <Text style={s.infoLabel}>{t('orders.currentStatus') || "Current Status"}</Text>
+              <Text style={[s.infoValue, { color: cfg.color }]}>{status === 'waiting' ? (t('orders.waitingForStore') || 'Waiting for store…') : status.toUpperCase()}</Text>
             </View>
           </View>
         </Animated.View>
@@ -201,14 +203,14 @@ export default function OrderPlaced() {
             <TouchableOpacity style={s.trackBtn} onPress={goHome} activeOpacity={0.88}>
               <LinearGradient colors={[C.green, C.greenDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.trackGrad}>
                 <Feather name="home" size={16} color={C.white} />
-                <Text style={s.trackText}>Proceed to Home</Text>
+                <Text style={s.trackText}>{t('orders.proceedToHome') || "Proceed to Home"}</Text>
               </LinearGradient>
             </TouchableOpacity>
           )}
 
           <TouchableOpacity style={s.homeBtn} onPress={(status === 'rejected' || status === 'expired') ? goHome : goOrders} activeOpacity={0.8}>
             <Feather name={(status === 'rejected' || status === 'expired') ? "home" : "list"} size={15} color={C.gray600} />
-            <Text style={s.homeBtnText}>{(status === 'rejected' || status === 'expired') ? "Back to Home" : "Go to My Orders"}</Text>
+            <Text style={s.homeBtnText}>{(status === 'rejected' || status === 'expired') ? (t('orders.backToHome') || "Back to Home") : (t('orders.goToMyOrders') || "Go to My Orders")}</Text>
           </TouchableOpacity>
         </Animated.View>
 

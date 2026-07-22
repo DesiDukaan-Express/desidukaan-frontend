@@ -13,6 +13,7 @@ import {
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import useAuthStore from '../../store/authStore';
+import { useTranslation } from 'react-i18next';
 
 const API_BASE   = process.env.EXPO_PUBLIC_API_URL    || 'http://localhost:3000/api';
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3000';
@@ -298,6 +299,7 @@ const es = StyleSheet.create({
 // ════════════════════════════════════════════════════════════════════════════════
 export default function QueueScreen({ navigation }) {
   const { token } = useAuthStore();
+  const { t } = useTranslation();
 
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_500Medium,

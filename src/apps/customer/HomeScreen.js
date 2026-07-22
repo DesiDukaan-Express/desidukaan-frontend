@@ -27,6 +27,7 @@ import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import { useNavigation } from "@react-navigation/native";
+import { useTranslation } from "react-i18next";
 import { vendorsAPI, ordersAPI, categoriesAPI } from "../../services/api";
 import ChatWidget from "./ChatWidget";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
@@ -127,6 +128,7 @@ function AddressPicker({
   onUseLocation,
   onDelete,
 }) {
+  const { t } = useTranslation();
   // mode: 'list' | 'add' | 'edit'
   const [mode, setMode] = React.useState("list");
   const [editingAddr, setEditingAddr] = React.useState(null);
@@ -157,14 +159,14 @@ function AddressPicker({
   const openEdit = (addr) => {
     setEditingAddr(addr);
     setInputText(addr.address_line || addr.address || "");
-    setInputLabel(addr.label || "Home");
+    setInputLabel(addr.label || t("home.labelPlaceholder"));
     setInputErr("");
     setMode("edit");
   };
 
   const handleSaveAdd = () => {
     if (inputText.trim().length < 5) {
-      setInputErr("Please enter a valid address (at least 5 characters)");
+      setInputErr(t("home.addressError"));
       return;
     }
     onSaveNew(inputText.trim());
@@ -175,13 +177,13 @@ function AddressPicker({
 
   const handleSaveEdit = async () => {
     if (inputText.trim().length < 5) {
-      setInputErr("Please enter a valid address (at least 5 characters)");
+      setInputErr(t("home.addressError"));
       return;
     }
     setSaving(true);
     await onUpdate?.(editingAddr.id, {
       address_line: inputText.trim(),
-      label: inputLabel.trim() || editingAddr.label || "Home",
+      label: inputLabel.trim() || editingAddr.label || t("home.labelPlaceholder"),
     });
     setSaving(false);
     setMode("list");
@@ -216,10 +218,10 @@ function AddressPicker({
           <View style={ap.titleRow}>
             <Text style={ap.title}>
               {mode === "add"
-                ? "Add new address"
+                ? t("home.addNewAddress")
                 : mode === "edit"
-                ? "Edit address"
-                : "Select delivery address"}
+                ? t("home.editAddress")
+                : t("home.selectAddress")}
             </Text>
             <TouchableOpacity
               onPress={() => (isFormMode ? setMode("list") : onClose())}
@@ -239,7 +241,7 @@ function AddressPicker({
               {/* Label field (only shown in edit) */}
               {mode === "edit" && (
                 <>
-                  <Text style={ap.formLabel}>Label (e.g. Home, Office)</Text>
+                  <Text style={ap.formLabel}>{t("home.labelHint")}</Text>
                   <View style={[ap.inputBoxSingle, inputErr ? ap.inputBoxError : null]}>
                     <MaterialIcons
                       name="label"
@@ -249,7 +251,7 @@ function AddressPicker({
                     />
                     <TextInput
                       style={ap.input}
-                      placeholder="Home"
+                      placeholder={t("home.labelPlaceholder")}
                       placeholderTextColor={C.gray400}
                       value={inputLabel}
                       onChangeText={(t) => setInputLabel(t)}
@@ -260,7 +262,7 @@ function AddressPicker({
                 </>
               )}
 
-              <Text style={ap.formLabel}>Full address</Text>
+              <Text style={ap.formLabel}>{t("home.fullAddress")}</Text>
               <View style={[ap.inputBox, inputErr ? ap.inputBoxError : null]}>
                 <MaterialIcons
                   name="location-on"
@@ -270,10 +272,10 @@ function AddressPicker({
                 />
                 <TextInput
                   style={ap.input}
-                  placeholder="House no., street, area, city…"
+                  placeholder={t("home.addressPlaceholder")}
                   placeholderTextColor={C.gray400}
                   value={inputText}
-                  onChangeText={(t) => { setInputText(t); setInputErr(""); }}
+                  onChangeText={(text) => { setInputText(text); setInputErr(""); }}
                   multiline
                   numberOfLines={3}
                   autoFocus
@@ -296,7 +298,7 @@ function AddressPicker({
                   <>
                     <MaterialIcons name="check" size={16} color={C.white} />
                     <Text style={ap.saveBtnText}>
-                      {mode === "edit" ? "Update address" : "Save address"}
+                      {mode === "edit" ? t("home.updateAddress") : t("home.saveAddress")}
                     </Text>
                   </>
                 )}
@@ -311,8 +313,8 @@ function AddressPicker({
                   <MaterialIcons name="my-location" size={20} color={C.green} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={ap.locationRowTitle}>Use current location</Text>
-                  <Text style={ap.locationRowSub}>Detect my location automatically</Text>
+                  <Text style={ap.locationRowTitle}>{t("home.useLocation")}</Text>
+                  <Text style={ap.locationRowSub}>{t("home.detectLocation")}</Text>
                 </View>
                 <MaterialIcons name="chevron-right" size={22} color={C.gray400} />
               </TouchableOpacity>
@@ -323,7 +325,7 @@ function AddressPicker({
                 {addresses.length === 0 ? (
                   <View style={ap.emptyWrap}>
                     <MaterialIcons name="location-on" size={32} color={C.gray300} />
-                    <Text style={ap.emptyText}>No saved addresses yet</Text>
+                    <Text style={ap.emptyText}>{t("home.noSavedAddresses")}</Text>
                   </View>
                 ) : (
                   addresses.map((addr) => {
@@ -346,7 +348,7 @@ function AddressPicker({
                         <View style={{ flex: 1 }}>
                           <View style={ap.addrCardTopRow}>
                             <Text style={[ap.addrLabel, isActive && ap.addrLabelActive]}>
-                              {addr.label || "Home"}
+                              {addr.label || t("home.labelPlaceholder")}
                             </Text>
                             {/* Radio / Check indicator */}
                             {isActive ? (
@@ -366,7 +368,7 @@ function AddressPicker({
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                             >
                               <MaterialIcons name="edit" size={14} color={C.gray700} />
-                              <Text style={ap.editBtnText}>Edit</Text>
+                              <Text style={ap.editBtnText}>{t("common.edit")}</Text>
                             </TouchableOpacity>
                             {!isActive && (
                               <TouchableOpacity
@@ -388,7 +390,7 @@ function AddressPicker({
               {/* Add new address */}
               <TouchableOpacity style={ap.addNewBtn} onPress={openAdd} activeOpacity={0.85}>
                 <MaterialIcons name="add" size={20} color={C.green} />
-                <Text style={ap.addNewText}>Add new address</Text>
+                <Text style={ap.addNewText}>{t("home.addNewAddress")}</Text>
               </TouchableOpacity>
             </>
           )}
@@ -602,6 +604,7 @@ const ap = StyleSheet.create({
 
 // ─── Store Picker Modal ────────────────────────────────────────────────────────
 function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
+  const { t } = useTranslation();
   if (!item) return null;
 
   const vendorsWithItem = vendors.filter((v) =>
@@ -620,10 +623,9 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
       <Pressable style={sp.backdrop} onPress={onClose}>
         <Pressable style={sp.sheet} onPress={() => { }}>
           <View style={sp.handle} />
-          <Text style={sp.sheetTitle}>Choose a store</Text>
+          <Text style={sp.sheetTitle}>{t("home.chooseStore")}</Text>
           <Text style={sp.sheetSub}>
-            Stores that have <Text style={sp.itemName}>{item.name}</Text> in
-            stock
+            {t("home.storeHasItem", { name: item.name })}
           </Text>
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -633,7 +635,7 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
               <View style={sp.emptyWrap}>
                 <MaterialIcons name="error-outline" size={32} color={C.gray300} />
                 <Text style={sp.emptyText}>
-                  No stores nearby carry this item right now.
+                  {t("home.noStoresNearby")}
                 </Text>
               </View>
             ) : (
@@ -664,18 +666,18 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
                         <Text style={sp.storeMetaText}>
                           {v.distance_km
                             ? `${parseFloat(v.distance_km).toFixed(1)} km`
-                            : "Nearby"}
+                            : t("home.nearby")}
                         </Text>
                         <View style={sp.dot} />
                         <MaterialIcons name="access-time" size={11} color={C.gray400} />
-                        <Text style={sp.storeMetaText}>30 min</Text>
+                        <Text style={sp.storeMetaText}>{t("home.deliveryTime")}</Text>
                       </View>
                       <Text style={sp.storePrice}>
                         ₹{price} <Text style={sp.storeUnit}>· {formatWeight(item.selectedWeight || item.unit)}</Text>
                       </Text>
                     </View>
                     <View style={sp.addStoreBtn}>
-                      <Text style={sp.addStoreBtnText}>Add</Text>
+                      <Text style={sp.addStoreBtnText}>{t("common.add")}</Text>
                       <MaterialIcons name="arrow-forward" size={13} color={C.white} />
                     </View>
                   </TouchableOpacity>
@@ -684,7 +686,7 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
             )}
           </ScrollView>
           <TouchableOpacity style={sp.cancelBtn} onPress={onClose}>
-            <Text style={sp.cancelText}>Cancel</Text>
+            <Text style={sp.cancelText}>{t("common.cancel")}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -889,6 +891,7 @@ function CategoryBrowseSheet({
   onAdd, onRemove, getCartQty, onOpenWeightPicker, vendors,
   onStoreSelect, apiCategories, onItemDetail,
 }) {
+  const { t } = useTranslation();
   const [activeSubCat, setActiveSubCat] = React.useState(null);
   const subCats = category && hierarchy[category]
     ? Object.keys(hierarchy[category]).filter(sc => sc !== "All")
@@ -929,7 +932,7 @@ function CategoryBrowseSheet({
               )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={cbs.headerCat}>Category</Text>
+              <Text style={cbs.headerCat}>{t("home.categoryLabel")}</Text>
               <Text style={cbs.headerTitle}>{category}</Text>
             </View>
             <TouchableOpacity style={cbs.closeBtn} onPress={onClose}>
@@ -942,7 +945,7 @@ function CategoryBrowseSheet({
               showsVerticalScrollIndicator={false}
               contentContainerStyle={cbs.subCatGridContainer}
             >
-              <Text style={cbs.subCatGridTitle}>Select a sub-category to browse</Text>
+              <Text style={cbs.subCatGridTitle}>{t("home.selectSubCategory")}</Text>
               <View style={cbs.subCatGrid}>
                 {subCats.map(sc => {
                   const count = hierarchy[category]?.[sc]?.length || 0;
@@ -964,7 +967,7 @@ function CategoryBrowseSheet({
                       </View>
                       <View style={cbs.subCatCardInfo}>
                         <Text style={cbs.subCatCardName} numberOfLines={2}>{sc}</Text>
-                        <Text style={cbs.subCatCardCount}>{count} Item{count !== 1 ? "s" : ""}</Text>
+                        <Text style={cbs.subCatCardCount}>{t("home.itemsCount", { count })}</Text>
                       </View>
                       <MaterialIcons name="chevron-right" size={20} color={catAccent.accent} />
                     </TouchableOpacity>
@@ -983,7 +986,7 @@ function CategoryBrowseSheet({
                   >
                     <MaterialIcons name="arrow-back" size={16} color={catAccent.accent} />
                     <Text style={[cbs.backToSubCatsText, { color: catAccent.accent }]}>
-                      Back to Subcategories
+                      {t("home.backToSubcategories")}
                     </Text>
                   </TouchableOpacity>
                   <Text style={cbs.activeSubCatTitle}>{activeSubCat}</Text>
@@ -1026,10 +1029,10 @@ function CategoryBrowseSheet({
 
               {/* ── Column Headers ── */}
               <View style={cbs.tableHeader}>
-                <Text style={[cbs.thCell, { flex: 2 }]}>PRODUCT</Text>
-                <Text style={[cbs.thCell, { flex: 1, textAlign: "center" }]}>BRAND</Text>
-                <Text style={[cbs.thCell, { flex: 1, textAlign: "center" }]}>QTY / UNIT</Text>
-                <Text style={[cbs.thCell, { width: 80, textAlign: "right" }]}>PRICE</Text>
+                <Text style={[cbs.thCell, { flex: 2 }]}>{t("home.colProduct")}</Text>
+                <Text style={[cbs.thCell, { flex: 1, textAlign: "center" }]}>{t("home.brand")}</Text>
+                <Text style={[cbs.thCell, { flex: 1, textAlign: "center" }]}>{t("home.qtyUnit")}</Text>
+                <Text style={[cbs.thCell, { width: 80, textAlign: "right" }]}>{t("home.price")}</Text>
               </View>
 
               {/* ── Product Rows ── */}
@@ -1040,7 +1043,7 @@ function CategoryBrowseSheet({
                 {subCatItems.length === 0 ? (
                   <View style={cbs.emptyWrap}>
                     <MaterialIcons name="inventory" size={32} color={C.gray300} />
-                    <Text style={cbs.emptyText}>No items in this sub-category</Text>
+                    <Text style={cbs.emptyText}>{t("home.noSubCatItems")}</Text>
                   </View>
                 ) : (
                   subCatItems.map((inv, idx) => {
@@ -1083,7 +1086,7 @@ function CategoryBrowseSheet({
                             )}
                             {loose && (
                               <View style={[cbs.discPill, { backgroundColor: "#0891B2" }]}>
-                                <Text style={cbs.discPillText}>Loose</Text>
+                                <Text style={cbs.discPillText}>{t("home.loose")}</Text>
                               </View>
                             )}
                             <TouchableOpacity
@@ -1125,7 +1128,7 @@ function CategoryBrowseSheet({
                                 else onAdd(item);
                               }}
                             >
-                              <Text style={cbs.addBtnText}>{loose ? "SELECT" : "ADD"}</Text>
+                              <Text style={cbs.addBtnText}>{loose ? t("home.select") : t("common.add")}</Text>
                             </TouchableOpacity>
                           ) : (
                             <View style={cbs.qtyRow}>
@@ -1338,6 +1341,7 @@ const VENDOR_TYPE_META = {
 
 // ─── Item Card (grid, used inside CategoryBrowseSheet) ────────────────────────
 function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker }) {
+  const { t } = useTranslation();
   const size = cardWidth || 130;
   const imgUri =
     item.img ||
@@ -1353,12 +1357,12 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
       <View style={ic.imgWrap}>
         {loose && (
           <View style={[ic.badge, { backgroundColor: C.cyan, right: 6, left: "auto", top: 6 }]}>
-            <Text style={ic.badgeText}>Loose</Text>
+            <Text style={ic.badgeText}>{t("home.loose")}</Text>
           </View>
         )}
         {hasMrp && (
           <View style={[ic.badge, { top: 6, left: 6 }]}>
-            <Text style={ic.badgeText}>{discPct}% off</Text>
+            <Text style={ic.badgeText}>{t("home.discountOff", { count: discPct })}</Text>
           </View>
         )}
         <Image
@@ -1390,7 +1394,7 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
             ) : (
               <MaterialIcons name="add" size={12} color={C.white} />
             )}
-            <Text style={ic.addText}>{loose ? "SELECT" : "ADD"}</Text>
+            <Text style={ic.addText}>{loose ? t("home.select") : t("common.add")}</Text>
           </TouchableOpacity>
         ) : (
           <View style={ic.qtyRow}>
@@ -1410,6 +1414,7 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
 
 // ─── Popular Item Card (horizontal scroll, HTML-reference style) ───────────────
 function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPress }) {
+  const { t } = useTranslation();
   const CARD_W = 160;
   const IMG_H = 100;
 
@@ -1429,13 +1434,13 @@ function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPre
         {/* Discount badge – top-left */}
         {hasMrp && (
           <View style={pic.discBadge}>
-            <Text style={pic.discBadgeText}>{discPct}% OFF</Text>
+            <Text style={pic.discBadgeText}>{t("home.discountOffUpper", { count: discPct })}</Text>
           </View>
         )}
         {/* Loose badge – top-right */}
         {loose && (
           <View style={[pic.discBadge, { right: 32, left: 'auto', backgroundColor: C.cyan }]}>
-            <Text style={pic.discBadgeText}>Loose</Text>
+            <Text style={pic.discBadgeText}>{t("home.loose")}</Text>
           </View>
         )}
         <TouchableOpacity
@@ -1680,7 +1685,9 @@ const ic = StyleSheet.create({
 });
 
 // ─── Weight Picker Modal ───────────────────────────────────────────────────
+// ─── Weight Picker Modal ───────────────────────────────────────────────────
 function WeightPickerModal({ item, onClose, onAdd }) {
+  const { t } = useTranslation();
   if (!item) return null;
   const weightOptions = parseWeightOptions(item) || [item.unit || "1 pc"];
   const [selected, setSelected] = useState(weightOptions[0]);
@@ -1700,18 +1707,18 @@ function WeightPickerModal({ item, onClose, onAdd }) {
             <View style={{ flex: 1 }}>
               <View style={wp.looseBadge}>
                 <MaterialIcons name="water-drop" size={10} color={C.cyan} />
-                <Text style={wp.looseBadgeText}>Loose item</Text>
+                <Text style={wp.looseBadgeText}>{t("home.looseItem")}</Text>
               </View>
               <Text style={wp.productName} numberOfLines={2}>{item.name}</Text>
               <Text style={wp.basePriceText}>
                 ₹{item.price}{" "}
-                <Text style={wp.perUnit}>per {item.unit || "unit"}</Text>
+                <Text style={wp.perUnit}>{t("home.perUnit", { unit: item.unit || "unit" })}</Text>
               </Text>
             </View>
           </View>
 
           {/* Weight chips */}
-          <Text style={wp.pickLabel}>Select quantity</Text>
+          <Text style={wp.pickLabel}>{t("home.selectQuantity")}</Text>
           <View style={wp.optionsGrid}>
             {weightOptions.map(w => {
               const formatted = formatWeight(w);
@@ -1741,7 +1748,7 @@ function WeightPickerModal({ item, onClose, onAdd }) {
               style={wp.addBtnGrad}
             >
               <MaterialIcons name="shopping-cart" size={16} color={C.white} />
-              <Text style={wp.addBtnText}>Add {formatWeight(selected)} to Cart</Text>
+              <Text style={wp.addBtnText}>{t("home.addWeightToCart", { weight: formatWeight(selected) })}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </Pressable>
@@ -1775,6 +1782,7 @@ const wp = StyleSheet.create({
 // ─── Item Detail Modal (animated slide-up + blurred backdrop) ─────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
 function ItemDetailModal({ item, onClose, onAdd, onRemove, qty }) {
+  const { t } = useTranslation();
   const { width: W, height: H } = Dimensions.get("window");
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -1892,7 +1900,7 @@ function ItemDetailModal({ item, onClose, onAdd, onRemove, qty }) {
               </TouchableOpacity>
               {hasDiscount && (
                 <View style={dm.discBadge}>
-                  <Text style={dm.discBadgeText}>{discountPct}% OFF</Text>
+                  <Text style={dm.discBadgeText}>{t("home.discountOffUpper", { count: discountPct })}</Text>
                 </View>
               )}
               <View style={dm.priceOnImg}>
@@ -1913,7 +1921,7 @@ function ItemDetailModal({ item, onClose, onAdd, onRemove, qty }) {
                 <View style={dm.descBox}>
                   <View style={dm.descIconRow}>
                     <MaterialIcons name="info-outline" size={13} color={C.green} />
-                    <Text style={dm.descLabel}>Description</Text>
+                    <Text style={dm.descLabel}>{t("home.description")}</Text>
                   </View>
                   <Text style={dm.descText}>{description}</Text>
                 </View>
@@ -1922,7 +1930,7 @@ function ItemDetailModal({ item, onClose, onAdd, onRemove, qty }) {
               {hasDiscount && (
                 <View style={dm.savingsPill}>
                   <MaterialIcons name="savings" size={14} color="#D97706" />
-                  <Text style={dm.savingsText}>You save ₹{mrp - price} per item</Text>
+                  <Text style={dm.savingsText}>{t("home.youSave", { amount: mrp - price })}</Text>
                 </View>
               )}
 
@@ -1935,13 +1943,13 @@ function ItemDetailModal({ item, onClose, onAdd, onRemove, qty }) {
 
               <View style={dm.actionRow}>
                 <View>
-                  <Text style={dm.totalLabel}>TOTAL</Text>
+                  <Text style={dm.totalLabel}>{t("home.totalUpper")}</Text>
                   <Text style={dm.totalPrice}>₹{price}</Text>
                 </View>
                 {currentQty === 0 ? (
                   <TouchableOpacity style={dm.addBtn} onPress={() => { onAdd(item); handleClose(); }} activeOpacity={0.85}>
                     <MaterialIcons name="shopping-cart" size={16} color="#fff" />
-                    <Text style={dm.addBtnText}>Add to Cart</Text>
+                    <Text style={dm.addBtnText}>{t("home.addToCart")}</Text>
                   </TouchableOpacity>
                 ) : (
                   <View style={dm.qtyRow}>
@@ -2061,6 +2069,7 @@ const dm = StyleSheet.create({
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function HomeScreen() {
+  const { t } = useTranslation();
   const { token, user } = useAuthStore();
   const navigation = useNavigation();
   const goToSearch = () => {
@@ -2088,8 +2097,8 @@ export default function HomeScreen() {
         );
       }
     }
-    return currentLocation.displayName || "Set location";
-  }, [selectedAddrId, addressStore.addresses, currentLocation.displayName]);
+    return currentLocation.displayName || t("home.setLocation");
+  }, [selectedAddrId, addressStore.addresses, currentLocation.displayName, t]);
 
   // Address picker state moved up to avoid ReferenceError in locationCoords
 
@@ -2519,10 +2528,10 @@ export default function HomeScreen() {
   // ── Utilities ──────────────────────────────────────────────────────────────
   const getGreeting = () => {
     const h = new Date().getHours();
-    if (h < 12) return "Good Morning";
-    if (h < 17) return "Good Afternoon";
-    if (h < 21) return "Good Evening";
-    return "Good Night";
+    if (h < 12) return t("home.goodMorning");
+    if (h < 17) return t("home.goodAfternoon");
+    if (h < 21) return t("home.goodEvening");
+    return t("home.goodNight");
   };
 
   const getStatusColor = (s) =>
@@ -2549,33 +2558,31 @@ export default function HomeScreen() {
     .filter((distance) => Number.isFinite(distance))
     .sort((a, b) => a - b)[0];
   const heroTitle = locationCoords
-    ? "Your neighborhood market, online"
-    : "Set your location to start shopping";
+    ? t("home.heroTitleLocation")
+    : t("home.heroTitleNoLocation");
   const heroSub = locationCoords
-    ? `${openStoreCount || vendors.length || "Local"} stores ready with groceries, snacks, dairy and home essentials.`
-    : "Find nearby stores, compare essentials and get everything delivered to your door.";
+    ? t("home.heroSubLocation", { count: openStoreCount || vendors.length || t("home.local") })
+    : t("home.heroSubNoLocation");
   const homeStats = [
     {
       icon: "storefront",
       value: vendors.length ? `${vendors.length}` : "--",
-      label: "nearby stores",
+      label: t("home.nearbyStores"),
     },
     {
       icon: "inventory-2",
       value: popularItems.length ? `${popularItems.length}+` : "--",
-      label: "popular picks",
+      label: t("home.popularPicks"),
     },
     {
       icon: "near-me",
-      value: nearestStoreDistance ? `${nearestStoreDistance.toFixed(1)} km` : "Near you",
-      label: "closest store",
+      value: nearestStoreDistance ? t("home.kmDistance", { count: nearestStoreDistance.toFixed(1) }) : t("home.nearYou"),
+      label: t("home.closestStore"),
     },
   ];
   const quickActions = [
-    { icon: "search", label: "Find Stores", onPress: goToSearch },
-    { icon: "shopping-bag", label: "Open Stores", onPress: goToSearch },
-    // { icon: "receipt-long", label: "Orders", onPress: () => navigation.navigate("Orders") },
-    // { icon: "location-on", label: "Address", onPress: openAddressPicker },
+    { icon: "search", label: t("home.findStores"), onPress: goToSearch },
+    { icon: "shopping-bag", label: t("home.openStores"), onPress: goToSearch },
   ];
 
 
@@ -2637,14 +2644,14 @@ export default function HomeScreen() {
                     color={C.green}
                     style={{ transform: [{ scale: 0.7 }] }}
                   />
-                  <Text style={s.locLoadText}>Locating…</Text>
+                  <Text style={s.locLoadText}>{t("home.locating")}</Text>
                 </View>
               ) : (
                 <>
-                  <Text style={s.locationTop}>Delivering to</Text>
+                  <Text style={s.locationTop}>{t("home.deliveringTo")}</Text>
                   <View style={s.locationBottomRow}>
                     <Text style={s.locationBottom} numberOfLines={1}>
-                      {locationShort || "Set location"}
+                      {locationShort || t("home.setLocation")}
                     </Text>
                     <MaterialIcons name="expand-more" size={13} color={C.gray500} />
                   </View>
@@ -2658,7 +2665,7 @@ export default function HomeScreen() {
             >
               <MaterialIcons name="search" size={16} color={C.gray400} />
               <Text style={s.webSearchText} numberOfLines={1}>
-                {winW < 850 ? "Search…" : 'Search "rice", "daal", "milk"…'}
+                {winW < 850 ? t("home.searchShort") : t("home.searchPlaceholderWeb")}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -2669,7 +2676,7 @@ export default function HomeScreen() {
               <MaterialIcons name="person" size={16} color={C.green} />
               {winW >= 900 && (
                 <Text style={s.accountBtnText} numberOfLines={1}>
-                  {firstName || "Account"}
+                  {firstName || t("home.account")}
                 </Text>
               )}
               <MaterialIcons name="expand-more" size={13} color={C.gray500} />
@@ -2689,8 +2696,8 @@ export default function HomeScreen() {
                   style={[s.cartBtnText, cartCount > 0 && { color: C.white }]}
                 >
                   {cartCount > 0
-                    ? `${cartCount} item${cartCount > 1 ? "s" : ""}`
-                    : "Cart"}
+                    ? t("home.itemsInCart", { count: cartCount })
+                    : t("cart.title_short")}
                 </Text>
               )}
               {cartCount > 0 && (
@@ -2716,16 +2723,16 @@ export default function HomeScreen() {
                       color={C.green}
                       style={{ transform: [{ scale: 0.7 }] }}
                     />
-                    <Text style={s.locLoadText}>Locating…</Text>
+                    <Text style={s.locLoadText}>{t("home.locating")}</Text>
                   </View>
                 ) : (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <MaterialIcons name="location-on" size={20} color={C.green} />
                     <View style={{ flexShrink: 1 }}>
-                      <Text style={s.locationTop}>Deliver to</Text>
+                      <Text style={s.locationTop}>{t("home.deliveringTo")}</Text>
                       <View style={s.locationBottomRow}>
                         <Text style={s.mobileLocBottom} numberOfLines={1}>
-                          {locationShort || "Set location"}
+                          {locationShort || t("home.setLocation")}
                         </Text>
                         <MaterialIcons
                           name="expand-more"
@@ -2768,7 +2775,7 @@ export default function HomeScreen() {
               activeOpacity={0.9}
             >
               <MaterialIcons name="search" size={18} color={C.gray400} />
-              <Text style={s.mobileSearchText}>Search 'fresh milk' or 'chips'…</Text>
+              <Text style={s.mobileSearchText}>{t("home.searchHint")}</Text>
               <MaterialIcons name="mic" size={18} color={C.green} />
             </TouchableOpacity>
           </>
@@ -2794,7 +2801,7 @@ export default function HomeScreen() {
           </Text>
           <Text style={s.greetingEmoji}>👋</Text>
           <Text style={s.greetingSub}>
-            Fresh groceries & daily essentials, delivered fast.
+            {t("home.heroSubHeader")}
           </Text>
         </View>
 
@@ -2804,7 +2811,7 @@ export default function HomeScreen() {
             <View style={{ flex: 1 }}>
               <Text style={s.greetingKicker}>{getGreeting()}</Text>
               <Text style={s.heroIntroTitle}>
-                {firstName ? `Welcome back, ${firstName}` : "Welcome to KwikPik"}
+                {firstName ? t("home.welcomeBack", { name: firstName }) : t("home.welcomeGuest")}
               </Text>
             </View>
           </View>
@@ -2830,7 +2837,7 @@ export default function HomeScreen() {
             <View style={[s.heroLeft, { width: wide ? "62%" : "100%" }]}>
               <View style={s.heroBadge}>
                 <MaterialIcons name="verified" size={13} color={C.green} />
-                <Text style={s.heroBadgeText}>Fresh from nearby stores</Text>
+                <Text style={s.heroBadgeText}>{t("home.freshFromNearby")}</Text>
               </View>
               <Text style={s.heroTitle}>{heroTitle}</Text>
               <Text style={s.heroSub}>{heroSub}</Text>
@@ -2894,11 +2901,11 @@ export default function HomeScreen() {
 
         <View style={[s.sectionHeader, { paddingHorizontal: hPad }]}>
           <View>
-            <Text style={s.sectionTitle}>Nearby Stores</Text>
-            <Text style={s.sectionSub}>Delivering to your location</Text>
+            <Text style={s.sectionTitle}>{t("home.nearbyStoresTitle")}</Text>
+            <Text style={s.sectionSub}>{t("home.deliveringToYourLocation")}</Text>
           </View>
-          <TouchableOpacity onPress={goToSearch}>
-            <Text style={s.viewAll}>Explore</Text>
+          <TouchableOpacity onPress={gotoSearch}>
+            <Text style={s.viewAll}>{t("home.explore")}</Text>
           </TouchableOpacity>
         </View>
 
@@ -2926,7 +2933,7 @@ export default function HomeScreen() {
                 s.storeCatChipText,
                 selectedStoreCategory === null && s.storeCatChipTextActive,
               ]}>
-                🏪 All
+                🏪 {t("home.all")}
               </Text>
             </TouchableOpacity>
             {storeCategories.map(cat => {
@@ -2955,15 +2962,15 @@ export default function HomeScreen() {
         {loadingVendors ? (
           <View style={[s.loadingRow, { paddingHorizontal: hPad }]}>
             <ActivityIndicator size="small" color={C.green} />
-            <Text style={s.loadingText}>Finding stores near you…</Text>
+            <Text style={s.loadingText}>{t("home.findingStores")}</Text>
           </View>
         ) : vendors.length === 0 ? (
           <View style={s.emptyBox}>
             <View style={s.emptyIconWrap}>
               <MaterialIcons name="location-on" size={26} color={C.green} />
             </View>
-            <Text style={s.emptyTitle}>No stores found nearby</Text>
-            <Text style={s.emptySub}>Try updating your delivery location</Text>
+            <Text style={s.emptyTitle}>{t("home.noStoresNearby")}</Text>
+            <Text style={s.emptySub}>{t("home.tryUpdatingLocation")}</Text>
           </View>
         ) : (
           <ScrollView
@@ -3012,7 +3019,7 @@ export default function HomeScreen() {
                     ]}
                   >
                     <Text style={s.statusText}>
-                      {vendor.is_open ? "OPEN" : "CLOSED"}
+                      {vendor.is_open ? t("home.open") : t("home.closed")}
                     </Text>
                   </View>
                   <View style={s.ratingBadge}>
@@ -3020,7 +3027,7 @@ export default function HomeScreen() {
                     <Text style={s.ratingText}>
                       {vendor.avg_rating
                         ? parseFloat(vendor.avg_rating).toFixed(1)
-                        : "New"}
+                        : t("home.new")}
                     </Text>
                   </View>
                 </View>
@@ -3032,18 +3039,18 @@ export default function HomeScreen() {
                     <MaterialIcons name="location-on" size={10} color={C.green} />
                     <Text style={s.storeMeta}>
                       {vendor.distance_km
-                        ? `${parseFloat(vendor.distance_km).toFixed(1)} km`
-                        : "Nearby"}
+                        ? t("home.kmDistance", { count: parseFloat(vendor.distance_km).toFixed(1) })
+                        : t("home.nearby")}
                     </Text>
                     <View style={s.metaDot} />
                     <MaterialIcons name="access-time" size={10} color={C.gray400} />
-                    <Text style={s.storeMeta}>30 min</Text>
+                    <Text style={s.storeMeta}>{t("home.deliveryTime")}</Text>
                   </View>
                   <View style={s.storeTagRow}>
                     {/* Min order — orange pill */}
                     <View style={[s.storeTag, { backgroundColor: C.orangeLight, borderColor: "#FED7AA" }]}>
                       <Text style={[s.storeTagText, { color: C.orangeDark }]}>
-                        Min ₹{vendor.min_order || 99}
+                        {t("home.minOrder", { min: vendor.min_order || 99 })}
                       </Text>
                     </View>
                     {vendor.is_open && (
@@ -3057,7 +3064,7 @@ export default function HomeScreen() {
                         ]}
                       >
                         <Text style={[s.storeTagText, { color: C.green }]}>
-                          Accepting orders
+                          {t("home.acceptingOrders")}
                         </Text>
                       </View>
                     )}
@@ -3098,9 +3105,9 @@ export default function HomeScreen() {
                 { marginTop: 24, paddingHorizontal: hPad },
               ]}
             >
-              <Text style={s.sectionTitle}>Shop by Category</Text>
+              <Text style={s.sectionTitle}>{t("home.shopByCategory")}</Text>
               <TouchableOpacity onPress={goToSearch}>
-                <Text style={s.viewAll}>View All</Text>
+                <Text style={s.viewAll}>{t("home.viewAll")}</Text>
               </TouchableOpacity>
             </View>
             {/* 4-column clean tile grid */}
@@ -3159,7 +3166,7 @@ export default function HomeScreen() {
             style={[s.loadingRow, { paddingHorizontal: hPad, marginTop: 28 }]}
           >
             <ActivityIndicator size="small" color={C.green} />
-            <Text style={s.loadingText}>Loading products…</Text>
+            <Text style={s.loadingText}>{t("home.loadingProducts")}</Text>
           </View>
         )}
 
@@ -3172,9 +3179,9 @@ export default function HomeScreen() {
                 { marginTop: 28, paddingHorizontal: hPad },
               ]}
             >
-              <Text style={s.sectionTitle}>Popular Items</Text>
+              <Text style={s.sectionTitle}>{t("home.popularItemsTitle")}</Text>
               <TouchableOpacity onPress={goToSearch}>
-                <Text style={s.viewAll}>See all</Text>
+                <Text style={s.viewAll}>{t("home.seeAll")}</Text>
               </TouchableOpacity>
             </View>
             {/* Horizontal scroll cards */}
@@ -3212,9 +3219,9 @@ export default function HomeScreen() {
                 { marginTop: 28, paddingHorizontal: hPad },
               ]}
             >
-              <Text style={s.sectionTitle}>Recent Orders</Text>
+              <Text style={s.sectionTitle}>{t("home.recentOrders")}</Text>
               <TouchableOpacity onPress={() => navigation.navigate("Orders")}>
-                <Text style={s.viewAll}>View all</Text>
+                <Text style={s.viewAll}>{t("home.viewAll")}</Text>
               </TouchableOpacity>
             </View>
             {recentOrders.map((order) => (
@@ -3234,7 +3241,7 @@ export default function HomeScreen() {
                 />
                 <View style={s.orderInfo}>
                   <Text style={s.orderStore} numberOfLines={1}>
-                    {order.vendor?.shop_name || "Store"}
+                    {order.vendor?.shop_name || t("home.store")}
                   </Text>
                   <Text style={s.orderMeta}>
                     {order.order_number} · ₹{order.total}
@@ -3395,9 +3402,9 @@ export default function HomeScreen() {
             </View>
             <View>
               <Text style={s.floatingItems}>
-                {cartCount} item{cartCount > 1 ? "s" : ""} added
+                {t("home.itemsAdded", { count: cartCount })}
               </Text>
-              <Text style={s.floatingTotal}>₹{cartTotal} total</Text>
+              <Text style={s.floatingTotal}>{t("home.totalAmount", { amount: cartTotal })}</Text>
             </View>
           </View>
           <TouchableOpacity
@@ -3405,7 +3412,7 @@ export default function HomeScreen() {
             onPress={() => navigation.navigate("Cart")}
             activeOpacity={0.85}
           >
-            <Text style={s.floatingCTAText}>View Cart</Text>
+            <Text style={s.floatingCTAText}>{t("home.viewCart")}</Text>
             <MaterialIcons name="arrow-forward" size={14} color={C.white} />
           </TouchableOpacity>
         </Animated.View>
