@@ -138,7 +138,7 @@ export default function CartScreen() {
   const [loadingInfo,      setLoadingInfo]      = useState(false);
 
   const subtotal   = items.reduce((s, i) => s + i.price * (i.qty || i.quantity || 0), 0);
-  const activeFee  = deliveryInfo?.delivery_fee ?? 30;
+  const activeFee  = deliveryInfo?.delivery_fee ?? 20;
   const grandTotal = subtotal + activeFee;
 
   // Qty helpers ────────────────────────────────────────────────────────────

@@ -843,7 +843,7 @@ export default function CheckoutScreen() {
       customerLng = detectedCoords.lng;
     } else if (selectedAddrId && selectedAddrId !== 'manual') {
       const saved = (addressStore?.addresses || []).find(a => a.id === selectedAddrId);
-      if (saved?.latitude) { customerLat = saved.latitude; customerLng = saved.longitude; }
+      if (saved?.lat) { customerLat = saved.lat; customerLng = saved.lng; }
     }
 
     if (!customerLat || !customerLng) return; // can't compute without coords
