@@ -755,7 +755,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
           {/* Step header */}
           <View style={styles.stepHeader}>
-            <Text style={styles.stepIcon}>{STEPS[currentStep - 1].icon}</Text>
+            <MaterialIcons name={`${STEPS[currentStep - 1].icon}`} style={styles.stepIcon} />
             <View>
               <Text style={styles.stepTitle}>{STEPS[currentStep - 1].title}</Text>
               <Text style={styles.stepDesc}>{STEPS[currentStep - 1].desc}</Text>
@@ -1439,7 +1439,7 @@ const styles = StyleSheet.create({
 
   label: { fontSize: 13, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold", color: '#444', marginBottom: 6, marginTop: 14 },
   sectionLabel: { fontSize: 15, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#222', marginTop: 12, marginBottom: 4 },
-  sectionSep: { fontSize: 14, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#333', marginTop: 20, marginBottom: 6, paddingTop: 14, borderTopWidth: 0.5, borderTopColor: '#eee' },
+  sectionSep: { fontSize: 14, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#333', marginTop: 20, marginBottom: 6, paddingTop: 0, borderTopWidth: 0.5, borderTopColor: '#eee' },
   req: { color: '#e53935' },
   hintText: { fontSize: 11, color: '#999', marginTop: -4, marginBottom: 6 },
   input: {
