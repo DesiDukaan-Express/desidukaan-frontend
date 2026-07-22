@@ -210,7 +210,7 @@ function AddressPicker({
       onRequestClose={onClose}
     >
       <Pressable style={ap.backdrop} onPress={onClose}>
-        <Pressable style={ap.sheet} onPress={() => {}}>
+        <Pressable style={ap.sheet} onPress={() => { }}>
           {/* Handle */}
           <View style={ap.handle} />
 
@@ -220,8 +220,8 @@ function AddressPicker({
               {mode === "add"
                 ? t("home.addNewAddress")
                 : mode === "edit"
-                ? t("home.editAddress")
-                : t("home.selectAddress")}
+                  ? t("home.editAddress")
+                  : t("home.selectAddress")}
             </Text>
             <TouchableOpacity
               onPress={() => (isFormMode ? setMode("list") : onClose())}
@@ -816,15 +816,15 @@ const CAT_ACCENT = {
 
 // ─── Store category metadata (for filter chips on Nearby Stores) ───────────────
 const STORE_CATEGORY_META = {
-  grocery:     { icon: "🛒", color: "#16A34A", bg: "#F0FDF4" },
-  medical:     { icon: "💊", color: "#2563EB", bg: "#EFF6FF" },
-  restaurant:  { icon: "🍽️", color: "#EA580C", bg: "#FFF7ED" },
-  bakery:      { icon: "🥖", color: "#D97706", bg: "#FFFBEB" },
-  dairy:       { icon: "🥛", color: "#0EA5E9", bg: "#F0F9FF" },
+  grocery: { icon: "🛒", color: "#16A34A", bg: "#F0FDF4" },
+  medical: { icon: "💊", color: "#2563EB", bg: "#EFF6FF" },
+  restaurant: { icon: "🍽️", color: "#EA580C", bg: "#FFF7ED" },
+  bakery: { icon: "🥖", color: "#D97706", bg: "#FFFBEB" },
+  dairy: { icon: "🥛", color: "#0EA5E9", bg: "#F0F9FF" },
   electronics: { icon: "📱", color: "#7C3AED", bg: "#FAF5FF" },
-  stationery:  { icon: "✏️", color: "#475569", bg: "#F8FAFC" },
-  general:     { icon: "🏪", color: "#6B7280", bg: "#F3F4F6" },
-  _default:    { icon: "🏪", color: "#6B7280", bg: "#F3F4F6" },
+  stationery: { icon: "✏️", color: "#475569", bg: "#F8FAFC" },
+  general: { icon: "🏪", color: "#6B7280", bg: "#F3F4F6" },
+  _default: { icon: "🏪", color: "#6B7280", bg: "#F3F4F6" },
 };
 
 
@@ -2073,9 +2073,9 @@ export default function HomeScreen() {
   const { token, user } = useAuthStore();
   const navigation = useNavigation();
   const goToSearch = () => {
-  const root = navigation.getParent?.() || navigation;
-  root.navigate('Search');
-};
+    const root = navigation.getParent?.() || navigation;
+    root.navigate('Search');
+  };
   const addressStore = useAddressStore();
   const cart = useCartStore();
 
@@ -2457,7 +2457,7 @@ export default function HomeScreen() {
     setSelectedAddrId(null);
     addressStore?.setSelectedId?.(null);
     if (triggerRefetch) await triggerRefetch(true);
-};
+  };
 
 
   // ── Cart helpers — reads from cartStore, no local qty state ───────────────
@@ -2904,7 +2904,7 @@ export default function HomeScreen() {
             <Text style={s.sectionTitle}>{t("home.nearbyStoresTitle")}</Text>
             <Text style={s.sectionSub}>{t("home.deliveringToYourLocation")}</Text>
           </View>
-          <TouchableOpacity onPress={gotoSearch}>
+          <TouchableOpacity onPress={goToSearch}>
             <Text style={s.viewAll}>{t("home.explore")}</Text>
           </TouchableOpacity>
         </View>
