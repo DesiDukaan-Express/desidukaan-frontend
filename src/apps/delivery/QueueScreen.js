@@ -114,6 +114,7 @@ const sp = StyleSheet.create({
 
 // ── Queue card ────────────────────────────────────────────────────────────────
 function QueueCard({ order, onAccept, onDecline, isAccepting }) {
+  const { t } = useTranslation();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
 
@@ -130,11 +131,11 @@ function QueueCard({ order, onAccept, onDecline, isAccepting }) {
       <View style={qc.header}>
         <View>
           <Text style={qc.orderNum}>{order.orderNumber}</Text>
-          <Text style={qc.orderSub}>New delivery request</Text>
+          <Text style={qc.orderSub}>{t('delivery.newDeliveryRequest', 'New delivery request')}</Text>
         </View>
         <View style={qc.newPill}>
           <View style={qc.newDot} />
-          <Text style={qc.newPillText}>LIVE</Text>
+          <Text style={qc.newPillText}>{t('delivery.live', 'LIVE')}</Text>
         </View>
       </View>
 
@@ -146,7 +147,7 @@ function QueueCard({ order, onAccept, onDecline, isAccepting }) {
         <View style={qc.routeStop}>
           <View style={[qc.routeDot, { backgroundColor: C.blue }]} />
           <View style={{ flex: 1 }}>
-            <Text style={qc.routeStopLabel}>PICKUP</Text>
+            <Text style={qc.routeStopLabel}>{t('delivery.pickup', 'PICKUP')}</Text>
             <Text style={qc.routeStopName} numberOfLines={1}>{order.pickup?.name || '—'}</Text>
           </View>
         </View>
@@ -156,7 +157,7 @@ function QueueCard({ order, onAccept, onDecline, isAccepting }) {
         <View style={qc.routeStop}>
           <View style={[qc.routeDot, { backgroundColor: C.red }]} />
           <View style={{ flex: 1 }}>
-            <Text style={qc.routeStopLabel}>DROP</Text>
+            <Text style={qc.routeStopLabel}>{t('delivery.drop', 'DROP')}</Text>
             <Text style={qc.routeStopName} numberOfLines={1}>
               {order.dropoff?.city || order.dropoff?.address || '—'}
             </Text>
@@ -170,11 +171,11 @@ function QueueCard({ order, onAccept, onDecline, isAccepting }) {
       {/* Earning row */}
       <View style={qc.earningRow}>
         <View style={qc.earningBox}>
-          <Text style={qc.earningLabel}>YOUR EARNING</Text>
+          <Text style={qc.earningLabel}>{t('delivery.yourEarning', 'YOUR EARNING')}</Text>
           <Text style={qc.earningValue}>₹{order.deliveryFee || 0}</Text>
         </View>
         <View style={[qc.earningBox, { borderLeftWidth: 1, borderLeftColor: C.gray200 }]}>
-          <Text style={qc.earningLabel}>ORDER VALUE</Text>
+          <Text style={qc.earningLabel}>{t('delivery.orderValue', 'ORDER VALUE')}</Text>
           <Text style={[qc.earningValue, { color: C.gray700 }]}>₹{order.total || 0}</Text>
         </View>
       </View>
@@ -189,7 +190,7 @@ function QueueCard({ order, onAccept, onDecline, isAccepting }) {
           onPress={() => onDecline(order.orderId)}
           activeOpacity={0.8}
         >
-          <Text style={qc.btnDeclineText}>Decline</Text>
+          <Text style={qc.btnDeclineText}>{t('delivery.decline', 'Decline')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[qc.btnAccept, isAccepting && { opacity: 0.7 }]}
@@ -200,7 +201,7 @@ function QueueCard({ order, onAccept, onDecline, isAccepting }) {
           {isAccepting ? (
             <ActivityIndicator size="small" color={C.white} />
           ) : (
-            <Text style={qc.btnAcceptText}>Accept order</Text>
+            <Text style={qc.btnAcceptText}>{t('delivery.acceptOrder', 'Accept order')}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -248,6 +249,7 @@ const qc = StyleSheet.create({
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 function EmptyState() {
+  const { t } = useTranslation();
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -265,11 +267,11 @@ function EmptyState() {
         <Animated.View style={[es.ring, { transform: [{ scale: pulseAnim }] }]} />
         <View style={es.dot} />
       </View>
-      <Text style={es.title}>Listening for orders</Text>
-      <Text style={es.sub}>When a vendor dispatches an order your way,{'\n'}it'll appear here instantly.</Text>
+      <Text style={es.title}>{t('delivery.listeningForOrdersTitle', 'Listening for orders')}</Text>
+      <Text style={es.sub}>{t('delivery.listeningForOrdersSub', "When a vendor dispatches an order your way,\nit'll appear here instantly.")}</Text>
       <View style={es.liveBadge}>
         <View style={es.liveDot} />
-        <Text style={es.liveText}>CONNECTED LIVE</Text>
+        <Text style={es.liveText}>{t('delivery.connectedLive', 'CONNECTED LIVE')}</Text>
       </View>
     </View>
   );
@@ -402,16 +404,16 @@ export default function QueueScreen({ navigation }) {
       <Animated.View style={[s.hero, { opacity: fadeAnim }]}>
         <View style={s.heroTop}>
           <View>
-            <Text style={s.heroTitle}>Order Queue</Text>
+            <Text style={s.heroTitle}>{t('delivery.orderQueue', 'Order Queue')}</Text>
             <Text style={s.heroSub}>
               {queue.length > 0
-                ? `${queue.length} order${queue.length !== 1 ? 's' : ''} waiting`
-                : 'Listening for incoming orders'}
+                ? `${queue.length} ${t('delivery.ordersWaiting', 'order(s) waiting')}`
+                : t('delivery.listeningForOrders', 'Listening for incoming orders')}
             </Text>
           </View>
           <View style={s.livePill}>
             <View style={s.liveDotHero} />
-            <Text style={s.livePillText}>LIVE</Text>
+            <Text style={s.livePillText}>{t('delivery.live', 'LIVE')}</Text>
           </View>
         </View>
 
@@ -419,22 +421,22 @@ export default function QueueScreen({ navigation }) {
         <View style={s.heroStats}>
           <View style={s.heroStat}>
             <Text style={s.heroStatValue}>{queue.length}</Text>
-            <Text style={s.heroStatLabel}>In queue</Text>
+            <Text style={s.heroStatLabel}>{t('delivery.inQueue', 'In queue')}</Text>
           </View>
           <View style={s.heroStatDivider} />
           <View style={s.heroStat}>
             <Text style={[s.heroStatValue, { color: '#A8F0C0' }]}>{sessionStats.accepted}</Text>
-            <Text style={s.heroStatLabel}>Accepted</Text>
+            <Text style={s.heroStatLabel}>{t('delivery.accepted', 'Accepted')}</Text>
           </View>
           <View style={s.heroStatDivider} />
           <View style={s.heroStat}>
             <Text style={[s.heroStatValue, { color: '#FCA5A5' }]}>{sessionStats.declined}</Text>
-            <Text style={s.heroStatLabel}>Declined</Text>
+            <Text style={s.heroStatLabel}>{t('delivery.declined', 'Declined')}</Text>
           </View>
           <View style={s.heroStatDivider} />
           <View style={s.heroStat}>
             <Text style={s.heroStatValue}>{acceptRate}</Text>
-            <Text style={s.heroStatLabel}>Accept rate</Text>
+            <Text style={s.heroStatLabel}>{t('delivery.acceptRate', 'Accept rate')}</Text>
           </View>
         </View>
       </Animated.View>

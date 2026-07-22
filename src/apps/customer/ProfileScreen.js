@@ -750,10 +750,23 @@ export default function ProfileScreen() {
         animationType="slide"
         onRequestClose={() => setShowLanguage(false)}
       >
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }} onPress={() => setShowLanguage(false)}>
-          <Pressable style={{ backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48 }} onPress={() => { }}>
-            <View style={{ width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
-            <LanguageSwitcher inline />
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}
+          onPress={() => setShowLanguage(false)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: C.white,
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              padding: 24,
+              paddingBottom: 40,
+              maxHeight: '80%',
+            }}
+            onPress={(e) => e.stopPropagation?.()}
+          >
+            <View style={{ width: 44, height: 5, backgroundColor: C.gray200, borderRadius: 3, alignSelf: 'center', marginBottom: 16 }} />
+            <LanguageSwitcher inline onClose={() => setShowLanguage(false)} />
           </Pressable>
         </Pressable>
       </Modal>
