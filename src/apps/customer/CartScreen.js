@@ -138,8 +138,50 @@ export default function CartScreen() {
   const [loadingInfo,      setLoadingInfo]      = useState(false);
 
   const subtotal   = items.reduce((s, i) => s + i.price * (i.qty || i.quantity || 0), 0);
-  const activeFee  = deliveryInfo?.delivery_fee ?? 20;
+  const activeFee  = deliveryInfo?.delivery_fee ?? "failed to fetch";
   const grandTotal = subtotal + activeFee;
+
+  //   ─── Fetch real delivery fee as soon as Cart loads ─────────────────────────────────────────
+  // Triggers whenever address selection, coordinates, or subtotal changes
+
+  useEffect(() => {
+    if (!vendorId) return;
+
+    // Get the customer's default/selected address from local memory
+    const saved = (addressStore?.addresses || []).find(a => a.id === addressStore?.selectedId);
+    if (!saved?.lat || !saved?.lng) return; // Skip if they haven't saved a real address yet
+
+    const ctrl = new AbortController();
+    setLoadingInfo(true);
+    
+    (async () => {
+      try {
+        const queryParamsObj = {
+          vendor_id: vendorId,
+          customer_lat: saved.lat,
+          customer_lng: saved.lng,
+          subtotal: subtotal,
+        };
+        const params = new URLSearchParams(queryParamsObj);
+        const res = await fetch(`${BASE_URL}/slots/delivery-info?${params}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          signal: ctrl.signal,
+        });
+        const json = await res.json();
+        
+        if (res.ok && json.data) {
+          setDeliveryInfo(json.data); 
+        }
+      } catch (e) {
+        if (e.name !== 'AbortError') console.error('cart delivery-info fetch failed:', e.message);
+      } finally {
+        // setLoadingInfo(false);
+      }
+    })();
+
+    return () => ctrl.abort();
+  }, [vendorId, addressStore?.selectedId, subtotal, token]);
+
 
   // Qty helpers ────────────────────────────────────────────────────────────
   const handleIncrease = useCallback((item) => {
