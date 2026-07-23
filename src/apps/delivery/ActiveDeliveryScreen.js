@@ -852,6 +852,8 @@ export default function ActiveDeliveryScreen({ navigation }) {
           backendStatus,
           pickup: d.order?.vendor?.shop_name,
           drop: d.order?.delivery_address?.address_line || d.order?.delivery_address?.city || 'Local',
+          total: d.order?.total,
+          quantity: d.order?.items?.length,
           meta: `â‚¹${d.order?.total} Â· ${d.order?.items?.length || 0} items`,
           vendorLoc: d.order?.vendor ? { latitude: d.order.vendor.latitude, longitude: d.order.vendor.longitude } : null,
           dropLoc: d.order?.delivery_address ? { latitude: d.order.delivery_address.latitude, longitude: d.order.delivery_address.longitude } : null,
@@ -1122,7 +1124,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
             </View>
             <View style={styles.heroStatDivider} />
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>â‚¹{earnings}</Text>
+              <Text style={styles.heroStatValue}>{earnings}</Text>
               <Text style={styles.heroStatLabel}>Earned today</Text>
             </View>
             <View style={styles.heroStatDivider} />
@@ -1140,7 +1142,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
             <View style={styles.stepperHeader}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.stepperTitle}>Active Delivery</Text>
-                <Text style={styles.stepperSub}>{activeOrder.displayId} · {activeOrder.meta}</Text>
+                <Text style={styles.stepperSub}>{activeOrder.displayId} · {activeOrder.quantity} item · ₹{activeOrder.total}</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 {step < 2 && (
