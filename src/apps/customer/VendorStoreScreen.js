@@ -337,7 +337,7 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
 
   if (!item) return null;
   const p = item.product || {};
-  const catName = p.category?.name || p.category || "Other";
+  const catName = p.category?.name || p.category;
   const meta = getCatMeta(catName);
   const inStock = item.stock_qty > 0;
   const loose = isLooseItem(p);
@@ -366,10 +366,10 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
               <TouchableOpacity style={pm.closeBtn} onPress={handleClose} activeOpacity={0.7}>
                 <Feather name="x" size={16} color={C.white} />
               </TouchableOpacity>
-              <View style={[pm.catBadge, { backgroundColor: meta.bg }]}>
+              {/* <View style={[pm.catBadge, { backgroundColor: meta.bg }]}>
                 <Text>{meta.emoji}</Text>
                 <Text style={[pm.catBadgeText, { color: meta.accent }]}>{catName}</Text>
-              </View>
+              </View> */}
               {loose && (
                 <View style={pm.looseBadge}>
                   <Feather name="droplet" size={9} color={C.cyan} />
@@ -378,10 +378,10 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
               )}
               {discount && <View style={pm.discBadge}><Text style={pm.discText}>{discount}% OFF</Text></View>}
               {!inStock && <View style={pm.oosLayer}><Text style={pm.oosLayerText}>Out of Stock</Text></View>}
-              <View style={pm.priceOnImg}>
+              {/* <View style={pm.priceOnImg}>
                 <Text style={pm.priceOnImgText}>₹{p.price}</Text>
                 {p.mrp && p.mrp > p.price && <Text style={pm.mrpOnImgText}>₹{p.mrp}</Text>}
-              </View>
+              </View> */}
             </View>
             <View style={pm.body}>
               {item.stock_qty > 0 && item.stock_qty <= 10 && (
@@ -391,7 +391,7 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
                 </View>
               )}
               <Text style={pm.name}>{p.name}</Text>
-              <Text style={pm.unit}>{p.unit || "1 pc"}</Text>
+              <Text style={pm.unit}>{p.unit}</Text>
               {loose && (
                 <View style={pm.looseNote}>
                   <Feather name="droplet" size={12} color={C.cyan} />
