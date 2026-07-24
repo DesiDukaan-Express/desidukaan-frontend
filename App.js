@@ -4,6 +4,7 @@ import { useFonts, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold, PlusJa
 import Navigation from './src/navigation';
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import NetworkProvider from "./src/providers/NetworkProvider";
+import NotificationProvider from "./src/providers/NotificationProvider";
 
 import './src/i18n';
 
@@ -36,9 +37,11 @@ export default function App() {
 
   return (
     <NetworkProvider>
-      <SafeAreaProvider>
-        <Navigation />
-      </SafeAreaProvider>
+      <NotificationProvider>
+        <SafeAreaProvider>
+          <Navigation />
+        </SafeAreaProvider>
+      </NotificationProvider>
     </NetworkProvider>
   );
 }

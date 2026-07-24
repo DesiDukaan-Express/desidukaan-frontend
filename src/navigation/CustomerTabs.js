@@ -171,7 +171,10 @@ function PendingOrderMonitor() {
   const updatePending = useOrderStore((s) => s.updatePendingOrder);
   const clearPending  = useOrderStore((s) => s.clearPendingOrder);
 
-  const ORDER_TIMEOUT = 90; // seconds — must match Checkout.js
+  const VENDOR_RESPONSE_TIMEOUT_MS = Number(
+    process.env.EXPO_PUBLIC_VENDOR_RESPONSE_TIMEOUT || 90000
+  );
+  const ORDER_TIMEOUT = Math.floor(VENDOR_RESPONSE_TIMEOUT_MS / 1000);
   const [countdown, setCountdown] = useState(ORDER_TIMEOUT);
   const timerRef     = useRef(null);
   const startRef     = useRef(null);
@@ -249,7 +252,8 @@ function PendingOrderMonitor() {
   useEffect(() => {
     if (pendingOrder?.status === 'pending') {
       // Use placedAt from store so countdown is accurate even after re-mounts
-      const placedAt = pendingOrder.placedAt || Date.now();
+      const placedAtRaw = pendingOrder.placedAt || Date.now();
+      const placedAt = typeof placedAtRaw === 'number' ? placedAtRaw : new Date(placedAtRaw).getTime();
       startRef.current = placedAt;
 
       const tick = () => {

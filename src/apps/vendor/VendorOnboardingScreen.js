@@ -555,8 +555,8 @@ export default function VendorOnboardingScreen({ onComplete }) {
         alt_phone: altPhone || null,
         fssai_number: fssai || null,
         gst_number: gst || null,
-        aadhar_number: aadhar || null,
-        pan_number: pan || null,
+        aadhar_number: aadhar ? aadhar.replace(/\D/g, '').slice(0, 12) : null,
+        pan_number: pan ? pan.toUpperCase().trim() : null,
         trade_license_number: tradeLicense || null,
         fssai_license_url: docUrls.fssai || null,
         gst_certificate_url: docUrls.gst || null,
@@ -564,8 +564,8 @@ export default function VendorOnboardingScreen({ onComplete }) {
         landmark: landmark || null,
         city,
         pincode,
-        latitude: latitude || null,
-        longitude: longitude || null,
+        latitude: latitude ?? null,
+        longitude: longitude ?? null,
         upi_id: upiId || null,
         bank_account_name: accountName || null,
         bank_account_number: accountNumber || null,
@@ -585,7 +585,10 @@ export default function VendorOnboardingScreen({ onComplete }) {
       });
 
       const vendorData = await vendorRes.json();
-      if (!vendorRes.ok) throw new Error(vendorData.msg || vendorData.message || 'Failed to create shop');
+      if (!vendorRes.ok) {
+        const detail = vendorData.errors?.join('\n') || vendorData.msg || vendorData.message || 'Failed to create shop';
+        throw new Error(detail);
+      }
 
       // Capture auto-approve flag from backend (response: { data: { vendor: { auto_approved, ... } } })
       setAutoApproved(vendorData.data?.vendor?.auto_approved === true);

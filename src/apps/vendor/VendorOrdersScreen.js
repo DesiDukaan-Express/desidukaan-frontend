@@ -1630,7 +1630,6 @@ export default function VendorOrdersScreen() {
               </Text>
             </View>
           </View>
-
           <ScrollView
             bounces={false}
             style={{ flex: 1 }}
@@ -1950,11 +1949,7 @@ export default function VendorOrdersScreen() {
                 <MaterialIcons name="close" size={18} color="#64748B" />
               </TouchableOpacity>
             </View>
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 32 }}
-            >
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
               {/* Customer Card */}
               <View style={omStyles.customerCard}>
                 <View style={omStyles.customerAvatarLg}>
@@ -2535,7 +2530,6 @@ export default function VendorOrdersScreen() {
                 <MaterialIcons name="close" size={18} color="#64748B" />
               </TouchableOpacity>
             </View>
-
             <ScrollView
               contentContainerStyle={{ paddingBottom: 32 }}
               showsVerticalScrollIndicator={false}
