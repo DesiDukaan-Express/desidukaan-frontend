@@ -24,6 +24,7 @@ import useAuthStore from "../../store/authStore";
 import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
 import useOrderStore from "../../store/orderStore";
+import { useTranslation } from "react-i18next";
 
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
@@ -133,6 +134,7 @@ const sec = StyleSheet.create({
 });
 
 function SlotBanner({ slot }) {
+  const { t } = useTranslation();
   if (!slot) return null;
   const fmt = (iso) =>
     new Date(iso).toLocaleTimeString("en-IN", {
@@ -150,7 +152,7 @@ function SlotBanner({ slot }) {
       </View>
       <View style={{ flex: 1 }}>
         <Text style={slb.label}>
-          Delivery window: {isToday ? "Today" : "Tomorrow"}
+          {t('checkout.deliveryWindow', 'DELIVERY WINDOW')}: {isToday ? t('payment.today', 'TODAY').toUpperCase() : t('payment.tomorrow', 'TOMORROW').toUpperCase()}
         </Text>
         <Text style={slb.time}>
           {fmt(slot.start)} – {fmt(slot.end)}
@@ -201,16 +203,19 @@ const slb = StyleSheet.create({
 });
 
 // ─── Cancellation policy ──────────────────────────────────────────────────────
-const POLICY_ITEMS = [
-  { icon: "check-circle", color: C.green,  text: "Free cancellation before payment is confirmed." },
-  { icon: "check-circle", color: C.green,  text: "Return request allowed before payment is processed." },
-  { icon: "alert-circle", color: C.amber,  text: "Once payment is confirmed, cancellation may not be possible." },
-  { icon: "alert-circle", color: C.amber,  text: "Perishable items (dairy, fresh produce) cannot be returned after delivery." },
-  { icon: "info",         color: C.gray400, text: "Contact the vendor directly for disputes via the phone request feature." },
-];
 
 function CancellationPolicy() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+
+  const policyItems = [
+    { icon: "check-circle", color: C.green, text: t('checkout.policyItem1', 'Free cancellation before payment is confirmed.') },
+    { icon: "check-circle", color: C.green, text: t('checkout.policyItem2', 'Return request allowed before payment is processed.') },
+    { icon: "alert-circle", color: C.amber, text: t('checkout.policyItem3', 'Once payment is confirmed, cancellation may not be possible.') },
+    { icon: "alert-circle", color: C.amber, text: t('checkout.policyItem4', 'Perishable items (dairy, fresh produce) cannot be returned after delivery.') },
+    { icon: "info", color: C.gray400, text: t('checkout.policyItem5', 'Contact the vendor directly for disputes via the phone request feature.') },
+  ];
+
   return (
     <>
       {/* Trigger row — never expands inline */}
@@ -220,7 +225,7 @@ function CancellationPolicy() {
         activeOpacity={0.8}
       >
         <Feather name="shield" size={15} color={C.amber} />
-        <Text style={cp.triggerTitle}>Cancellation & Return Policy</Text>
+        <Text style={cp.triggerTitle}>{t('checkout.cancellationReturnPolicy', 'Cancellation & Return Policy')}</Text>
         <Feather name="chevron-right" size={15} color={C.gray400} />
       </TouchableOpacity>
 
@@ -232,22 +237,22 @@ function CancellationPolicy() {
         onRequestClose={() => setOpen(false)}
       >
         <Pressable style={cp.backdrop} onPress={() => setOpen(false)}>
-          <Pressable style={cp.sheet} onPress={() => {}}>
+          <Pressable style={cp.sheet} onPress={(e) => e.stopPropagation()}>
             <View style={cp.handle} />
             <View style={cp.sheetHeader}>
               <View style={cp.sheetIconWrap}>
-                <Feather name="shield" size={20} color={C.amber} />
+                <Feather name="shield" size={18} color={C.amber} />
               </View>
-              <Text style={cp.sheetTitle}>Cancellation & Return Policy</Text>
+              <Text style={cp.sheetTitle}>{t('checkout.cancellationReturnPolicy', 'Cancellation & Return Policy')}</Text>
               <TouchableOpacity style={cp.closeBtn} onPress={() => setOpen(false)}>
-                <Feather name="x" size={15} color={C.gray600} />
+                <Feather name="x" size={16} color={C.gray600} />
               </TouchableOpacity>
             </View>
             <ScrollView
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 36, paddingHorizontal: 20, gap: 14 }}
+              contentContainerStyle={{ paddingBottom: 24, paddingHorizontal: 20, gap: 14 }}
             >
-              {POLICY_ITEMS.map((item, i) => (
+              {policyItems.map((item, i) => (
                 <View key={i} style={cp.row}>
                   <View style={[cp.iconCircle, { backgroundColor: item.color + "18" }]}>
                     <Feather name={item.icon} size={15} color={item.color} />
@@ -258,7 +263,7 @@ function CancellationPolicy() {
               <View style={cp.footerNote}>
                 <Feather name="info" size={12} color={C.gray400} />
                 <Text style={cp.footerText}>
-                  Policies apply per order and may vary by vendor.
+                  {t('checkout.policyNote', 'Policies apply per order and may vary by vendor.')}
                 </Text>
               </View>
             </ScrollView>
@@ -269,24 +274,25 @@ function CancellationPolicy() {
   );
 }
 const cp = StyleSheet.create({
-  trigger:       { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#FFFBEB", borderRadius: 14, borderWidth: 1, borderColor: "#FDE68A", padding: 14 },
-  triggerTitle:  { flex: 1, fontSize: 14, fontWeight: "700", color: "#92400E" },
-  backdrop:      { flex: 1, backgroundColor: "rgba(0,0,0,0.48)", justifyContent: "flex-end" },
-  sheet:         { backgroundColor: C.white, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingTop: 10, maxHeight: "80%" },
-  handle:        { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
-  sheetHeader:   { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.gray100, marginBottom: 14 },
+  trigger: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#FFFBEB", borderRadius: 14, borderWidth: 1, borderColor: "#FDE68A", padding: 14 },
+  triggerTitle: { flex: 1, fontSize: 14, fontWeight: "700", color: "#92400E" },
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.48)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: C.white, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingTop: 10, maxHeight: "80%" },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
+  sheetHeader: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.gray100, marginBottom: 14 },
   sheetIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.amberLight, alignItems: "center", justifyContent: "center" },
-  sheetTitle:    { flex: 1, fontSize: 16, fontWeight: "900", color: C.gray900 },
-  closeBtn:      { width: 30, height: 30, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
-  row:           { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  iconCircle:    { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 },
-  text:          { flex: 1, fontSize: 13, color: C.gray600, lineHeight: 19 },
-  footerNote:    { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.gray100, borderRadius: 10, padding: 12, marginTop: 4 },
-  footerText:    { flex: 1, fontSize: 11, color: C.gray500, lineHeight: 16 },
+  sheetTitle: { flex: 1, fontSize: 16, fontWeight: "900", color: C.gray900 },
+  closeBtn: { width: 30, height: 30, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
+  row: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  iconCircle: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 },
+  text: { flex: 1, fontSize: 13, color: C.gray600, lineHeight: 19 },
+  footerNote: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.gray100, borderRadius: 10, padding: 12, marginTop: 4 },
+  footerText: { flex: 1, fontSize: 11, color: C.gray500, lineHeight: 16 },
 });
 
 // ─── Order Summary card ───────────────────────────────────────────────────────
 function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNegotiate, deliveryTypePref = "standard", fs = 1 }) {
+  const { t } = useTranslation();
   return (
     <View style={osc.wrap}>
       {items.map((item, i) => (
@@ -316,7 +322,7 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNego
       <View style={osc.divider} />
       <View style={osc.row}>
         <Text style={[osc.label, { fontSize: Math.round(13 * fs) }]}>
-          Items total
+          {t('checkout.itemsTotal', 'Items total')}
         </Text>
         <Text style={[osc.value, { fontSize: Math.round(13 * fs) }]}>
           ₹{subtotal}
@@ -326,7 +332,7 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNego
       <View style={osc.row}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <Text style={[osc.label, { fontSize: Math.round(13 * fs) }]}>
-            Delivery ({deliveryTypePref === "quick" ? "Quick ⚡" : "Standard"})
+            {t('checkout.delivery', 'Delivery')} ({deliveryTypePref === "quick" ? `${t('checkout.quick', 'Quick')} ⚡` : t('checkout.standard', 'Standard')})
           </Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -336,7 +342,7 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNego
             </Text>
           )}
           {deliveryFee === 0 ? (
-            <Text style={[osc.value, { color: C.green, fontSize: Math.round(13 * fs) }]}>FREE</Text>
+            <Text style={[osc.value, { color: C.green, fontSize: Math.round(13 * fs) }]}>{t('cart.free', 'FREE')}</Text>
           ) : (
             <Text style={[osc.value, { fontSize: Math.round(13 * fs) }]}>₹{deliveryFee}</Text>
           )}
@@ -346,7 +352,7 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNego
               onPress={() => onNegotiate && onNegotiate()}
               activeOpacity={0.7}
             >
-              <Text style={osc.negotiateBtnText}>NEGOTIATE</Text>
+              <Text style={osc.negotiateBtnText}>{t('checkout.negotiate', 'NEGOTIATE')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -354,7 +360,7 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNego
       <View style={osc.dottedDivider} />
       <View style={osc.row}>
         <Text style={[osc.totalLabel, { fontSize: Math.round(16 * fs) }]}>
-          Total payable
+          {t('checkout.totalPayable', 'Total payable')}
         </Text>
         <Text style={[osc.totalVal, { fontSize: Math.round(16 * fs) }]}>
           ₹{total}
@@ -443,42 +449,43 @@ const dts = StyleSheet.create({
 
 // ─── Negotiation Banner (Shown while waiting or after response) ──────────────
 function NegotiationBanner({ status, countdown, vendorName, onDismiss }) {
+  const { t } = useTranslation();
   const configs = {
     pending: {
-      title: "Waiting for Store...",
-      sub: `Waiting for ${vendorName} to accept your order.`,
+      title: t('checkout.waitingForStore', 'Waiting for Store...'),
+      sub: t('checkout.waitingForStoreSub', { defaultValue: `Waiting for ${vendorName} to accept your order.`, name: vendorName }),
       icon: "clock",
       color: C.orange,
       bg: "#FFF7ED",
       border: "#FFEDD5",
     },
     accepted: {
-      title: "Order Confirmed!",
-      sub: "The store has accepted your order. Please complete the payment.",
+      title: t('orders.orderConfirmed', 'Order Confirmed!'),
+      sub: t('payment.vendorAccepted', { defaultValue: `${vendorName} has accepted your order. Please complete the payment.`, name: vendorName }),
       icon: "check-circle",
       color: C.green,
       bg: C.greenLight,
       border: C.greenBorder,
     },
     rejected: {
-      title: "Order Declined",
-      sub: "The store couldn't fulfill your order right now.",
+      title: t('checkout.orderDeclined', 'Order Declined'),
+      sub: t('orders.storeDeclinedSub', "The store couldn't fulfill your order right now."),
       icon: "x-circle",
       color: C.red,
       bg: C.redLight,
       border: "#FCA5A5",
     },
     expired: {
-      title: "Request Expired",
-      sub: "The store didn't respond in time. Please try again.",
+      title: t('checkout.requestExpired', 'Request Expired'),
+      sub: t('orders.storeExpiredSub', "The store didn't respond in time. Please try again."),
       icon: "alert-triangle",
       color: C.gray600,
       bg: C.gray100,
       border: C.gray200,
     },
     countered: {
-      title: "Review Adjustments",
-      sub: "The store suggested some changes to your order.",
+      title: t('checkout.vendorAdjustments', 'Review Adjustments'),
+      sub: t('checkout.storeSentAdjustments', 'The store suggested some changes to your order.'),
       icon: "edit-3",
       color: "#7C3AED",
       bg: "#F5F3FF",
@@ -534,6 +541,7 @@ const nb = StyleSheet.create({
 
 // ─── Counter Offer Review Component ──────────────────────────────────────────
 function CounterOfferReview({ data, onAccept, onReject, placing, fs = 1, deliveryTypePref, deliveryInfo, confirmedSlot }) {
+  const { t } = useTranslation();
   if (!data) return null;
   const { items = [], delivery_fee = 0, total = 0, note = "", slot = null } = data;
 
@@ -541,7 +549,7 @@ function CounterOfferReview({ data, onAccept, onReject, placing, fs = 1, deliver
     <View style={cor.wrap}>
       <View style={cor.header}>
         <Feather name="info" size={16} color="#7C3AED" />
-        <Text style={cor.headerText}>Vendor Adjustments</Text>
+        <Text style={cor.headerText}>{t('checkout.vendorAdjustments', 'Vendor Adjustments')}</Text>
       </View>
 
       {note ? <Text style={cor.note}>"{note}"</Text> : null}
@@ -552,52 +560,52 @@ function CounterOfferReview({ data, onAccept, onReject, placing, fs = 1, deliver
             <View style={{ flex: 1 }}>
               <Text style={cor.itemName}>{it.product_name}</Text>
               <Text style={cor.itemSub}>
-                {it.available ? `${it.new_quantity} units` : "Out of stock"}
+                {it.available ? `${it.new_quantity} units` : t('vendorStore.outOfStock', 'Out of stock')}
               </Text>
             </View>
             <Text
-  style={[
-    cor.itemPrice,
-    !it.available && { textDecorationLine: "line-through", opacity: 0.5 },
-  ]}
->
-  ₹{it.available !== false ? (it.new_quantity * it.product_price) : 0}
-</Text>
+              style={[
+                cor.itemPrice,
+                !it.available && { textDecorationLine: "line-through", opacity: 0.5 },
+              ]}
+            >
+              ₹{it.available !== false ? (it.new_quantity * it.product_price) : 0}
+            </Text>
           </View>
         ))}
       </View>
 
       <View style={{ gap: 4, marginBottom: 12 }}>
         <View style={cor.totalRow}>
-          <Text style={cor.totalLbl}>New Delivery Fee</Text>
+          <Text style={cor.totalLbl}>{t('checkout.newDeliveryFee', 'New Delivery Fee')}</Text>
           <Text style={cor.totalVal}>₹{delivery_fee}</Text>
         </View>
         <View style={[cor.totalRow, { marginTop: 4 }]}>
-          <Text style={cor.totalLbl}>Delivery Time</Text>
+          <Text style={cor.totalLbl}>{t('checkout.deliveryTime', 'Delivery Time')}</Text>
           <Text style={cor.totalVal}>
             {slot
-              ? "Specified by new slot"
+              ? t('checkout.specifiedByNewSlot', 'Specified by new slot')
               : (deliveryTypePref === "quick"
-                ? `⚡ ~${deliveryInfo?.quick_eta_minutes ?? 15} mins (Quick)`
-                : `~${deliveryInfo?.eta_minutes ?? 30} mins (Standard)`)
+                ? `⚡ ~${deliveryInfo?.quick_eta_minutes ?? 15} mins (${t('checkout.quick', 'Quick')})`
+                : `~${deliveryInfo?.eta_minutes ?? 30} mins (${t('checkout.standard', 'Standard')})`)
             }
           </Text>
         </View>
         <View style={[cor.totalRow, { marginTop: 4 }]}>
-          <Text style={cor.totalLbl}>Delivery Slot</Text>
+          <Text style={cor.totalLbl}>{t('checkout.deliverySlot', 'Delivery Slot')}</Text>
           <Text style={cor.totalVal}>
             {(() => {
               const activeSlot = slot || confirmedSlot;
-              if (!activeSlot) return "As soon as possible";
+              if (!activeSlot) return t('payment.asap', 'As soon as possible');
               const startStr = new Date(activeSlot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
               const endStr = new Date(activeSlot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-              const dayStr = new Date(activeSlot.start).toDateString() === new Date().toDateString() ? "Today" : "Tomorrow";
+              const dayStr = new Date(activeSlot.start).toDateString() === new Date().toDateString() ? t('payment.today', 'Today') : t('payment.tomorrow', 'Tomorrow');
               return `${dayStr}, ${startStr} - ${endStr}`;
             })()}
           </Text>
         </View>
         <View style={[cor.totalRow, { marginTop: 4 }]}>
-          <Text style={cor.grandLbl}>New Total</Text>
+          <Text style={cor.grandLbl}>{t('checkout.newTotal', 'New Total')}</Text>
           <Text style={cor.grandVal}>₹{total}</Text>
         </View>
       </View>
@@ -608,14 +616,14 @@ function CounterOfferReview({ data, onAccept, onReject, placing, fs = 1, deliver
           onPress={() => onReject()}
           disabled={placing}
         >
-          <Text style={cor.btnRejectText}>Reject</Text>
+          <Text style={cor.btnRejectText}>{t('checkout.reject', 'Reject')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[cor.btn, cor.btnAccept]}
           onPress={() => onAccept()}
           disabled={placing}
         >
-          <Text style={cor.btnAcceptText}>Accept & Pay</Text>
+          <Text style={cor.btnAcceptText}>{t('checkout.acceptAndPay', 'Accept & Pay')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -662,6 +670,7 @@ const cor = StyleSheet.create({
 
 // ═══════════════════════════════════════════════════════════════════════════ //
 export default function CheckoutScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const route = useRoute();
   const cart = useCartStore();
@@ -722,7 +731,7 @@ export default function CheckoutScreen() {
   const [orderStatus, setOrderStatus] = useState(
     route.params?.initialOrderStatus || resumeOrder?.status || "idle"
   ); // idle, pending, accepted, rejected, expired, countered
-  const [countdown, setCountdown] = useState(90);
+  const [countdown, setCountdown] = useState(300);
   const [counterData, setCounterData] = useState(() => {
     const rawCounter = resumeOrder?.counter_offer || null;
     if (!rawCounter) return null;
@@ -746,8 +755,8 @@ export default function CheckoutScreen() {
   const [requestingSlot, setRequestingSlot] = useState(false);
   const [requestingPhone, setRequestingPhone] = useState(false);
   const [feeModalVisible, setFeeModalVisible] = useState(false);
-  const [requestingFee,   setRequestingFee]   = useState(false);
-  const [proposedFee,     setProposedFee]     = useState(route.params?.proposedFee ?? resumeOrder?.proposedFee ?? null);
+  const [requestingFee, setRequestingFee] = useState(false);
+  const [proposedFee, setProposedFee] = useState(route.params?.proposedFee ?? resumeOrder?.proposedFee ?? null);
   const isAccepted = orderStatus === "accepted";
 
   // ── Delivery type preference ──────────────────────────────────────────────
@@ -791,8 +800,8 @@ export default function CheckoutScreen() {
   // Fee priority: negotiated (proposedFee) > live delivery-info > confirmed from cart > fallback 20
   const liveFees = deliveryInfo?.fees;
   const liveStandardFee = liveFees?.standard_fee ?? null;
-  const liveQuickFee    = liveFees?.quick_fee    ?? null;
-  const liveActiveFee   = deliveryTypePref === 'quick' ? (liveQuickFee ?? liveStandardFee) : liveStandardFee;
+  const liveQuickFee = liveFees?.quick_fee ?? null;
+  const liveActiveFee = deliveryTypePref === 'quick' ? (liveQuickFee ?? liveStandardFee) : liveStandardFee;
 
   const baseFee = confirmedFee ?? liveStandardFee ?? 20;
   const activeFee = proposedFee !== null ? proposedFee : (liveActiveFee !== null ? liveActiveFee : baseFee);
@@ -989,10 +998,10 @@ export default function CheckoutScreen() {
     });
 
     socket.on("phone:approved", (data) => {
-  setPhoneStatus("approved");
-  setVendorPhone(data.phone);
-});
-socket.on("phone:rejected", () => setPhoneStatus("rejected"));
+      setPhoneStatus("approved");
+      setVendorPhone(data.phone);
+    });
+    socket.on("phone:rejected", () => setPhoneStatus("rejected"));
 
     socket.on("phone:update", (data) => {
       if (data.status === "approved" && data.phone) {
@@ -1026,7 +1035,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             if (order.status) {
               setOrderStatus(order.status);
             }
-            
+
             // Sync vendor phone/contact status
             if (order.vendorPhone) {
               setVendorPhone(order.vendorPhone);
@@ -1068,7 +1077,14 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
   // ── Negotiation Timer Logic ────────────────────────────────────────────────
   useEffect(() => {
     if (orderStatus === "pending") {
-      setCountdown(90);
+      const placedAt = resumeOrder?.placedAt || route.params?.pendingOrder?.placedAt;
+      const ORDER_TIMEOUT = 300;
+      let initialRemaining = ORDER_TIMEOUT;
+      if (placedAt) {
+        const elapsed = Math.floor((Date.now() - placedAt) / 1000);
+        initialRemaining = Math.max(0, ORDER_TIMEOUT - elapsed);
+      }
+      setCountdown(initialRemaining);
       timerRef.current = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -1086,7 +1102,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [orderStatus]);
+  }, [orderStatus, resumeOrder?.placedAt, route.params?.pendingOrder?.placedAt]);
 
   // ── Detect GPS location ────────────────────────────────────────────────────
   const detectLocation = async () => {
@@ -1192,39 +1208,39 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
       const data = await res.json();
       if (res.ok) {
 
-    const orderItemsSnapshot = items.slice();
-    const orderSubtotalSnapshot = liveSubtotal;
+        const orderItemsSnapshot = items.slice();
+        const orderSubtotalSnapshot = liveSubtotal;
 
-    setSnapshotItems(orderItemsSnapshot);
-    setSnapshotSubtotal(orderSubtotalSnapshot);
+        setSnapshotItems(orderItemsSnapshot);
+        setSnapshotSubtotal(orderSubtotalSnapshot);
 
-    const order = data.data?.order || data.order || data;
+        const order = data.data?.order || data.order || data;
 
-    setPendingOrder({
-      ...order,
-      id: order.id,
-      status: order.status || "pending",
-      vendorId,
-      vendorName,
-      selectedPay,
-      confirmedSlot,
-      confirmedFee,
-      proposedFee,
-      deliveryTypePref,
-      snapshotItems: orderItemsSnapshot,
-      snapshotSubtotal: orderSubtotalSnapshot,
-    });
+        setPendingOrder({
+          ...order,
+          id: order.id,
+          status: order.status || "pending",
+          vendorId,
+          vendorName,
+          selectedPay,
+          confirmedSlot,
+          confirmedFee,
+          proposedFee,
+          deliveryTypePref,
+          snapshotItems: orderItemsSnapshot,
+          snapshotSubtotal: orderSubtotalSnapshot,
+        });
 
-    // Keep customer on the screen so the countdown timer + counter-offer modal stays visible
-    setOrderId(order.id);
-    setOrderStatus("pending");  // triggers the 90s countdown & modal
-    setNegotiationModalVisible(true);
-    setPlacing(false);
+        // Keep customer on the screen so the countdown timer + counter-offer modal stays visible
+        setOrderId(order.id);
+        setOrderStatus("pending");  // triggers the 5-minute countdown & modal
+        setNegotiationModalVisible(true);
+        setPlacing(false);
 
-    cart?.clearCart?.();
+        cart?.clearCart?.();
 
-    showToast("Order sent! Waiting for store to respond...", "success");
-} else {
+        showToast("Order sent! Waiting for store to respond...", "success");
+      } else {
         console.log("ORDER CREATION FAILED", data); // LOG ERROR DATA
         setErrorMsg(
           data.errors?.join(', ') || data.message || data.msg || "Order failed. Please try again.",
@@ -1403,7 +1419,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
         </TouchableOpacity>
         <View style={s.headerMid}>
           <Text style={[s.headerTitle, { fontSize: Math.round(20 * fs), color: C.orange }]}>
-            Checkout
+            {t('checkout.title', 'Checkout')}
           </Text>
           <Text style={[s.headerSub, { fontSize: Math.round(12 * fs), color: C.gray500, fontWeight: "400" }]}>
             {vendorName}
@@ -1467,7 +1483,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
           {/* ── SECTION 2: DELIVERY TYPE ──────────────────────────────── */}
           <Section
             num="2"
-            title="Delivery Type"
+            title={t('checkout.deliveryType', 'Delivery Type')}
             icon="truck"
             cardR={cardR}
             px={px}
@@ -1483,15 +1499,15 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                   <Feather name="package" size={18} color={deliveryTypePref === 'standard' ? C.white : C.gray500} />
                 </View>
                 <View style={dts.pillBody}>
-                  <Text style={[dts.pillTitle, deliveryTypePref === 'standard' && dts.pillTitleActive]}>Standard</Text>
+                  <Text style={[dts.pillTitle, deliveryTypePref === 'standard' && dts.pillTitleActive]}>{t('checkout.standard', 'Standard')}</Text>
                   <Text style={[dts.pillSub, deliveryTypePref === 'standard' && dts.pillSubActive]}>
-                    {deliveryInfo ? `~${deliveryInfo.eta_minutes} min` : 'Regular speed'}
+                    {deliveryInfo ? `~${deliveryInfo.eta_minutes} min` : t('checkout.regularSpeed', 'Regular speed')}
                   </Text>
                 </View>
                 <Text style={[dts.pillFee, deliveryTypePref === 'standard' && dts.pillFeeActive]}>
                   {fetchingDeliveryInfo ? '...' :
-                    liveStandardFee === 0 ? 'FREE' :
-                    liveStandardFee != null ? `₹${liveStandardFee}` : `₹${baseFee}`
+                    liveStandardFee === 0 ? t('cart.free', 'FREE') :
+                      liveStandardFee != null ? `₹${liveStandardFee}` : `₹${baseFee}`
                   }
                 </Text>
               </TouchableOpacity>
@@ -1505,9 +1521,9 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                   <Feather name="zap" size={18} color={deliveryTypePref === 'quick' ? C.white : '#D97706'} />
                 </View>
                 <View style={dts.pillBody}>
-                  <Text style={[dts.pillTitle, deliveryTypePref === 'quick' && dts.pillTitleQuickActive]}>Quick</Text>
+                  <Text style={[dts.pillTitle, deliveryTypePref === 'quick' && dts.pillTitleQuickActive]}>{t('checkout.quick', 'Quick')}</Text>
                   <Text style={[dts.pillSub, deliveryTypePref === 'quick' && dts.pillSubQuickActive]}>
-                    {deliveryInfo ? `~${deliveryInfo.quick_eta_minutes} min` : 'Faster delivery'}
+                    {deliveryInfo ? `~${deliveryInfo.quick_eta_minutes} min` : t('checkout.fasterDelivery', 'Faster delivery')}
                   </Text>
                 </View>
                 <Text style={[dts.pillFee, deliveryTypePref === 'quick' && dts.pillFeeQuickActive]}>
@@ -1523,18 +1539,18 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
               <View style={dts.breakdown}>
                 <View style={dts.bRow}>
                   <Feather name="map-pin" size={12} color={C.gray400} />
-                  <Text style={dts.bLabel}>Distance charge</Text>
+                  <Text style={dts.bLabel}>{t('checkout.distanceCharge', 'Distance charge')}</Text>
                   <Text style={dts.bVal}>₹{deliveryInfo.fees.distance_based_fee}</Text>
                 </View>
                 <View style={dts.bRow}>
                   <Feather name="shield" size={12} color={C.gray400} />
-                  <Text style={dts.bLabel}>Min floor (₹20 or 2% of order)</Text>
+                  <Text style={dts.bLabel}>{t('checkout.minFloor', 'Min floor (₹20 or 2% of order)')}</Text>
                   <Text style={dts.bVal}>₹{deliveryInfo.fees.floor_used}</Text>
                 </View>
                 {deliveryInfo.fees.demand_surcharge_pct > 0 && (
                   <View style={dts.bRow}>
                     <Feather name="cloud-rain" size={12} color={C.amber} />
-                    <Text style={[dts.bLabel, { color: C.amber }]}>Demand surcharge ({deliveryInfo.fees.demand_surcharge_pct}%)</Text>
+                    <Text style={[dts.bLabel, { color: C.amber }]}>{t('checkout.demandSurcharge', { defaultValue: `Demand surcharge (${deliveryInfo.fees.demand_surcharge_pct}%)`, pct: deliveryInfo.fees.demand_surcharge_pct })}</Text>
                     <Text style={[dts.bVal, { color: C.amber }]}>+{deliveryInfo.fees.demand_surcharge_pct}%</Text>
                   </View>
                 )}
@@ -1542,13 +1558,13 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                   deliveryInfo.fees.quick_delivery_fee > 0 ? (
                     <View style={dts.bRow}>
                       <Feather name="zap" size={12} color={C.orange} />
-                      <Text style={[dts.bLabel, { color: C.orange }]}>Flat Quick Delivery Surcharge</Text>
+                      <Text style={[dts.bLabel, { color: C.orange }]}>{t('checkout.flatQuickSurcharge', 'Flat Quick Delivery Surcharge')}</Text>
                       <Text style={[dts.bVal, { color: C.orange }]}>+₹{deliveryInfo.fees.quick_delivery_fee}</Text>
                     </View>
                   ) : (
                     <View style={dts.bRow}>
                       <Feather name="zap" size={12} color={C.orange} />
-                      <Text style={[dts.bLabel, { color: C.orange }]}>Quick surcharge ({deliveryInfo.fees.quick_delivery_pct}%)</Text>
+                      <Text style={[dts.bLabel, { color: C.orange }]}>{t('checkout.quickSurcharge', { defaultValue: `Quick surcharge (${deliveryInfo.fees.quick_delivery_pct}%)`, pct: deliveryInfo.fees.quick_delivery_pct })}</Text>
                       <Text style={[dts.bVal, { color: C.orange }]}>+{deliveryInfo.fees.quick_delivery_pct}%</Text>
                     </View>
                   )
@@ -1556,22 +1572,22 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                 {deliveryInfo.fees.is_bad_weather && deliveryInfo.fees.weather_surcharge > 0 && (
                   <View style={dts.bRow}>
                     <Feather name="cloud-rain" size={12} color={C.red} />
-                    <Text style={[dts.bLabel, { color: C.red }]}>Bad Weather Surcharge</Text>
+                    <Text style={[dts.bLabel, { color: C.red }]}>{t('checkout.badWeatherSurcharge', 'Bad Weather Surcharge')}</Text>
                     <Text style={[dts.bVal, { color: C.red }]}>+₹{deliveryInfo.fees.weather_surcharge}</Text>
                   </View>
                 )}
                 {deliveryInfo.fees.is_free_delivery && deliveryTypePref === 'standard' && (
                   <View style={dts.bRow}>
                     <Feather name="gift" size={12} color={C.green} />
-                    <Text style={[dts.bLabel, { color: C.green }]}>Free delivery threshold reached!</Text>
-                    <Text style={[dts.bVal, { color: C.green }]}>FREE</Text>
+                    <Text style={[dts.bLabel, { color: C.green }]}>{t('checkout.freeDeliveryThresholdReached', 'Free delivery threshold reached!')}</Text>
+                    <Text style={[dts.bVal, { color: C.green }]}>{t('cart.free', 'FREE')}</Text>
                   </View>
                 )}
                 {deliveryInfo.fees.free_delivery_threshold != null && !deliveryInfo.fees.is_free_delivery && (
                   <View style={[dts.bRow, { backgroundColor: C.greenLight, borderRadius: 8, padding: 6, marginTop: 4 }]}>
                     <Feather name="info" size={12} color={C.green} />
                     <Text style={[dts.bLabel, { color: C.green, flex: 1 }]}>
-                      Add ₹{Math.round(deliveryInfo.fees.free_delivery_threshold - liveSubtotal)} more for FREE standard delivery
+                      {t('checkout.addMoreForFreeDelivery', { defaultValue: `Add ₹${Math.round(deliveryInfo.fees.free_delivery_threshold - liveSubtotal)} more for FREE standard delivery`, amount: Math.round(deliveryInfo.fees.free_delivery_threshold - liveSubtotal) })}
                     </Text>
                   </View>
                 )}
@@ -1581,7 +1597,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             {proposedFee !== null && (
               <View style={dts.negotiatedNote}>
                 <Feather name="check-circle" size={13} color={C.green} />
-                <Text style={dts.negotiatedNoteText}>Using negotiated fee ₹{proposedFee} — delivery type locked</Text>
+                <Text style={dts.negotiatedNoteText}>{t('checkout.usingNegotiatedFee', { defaultValue: `Using negotiated fee ₹${proposedFee} — delivery type locked`, fee: proposedFee })}</Text>
               </View>
             )}
           </Section>
@@ -1589,14 +1605,14 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
           {/* ── SECTION 3: DELIVERY SLOT ──────────────────────────────── */}
           <Section
             num="3"
-            title="Delivery Slot"
+            title={t('checkout.deliverySlot', 'Delivery Slot')}
             icon="clock"
             cardR={cardR}
             px={px}
             rightElement={
               confirmedSlot ? (
                 <TouchableOpacity onPress={() => setSlotModalVisible(true)}>
-                  <Text style={{ color: C.green, fontWeight: "700", fontSize: 14 }}>Change</Text>
+                  <Text style={{ color: C.green, fontWeight: "700", fontSize: 14 }}>{t('checkout.change', 'Change')}</Text>
                 </TouchableOpacity>
               ) : null
             }
@@ -1604,9 +1620,9 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
             {confirmedSlot ? (
               <View style={[s.slotDisplay, { backgroundColor: C.greenLight, borderColor: C.greenBorder }]}>
                 <View style={s.slotInfo}>
-                  <Text style={[s.slotDateText, { color: C.gray500, fontWeight: "500", fontSize: 12 }]}>Selected Slot</Text>
+                  <Text style={[s.slotDateText, { color: C.gray500, fontWeight: "500", fontSize: 12 }]}>{t('checkout.selectedSlot', 'Selected Slot')}</Text>
                   <Text style={[s.slotTimeText, { color: C.greenDark }]}>
-                    {new Date(confirmedSlot.start).toDateString() === new Date().toDateString() ? "Today" : "Tomorrow"},{" "}
+                    {new Date(confirmedSlot.start).toDateString() === new Date().toDateString() ? t('payment.today', 'Today') : t('payment.tomorrow', 'Tomorrow')},{" "}
                     {new Date(confirmedSlot.start).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
                     {" – "}
                     {new Date(confirmedSlot.end).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
@@ -1620,7 +1636,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                 onPress={() => setSlotModalVisible(true)}
               >
                 <Feather name="plus-circle" size={18} color={C.green} />
-                <Text style={s.slotPickText}>Choose a delivery window</Text>
+                <Text style={s.slotPickText}>{t('checkout.chooseDeliveryWindow', 'Choose a delivery window')}</Text>
               </TouchableOpacity>
             )}
           </Section>
@@ -1628,7 +1644,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
           {/* ── SECTION 4: VENDOR CONTACT ────────────────────────────── */}
           <Section
             num="4"
-            title="Vendor Contact"
+            title={t('checkout.vendorContact', 'Vendor Contact')}
             icon="phone"
             cardR={cardR}
             px={px}
@@ -1638,7 +1654,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                 <Feather name="phone-call" size={18} color={C.green} />
                 <View style={{ flex: 1 }}>
                   <Text style={s.phoneValue}>{vendorPhone || "Shared"}</Text>
-                  <Text style={s.phoneLabel}>Vendor contact approved</Text>
+                  <Text style={s.phoneLabel}>{t('checkout.vendorContactApproved', 'Vendor contact approved')}</Text>
                 </View>
                 {vendorPhone && (
                   <TouchableOpacity
@@ -1647,14 +1663,14 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                     activeOpacity={0.85}
                   >
                     <Feather name="phone" size={14} color={C.white} />
-                    <Text style={s.callBtnText}>Call</Text>
+                    <Text style={s.callBtnText}>{t('checkout.call', 'Call')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
             ) : phoneStatus === "pending" ? (
               <View style={s.phoneWait}>
                 <ActivityIndicator size="small" color={C.amber} />
-                <Text style={s.phoneWaitText}>Request pending approval...</Text>
+                <Text style={s.phoneWaitText}>{t('checkout.requestPendingApproval', 'Request pending approval...')}</Text>
               </View>
             ) : (
               <TouchableOpacity
@@ -1664,7 +1680,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
               >
                 <Feather name="shield" size={16} color={C.gray600} />
                 <Text style={s.phoneRequestText}>
-                  {requestingPhone ? "Requesting..." : "Request Shop Contact"}
+                  {requestingPhone ? t('checkout.requesting', 'Requesting...') : t('checkout.requestShopContact', 'Request Shop Contact')}
                 </Text>
               </TouchableOpacity>
             )}
@@ -1673,304 +1689,275 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
           {/* ── SECTION 5: PAYMENT METHOD (Only shown after acceptance) ── */}
           {orderStatus === "accepted" && (
             <View onLayout={(e) => { paymentSectionY.current = e.nativeEvent.layout.y; }}>
-            <Section
-              num="5"
-              title="Payment Method"
-              icon="credit-card"
-              cardR={cardR}
-              px={px}
-            >
-              {PAYMENT_METHODS.map((pm) => {
-                const active = selectedPay === pm.id;
-                return (
-                  <View key={pm.id}>
-                    <TouchableOpacity
-                      style={[
-                        s.payOption,
-                        active && s.payOptionActive,
-                        { borderRadius: cardR - 4 },
-                      ]}
-                      onPress={() => setSelectedPay(active ? null : pm.id)}
-                      activeOpacity={0.85}
-                    >
-                      {/* ... existing pay option content ... */}
-                      <View
+              <Section
+                num="5"
+                title={t('checkout.paymentMethod', 'Payment Method')}
+                icon="credit-card"
+                cardR={cardR}
+                px={px}
+              >
+                {PAYMENT_METHODS.map((pm) => {
+                  const active = selectedPay === pm.id;
+                  return (
+                    <View key={pm.id}>
+                      <TouchableOpacity
                         style={[
-                          s.payIcon,
-                          {
-                            backgroundColor: pm.color + "18",
-                            borderRadius: cardR - 6,
-                          },
+                          s.payOption,
+                          active && s.payOptionActive,
+                          { borderRadius: cardR - 4 },
                         ]}
+                        onPress={() => setSelectedPay(active ? null : pm.id)}
+                        activeOpacity={0.85}
                       >
-                        <Feather
-                          name={pm.icon}
-                          size={isDesktop ? 22 : 19}
-                          color={pm.color}
-                        />
-                      </View>
-                      <View style={s.payBody}>
-                        <Text
-                          style={[
-                            s.payLabel,
-                            { fontSize: Math.round(15 * fs) },
-                          ]}
-                        >
-                          {pm.label}
-                        </Text>
-                        <Text
-                          style={[s.paySub, { fontSize: Math.round(12 * fs) }]}
-                        >
-                          {pm.sub}
-                        </Text>
-                      </View>
-                      <View style={[s.radioOuter, active && s.radioOuterActive]}>
-                        {active && <View style={s.radioDot} />}
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* expansion logic remains same... */}
-                    {active && pm.id === "upi" && (
-                      <View style={[s.upiPanel, { borderRadius: cardR - 4 }]}>
-                        <Text
-                          style={[
-                            s.upiFieldLabel,
-                            { fontSize: Math.round(12 * fs) },
-                          ]}
-                        >
-                          Enter UPI ID
-                        </Text>
+                        {/* ... existing pay option content ... */}
                         <View
                           style={[
-                            s.upiInputRow,
-                            upiError && s.upiInputRowErr,
-                            upiValidated && s.upiInputRowOk,
+                            s.payIcon,
+                            {
+                              backgroundColor: pm.color + "18",
+                              borderRadius: cardR - 6,
+                            },
                           ]}
                         >
                           <Feather
-                            name="at-sign"
-                            size={15}
-                            color={
-                              upiValidated
-                                ? C.green
-                                : upiError
-                                  ? C.red
-                                  : C.gray400
-                            }
+                            name={pm.icon}
+                            size={isDesktop ? 22 : 19}
+                            color={pm.color}
                           />
-                          <TextInput
-                            style={[
-                              s.upiInput,
-                              { fontSize: Math.round(14 * fs) },
-                            ]}
-                            placeholder="yourname@upi"
-                            placeholderTextColor={C.gray400}
-                            value={upiId}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            onChangeText={(t) => {
-                              setUpiId(t);
-                              setUpiValidated(false);
-                              setUpiError(null);
-                              setSelectedUPI(null);
-                            }}
-                            underlineColorAndroid="transparent"
-                            selectionColor={C.green}
-                          />
-                          {upiValidating && (
-                            <ActivityIndicator size="small" color={C.green} />
-                          )}
-                          {upiValidated && !upiValidating && (
-                            <Feather
-                              name="check-circle"
-                              size={16}
-                              color={C.green}
-                            />
-                          )}
                         </View>
-                        {upiError && (
-                          <Text style={s.upiErrorText}>{upiError}</Text>
-                        )}
+                        <View style={s.payBody}>
+                          <Text
+                            style={[
+                              s.payLabel,
+                              { fontSize: Math.round(15 * fs) },
+                            ]}
+                          >
+                            {pm.label}
+                          </Text>
+                          <Text
+                            style={[s.paySub, { fontSize: Math.round(12 * fs) }]}
+                          >
+                            {pm.sub}
+                          </Text>
+                        </View>
+                        <View style={[s.radioOuter, active && s.radioOuterActive]}>
+                          {active && <View style={s.radioDot} />}
+                        </View>
+                      </TouchableOpacity>
 
-                        {upiId.trim().length > 3 &&
-                          !upiValidated &&
-                          !upiValidating && (
-                            <TouchableOpacity
-                              style={s.verifyBtn}
-                              activeOpacity={0.85}
-                              onPress={async () => {
-                                setUpiValidating(true);
+                      {/* expansion logic remains same... */}
+                      {active && pm.id === "upi" && (
+                        <View style={[s.upiPanel, { borderRadius: cardR - 4 }]}>
+                          <Text
+                            style={[
+                              s.upiFieldLabel,
+                              { fontSize: Math.round(12 * fs) },
+                            ]}
+                          >
+                            Enter UPI ID
+                          </Text>
+                          <View
+                            style={[
+                              s.upiInputRow,
+                              upiError && s.upiInputRowErr,
+                              upiValidated && s.upiInputRowOk,
+                            ]}
+                          >
+                            <Feather
+                              name="at-sign"
+                              size={15}
+                              color={
+                                upiValidated
+                                  ? C.green
+                                  : upiError
+                                    ? C.red
+                                    : C.gray400
+                              }
+                            />
+                            <TextInput
+                              style={[
+                                s.upiInput,
+                                { fontSize: Math.round(14 * fs) },
+                              ]}
+                              placeholder="yourname@upi"
+                              placeholderTextColor={C.gray400}
+                              value={upiId}
+                              autoCapitalize="none"
+                              autoCorrect={false}
+                              onChangeText={(t) => {
+                                setUpiId(t);
+                                setUpiValidated(false);
                                 setUpiError(null);
-                                try {
-                                  const res = await fetch(
-                                    `${BASE_URL}/payments/verify-upi`,
-                                    {
-                                      method: "POST",
-                                      headers: {
-                                        "Content-Type": "application/json",
-                                        Authorization: `Bearer ${token}`,
-                                      },
-                                      body: JSON.stringify({
-                                        upi_id: upiId.trim(),
-                                      }),
-                                    },
-                                  );
-                                  const d = await res.json();
-                                  if (d.valid || d.data?.valid) {
-                                    setUpiValidated(true);
-                                    setSelectedUPI("upi_id");
-                                  } else {
-                                    setUpiError(
-                                      d.message ||
-                                        "Invalid UPI ID. Please check and try again.",
-                                    );
-                                  }
-                                } catch {
-                                  setUpiValidated(true);
-                                  setSelectedUPI("upi_id");
-                                } finally {
-                                  setUpiValidating(false);
-                                }
+                                setSelectedUPI(null);
                               }}
-                            >
-                              <Text
-                                style={[
-                                  s.verifyBtnText,
-                                  { fontSize: Math.round(13 * fs) },
-                                ]}
-                              >
-                                Verify UPI ID
-                              </Text>
-                            </TouchableOpacity>
-                          )}
-
-                        {upiValidated && (
-                          <>
-                            <View style={s.upiVerifiedRow}>
+                              underlineColorAndroid="transparent"
+                              selectionColor={C.green}
+                            />
+                            {upiValidating && (
+                              <ActivityIndicator size="small" color={C.green} />
+                            )}
+                            {upiValidated && !upiValidating && (
                               <Feather
                                 name="check-circle"
-                                size={14}
+                                size={16}
                                 color={C.green}
                               />
-                              <Text
-                                style={[
-                                  s.upiVerifiedText,
-                                  { fontSize: Math.round(13 * fs) },
-                                ]}
-                              >
-                                UPI ID verified
-                              </Text>
-                            </View>
+                            )}
+                          </View>
+                          {upiError && (
+                            <Text style={s.upiErrorText}>{upiError}</Text>
+                          )}
 
-                            {Platform.OS === "web" && (
+                          {upiId.trim().length > 3 &&
+                            !upiValidated &&
+                            !upiValidating && (
                               <TouchableOpacity
-                                style={s.qrBtn}
-                                onPress={() => setShowQR(true)}
+                                style={s.verifyBtn}
                                 activeOpacity={0.85}
+                                onPress={async () => {
+                                  setUpiValidating(true);
+                                  setUpiError(null);
+                                  try {
+                                    const res = await fetch(
+                                      `${BASE_URL}/payments/verify-upi`,
+                                      {
+                                        method: "POST",
+                                        headers: {
+                                          "Content-Type": "application/json",
+                                          Authorization: `Bearer ${token}`,
+                                        },
+                                        body: JSON.stringify({
+                                          upi_id: upiId.trim(),
+                                        }),
+                                      },
+                                    );
+                                    const d = await res.json();
+                                    if (d.valid || d.data?.valid) {
+                                      setUpiValidated(true);
+                                      setSelectedUPI("upi_id");
+                                    } else {
+                                      setUpiError(
+                                        d.message ||
+                                        "Invalid UPI ID. Please check and try again.",
+                                      );
+                                    }
+                                  } catch {
+                                    setUpiValidated(true);
+                                    setSelectedUPI("upi_id");
+                                  } finally {
+                                    setUpiValidating(false);
+                                  }
+                                }}
                               >
-                                <Feather
-                                  name="grid"
-                                  size={16}
-                                  color="#7C3AED"
-                                />
                                 <Text
                                   style={[
-                                    s.qrBtnText,
+                                    s.verifyBtnText,
                                     { fontSize: Math.round(13 * fs) },
                                   ]}
                                 >
-                                  Show QR to scan & pay
+                                  Verify UPI ID
                                 </Text>
                               </TouchableOpacity>
                             )}
-                          </>
-                        )}
 
-                        <View style={s.upiDividerRow}>
-                          <View style={s.upiDividerLine} />
-                          <Text style={s.upiDividerText}>or pay using app</Text>
-                          <View style={s.upiDividerLine} />
-                        </View>
-
-                        <View style={s.paySubRow}>
-                          {pm.options.map((app) => {
-                            const deepLinks = {
-                              "Google Pay": `tez://upi/pay?pa=${upiId || "merchant@upi"}&pn=DesiDukaan&am=${total}&cu=INR`,
-                              PhonePe: `phonepe://pay?pa=${upiId || "merchant@upi"}&pn=DesiDukaan&am=${total}&cu=INR`,
-                              Paytm: `paytmmp://pay?pa=${upiId || "merchant@upi"}&pn=DesiDukaan&am=${total}&cu=INR`,
-                              "Other UPI": `upi://pay?pa=${upiId || "merchant@upi"}&pn=DesiDukaan&am=${total}&cu=INR`,
-                            };
-                            const appActive = selectedUPI === app;
-                            return (
-                              <TouchableOpacity
-                                key={app}
-                                style={[
-                                  s.upiChip,
-                                  appActive && s.upiChipActive,
-                                ]}
-                                onPress={() => {
-                                  setSelectedUPI(app);
-                                  if (Platform.OS !== "web") {
-                                    const { Linking } = require("react-native");
-                                    Linking.canOpenURL(deepLinks[app]).then(
-                                      (ok) => {
-                                        if (ok) Linking.openURL(deepLinks[app]);
-                                      },
-                                    );
-                                  }
-                                }}
-                                activeOpacity={0.8}
-                              >
+                          {upiValidated && (
+                            <>
+                              <View style={s.upiVerifiedRow}>
+                                <Feather
+                                  name="check-circle"
+                                  size={14}
+                                  color={C.green}
+                                />
                                 <Text
                                   style={[
-                                    s.upiChipText,
-                                    appActive && s.upiChipTextActive,
+                                    s.upiVerifiedText,
                                     { fontSize: Math.round(13 * fs) },
                                   ]}
                                 >
-                                  {app}
+                                  UPI ID verified
                                 </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      </View>
-                    )}
+                              </View>
 
-                    {active && pm.id === "card" && (
-                      <View style={[s.cardForm, { borderRadius: cardR - 4 }]}>
-                        <View style={s.inputWrap}>
-                          <Feather
-                            name="credit-card"
-                            size={15}
-                            color={C.gray400}
-                          />
-                          <TextInput
-                            style={[
-                              s.cardInput,
-                              { fontSize: Math.round(14 * fs) },
-                            ]}
-                            placeholder="Card number"
-                            placeholderTextColor={C.gray400}
-                            keyboardType="number-pad"
-                            maxLength={19}
-                            value={cardNum}
-                            onChangeText={(t) =>
-                              setCardNum(
-                                t
-                                  .replace(/\D/g, "")
-                                  .replace(/(.{4})/g, "$1 ")
-                                  .trim(),
-                              )
-                            }
-                            underlineColorAndroid="transparent"
-                            selectionColor={C.green}
-                          />
+                              {Platform.OS === "web" && (
+                                <TouchableOpacity
+                                  style={s.qrBtn}
+                                  onPress={() => setShowQR(true)}
+                                  activeOpacity={0.85}
+                                >
+                                  <Feather
+                                    name="grid"
+                                    size={16}
+                                    color="#7C3AED"
+                                  />
+                                  <Text
+                                    style={[
+                                      s.qrBtnText,
+                                      { fontSize: Math.round(13 * fs) },
+                                    ]}
+                                  >
+                                    Show QR to scan & pay
+                                  </Text>
+                                </TouchableOpacity>
+                              )}
+                            </>
+                          )}
+
+                          <View style={s.upiDividerRow}>
+                            <View style={s.upiDividerLine} />
+                            <Text style={s.upiDividerText}>or pay using app</Text>
+                            <View style={s.upiDividerLine} />
+                          </View>
+
+                          <View style={s.paySubRow}>
+                            {pm.options.map((app) => {
+                              const deepLinks = {
+                                "Google Pay": `tez://upi/pay?pa=${upiId || "merchant@upi"}&pn=DesiDukaan&am=${total}&cu=INR`,
+                                PhonePe: `phonepe://pay?pa=${upiId || "merchant@upi"}&pn=DesiDukaan&am=${total}&cu=INR`,
+                                Paytm: `paytmmp://pay?pa=${upiId || "merchant@upi"}&pn=DesiDukaan&am=${total}&cu=INR`,
+                                "Other UPI": `upi://pay?pa=${upiId || "merchant@upi"}&pn=DesiDukaan&am=${total}&cu=INR`,
+                              };
+                              const appActive = selectedUPI === app;
+                              return (
+                                <TouchableOpacity
+                                  key={app}
+                                  style={[
+                                    s.upiChip,
+                                    appActive && s.upiChipActive,
+                                  ]}
+                                  onPress={() => {
+                                    setSelectedUPI(app);
+                                    if (Platform.OS !== "web") {
+                                      const { Linking } = require("react-native");
+                                      Linking.canOpenURL(deepLinks[app]).then(
+                                        (ok) => {
+                                          if (ok) Linking.openURL(deepLinks[app]);
+                                        },
+                                      );
+                                    }
+                                  }}
+                                  activeOpacity={0.8}
+                                >
+                                  <Text
+                                    style={[
+                                      s.upiChipText,
+                                      appActive && s.upiChipTextActive,
+                                      { fontSize: Math.round(13 * fs) },
+                                    ]}
+                                  >
+                                    {app}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
                         </View>
-                        <View style={s.inputRow}>
-                          <View style={[s.inputWrap, { flex: 1 }]}>
+                      )}
+
+                      {active && pm.id === "card" && (
+                        <View style={[s.cardForm, { borderRadius: cardR - 4 }]}>
+                          <View style={s.inputWrap}>
                             <Feather
-                              name="calendar"
+                              name="credit-card"
                               size={15}
                               color={C.gray400}
                             />
@@ -1979,55 +1966,84 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                                 s.cardInput,
                                 { fontSize: Math.round(14 * fs) },
                               ]}
-                              placeholder="MM/YY"
+                              placeholder="Card number"
                               placeholderTextColor={C.gray400}
                               keyboardType="number-pad"
-                              maxLength={5}
-                              value={cardExpiry}
-                              onChangeText={(t) => {
-                                const c = t.replace(/\D/g, "");
-                                setCardExpiry(
-                                  c.length > 2
-                                    ? `${c.slice(0, 2)}/${c.slice(2)}`
-                                    : c,
-                                );
-                              }}
+                              maxLength={19}
+                              value={cardNum}
+                              onChangeText={(t) =>
+                                setCardNum(
+                                  t
+                                    .replace(/\D/g, "")
+                                    .replace(/(.{4})/g, "$1 ")
+                                    .trim(),
+                                )
+                              }
                               underlineColorAndroid="transparent"
                               selectionColor={C.green}
                             />
                           </View>
-                          <View style={[s.inputWrap, { flex: 1 }]}>
-                            <Feather name="lock" size={15} color={C.gray400} />
-                            <TextInput
-                              style={[
-                                s.cardInput,
-                                { fontSize: Math.round(14 * fs) },
-                              ]}
-                              placeholder="CVV"
-                              placeholderTextColor={C.gray400}
-                              keyboardType="number-pad"
-                              maxLength={4}
-                              secureTextEntry
-                              value={cardCVV}
-                              onChangeText={setCardCVV}
-                              underlineColorAndroid="transparent"
-                              selectionColor={C.green}
-                            />
+                          <View style={s.inputRow}>
+                            <View style={[s.inputWrap, { flex: 1 }]}>
+                              <Feather
+                                name="calendar"
+                                size={15}
+                                color={C.gray400}
+                              />
+                              <TextInput
+                                style={[
+                                  s.cardInput,
+                                  { fontSize: Math.round(14 * fs) },
+                                ]}
+                                placeholder="MM/YY"
+                                placeholderTextColor={C.gray400}
+                                keyboardType="number-pad"
+                                maxLength={5}
+                                value={cardExpiry}
+                                onChangeText={(t) => {
+                                  const c = t.replace(/\D/g, "");
+                                  setCardExpiry(
+                                    c.length > 2
+                                      ? `${c.slice(0, 2)}/${c.slice(2)}`
+                                      : c,
+                                  );
+                                }}
+                                underlineColorAndroid="transparent"
+                                selectionColor={C.green}
+                              />
+                            </View>
+                            <View style={[s.inputWrap, { flex: 1 }]}>
+                              <Feather name="lock" size={15} color={C.gray400} />
+                              <TextInput
+                                style={[
+                                  s.cardInput,
+                                  { fontSize: Math.round(14 * fs) },
+                                ]}
+                                placeholder="CVV"
+                                placeholderTextColor={C.gray400}
+                                keyboardType="number-pad"
+                                maxLength={4}
+                                secureTextEntry
+                                value={cardCVV}
+                                onChangeText={setCardCVV}
+                                underlineColorAndroid="transparent"
+                                selectionColor={C.green}
+                              />
+                            </View>
                           </View>
                         </View>
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-            </Section>
-          </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </Section>
+            </View>
           )}
 
           {/* ── ORDER SUMMARY (mobile/tablet inline) ─────────────────── */}
           {!isDesktop && (
             <View style={[sec.wrap, { borderRadius: cardR, marginHorizontal: px }]}>
-              <Text style={[sec.title, { marginBottom: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.gray100 }]}>Order Summary</Text>
+              <Text style={[sec.title, { marginBottom: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.gray100 }]}>{t('checkout.orderSummary', 'Order Summary')}</Text>
               <OrderSummaryCard
                 items={displayItems}
                 subtotal={subtotal}
@@ -2070,7 +2086,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
           <View style={s.sideCol}>
             {/* Order Summary */}
             <View style={s.sideCard}>
-              <Text style={s.sideCardTitle}>Order Summary</Text>
+              <Text style={s.sideCardTitle}>{t('checkout.orderSummary', 'Order Summary')}</Text>
               <OrderSummaryCard
                 items={displayItems}
                 subtotal={subtotal}
@@ -2112,7 +2128,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
           onRequestClose={() => setShowQR(false)}
         >
           <Pressable style={qr.backdrop} onPress={() => setShowQR(false)}>
-            <Pressable style={qr.card} onPress={() => {}}>
+            <Pressable style={qr.card} onPress={() => { }}>
               <View style={qr.header}>
                 <Text style={qr.title}>Scan to Pay</Text>
                 <TouchableOpacity
@@ -2226,7 +2242,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                   marginBottom: 12,
                   textAlign: "center"
                 }}>
-                  {counterData && orderStatus === "accepted" ? "Counter Offer — Final Details" : "Selected Delivery Details"}
+                  {counterData && orderStatus === "accepted" ? t('checkout.counterOfferFinalDetails', 'Counter Offer — Final Details') : t('checkout.selectedDeliveryDetails', 'Selected Delivery Details')}
                 </Text>
 
                 {/* Delivery Time Row */}
@@ -2237,11 +2253,11 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                   borderBottomWidth: 1,
                   borderBottomColor: "#F1F5F9",
                 }}>
-                  <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>Delivery Time</Text>
+                  <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>{t('checkout.deliveryTime', 'Delivery Time')}</Text>
                   <Text style={{ fontSize: 13, color: C.gray900, fontWeight: "700" }}>
                     {deliveryTypePref === "quick"
-                      ? `⚡ ~${deliveryInfo?.quick_eta_minutes ?? 15} mins (Quick)`
-                      : `~${deliveryInfo?.eta_minutes ?? 30} mins (Standard)`
+                      ? `⚡ ~${deliveryInfo?.quick_eta_minutes ?? 15} mins (${t('checkout.quick', 'Quick')})`
+                      : `~${deliveryInfo?.eta_minutes ?? 30} mins (${t('checkout.standard', 'Standard')})`
                     }
                   </Text>
                 </View>
@@ -2254,15 +2270,15 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                   borderBottomWidth: 1,
                   borderBottomColor: "#F1F5F9",
                 }}>
-                  <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>Delivery Slot</Text>
+                  <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>{t('checkout.deliverySlot', 'Delivery Slot')}</Text>
                   <Text style={{ fontSize: 13, color: C.gray900, fontWeight: "700" }}>
                     {(() => {
                       // After accepting a counter offer, show the counter's slot (already merged into confirmedSlot)
                       const activeSlot = confirmedSlot;
-                      if (!activeSlot) return "As soon as possible";
+                      if (!activeSlot) return t('payment.asap', 'As soon as possible');
                       const startStr = new Date(activeSlot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                       const endStr = new Date(activeSlot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                      const dayStr = new Date(activeSlot.start).toDateString() === new Date().toDateString() ? "Today" : "Tomorrow";
+                      const dayStr = new Date(activeSlot.start).toDateString() === new Date().toDateString() ? t('payment.today', 'Today') : t('payment.tomorrow', 'Tomorrow');
                       return `${dayStr}, ${startStr} - ${endStr}`;
                     })()}
                   </Text>
@@ -2274,7 +2290,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                   justifyContent: "space-between",
                   paddingVertical: 8,
                 }}>
-                  <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>Delivery Charges</Text>
+                  <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>{t('checkout.deliveryCharges', 'Delivery Charges')}</Text>
                   <Text style={{ fontSize: 13, color: C.greenDark, fontWeight: "800" }}>
                     ₹{counterData && orderStatus === "accepted"
                       ? (counterData.delivery_fee ?? activeFee)
@@ -2293,11 +2309,13 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                     borderTopColor: "#F1F5F9",
                     marginTop: 4,
                   }}>
-                    <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>Vendor Phone</Text>
+                    <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>{t('checkout.vendorPhone', 'Vendor Phone')}</Text>
                     <TouchableOpacity
                       onPress={() => Linking.openURL(`tel:${vendorPhone}`)}
-                      style={{ flexDirection: "row", alignItems: "center", gap: 6,
-                        backgroundColor: C.greenLight, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}
+                      style={{
+                        flexDirection: "row", alignItems: "center", gap: 6,
+                        backgroundColor: C.greenLight, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8
+                      }}
                     >
                       <Feather name="phone" size={13} color={C.green} />
                       <Text style={{ fontSize: 13, fontWeight: "800", color: C.greenDark }}>{vendorPhone}</Text>
@@ -2338,7 +2356,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                 activeOpacity={0.85}
               >
                 <Feather name="credit-card" size={16} color={C.white} />
-                <Text style={negModal.proceedBtnText}>Proceed to Payment</Text>
+                <Text style={negModal.proceedBtnText}>{t('checkout.proceedToPayment', 'Proceed to Payment')}</Text>
               </TouchableOpacity>
             )}
 
@@ -2347,7 +2365,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                 <View style={negModal.pendingNote}>
                   <Feather name="info" size={13} color={C.amber} />
                   <Text style={negModal.pendingNoteText}>
-                    Waiting for store response. Timer is running — we'll alert you here.
+                    {t('checkout.waitingStoreResponse', "Waiting for store response. Timer is running — we'll alert you here.")}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -2362,7 +2380,7 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
                   activeOpacity={0.85}
                 >
                   <Feather name="home" size={16} color={C.white} />
-                  <Text style={negModal.proceedBtnText}>Browse while waiting</Text>
+                  <Text style={negModal.proceedBtnText}>{t('checkout.browseWhileWaiting', 'Browse while waiting')}</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -2380,14 +2398,14 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
           <View style={[negModal.chipDot, {
             backgroundColor:
               orderStatus === "accepted" ? C.green :
-              orderStatus === "pending" ? C.orange :
-              orderStatus === "countered" ? "#7C3AED" : C.red
+                orderStatus === "pending" ? C.orange :
+                  orderStatus === "countered" ? "#7C3AED" : C.red
           }]} />
           <Text style={negModal.chipText}>
-            {orderStatus === "accepted" ? "Order Accepted — Tap to pay" :
-             orderStatus === "pending" ? `Waiting for store... ${countdown}s` :
-             orderStatus === "countered" ? "Store sent adjustments — Tap to review" :
-             orderStatus === "rejected" ? "Order Declined" : "Request Expired"}
+            {orderStatus === "accepted" ? t('checkout.orderAcceptedTapToPay', 'Order Accepted — Tap to pay') :
+              orderStatus === "pending" ? t('checkout.waitingForStoreTimer', { defaultValue: `Waiting for store... ${countdown}s`, seconds: countdown }) :
+                orderStatus === "countered" ? t('checkout.storeSentAdjustmentsTap', 'Store sent adjustments — Tap to review') :
+                  orderStatus === "rejected" ? t('checkout.orderDeclined', 'Order Declined') : t('checkout.requestExpired', 'Request Expired')}
           </Text>
           <Feather name="chevron-up" size={14} color={C.gray600} />
         </TouchableOpacity>
@@ -2429,12 +2447,13 @@ socket.on("phone:rejected", () => setPhoneStatus("rejected"));
 }
 // ─── Place Order Button (shared mobile + desktop) ─────────────────────────────
 function PlaceOrderBtn({ status, total, canPlace, placing, onPress, fs = 1 }) {
+  const { t } = useTranslation();
   const isAccepted = status === "accepted";
   const label = isAccepted
-    ? "Pay Now"
+    ? t('payment.payNow', 'Pay Now')
     : status === "pending"
-      ? "Waiting for store..."
-      : "Send Order Request";
+      ? t('checkout.waitingForStoreShort', 'Waiting for store...')
+      : t('checkout.sendOrderRequest', 'Send Order Request');
   const icon = isAccepted ? "credit-card" : "send";
 
   return (
@@ -2448,7 +2467,7 @@ function PlaceOrderBtn({ status, total, canPlace, placing, onPress, fs = 1 }) {
         <View style={pob.grad}>
           <ActivityIndicator color={C.white} />
           <Text style={[pob.text, { fontSize: Math.round(16 * fs) }]}>
-            Processing...
+            {t('payment.processing', 'Processing...')}
           </Text>
         </View>
       ) : (
@@ -2467,7 +2486,7 @@ function PlaceOrderBtn({ status, total, canPlace, placing, onPress, fs = 1 }) {
               ₹{total}
             </Text>
             <Text style={[pob.totalLbl, { fontSize: Math.round(10 * fs) }]}>
-              TOTAL
+              {t('orders.total', 'TOTAL')}
             </Text>
           </View>
           <View style={pob.divider} />
@@ -2643,14 +2662,15 @@ function parseSlotLocally(input) {
 
 // ─── Fee Modal ───────────────────────────────────────────────────────────────
 function FeeModal({ visible, currentFee, onClose, onPropose }) {
+  const { t } = useTranslation();
   const [val, setVal] = useState(String(currentFee || ""));
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={fm.backdrop} onPress={onClose}>
         <Pressable style={fm.sheet} onPress={(e) => e.stopPropagation()}>
           <View style={fm.handle} />
-          <Text style={fm.title}>Negotiate delivery fee</Text>
-          <Text style={fm.sub}>Enter what you'd like to pay for delivery</Text>
+          <Text style={fm.title}>{t('checkout.negotiateDeliveryFee', 'Negotiate delivery fee')}</Text>
+          <Text style={fm.sub}>{t('checkout.enterDeliveryFeeSub', "Enter what you'd like to pay for delivery")}</Text>
           <View style={fm.inputBox}>
             <Text style={fm.rupee}>₹</Text>
             <TextInput
@@ -2661,11 +2681,11 @@ function FeeModal({ visible, currentFee, onClose, onPropose }) {
               autoFocus
             />
           </View>
-          <TouchableOpacity 
-            style={fm.confirmBtn} 
+          <TouchableOpacity
+            style={fm.confirmBtn}
             onPress={() => onPropose(parseInt(val || "0", 10))}
           >
-            <Text style={fm.confirmBtnText}>Confirm Proposal</Text>
+            <Text style={fm.confirmBtnText}>{t('checkout.confirmProposal', 'Confirm Proposal')}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -2688,16 +2708,17 @@ const fm = StyleSheet.create({
 
 // ─── Slot picker modal ────────────────────────────────────────────────────────
 const SLOT_OPTIONS = [
-  { label: "7 – 9 AM",   start: 7,  end: 9  },
-  { label: "9 – 11 AM",  start: 9,  end: 11 },
+  { label: "7 – 9 AM", start: 7, end: 9 },
+  { label: "9 – 11 AM", start: 9, end: 11 },
   { label: "11 AM – 1 PM", start: 11, end: 13 },
-  { label: "1 – 3 PM",   start: 13, end: 15 },
-  { label: "3 – 5 PM",   start: 15, end: 17 },
-  { label: "5 – 7 PM",   start: 17, end: 19 },
-  { label: "7 – 9 PM",   start: 19, end: 21 },
+  { label: "1 – 3 PM", start: 13, end: 15 },
+  { label: "3 – 5 PM", start: 15, end: 17 },
+  { label: "5 – 7 PM", start: 17, end: 19 },
+  { label: "7 – 9 PM", start: 19, end: 21 },
 ];
 
 function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
+  const { t } = useTranslation();
   const [day, setDay] = useState("today");
   const [selectedSlot, setSelectedSlot] = useState(null);
 
@@ -2754,15 +2775,15 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
         <Pressable style={sm.sheet} onPress={(e) => e.stopPropagation()}>
           <View style={sm.handle} />
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-            <Text style={sm.title}>Choose delivery window</Text>
+            <Text style={sm.title}>{t('checkout.chooseDeliveryWindow', 'Choose delivery window')}</Text>
             <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
               <Feather name="x" size={22} color={C.gray500} />
             </TouchableOpacity>
           </View>
-          <Text style={sm.sub}>Pick a time slot for your delivery</Text>
+          <Text style={sm.sub}>{t('checkout.pickTimeSlot', 'Pick a time slot for your delivery')}</Text>
 
           <View style={{ marginBottom: 18 }}>
-            <Text style={{ fontWeight: '700', marginBottom: 10, color: C.gray700 }}>Select Day</Text>
+            <Text style={{ fontWeight: '700', marginBottom: 10, color: C.gray700 }}>{t('checkout.selectDay', 'Select Day')}</Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               {['today', 'tomorrow'].map((d) => (
                 <TouchableOpacity
@@ -2774,14 +2795,14 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
                   onPress={() => { setDay(d); setSelectedSlot(null); }}
                 >
                   <Text style={[sm.hintText, day === d && { color: C.green }]}>
-                    {d.charAt(0).toUpperCase() + d.slice(1)}
+                    {d === 'today' ? t('payment.today', 'Today') : t('payment.tomorrow', 'Tomorrow')}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
-          <Text style={{ fontWeight: '700', marginBottom: 10, color: C.gray700 }}>Available Slots</Text>
+          <Text style={{ fontWeight: '700', marginBottom: 10, color: C.gray700 }}>{t('checkout.availableSlots', 'Available Slots')}</Text>
           <View style={sm.slotGrid}>
             {SLOT_OPTIONS.map((slot) => {
               const disabled = isSlotDisabled(slot);
@@ -2818,7 +2839,7 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
             <View style={[sm.preview, sm.previewValid]}>
               <Feather name="check-circle" size={16} color={C.green} />
               <Text style={sm.previewText}>
-                Delivery on <Text style={sm.previewBold}>{day === 'today' ? 'Today' : 'Tomorrow'}</Text>, window: <Text style={sm.previewBold}>{selectedSlot.label}</Text>
+                {t('checkout.deliveryOn', 'Delivery on')} <Text style={sm.previewBold}>{day === 'today' ? t('payment.today', 'Today') : t('payment.tomorrow', 'Tomorrow')}</Text>, window: <Text style={sm.previewBold}>{selectedSlot.label}</Text>
               </Text>
             </View>
           )}
@@ -2833,7 +2854,7 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
               <ActivityIndicator size="small" color={C.white} />
             ) : (
               <Text style={sm.confirmBtnText}>
-                {selectedSlot ? "Confirm this slot →" : "Select a slot"}
+                {selectedSlot ? t('checkout.confirmSlot', 'Confirm this slot →') : t('checkout.selectSlot', 'Select a slot')}
               </Text>
             )}
           </TouchableOpacity>

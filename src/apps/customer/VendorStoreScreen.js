@@ -11,6 +11,7 @@ import useCartStore from "../../store/cartStore";
 import useAuthStore from "../../store/authStore";
 import { categoriesAPI } from "../../services/api";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
+import { useTranslation } from "react-i18next";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -201,10 +202,18 @@ function formatWeight(w) {
 // ─── Weight Picker Modal ─────────────────────────────────────────────────── //
 // ═══════════════════════════════════════════════════════════════════════════ //
 function WeightPickerModal({ item, onClose, onAdd }) {
-  if (!item) return null;
-  const p = item.product || {};
+  const { t } = useTranslation();
+  const p = item?.product || {};
   const weightOptions = parseWeightOptions(p) || [p.unit || "1 pc"];
   const [selected, setSelected] = useState(weightOptions[0]);
+
+  useEffect(() => {
+    if (weightOptions && weightOptions.length > 0) {
+      setSelected(weightOptions[0]);
+    }
+  }, [item]);
+
+  if (!item) return null;
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
@@ -221,18 +230,18 @@ function WeightPickerModal({ item, onClose, onAdd }) {
             <View style={{ flex: 1 }}>
               <View style={wp.looseBadge}>
                 <Feather name="droplet" size={10} color={C.cyan} />
-                <Text style={wp.looseBadgeText}>Loose item</Text>
+                <Text style={wp.looseBadgeText}>{t('vendorStore.looseItem')}</Text>
               </View>
               <Text style={wp.productName} numberOfLines={2}>{p.name}</Text>
               <Text style={wp.basePriceText}>
                 ₹{p.price}{" "}
-                <Text style={wp.perUnit}>per {p.unit || "unit"}</Text>
+                <Text style={wp.perUnit}>{t('vendorStore.perUnit', { unit: p.unit || "unit" })}</Text>
               </Text>
             </View>
           </View>
 
           {/* Weight chips */}
-          <Text style={wp.pickLabel}>Select quantity</Text>
+          <Text style={wp.pickLabel}>{t('vendorStore.selectQuantity')}</Text>
           <View style={wp.optionsGrid}>
             {weightOptions.map(w => {
               const formatted = formatWeight(w);
@@ -270,7 +279,7 @@ function WeightPickerModal({ item, onClose, onAdd }) {
               style={wp.addBtnGrad}
             >
               <Feather name="shopping-cart" size={16} color={C.white} />
-              <Text style={wp.addBtnText}>Add {formatWeight(selected)} to Cart</Text>
+              <Text style={wp.addBtnText}>{t('vendorStore.addWeightToCart', { weight: formatWeight(selected) })}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </Pressable>
@@ -306,6 +315,7 @@ const wp = StyleSheet.create({
 // ─── Product Detail Modal ────────────────────────────────────────────────── //
 // ═══════════════════════════════════════════════════════════════════════════ //
 function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker }) {
+  const { t } = useTranslation();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.88)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
@@ -373,11 +383,11 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
               {loose && (
                 <View style={pm.looseBadge}>
                   <Feather name="droplet" size={9} color={C.cyan} />
-                  <Text style={pm.looseBadgeText}>Loose</Text>
+                  <Text style={pm.looseBadgeText}>{t('vendorStore.loose')}</Text>
                 </View>
               )}
-              {discount && <View style={pm.discBadge}><Text style={pm.discText}>{discount}% OFF</Text></View>}
-              {!inStock && <View style={pm.oosLayer}><Text style={pm.oosLayerText}>Out of Stock</Text></View>}
+              {discount && <View style={pm.discBadge}><Text style={pm.discText}>{discount}% {t('vendorStore.off')}</Text></View>}
+              {!inStock && <View style={pm.oosLayer}><Text style={pm.oosLayerText}>{t('vendorStore.outOfStock')}</Text></View>}
               {/* <View style={pm.priceOnImg}>
                 <Text style={pm.priceOnImgText}>₹{p.price}</Text>
                 {p.mrp && p.mrp > p.price && <Text style={pm.mrpOnImgText}>₹{p.mrp}</Text>}
@@ -387,7 +397,7 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
               {item.stock_qty > 0 && item.stock_qty <= 10 && (
                 <View style={pm.lowBanner}>
                   <Feather name="alert-circle" size={13} color="#D97706" />
-                  <Text style={pm.lowBannerText}>Only {item.stock_qty} left — order soon!</Text>
+                  <Text style={pm.lowBannerText}>{t('vendorStore.onlyLeft', { count: item.stock_qty })}</Text>
                 </View>
               )}
               <Text style={pm.name}>{p.name}</Text>
@@ -402,19 +412,19 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
               )}
               {p.description ? (
                 <View style={pm.descBox}>
-                  <Text style={pm.descLabel}>Description</Text>
+                  <Text style={pm.descLabel}>{t('vendorStore.description')}</Text>
                   <Text style={pm.descText}>{p.description}</Text>
                 </View>
               ) : null}
               {discount && (
                 <View style={pm.savingsPill}>
                   <MaterialIcons name="savings" size={14} color="#D97706" />
-                  <Text style={pm.savingsText}>You save ₹{p.mrp - p.price} per item</Text>
+                  <Text style={pm.savingsText}>{t('vendorStore.youSave', { amount: p.mrp - p.price })}</Text>
                 </View>
               )}
               <View style={pm.actionRow}>
                 <View>
-                  <Text style={pm.totalLabel}>TOTAL</Text>
+                  <Text style={pm.totalLabel}>{t('cart.total') || 'TOTAL'}</Text>
                   <Text style={pm.totalPrice}>₹{p.price}</Text>
                 </View>
                 {inStock ? (
@@ -425,12 +435,12 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
                       activeOpacity={0.85}
                     >
                       <Feather name="sliders" size={15} color={C.white} />
-                      <Text style={pm.addBtnText}>Select Weight</Text>
+                      <Text style={pm.addBtnText}>{t('vendorStore.selectWeight')}</Text>
                     </TouchableOpacity>
                   ) : qty === 0 ? (
                     <TouchableOpacity style={pm.addBtn} onPress={() => { onAdd(item); handleClose(); }} activeOpacity={0.85}>
                       <MaterialIcons name="shopping-cart" size={16} color="#fff" />
-                      <Text style={pm.addBtnText}>Add to Cart</Text>
+                      <Text style={pm.addBtnText}>{t('vendorStore.add')}</Text>
                     </TouchableOpacity>
                   ) : (
                     <View style={pm.qtyRow}>
@@ -444,7 +454,7 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
                     </View>
                   )
                 ) : (
-                  <View style={pm.oosBtn}><Text style={pm.oosBtnText}>Out of Stock</Text></View>
+                  <View style={pm.oosBtn}><Text style={pm.oosBtnText}>{t('vendorStore.outOfStock')}</Text></View>
                 )}
               </View>
             </View>
@@ -512,6 +522,7 @@ const pm = StyleSheet.create({
 // ─── Product Card — responsive 2-5 col grid ──────────────────────────────── //
 // ═══════════════════════════════════════════════════════════════════════════ //
 function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
+  const { t } = useTranslation();
   const p = item.product || {};
   const inStock = item.stock_qty > 0;
   const loose = isLooseItem(p);
@@ -539,17 +550,17 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
           <Feather name="eye" size={14} color={C.white} />
         </TouchableOpacity>
         {discount && inStock && (
-          <View style={pc.discBadge}><Text style={pc.discText}>{discount}% OFF</Text></View>
+          <View style={pc.discBadge}><Text style={pc.discText}>{discount}% {t('vendorStore.off')}</Text></View>
         )}
         {/* Loose badge — top right */}
         {loose && inStock && (
           <View style={pc.looseBadge}>
             <Feather name="droplet" size={8} color={C.cyan} />
-            <Text style={pc.looseBadgeText}>Loose</Text>
+            <Text style={pc.looseBadgeText}>{t('vendorStore.loose')}</Text>
           </View>
         )}
         {!inStock && (
-          <View style={pc.oosOverlay}><Text style={pc.oosText}>Out of{"\n"}Stock</Text></View>
+          <View style={pc.oosOverlay}><Text style={pc.oosText}>{t('vendorStore.outOfStock')}</Text></View>
         )}
       </View>
 
@@ -573,7 +584,7 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
               {loose
                 ? <Feather name="sliders" size={12} color={C.white} />
                 : <Feather name="plus" size={12} color={C.white} />}
-              <Text style={pc.addText}>{loose ? "SELECT" : "ADD"}</Text>
+              <Text style={pc.addText}>{loose ? t('vendorStore.select') : t('vendorStore.add')}</Text>
             </TouchableOpacity>
           ) : (
             <View style={pc.qtyRow}>
@@ -595,7 +606,7 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
             </View>
           )
         ) : (
-          <View style={pc.oosBtn}><Text style={pc.oosBtnText}>Out of stock</Text></View>
+          <View style={pc.oosBtn}><Text style={pc.oosBtnText}>{t('vendorStore.outOfStock')}</Text></View>
         )}
       </View>
     </TouchableOpacity>
@@ -733,6 +744,7 @@ const ct = StyleSheet.create({
 // ─── Main Screen ─────────────────────────────────────────────────────────── //
 // ═══════════════════════════════════════════════════════════════════════════ //
 export default function VendorStoreScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const route = useRoute();
   const { vendorId, vendorName } = route.params || {};
@@ -1005,15 +1017,15 @@ export default function VendorStoreScreen() {
           <Text style={s.shopName} numberOfLines={1}>{vendor?.shop_name || vendorName}</Text>
           <View style={s.shopMetaRow}>
             <View style={[s.statusDot, { backgroundColor: vendor?.is_open ? "#4ADE80" : "#F87171" }]} />
-            <Text style={s.metaText}>{vendor?.is_open ? "Open" : "Closed"}</Text>
+            <Text style={s.metaText}>{vendor?.is_open ? t('vendorStore.open') : t('vendorStore.closed')}</Text>
             <Text style={s.metaSep}>·</Text>
-            <Text style={s.metaText}>{inStockTotal} in stock</Text>
+            <Text style={s.metaText}>{t('vendorStore.inStock', { count: inStockTotal })}</Text>
           </View>
         </View>
         <View style={[s.statusChip, !vendor?.is_open && s.statusChipClosed]}>
           <View style={[s.statusDot, { backgroundColor: vendor?.is_open ? C.greenFixed : "#F87171" }]} />
           <Text style={[s.statusText, !vendor?.is_open && s.statusTextClosed]}>
-            {vendor?.is_open ? "Open" : "Closed"}
+            {vendor?.is_open ? t('vendorStore.open') : t('vendorStore.closed')}
           </Text>
         </View>
         <TouchableOpacity
@@ -1032,7 +1044,7 @@ export default function VendorStoreScreen() {
           <TextInput
             ref={searchInputRef}
             style={s.searchInput}
-            placeholder={`Search in ${vendor?.shop_name || "store"}…`}
+            placeholder={t('vendorStore.searchIn', { name: vendor?.shop_name || "store" })}
             placeholderTextColor={C.gray400}
             value={search}
             onChangeText={t => setSearch(t)}
@@ -1053,14 +1065,14 @@ export default function VendorStoreScreen() {
       <View style={s.sortWrap}>
         <View style={s.sortHeader}>
           <Feather name="sliders" size={12} color={C.gray500} />
-          <Text style={s.sortTitle}>Sort:</Text>
+          <Text style={s.sortTitle}>{t('vendorStore.sort')}</Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.sortRow}>
           {[
-            { key: "default", label: "Default" },
-            { key: "price_asc", label: "Price: Low to High", icon: "arrow-up" },
-            { key: "price_desc", label: "Price: High to Low", icon: "arrow-down" },
-            { key: "name_asc", label: "Name: A-Z" },
+            { key: "default", label: t('vendorStore.default') },
+            { key: "price_asc", label: t('vendorStore.priceLowHigh'), icon: "arrow-up" },
+            { key: "price_desc", label: t('vendorStore.priceHighLow'), icon: "arrow-down" },
+            { key: "name_asc", label: t('vendorStore.nameAZ') },
           ].map((opt) => {
             const active = sortBy === opt.key;
             return (

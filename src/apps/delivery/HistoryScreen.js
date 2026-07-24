@@ -11,6 +11,7 @@ import {
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import useAuthStore from '../../store/authStore';
+import { useTranslation } from 'react-i18next';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 
@@ -41,6 +42,7 @@ const C = {
 const TABS = ['Today', 'This Week', 'This Month'];
 
 function HistoryCard({ delivery }) {
+  const { t } = useTranslation();
   const isDelivered = delivery.status === 'delivered';
   const earnings = delivery.partner_earnings || 0;
   const pickupName = delivery.order?.vendor?.shop_name || 'Unknown Store';
@@ -84,7 +86,7 @@ function HistoryCard({ delivery }) {
           <Text style={s.metaTime}>{dateStr}  {timeStr}</Text>
           <View style={[s.statusPill, { backgroundColor: isDelivered ? C.greenLight : C.redLight }]}>
             <Text style={[s.statusPillText, { color: isDelivered ? C.greenText : C.redText }]}>
-              {isDelivered ? 'Delivered' : 'Failed'}
+              {isDelivered ? t('delivery.delivered', 'Delivered') : t('delivery.failed', 'Failed')}
             </Text>
           </View>
         </View>
@@ -95,6 +97,7 @@ function HistoryCard({ delivery }) {
 
 export default function HistoryScreen() {
   const { token } = useAuthStore();
+  const { t } = useTranslation();
 
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_500Medium,
@@ -103,11 +106,17 @@ export default function HistoryScreen() {
     PlusJakartaSans_800ExtraBold,
   });
 
-  const [activeTab, setActiveTab] = useState('Today');
+  const [activeTabKey, setActiveTabKey] = useState('today');
   const [allDeliveries, setAllDeliveries] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const TABS = [
+    { key: 'today', label: t('delivery.today', 'Today') },
+    { key: 'week', label: t('delivery.thisWeek', 'This Week') },
+    { key: 'month', label: t('delivery.thisMonth', 'This Month') },
+  ];
 
   const fetchData = useCallback(async () => {
     try {
@@ -134,9 +143,9 @@ export default function HistoryScreen() {
     const now = new Date();
     return allDeliveries.filter(d => {
       const date = new Date(d.delivered_at || d.created_at);
-      if (activeTab === 'Today')      return date.toDateString() === now.toDateString();
-      if (activeTab === 'This Week')  { const wa = new Date(now); wa.setDate(now.getDate() - 7); return date >= wa; }
-      if (activeTab === 'This Month') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+      if (activeTabKey === 'today') return date.toDateString() === now.toDateString();
+      if (activeTabKey === 'week')  { const wa = new Date(now); wa.setDate(now.getDate() - 7); return date >= wa; }
+      if (activeTabKey === 'month') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
       return true;
     });
   };
@@ -155,6 +164,8 @@ export default function HistoryScreen() {
     );
   }
 
+  const currentTabLabel = TABS.find(t => t.key === activeTabKey)?.label || '';
+
   return (
     <View style={s.root}>
       <StatusBar barStyle="light-content" backgroundColor={C.heroBg} />
@@ -163,11 +174,11 @@ export default function HistoryScreen() {
       <View style={s.hero}>
         <View style={s.heroTop}>
           <View>
-            <Text style={s.heroTitle}>History</Text>
-            <Text style={s.heroSub}>Your delivery record</Text>
+            <Text style={s.heroTitle}>{t('delivery.history', 'History')}</Text>
+            <Text style={s.heroSub}>{t('delivery.yourDeliveryRecord', 'Your delivery record')}</Text>
           </View>
           <View style={s.heroEarningBox}>
-            <Text style={s.heroEarningLabel}>PERIOD EARNINGS</Text>
+            <Text style={s.heroEarningLabel}>{t('delivery.periodEarnings', 'PERIOD EARNINGS')}</Text>
             <Text style={s.heroEarningValue}>₹{Math.round(totalEarnings).toLocaleString('en-IN')}</Text>
           </View>
         </View>
@@ -176,22 +187,22 @@ export default function HistoryScreen() {
         <View style={s.heroStats}>
           <View style={s.heroStat}>
             <Text style={s.heroStatValue}>{deliveredCount}</Text>
-            <Text style={s.heroStatLabel}>Delivered</Text>
+            <Text style={s.heroStatLabel}>{t('delivery.delivered', 'Delivered')}</Text>
           </View>
           <View style={s.heroStatDivider} />
           <View style={s.heroStat}>
             <Text style={[s.heroStatValue, { color: '#FCA5A5' }]}>{failedCount}</Text>
-            <Text style={s.heroStatLabel}>Failed</Text>
+            <Text style={s.heroStatLabel}>{t('delivery.failed', 'Failed')}</Text>
           </View>
           <View style={s.heroStatDivider} />
           <View style={s.heroStat}>
             <Text style={s.heroStatValue}>{stats?.totalDeliveries || 0}</Text>
-            <Text style={s.heroStatLabel}>All-time</Text>
+            <Text style={s.heroStatLabel}>{t('delivery.allTime', 'All-time')}</Text>
           </View>
           <View style={s.heroStatDivider} />
           <View style={s.heroStat}>
             <Text style={s.heroStatValue}>{stats?.acceptanceRate ?? 100}%</Text>
-            <Text style={s.heroStatLabel}>Accept rate</Text>
+            <Text style={s.heroStatLabel}>{t('delivery.acceptRate', 'Accept rate')}</Text>
           </View>
         </View>
       </View>
@@ -200,12 +211,12 @@ export default function HistoryScreen() {
       <View style={s.tabsWrap}>
         {TABS.map(tab => (
           <TouchableOpacity
-            key={tab}
-            style={[s.tab, activeTab === tab && s.tabActive]}
-            onPress={() => setActiveTab(tab)}
+            key={tab.key}
+            style={[s.tab, activeTabKey === tab.key && s.tabActive]}
+            onPress={() => setActiveTabKey(tab.key)}
             activeOpacity={0.7}
           >
-            <Text style={[s.tabText, activeTab === tab && s.tabTextActive]}>{tab}</Text>
+            <Text style={[s.tabText, activeTabKey === tab.key && s.tabTextActive]}>{tab.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -219,34 +230,34 @@ export default function HistoryScreen() {
         {/* ── Earnings breakdown card ── */}
         <View style={s.earningsCard}>
           <View style={s.earningsCardHeader}>
-            <Text style={s.earningsCardTitle}>Earnings breakdown</Text>
+            <Text style={s.earningsCardTitle}>{t('delivery.earningsBreakdown', 'Earnings breakdown')}</Text>
             <Text style={s.earningsCardTotal}>₹{Math.round(totalEarnings).toLocaleString('en-IN')}</Text>
           </View>
           <View style={s.earningsRow}>
-            <Text style={s.earningsLabel}>Base pay (80% of fee)</Text>
+            <Text style={s.earningsLabel}>{t('delivery.basePay', 'Base pay (80% of fee)')}</Text>
             <Text style={s.earningsValue}>₹{Math.round(totalEarnings * 0.8).toLocaleString('en-IN')}</Text>
           </View>
           <View style={s.earningsRow}>
-            <Text style={s.earningsLabel}>Acceptance rate bonus</Text>
+            <Text style={s.earningsLabel}>{t('delivery.acceptanceBonus', 'Acceptance rate bonus')}</Text>
             <Text style={[s.earningsValue, { color: C.greenDark }]}>{stats?.acceptanceRate ?? 100}%</Text>
           </View>
           <View style={[s.earningsRow, { borderBottomWidth: 0 }]}>
-            <Text style={s.earningsLabel}>Total deliveries (all-time)</Text>
+            <Text style={s.earningsLabel}>{t('delivery.totalDeliveriesAllTime', 'Total deliveries (all-time)')}</Text>
             <Text style={s.earningsValue}>{stats?.totalDeliveries || 0}</Text>
           </View>
         </View>
 
         {/* ── List header ── */}
         <Text style={s.listHeader}>
-          {filtered.length} {activeTab === 'Today' ? 'today' : activeTab === 'This Week' ? 'this week' : 'this month'}
+          {filtered.length} {currentTabLabel.toLowerCase()}
         </Text>
 
         {/* ── List ── */}
         {filtered.length === 0 ? (
           <View style={s.emptyWrap}>
             <Text style={s.emptyEmoji}>📭</Text>
-            <Text style={s.emptyTitle}>No deliveries {activeTab.toLowerCase()}</Text>
-            <Text style={s.emptySub}>Pull down to refresh</Text>
+            <Text style={s.emptyTitle}>{t('delivery.noDeliveries', { period: currentTabLabel.toLowerCase(), defaultValue: `No deliveries ${currentTabLabel.toLowerCase()}` })}</Text>
+            <Text style={s.emptySub}>{t('delivery.pullToRefresh', 'Pull down to refresh')}</Text>
           </View>
         ) : (
           <View style={s.listCard}>

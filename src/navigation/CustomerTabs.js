@@ -42,7 +42,7 @@ const C = {
 
 const TAB_ICONS = {
   Home:    'home',
-  Search:  'search',
+  // Search:  'search',
   Cart:    'shopping-cart',
   Orders:  'receipt-long',
   Profile: 'person',
@@ -155,7 +155,7 @@ function CustomerTabNavigator() {
       })}
     >
       <Tab.Screen name="Home"    component={HomeScreen}    />
-      <Tab.Screen name="Search"  component={SearchScreen}  />
+      {/* <Tab.Screen name="Search"  component={SearchScreen}  /> */}
       <Tab.Screen name="Cart"    component={CartScreen}    />
       <Tab.Screen name="Orders"  component={OrdersScreen}  />
       <Tab.Screen name="Profile" component={ProfileScreen} />
@@ -167,13 +167,14 @@ function CustomerTabNavigator() {
 // Stays visible above the tab bar while customer browses after sending an order.
 // Shows a live countdown. Tap → back to Checkout (re-opens modal).
 function PendingOrderMonitor() {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const { token } = useAuthStore();
   const pendingOrder  = useOrderStore((s) => s.pendingOrder);
   const updatePending = useOrderStore((s) => s.updatePendingOrder);
   const clearPending  = useOrderStore((s) => s.clearPendingOrder);
 
-  const ORDER_TIMEOUT = 90; // seconds — must match Checkout.js
+  const ORDER_TIMEOUT = 300; // seconds (5 minutes) — must match Checkout.js and backend
   const [countdown, setCountdown] = useState(ORDER_TIMEOUT);
   const timerRef     = useRef(null);
   const startRef     = useRef(null);
@@ -305,9 +306,9 @@ function PendingOrderMonitor() {
       updatePending({ status: data.status, order_number: data.order_number });
 
       if (data.status === 'accepted') {
-        showToast('✅ Order accepted! Tap to pay.', 'success', () => openCheckout('accepted'), null);
+        showToast(t('orders.orderAcceptedTapToPayToast', '✅ Order accepted! Tap to pay.'), 'success', () => openCheckout('accepted'), null);
       } else if (data.status === 'rejected') {
-        showToast(data.reason || '❌ Store declined your order.', 'danger', null, 8000);
+        showToast(data.reason || t('orders.storeDeclinedOrderToast', '❌ Store declined your order.'), 'danger', null, 8000);
         setTimeout(() => clearPending(), 8000);
       }
     });
@@ -320,7 +321,7 @@ function PendingOrderMonitor() {
       handledRef.current[key] = true;
 
       updatePending({ status: 'countered', counter_offer: data.counter_offer });
-      showToast('🔄 Store suggested changes. Tap to review.', 'countered', () => openCheckout('countered'), null);
+      showToast(t('orders.storeSuggestedChangesToast', '🔄 Store suggested changes. Tap to review.'), 'countered', () => openCheckout('countered'), null);
     });
 
     socket.on('delivery_assigned', (data) => {
@@ -329,7 +330,7 @@ function PendingOrderMonitor() {
       const orderId = data.order_id || data.orderId;
 
       showToast(
-        `🛵 ${partnerName} has been assigned as your delivery partner! Tap to track.`,
+        t('orders.deliveryPartnerAssignedToast', { defaultValue: `🛵 ${partnerName} has been assigned as your delivery partner! Tap to track.`, partnerName }),
         'success',
         () => {
           const root = navigation.getParent?.() || navigation;
@@ -413,21 +414,21 @@ function PendingOrderMonitor() {
           <View style={{ flex: 1 }}>
             <Text style={ms.bannerTitle} numberOfLines={1}>
               {status === 'pending'
-                ? `Waiting for ${vendor}…`
+                ? t('checkout.waitingForVendor', { defaultValue: `Waiting for ${vendor}…`, vendor })
                 : status === 'accepted'
-                ? `Order Confirmed — Proceed to Pay`
+                ? t('checkout.orderConfirmedProceedPay', 'Order Confirmed — Proceed to Pay')
                 : status === 'countered'
-                ? `${vendor} suggested changes`
-                : 'Request expired'}
+                ? t('checkout.vendorSuggestedChanges', { defaultValue: `${vendor} suggested changes`, vendor })
+                : t('checkout.requestExpired', 'Request expired')}
             </Text>
             <Text style={ms.bannerSub}>
               {status === 'pending'
-                ? `${countdown}s remaining · tap to view`
+                ? t('checkout.remainingTapToView', { defaultValue: `${countdown}s remaining · tap to view`, seconds: countdown })
                 : status === 'accepted'
-                ? 'Tap to complete payment'
+                ? t('checkout.tapToCompletePayment', 'Tap to complete payment')
                 : status === 'countered'
-                ? 'Tap to review & respond'
-                : 'Tap for details'}
+                ? t('checkout.tapToReviewRespond', 'Tap to review & respond')
+                : t('checkout.tapForDetails', 'Tap for details')}
             </Text>
           </View>
 
@@ -471,6 +472,7 @@ export default function CustomerTabs() {
         <Stack.Screen name="CustomerTabNavigator" component={CustomerTabNavigator} />
         <Stack.Screen name="VendorStore" component={VendorStoreScreen} />
         <Stack.Screen name="TrackOrder"  component={TrackOrderScreen}  />
+        <Stack.Screen name="Search"      component={SearchScreen}      />
       </Stack.Navigator>
       <PendingOrderMonitor />
     </View>

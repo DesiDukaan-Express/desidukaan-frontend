@@ -133,6 +133,15 @@ export const categoriesAPI = {
   getSubcategories: (parentId) => request("GET", `/products/subcategories/${parentId}`),
 };
 
+// ─── Products ─────────────────────────────────────────────────────────────────
+export const productsAPI = {
+  getTrending: (lat = null, lng = null, limit = 12) => {
+    let url = `/products/trending?limit=${limit}`;
+    if (lat != null && lng != null) url += `&lat=${lat}&lng=${lng}`;
+    return request("GET", url);
+  },
+};
+
 // ─── Admin Categories ─────────────────────────────────────────────────────────
 export const adminCategoriesAPI = {
   getAll:   (token)           => request("GET",    "/admin/categories",      null,  token),
@@ -150,6 +159,19 @@ export const vendorsAPI = {
   },
 
   getStoreCategories: () => request("GET", "/vendors/store-categories"),
+
+  /**
+   * Shop-name search → { matched: [...], similar: [...] }
+   * matched = vendors whose name matches the query
+   * similar = other vendors sharing the same store_category as the matches
+   */
+  searchByName: (q, latitude = null, longitude = null, radius_km = 10) => {
+    let url = `/vendors/search?q=${encodeURIComponent(q)}`;
+    if (latitude != null && longitude != null) {
+      url += `&latitude=${latitude}&longitude=${longitude}&radius_km=${radius_km}`;
+    }
+    return request("GET", url);
+  },
 
   getById:      (id)         => request("GET",   `/vendors/${id}`),
   getMyProfile: (token)      => request("GET",   "/vendors/me/profile", null, token),
@@ -194,13 +216,9 @@ export const searchAPI = {
    */
   correct: (q) => request("GET", `/search/correct?q=${encodeURIComponent(q)}`),
 
-  /**
-   * Fire-and-forget search tracking — called after every successful search.
-   * Increments count in search_history for popularity-based suggestions.
-   */
-  track: (query) => {
+  track: (query, image_url = null, category = null) => {
     // Fire and forget — don't await, don't block UI
-    request("POST", "/search/track", { query }).catch(() => {});
+    request("POST", "/search/track", { query, image_url, category }).catch(() => {});
   },
 };
 

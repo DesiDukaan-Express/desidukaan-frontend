@@ -8,6 +8,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import useOrderStore from "../../store/orderStore";
 import useAuthStore from "../../store/authStore";
+import { useTranslation } from "react-i18next";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -44,6 +45,7 @@ function fmtSlot(slot) {
 }
 
 export default function PaymentScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const route      = useRoute();
   const { token }  = useAuthStore();
@@ -69,7 +71,7 @@ export default function PaymentScreen() {
 
   const handlePay = () => {
     if (!selectedPay) {
-      Alert.alert("Select Payment", "Please choose a payment method.");
+      Alert.alert(t('payment.selectPaymentMethod'), t('payment.selectPaymentMethod'));
       return;
     }
     setPlacing(true);
@@ -93,7 +95,7 @@ export default function PaymentScreen() {
           <Feather name="arrow-left" size={20} color={C.gray900} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={st.headerTitle}>Payment</Text>
+          <Text style={st.headerTitle}>{t('payment.title')}</Text>
           <Text style={st.headerSub}>{vendorName}</Text>
         </View>
         <View style={st.totalChip}>
@@ -112,8 +114,8 @@ export default function PaymentScreen() {
             <Feather name="check-circle" size={22} color={C.green} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={st.confirmedTitle}>Order Confirmed!</Text>
-            <Text style={st.confirmedSub}>{vendorName} has accepted your order.</Text>
+            <Text style={st.confirmedTitle}>{t('payment.orderConfirmed')}</Text>
+            <Text style={st.confirmedSub}>{t('payment.vendorAccepted', { name: vendorName })}</Text>
           </View>
         </View>
 
@@ -121,7 +123,7 @@ export default function PaymentScreen() {
         <View style={st.card}>
           <View style={st.cardHeader}>
             <Feather name="clock" size={15} color={C.green} />
-            <Text style={st.cardTitle}>Delivery Slot</Text>
+            <Text style={st.cardTitle}>{t('payment.deliverySlot')}</Text>
           </View>
           <View style={st.slotRow}>
             <Feather name="calendar" size={14} color={C.green} />
@@ -133,7 +135,7 @@ export default function PaymentScreen() {
         <View style={st.card}>
           <View style={st.cardHeader}>
             <Feather name="shopping-bag" size={15} color={C.green} />
-            <Text style={st.cardTitle}>Order Summary</Text>
+            <Text style={st.cardTitle}>{t('payment.orderSummary')}</Text>
           </View>
           {items.map((item, i) => (
             <View key={i} style={[st.itemRow, i < items.length - 1 && { borderBottomWidth: 1, borderBottomColor: C.gray100 }]}>
@@ -145,16 +147,16 @@ export default function PaymentScreen() {
           ))}
           <View style={st.divider} />
           <View style={st.summaryRow}>
-            <Text style={st.summaryLabel}>Items total</Text>
+            <Text style={st.summaryLabel}>{t('payment.itemsTotal')}</Text>
             <Text style={st.summaryVal}>₹{subtotal}</Text>
           </View>
           <View style={st.summaryRow}>
-            <Text style={st.summaryLabel}>Delivery ({deliveryTypePref === "quick" ? "Quick ⚡" : "Standard"})</Text>
-            <Text style={st.summaryVal}>{deliveryFee === 0 ? "FREE" : `₹${deliveryFee}`}</Text>
+            <Text style={st.summaryLabel}>{t('payment.delivery')} ({deliveryTypePref === "quick" ? "Quick ⚡" : "Standard"})</Text>
+            <Text style={st.summaryVal}>{deliveryFee === 0 ? t('cart.free') : `₹${deliveryFee}`}</Text>
           </View>
           <View style={[st.divider, { borderStyle: "dashed" }]} />
           <View style={st.summaryRow}>
-            <Text style={[st.summaryLabel, { fontSize: 16, fontWeight: "900", color: C.gray900 }]}>Total payable</Text>
+            <Text style={[st.summaryLabel, { fontSize: 16, fontWeight: "900", color: C.gray900 }]}>{t('payment.totalPayable')}</Text>
             <Text style={[st.summaryVal, { fontSize: 17, color: C.green }]}>₹{total}</Text>
           </View>
         </View>
@@ -164,14 +166,14 @@ export default function PaymentScreen() {
           <View style={st.card}>
             <View style={st.cardHeader}>
               <Feather name="phone" size={15} color={C.green} />
-              <Text style={st.cardTitle}>Vendor Contact</Text>
+              <Text style={st.cardTitle}>{t('payment.vendorContact')}</Text>
             </View>
             <View style={st.phoneRow}>
               <Feather name="phone-call" size={16} color={C.green} />
               <Text style={st.phoneNum}>{vendorPhone}</Text>
               <TouchableOpacity style={st.callBtn} onPress={() => Linking.openURL(`tel:${vendorPhone}`)}>
                 <Feather name="phone" size={13} color={C.white} />
-                <Text style={st.callBtnText}>Call</Text>
+                <Text style={st.callBtnText}>{t('payment.call')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -181,7 +183,7 @@ export default function PaymentScreen() {
         <View style={st.card}>
           <View style={st.cardHeader}>
             <Feather name="credit-card" size={15} color={C.green} />
-            <Text style={st.cardTitle}>Payment Method</Text>
+            <Text style={st.cardTitle}>{t('payment.paymentMethod')}</Text>
           </View>
           {PAYMENT_METHODS.map((pm) => {
             const active = selectedPay === pm.id;
@@ -207,7 +209,7 @@ export default function PaymentScreen() {
                 {/* UPI expansion */}
                 {active && pm.id === "upi" && (
                   <View style={st.upiPanel}>
-                    <Text style={st.upiFieldLabel}>Enter UPI ID</Text>
+                    <Text style={st.upiFieldLabel}>{t('payment.upiId')}</Text>
                     <View style={[st.upiInputRow, upiError && { borderColor: C.red }, upiValidated && { borderColor: C.green }]}>
                       <Feather name="at-sign" size={14} color={upiValidated ? C.green : upiError ? C.red : C.gray400} />
                       <TextInput
@@ -241,7 +243,7 @@ export default function PaymentScreen() {
                           finally { setUpiValidating(false); }
                         }}
                       >
-                        <Text style={st.verifyBtnText}>Verify UPI ID</Text>
+                        <Text style={st.verifyBtnText}>{t('payment.verifyUpi')}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -297,7 +299,7 @@ export default function PaymentScreen() {
           {placing ? (
             <View style={st.payBtnInner}>
               <ActivityIndicator color={C.white} />
-              <Text style={st.payBtnText}>Processing...</Text>
+              <Text style={st.payBtnText}>{t('payment.processing')}</Text>
             </View>
           ) : (
             <LinearGradient colors={[C.green, C.greenDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.payBtnInner}>
@@ -306,7 +308,7 @@ export default function PaymentScreen() {
                 <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 10, fontWeight: "600" }}>TOTAL</Text>
               </View>
               <View style={{ width: 1, height: 30, backgroundColor: "rgba(255,255,255,0.3)" }} />
-              <Text style={st.payBtnText}>Pay Now</Text>
+              <Text style={st.payBtnText}>{t('payment.payNow')}</Text>
               <Feather name="arrow-right" size={18} color={C.white} />
             </LinearGradient>
           )}

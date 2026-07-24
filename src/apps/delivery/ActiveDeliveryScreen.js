@@ -9,6 +9,7 @@ import * as Location from 'expo-location';
 import { io } from 'socket.io-client';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 
 // Helper to open telephone dialer on both Native (Expo/React Native) and Web
 const openPhoneCall = (phone) => {
@@ -82,6 +83,12 @@ const C = {
 };
 
 // ──────────────────────────────────────────────────────────────────────────────────────────────────
+const getSteps = (t) => [
+  { key: 'reach_pickup', label: t('delivery.reachPickup', 'Reach Pickup'),  api: null,        btnLabel: t('delivery.reachedPickupLocation', 'REACHED PICKUP LOCATION') },
+  { key: 'pick_order',   label: t('delivery.pickOrder', 'Pick Order'),    api: 'picked_up', btnLabel: t('delivery.pickedOrder', 'PICKED ORDER')            },
+  { key: 'reach_drop',   label: t('delivery.reachDrop', 'Reach Drop'),    api: null,        btnLabel: t('delivery.reachedDropLocation', 'REACHED DROP LOCATION')   },
+  { key: 'drop_order',   label: t('delivery.dropOrder', 'Drop Order'),    api: 'delivered', btnLabel: t('delivery.orderDelivered', 'ORDER DELIVERED')         },
+];
 const STEPS = [
   { key: 'reach_pickup', label: 'Reach Pickup',  api: null,        btnLabel: 'Reached Pickup Location' },
   { key: 'pick_order',   label: 'Pick Order',    api: 'picked_up', btnLabel: 'Picked Order'            },
@@ -466,10 +473,12 @@ const sb = StyleSheet.create({
   },
 });
 // â”€â”€ Step Progress Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function StepBar({ currentStep }) {
+function StepBar({ currentStep, steps: propSteps }) {
+  const { t } = useTranslation();
+  const steps = propSteps || getSteps(t);
   return (
     <View style={spb.row}>
-      {STEPS.map((s, i) => {
+      {steps.map((s, i) => {
         const past   = i < currentStep;
         const active = i === currentStep;
         return (
@@ -484,7 +493,7 @@ function StepBar({ currentStep }) {
                 {s.label}
               </Text>
             </View>
-            {i < STEPS.length - 1 && (
+            {i < steps.length - 1 && (
               <View style={[spb.line, past && { backgroundColor: C.primary }]} />
             )}
           </React.Fragment>
@@ -511,13 +520,14 @@ const spb = StyleSheet.create({
 
 // â”€â”€ Action Buttons (Call + Map) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ActionButtons({ onCall, onMap, phone, hideCall = false }) {
+  const { t } = useTranslation();
   const handleCall = () => {
     if (phone) {
       openPhoneCall(phone);
     } else if (onCall) {
       onCall();
     } else {
-      Alert.alert('No Phone Number', 'Phone number is not available for this contact.');
+      Alert.alert(t('delivery.noPhoneNumber', 'No Phone Number'), t('delivery.phoneNotAvailable', 'Phone number is not available for this contact.'));
     }
   };
 
@@ -526,12 +536,12 @@ function ActionButtons({ onCall, onMap, phone, hideCall = false }) {
       {!hideCall && (
         <TouchableOpacity style={ab.btnCall} onPress={handleCall} activeOpacity={0.8}>
           <MaterialIcons name="call" size={16} color={C.textPrimary} />
-          <Text style={ab.callText}>Call</Text>
+          <Text style={ab.callText}>{t('delivery.call', 'Call')}</Text>
         </TouchableOpacity>
       )}
       <TouchableOpacity style={[ab.btnMap, hideCall && { flex: 1 }]} onPress={onMap} activeOpacity={0.8}>
         <MaterialIcons name="map" size={16} color={C.white} />
-        <Text style={ab.mapText}>Go to map</Text>
+        <Text style={ab.mapText}>{t('delivery.goToMap', 'Go to map')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -569,13 +579,14 @@ const mr = StyleSheet.create({
 // â”€â”€ Order Items Accordion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ItemsAccordion({ items, vendorName }) {
   const [open, setOpen] = useState(false);
+  const { t } = useTranslation();
   return (
     <View style={ac.wrap}>
       <TouchableOpacity style={ac.header} onPress={() => setOpen(o => !o)} activeOpacity={0.8}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <View style={ac.iconWrap}><MaterialIcons name="receipt" size={18} color={C.textSecond} /></View>
           <View>
-            <Text style={ac.title}>Order details</Text>
+            <Text style={ac.title}>{t('delivery.orderDetails', 'Order details')}</Text>
             <Text style={ac.sub}>{vendorName}</Text>
           </View>
         </View>
@@ -587,7 +598,7 @@ function ItemsAccordion({ items, vendorName }) {
             <View key={i} style={ac.itemRow}>
               <Text style={ac.itemQty}>{item.quantity}x</Text>
               <Text style={ac.itemName}>{item.product_name}</Text>
-              <Text style={ac.itemPrice}>Rs.{item.subtotal}</Text>
+              <Text style={ac.itemPrice}>₹{item.subtotal}</Text>
             </View>
           ))}
         </View>
@@ -612,6 +623,7 @@ const ac = StyleSheet.create({
 
 // â”€â”€ Step Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StepContent({ step, activeOrder, myLocation }) {
+  const { t } = useTranslation();
   const vendorLoc = activeOrder?.vendorLoc;
   const dropLoc   = activeOrder?.dropLoc;
 
@@ -634,8 +646,27 @@ function StepContent({ step, activeOrder, myLocation }) {
   const targetLoc = step <= 1 ? vendorLoc : dropLoc;
   const mapRegion = targetLoc?.latitude != null ? targetLoc : null;
 
-  const openMap = (loc) => {
-    if (loc) Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`);
+  const openMap = (loc, fallbackAddress) => {
+    let url = null;
+    if (loc && loc.latitude != null && loc.longitude != null) {
+      url = `https://www.google.com/maps/dir/?api=1&destination=${loc.latitude},${loc.longitude}`;
+    } else if (typeof loc === 'string' && loc.trim().length > 0) {
+      url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}`;
+    } else if (fallbackAddress && typeof fallbackAddress === 'string' && fallbackAddress.trim().length > 0) {
+      url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fallbackAddress)}`;
+    }
+
+    if (url) {
+      if (Platform.OS === 'web') {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } else {
+        Linking.openURL(url).catch(() => {
+          Alert.alert('Error', 'Could not open map navigation.');
+        });
+      }
+    } else {
+      Alert.alert('Location unavailable', 'Location coordinates or address are not available for this delivery step.');
+    }
   };
 
   return (
@@ -648,11 +679,11 @@ function StepContent({ step, activeOrder, myLocation }) {
       {/* Drag handle pill */}
       <View style={styles.dragHandle} />
 
-      {/* â”€â”€ Step 0 â€“ Reach Pickup â”€â”€ */}
+      {/* ── Step 0 – Reach Pickup ── */}
       {step === 0 && (
         <View style={styles.stepCard}>
-          <Text style={styles.locationLabel}>PICKUP FROM</Text>
-          <Text style={styles.locationName}>{activeOrder?.pickup || 'â€”'}</Text>
+          <Text style={styles.locationLabel}>{t('delivery.pickupFrom', 'PICKUP FROM')}</Text>
+          <Text style={styles.locationName}>{activeOrder?.pickup || '—'}</Text>
           {vendorLoc && (
             <Text style={styles.locationAddress}>
               {vendorLoc.latitude?.toFixed(4)}, {vendorLoc.longitude?.toFixed(4)}
@@ -660,20 +691,20 @@ function StepContent({ step, activeOrder, myLocation }) {
           )}
           <ActionButtons
             hideCall
-            onMap={() => openMap(vendorLoc)}
+            onMap={() => openMap(vendorLoc, activeOrder?.pickup)}
           />
           <View style={styles.metaDivider} />
-          <MetaRow icon="assignment" text={`Order: ${activeOrder?.displayId || '—'}`} />
-          <MetaRow icon="person" text={`Customer: ${activeOrder?.customerName || '—'}`} />
+          <MetaRow icon="assignment" text={`${t('delivery.orderLabel', 'Order')}: ${activeOrder?.displayId || '—'}`} />
+          <MetaRow icon="person" text={`${t('delivery.customerLabel', 'Customer')}: ${activeOrder?.customerName || '—'}`} />
         </View>
       )}
 
-      {/* â”€â”€ Step 1 â€“ Pick Order â”€â”€ */}
+      {/* ── Step 1 – Pick Order ── */}
       {step === 1 && (
         <View>
           <View style={styles.orderIdCard}>
-            <Text style={styles.orderIdLabel}>ORDER ID</Text>
-            <Text style={styles.orderIdValue}>{activeOrder?.displayId || 'â€”'}</Text>
+            <Text style={styles.orderIdLabel}>{t('delivery.orderIdLabel', 'ORDER ID')}</Text>
+            <Text style={styles.orderIdValue}>{activeOrder?.displayId || '—'}</Text>
           </View>
           <ItemsAccordion items={activeOrder?.items} vendorName={activeOrder?.pickup} />
           <View style={ac.wrap}>
@@ -681,7 +712,7 @@ function StepContent({ step, activeOrder, myLocation }) {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <View style={ac.iconWrap}><MaterialIcons name="store" size={18} color={C.textSecond} /></View>
                 <View>
-                  <Text style={ac.title}>Restaurant details</Text>
+                  <Text style={ac.title}>{t('delivery.restaurantDetails', 'Restaurant details')}</Text>
                   <Text style={ac.sub}>{activeOrder?.pickup}</Text>
                 </View>
               </View>
@@ -692,12 +723,12 @@ function StepContent({ step, activeOrder, myLocation }) {
                     onPress={() => openPhoneCall(activeOrder.vendorPhone)}
                   >
                     <MaterialIcons name="call" size={14} color={C.blue} />
-                    <Text style={{ fontSize: 12, color: C.blue, fontWeight: '700' }}>Call</Text>
+                    <Text style={{ fontSize: 12, color: C.blue, fontWeight: '700' }}>{t('delivery.call', 'Call')}</Text>
                   </TouchableOpacity>
                 )}
-                {vendorLoc && (
-                  <TouchableOpacity onPress={() => openMap(vendorLoc)}>
-                    <Text style={{ fontSize: 12, color: C.blue, fontWeight: '700' }}>Go to map</Text>
+                {(vendorLoc || activeOrder?.pickup) && (
+                  <TouchableOpacity onPress={() => openMap(vendorLoc, activeOrder?.pickup)}>
+                    <Text style={{ fontSize: 12, color: C.blue, fontWeight: '700' }}>{t('delivery.goToMap', 'Go to map')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -708,8 +739,8 @@ function StepContent({ step, activeOrder, myLocation }) {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <View style={ac.iconWrap}><MaterialIcons name="person" size={18} color={C.textSecond} /></View>
                 <View>
-                  <Text style={ac.title}>Customer details</Text>
-                  <Text style={ac.sub}>{activeOrder?.customerName || 'â€”'}</Text>
+                  <Text style={ac.title}>{t('delivery.customerDetails', 'Customer details')}</Text>
+                  <Text style={ac.sub}>{activeOrder?.customerName || '—'}</Text>
                 </View>
               </View>
               {activeOrder?.customerPhone && (
@@ -718,7 +749,7 @@ function StepContent({ step, activeOrder, myLocation }) {
                   onPress={() => openPhoneCall(activeOrder.customerPhone)}
                 >
                   <MaterialIcons name="call" size={14} color={C.blue} />
-                  <Text style={{ fontSize: 12, color: C.blue, fontWeight: '700' }}>Call</Text>
+                  <Text style={{ fontSize: 12, color: C.blue, fontWeight: '700' }}>{t('delivery.call', 'Call')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -726,22 +757,22 @@ function StepContent({ step, activeOrder, myLocation }) {
         </View>
       )}
 
-      {/* â”€â”€ Step 2 â€“ Reach Drop â”€â”€ */}
+      {/* ── Step 2 – Reach Drop ── */}
       {step === 2 && (
         <View style={styles.stepCard}>
-          <Text style={styles.locationName}>{activeOrder?.customerName || 'â€”'}</Text>
-          <Text style={styles.locationAddress}>{activeOrder?.drop || 'â€”'}</Text>
+          <Text style={styles.locationName}>{activeOrder?.customerName || '—'}</Text>
+          <Text style={styles.locationAddress}>{activeOrder?.drop || '—'}</Text>
           <ActionButtons
             phone={activeOrder?.customerPhone}
-            onMap={() => openMap(dropLoc)}
+            onMap={() => openMap(dropLoc, activeOrder?.drop)}
           />
           <View style={styles.metaDivider} />
-          <MetaRow icon="assignment" text={`Order: ${activeOrder?.displayId || '—'}`} />
-          <MetaRow icon="store" text={`Pickup: ${activeOrder?.pickup || '—'}`} />
+          <MetaRow icon="assignment" text={`${t('delivery.orderLabel', 'Order')}: ${activeOrder?.displayId || '—'}`} />
+          <MetaRow icon="store" text={`${t('delivery.pickupLabel', 'Pickup')}: ${activeOrder?.pickup || '—'}`} />
         </View>
       )}
 
-      {/* â”€â”€ Step 3 â€“ Drop Order â”€â”€ */}
+      {/* ── Step 3 – Drop Order ── */}
       {step === 3 && (
         <View>
           <View style={styles.stepCard}>
@@ -750,8 +781,8 @@ function StepContent({ step, activeOrder, myLocation }) {
                 <MaterialIcons name="check" size={16} color={C.white} />
               </View>
               <View>
-                <Text style={styles.paymentTitle}>Paid online</Text>
-                <Text style={styles.paymentSub}>Order: {activeOrder?.displayId || 'â€”'}</Text>
+                <Text style={styles.paymentTitle}>{t('delivery.paidOnline', 'Paid online')}</Text>
+                <Text style={styles.paymentSub}>{t('delivery.orderLabel', 'Order')}: {activeOrder?.displayId || '—'}</Text>
               </View>
             </View>
             <View style={styles.metaDivider} />
@@ -760,13 +791,13 @@ function StepContent({ step, activeOrder, myLocation }) {
                 <MaterialIcons name="person" size={22} color={C.textSecond} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.customerName}>{activeOrder?.customerName || 'â€”'}</Text>
-                <Text style={styles.customerAddress}>{activeOrder?.drop || 'â€”'}</Text>
+                <Text style={styles.customerName}>{activeOrder?.customerName || '—'}</Text>
+                <Text style={styles.customerAddress}>{activeOrder?.drop || '—'}</Text>
               </View>
             </View>
             <ActionButtons
               phone={activeOrder?.customerPhone}
-              onMap={() => openMap(dropLoc)}
+              onMap={() => openMap(dropLoc, activeOrder?.drop)}
             />
           </View>
           <ItemsAccordion items={activeOrder?.items} vendorName={activeOrder?.pickup} />
@@ -778,11 +809,12 @@ function StepContent({ step, activeOrder, myLocation }) {
 
 // â”€â”€ Available Order Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function AvailableOrderCard({ order, onAccept }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.orderCard}>
       <View style={styles.orderTop}>
         <Text style={styles.orderId}>{order.displayId}</Text>
-        <View style={styles.newBadge}><Text style={styles.newBadgeText}>New</Text></View>
+        <View style={styles.newBadge}><Text style={styles.newBadgeText}>{t('delivery.new', 'New')}</Text></View>
       </View>
       <View style={styles.routeRow}>
         <View style={[styles.routeDot, { backgroundColor: C.blue }]} />
@@ -794,7 +826,7 @@ function AvailableOrderCard({ order, onAccept }) {
       <View style={styles.orderBottom}>
         <Text style={styles.orderMeta}>{order.meta}</Text>
         <TouchableOpacity style={styles.btnAccept} onPress={() => onAccept(order.orderIdRaw)} activeOpacity={0.85}>
-          <Text style={styles.btnAcceptText}>Accept</Text>
+          <Text style={styles.btnAcceptText}>{t('delivery.accept', 'Accept')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -804,6 +836,8 @@ function AvailableOrderCard({ order, onAccept }) {
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 export default function ActiveDeliveryScreen({ navigation }) {
   const { token, user } = useAuthStore();
+  const { t } = useTranslation();
+  const steps = getSteps(t);
 
 
 
@@ -854,7 +888,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
           drop: d.order?.delivery_address?.address_line || d.order?.delivery_address?.city || 'Local',
           total: d.order?.total,
           quantity: d.order?.items?.length,
-          meta: `â‚¹${d.order?.total} Â· ${d.order?.items?.length || 0} items`,
+          meta: `₹${d.order?.total} · ${d.order?.items?.length || 0} ${t('delivery.items', 'items')}`,
           vendorLoc: d.order?.vendor ? { latitude: d.order.vendor.latitude, longitude: d.order.vendor.longitude } : null,
           dropLoc: d.order?.delivery_address ? { latitude: d.order.delivery_address.latitude, longitude: d.order.delivery_address.longitude } : null,
           customerName: d.order?.customer?.name || null,
@@ -878,7 +912,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
           displayId: o.order_number,
           pickup: o.vendor.shop_name,
           drop: o.delivery_address?.address_line || o.delivery_address?.city || 'Local',
-          meta: `â‚¹${o.total} Â· ${o._count?.items || 0} items`,
+          meta: `₹${o.total} · ${o._count?.items || 0} ${t('delivery.items', 'items')}`,
         })));
       }
     } catch (err) {
@@ -1008,7 +1042,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
   };
 
   const handleStepComplete = async () => {
-    const displayStep = Math.min(Math.max(step, 0), STEPS.length - 1);
+    const displayStep = Math.min(Math.max(step, 0), steps.length - 1);
     
     // Distance check for Reach Pickup (0) and Reach Drop (2)
     // Skip on web — browser GPS is unreliable for proximity enforcement.
@@ -1054,7 +1088,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
   };
 
   const proceedStepComplete = async (displayStep) => {
-    const currentStepDef = STEPS[displayStep];
+    const currentStepDef = steps[displayStep];
     if (!currentStepDef) return;
 
     if (currentStepDef.api) {
@@ -1075,7 +1109,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
         }
       } catch (e) { Alert.alert('Error', 'Network error'); return; }
     }
-    if (displayStep < STEPS.length - 1) {
+    if (displayStep < steps.length - 1) {
       const nextStep = displayStep + 1;
       if (activeOrder?.id) await saveStep(activeOrder.id, nextStep);
       setTimeout(() => setStep(nextStep), 400);
@@ -1120,29 +1154,29 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
           <View style={styles.heroStats}>
             <View style={styles.heroStat}>
               <Text style={styles.heroStatValue}>{deliveryCount}</Text>
-              <Text style={styles.heroStatLabel}>Deliveries</Text>
+              <Text style={styles.heroStatLabel}>{t('delivery.deliveriesStat', 'Deliveries')}</Text>
             </View>
             <View style={styles.heroStatDivider} />
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>{earnings}</Text>
-              <Text style={styles.heroStatLabel}>Earned today</Text>
+              <Text style={styles.heroStatValue}>₹{earnings}</Text>
+              <Text style={styles.heroStatLabel}>{t('delivery.earnedToday', 'Earned today')}</Text>
             </View>
             <View style={styles.heroStatDivider} />
             <View style={styles.heroStat}>
-  <Text style={styles.heroStatValue}>{partner.id}</Text>
-  <Text style={styles.heroStatLabel}>Partner ID</Text>
-</View>
+              <Text style={styles.heroStatValue}>{partner.id}</Text>
+              <Text style={styles.heroStatLabel}>{t('delivery.partnerId', 'Partner ID')}</Text>
+            </View>
           </View>
         </View>
 
-        {/* â”€â”€ Active delivery stepper â”€â”€ */}
+        {/* ── Active delivery stepper ── */}
         {activeOrder ? (
           <View style={styles.stepperWrap}>
             {/* Header */}
             <View style={styles.stepperHeader}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.stepperTitle}>Active Delivery</Text>
-                <Text style={styles.stepperSub}>{activeOrder.displayId} · {activeOrder.quantity} item · ₹{activeOrder.total}</Text>
+                <Text style={styles.stepperTitle}>{t('delivery.activeDelivery', 'Active Delivery')}</Text>
+                <Text style={styles.stepperSub}>{activeOrder.displayId} · {activeOrder.meta}</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 {step < 2 && (
@@ -1157,7 +1191,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
                     }}
                     onPress={handleDeclineActiveOrder}
                   >
-                    <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>Decline</Text>
+                    <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>{t('delivery.decline', 'Decline')}</Text>
                   </TouchableOpacity>
                 )}
                 <View style={styles.stepBadge}>
@@ -1169,11 +1203,11 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
             {/* Step label */}
             <View style={styles.stepLabelRow}>
               <MaterialIcons name="expand-more" size={22} color={C.textSecond} />
-              <Text style={styles.stepLabelText}>{STEPS[Math.min(Math.max(step, 0), STEPS.length - 1)]?.label}</Text>
+              <Text style={styles.stepLabelText}>{steps[Math.min(Math.max(step, 0), steps.length - 1)]?.label}</Text>
             </View>
 
             {/* Progress dots */}
-            <StepBar currentStep={step} />
+            <StepBar currentStep={step} steps={steps} />
 
             {/* Step content */}
             <StepContent step={step} activeOrder={activeOrder} myLocation={myLocation} />
@@ -1181,10 +1215,10 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
             {/* Slide button */}
             <View style={styles.slideWrap}>
               <SlideButton
-                key={`slide-${Math.min(Math.max(step, 0), STEPS.length - 1)}`}
-                label={STEPS[Math.min(Math.max(step, 0), STEPS.length - 1)]?.btnLabel}
+                key={`slide-${Math.min(Math.max(step, 0), steps.length - 1)}`}
+                label={steps[Math.min(Math.max(step, 0), steps.length - 1)]?.btnLabel}
                 onComplete={handleStepComplete}
-                color={Math.min(Math.max(step, 0), STEPS.length - 1) === 3 ? '#1B5E20' : C.primary}
+                color={Math.min(Math.max(step, 0), steps.length - 1) === 3 ? '#1B5E20' : C.primary}
                 onDragStart={() => setScrollEnabled(false)}
                 onDragEnd={() => setScrollEnabled(true)}
               />
@@ -1199,12 +1233,12 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
               />
             </View>
 
-            <Text style={styles.sectionTitle}>Available orders</Text>
+            <Text style={styles.sectionTitle}>{t('delivery.availableOrders', 'Available orders')}</Text>
 
             {availableOrders.length === 0 ? (
               <View style={styles.emptyBox}>
                 <MaterialIcons name="delivery-dining" size={48} color={C.textLight} />
-                <Text style={styles.emptyText}>No orders right now</Text>
+                <Text style={styles.emptyText}>{t('delivery.noOrdersRightNow', 'No orders right now')}</Text>
               </View>
             ) : (
               availableOrders.map(order => (
