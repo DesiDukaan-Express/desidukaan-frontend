@@ -174,7 +174,7 @@ function PendingOrderMonitor() {
   const updatePending = useOrderStore((s) => s.updatePendingOrder);
   const clearPending  = useOrderStore((s) => s.clearPendingOrder);
 
-  const ORDER_TIMEOUT = 90; // seconds — must match Checkout.js
+  const ORDER_TIMEOUT = 300; // seconds (5 minutes) — must match Checkout.js and backend
   const [countdown, setCountdown] = useState(ORDER_TIMEOUT);
   const timerRef     = useRef(null);
   const startRef     = useRef(null);

@@ -731,7 +731,7 @@ export default function CheckoutScreen() {
   const [orderStatus, setOrderStatus] = useState(
     route.params?.initialOrderStatus || resumeOrder?.status || "idle"
   ); // idle, pending, accepted, rejected, expired, countered
-  const [countdown, setCountdown] = useState(90);
+  const [countdown, setCountdown] = useState(300);
   const [counterData, setCounterData] = useState(() => {
     const rawCounter = resumeOrder?.counter_offer || null;
     if (!rawCounter) return null;
@@ -1077,7 +1077,14 @@ export default function CheckoutScreen() {
   // ── Negotiation Timer Logic ────────────────────────────────────────────────
   useEffect(() => {
     if (orderStatus === "pending") {
-      setCountdown(90);
+      const placedAt = resumeOrder?.placedAt || route.params?.pendingOrder?.placedAt;
+      const ORDER_TIMEOUT = 300;
+      let initialRemaining = ORDER_TIMEOUT;
+      if (placedAt) {
+        const elapsed = Math.floor((Date.now() - placedAt) / 1000);
+        initialRemaining = Math.max(0, ORDER_TIMEOUT - elapsed);
+      }
+      setCountdown(initialRemaining);
       timerRef.current = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -1095,7 +1102,7 @@ export default function CheckoutScreen() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [orderStatus]);
+  }, [orderStatus, resumeOrder?.placedAt, route.params?.pendingOrder?.placedAt]);
 
   // ── Detect GPS location ────────────────────────────────────────────────────
   const detectLocation = async () => {
@@ -1226,7 +1233,7 @@ export default function CheckoutScreen() {
 
         // Keep customer on the screen so the countdown timer + counter-offer modal stays visible
         setOrderId(order.id);
-        setOrderStatus("pending");  // triggers the 90s countdown & modal
+        setOrderStatus("pending");  // triggers the 5-minute countdown & modal
         setNegotiationModalVisible(true);
         setPlacing(false);
 
