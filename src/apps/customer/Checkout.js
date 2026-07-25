@@ -24,7 +24,11 @@ import useAuthStore from "../../store/authStore";
 import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
 import useOrderStore from "../../store/orderStore";
+<<<<<<< HEAD
+import { ordersAPI } from "../../services/api";
+=======
 import { useTranslation } from "react-i18next";
+>>>>>>> 3671524a374fccb6be54fc574a65ba1acbda356f
 
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
@@ -54,6 +58,11 @@ const C = {
   amber: "#D97706",
   amberLight: "#FEF3C7",
 };
+
+// ── Vendor response timeout (in ms) — must match backend 90s window
+const VENDOR_RESPONSE_TIMEOUT_MS = Number(
+  process.env.EXPO_PUBLIC_VENDOR_RESPONSE_TIMEOUT || 90000
+);
 
 const PAYMENT_METHODS = [
   {
@@ -476,12 +485,17 @@ function NegotiationBanner({ status, countdown, vendorName, onDismiss }) {
       border: "#FCA5A5",
     },
     expired: {
+<<<<<<< HEAD
+      title: "Vendor did not respond in time",
+      sub: "The store didn't respond. You can retry your order request below.",
+=======
       title: t('checkout.requestExpired', 'Request Expired'),
       sub: t('orders.storeExpiredSub', "The store didn't respond in time. Please try again."),
+>>>>>>> 3671524a374fccb6be54fc574a65ba1acbda356f
       icon: "alert-triangle",
-      color: C.gray600,
-      bg: C.gray100,
-      border: C.gray200,
+      color: C.orange,
+      bg: "#FFF7ED",
+      border: "#FFEDD5",
     },
     countered: {
       title: t('checkout.vendorAdjustments', 'Review Adjustments'),
@@ -707,7 +721,16 @@ export default function CheckoutScreen() {
     route.params?.phoneStatus || null // 'pending', 'approved', 'rejected'
   );
 
-  const items = isResumingPendingOrder ? [] : (cart?.items || []);
+  // ── Snapshot of cart items/subtotal taken before cart is cleared on order submit ──
+  // NOTE: must be declared BEFORE `items` below so there's no TDZ error
+  const [snapshotItems, setSnapshotItems] = useState(
+    route.params?.snapshotItems || resumeOrder?.snapshotItems || null
+  );
+  const [snapshotSubtotal, setSnapshotSubtotal] = useState(
+    route.params?.snapsgithotSubtotal ?? resumeOrder?.snapshotSubtotal ?? null
+  );
+
+  const items = isResumingPendingOrder ? (snapshotItems || []) : (cart?.items || []);
   const vendorId = route.params?.vendorId || resumeOrder?.vendor_id || resumeOrder?.vendorId || cart?.vendorId;
   const vendorName =
     route.params?.vendorName ||
@@ -716,14 +739,6 @@ export default function CheckoutScreen() {
     items[0]?.vendorName ||
     "Store";
 
-  // ── Snapshot of cart items/subtotal taken before cart is cleared on order submit ──
-  const [snapshotItems, setSnapshotItems] = useState(
-    route.params?.snapshotItems || resumeOrder?.snapshotItems || null
-  );
-  const [snapshotSubtotal, setSnapshotSubtotal] = useState(
-    route.params?.snapsgithotSubtotal ?? resumeOrder?.snapshotSubtotal ?? null
-  );
-
   // ── Order state ────────────────────────────────────────────────────────────
   const [placing, setPlacing] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -731,7 +746,21 @@ export default function CheckoutScreen() {
   const [orderStatus, setOrderStatus] = useState(
     route.params?.initialOrderStatus || resumeOrder?.status || "idle"
   ); // idle, pending, accepted, rejected, expired, countered
+<<<<<<< HEAD
+  const countdownSeconds = Math.floor(VENDOR_RESPONSE_TIMEOUT_MS / 1000);
+  const [countdown, setCountdown] = useState(() => {
+    if (isResumingPendingOrder) {
+      const at = resumeOrder?.placedAt;
+      if (at) {
+        const elapsed = Math.floor((Date.now() - new Date(at).getTime()) / 1000);
+        return Math.max(0, countdownSeconds - elapsed);
+      }
+    }
+    return countdownSeconds;
+  });
+=======
   const [countdown, setCountdown] = useState(300);
+>>>>>>> 3671524a374fccb6be54fc574a65ba1acbda356f
   const [counterData, setCounterData] = useState(() => {
     const rawCounter = resumeOrder?.counter_offer || null;
     if (!rawCounter) return null;
@@ -746,6 +775,11 @@ export default function CheckoutScreen() {
     };
   });
   const timerRef = useRef(null);
+  const placedAtRef = useRef(
+    isResumingPendingOrder && resumeOrder?.placedAt
+      ? new Date(resumeOrder.placedAt).getTime()
+      : null
+  );
   const scrollViewRef = useRef(null);       // ref to main ScrollView
   const paymentSectionY = useRef(0);        // Y-offset of payment section inside scroll
 
@@ -755,8 +789,26 @@ export default function CheckoutScreen() {
   const [requestingSlot, setRequestingSlot] = useState(false);
   const [requestingPhone, setRequestingPhone] = useState(false);
   const [feeModalVisible, setFeeModalVisible] = useState(false);
+<<<<<<< HEAD
+  const [requestingFee,   setRequestingFee]   = useState(false);
+  const [proposedFee,     setProposedFee]     = useState(route.params?.proposedFee ?? resumeOrder?.proposedFee ?? null);
+  const [slotValidationError, setSlotValidationError] = useState(false);
+  const [vendorTimedOut, setVendorTimedOut] = useState(() => {
+    // If resuming a pending order, check if elapsed time exceeds timeout
+    if (resumeOrder?.status === "pending" || resumeOrder?.status === "expired") {
+      const placedAt = resumeOrder?.placedAt || resumeOrder?.created_at;
+      if (placedAt) {
+        const elapsed = Date.now() - new Date(placedAt).getTime();
+        return elapsed >= VENDOR_RESPONSE_TIMEOUT_MS;
+      }
+      return resumeOrder?.status === "expired";
+    }
+    return false;
+  });
+=======
   const [requestingFee, setRequestingFee] = useState(false);
   const [proposedFee, setProposedFee] = useState(route.params?.proposedFee ?? resumeOrder?.proposedFee ?? null);
+>>>>>>> 3671524a374fccb6be54fc574a65ba1acbda356f
   const isAccepted = orderStatus === "accepted";
 
   // ── Delivery type preference ──────────────────────────────────────────────
@@ -956,6 +1008,9 @@ export default function CheckoutScreen() {
         setPlacing(false);
         setErrorMsg(data.reason || "Vendor couldn't accept your order.");
         if (timerRef.current) clearInterval(timerRef.current);
+        if (data.reason === "Vendor response timeout") {
+          setVendorTimedOut(true);
+        }
       }
     });
 
@@ -1075,8 +1130,27 @@ export default function CheckoutScreen() {
   }, [orderId, token]);
 
   // ── Negotiation Timer Logic ────────────────────────────────────────────────
+  // Reads from placedAtRef so the same shared timestamp is used on every mount,
+  // keeping the countdown in sync with Home screen's PendingOrderMonitor.
   useEffect(() => {
     if (orderStatus === "pending") {
+<<<<<<< HEAD
+      if (!placedAtRef.current) placedAtRef.current = Date.now();
+
+      const tick = () => {
+        const elapsed = Math.floor((Date.now() - placedAtRef.current) / 1000);
+        const remaining = Math.max(0, countdownSeconds - elapsed);
+        setCountdown(remaining);
+        if (remaining <= 0) {
+          clearInterval(timerRef.current);
+          setOrderStatus("expired");
+          setPlacing(false);
+          setVendorTimedOut(true);
+        }
+      };
+      tick();
+      timerRef.current = setInterval(tick, 1000);
+=======
       const placedAt = resumeOrder?.placedAt || route.params?.pendingOrder?.placedAt;
       const ORDER_TIMEOUT = 300;
       let initialRemaining = ORDER_TIMEOUT;
@@ -1096,6 +1170,7 @@ export default function CheckoutScreen() {
           return prev - 1;
         });
       }, 1000);
+>>>>>>> 3671524a374fccb6be54fc574a65ba1acbda356f
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
     }
@@ -1141,8 +1216,8 @@ export default function CheckoutScreen() {
   const placeOrder = async () => {
     console.log("placeOrder function INVOKED"); // START LOG
     if (!confirmedSlot) {
-      setErrorMsg("Please select a delivery slot before placing your order.");
-      Alert.alert("Delivery Slot Required", "Please select a delivery slot before placing your order.");
+      setSlotValidationError(true);
+      showToast("To send an order request, you must select a delivery slot.", "error");
       return;
     }
     setErrorMsg(null);
@@ -1197,16 +1272,12 @@ export default function CheckoutScreen() {
 
       console.log("PLACING ORDER PAYLOAD:", JSON.stringify(payload, null, 2)); // LOG PAYLOAD
 
-      const res = await fetch(`${BASE_URL}/orders`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (res.ok) {
+      const data = await ordersAPI.place(payload, token);
+      if (!data.success && !data.data && !data.order) {
+        setErrorMsg(data.message || data.msg || "Order failed. Please try again.");
+        setPlacing(false);
+        return;
+      }
 
         const orderItemsSnapshot = items.slice();
         const orderSubtotalSnapshot = liveSubtotal;
@@ -1216,6 +1287,30 @@ export default function CheckoutScreen() {
 
         const order = data.data?.order || data.order || data;
 
+<<<<<<< HEAD
+    setPendingOrder({
+      ...order,
+      id: order.id,
+      status: order.status || "pending",
+      placedAt: Date.now(),
+      vendorId,
+      vendorName,
+      selectedPay,
+      confirmedSlot,
+      confirmedFee,
+      proposedFee,
+      deliveryTypePref,
+      snapshotItems: orderItemsSnapshot,
+      snapshotSubtotal: orderSubtotalSnapshot,
+    });
+
+    // Keep customer on the screen so the countdown timer + counter-offer modal stays visible
+    setOrderId(order.id);
+    placedAtRef.current = Date.now();
+    setOrderStatus("pending");  // triggers the countdown & modal
+    setNegotiationModalVisible(true);
+    setPlacing(false);
+=======
         setPendingOrder({
           ...order,
           id: order.id,
@@ -1236,9 +1331,13 @@ export default function CheckoutScreen() {
         setOrderStatus("pending");  // triggers the 5-minute countdown & modal
         setNegotiationModalVisible(true);
         setPlacing(false);
+>>>>>>> 3671524a374fccb6be54fc574a65ba1acbda356f
 
         cart?.clearCart?.();
 
+<<<<<<< HEAD
+    showToast("Order sent! Waiting for store to respond...", "success");
+=======
         showToast("Order sent! Waiting for store to respond...", "success");
       } else {
         console.log("ORDER CREATION FAILED", data); // LOG ERROR DATA
@@ -1247,9 +1346,14 @@ export default function CheckoutScreen() {
         );
         setPlacing(false);
       }
+>>>>>>> 3671524a374fccb6be54fc574a65ba1acbda356f
     } catch (e) {
       console.error("placeOrder EXCEPTION:", e); // LOG EXCEPTION
-      setErrorMsg(e.message);
+      if (e.sessionExpired) {
+        showToast("Your session expired, please log in again.", "error");
+      } else {
+        setErrorMsg(e.message || "Order failed. Please try again.");
+      }
       setPlacing(false);
     }
   };
@@ -1278,6 +1382,7 @@ export default function CheckoutScreen() {
   // ── Slot actions ───────────────────────────────────────────────────────────
   const handleRequestSlot = async ({ slot_start, slot_end }) => {
     setConfirmedSlot({ start: slot_start, end: slot_end });
+      setSlotValidationError(false);
     setSlotId(null); // clear any previously confirmed DB slot ID
     setSlotModalVisible(false);
   };
@@ -1346,6 +1451,39 @@ export default function CheckoutScreen() {
     }
   };
 
+  // ── Retry timed-out order ───────────────────────────────────────────────
+  const handleRetryOrder = async () => {
+    if (!orderId) return;
+    setPlacing(true);
+    try {
+      const data = await ordersAPI.retry(orderId, token);
+      if (!data.success && !data.data && !data.order) {
+        showToast(data.message || "Retry failed. Please try again.", "error");
+        return;
+      }
+      const order = data.data?.order || data.order || data;
+      setVendorTimedOut(false);
+      placedAtRef.current = Date.now();
+      setOrderStatus("pending");
+      setNegotiationModalVisible(true);
+      updatePendingOrder({
+        ...order,
+        status: "pending",
+        placedAt: Date.now(),
+        cancellation_reason: null,
+      });
+      showToast("Order request resent to the store!", "success");
+    } catch (e) {
+      if (e.sessionExpired) {
+        showToast("Your session expired, please log in again.", "error");
+      } else {
+        showToast(e.message || "Retry failed. Please try again.", "error");
+      }
+    } finally {
+      setPlacing(false);
+    }
+  };
+
   // ── Breakpoint ────────────────────────────────────────────────────────────
   const { isDesktop, isTablet } = useBreakpoint();
   const px = isDesktop ? 40 : isTablet ? 28 : 16;
@@ -1391,6 +1529,9 @@ export default function CheckoutScreen() {
           });
           setOrderStatus(order.status);
           setPlacing(false);
+          if (order.status === "rejected" && order.cancellation_reason === "Vendor response timeout") {
+            setVendorTimedOut(true);
+          }
         }
       } catch (e) {
         // fail silently for polling
@@ -1631,6 +1772,27 @@ export default function CheckoutScreen() {
                 <Feather name="check-circle" size={24} color={C.green} />
               </View>
             ) : (
+<<<<<<< HEAD
+              <>
+                <TouchableOpacity
+                  style={[s.slotPickBtn, slotValidationError && { borderColor: C.red, backgroundColor: C.redLight }]}
+                  onPress={() => { setSlotModalVisible(true); setSlotValidationError(false); }}
+                >
+                  <Feather name="plus-circle" size={18} color={slotValidationError ? C.red : C.green} />
+                  <Text style={[s.slotPickText, slotValidationError && { color: C.red }]}>
+                    {slotValidationError ? "Delivery slot required" : "Choose a delivery window"}
+                  </Text>
+                </TouchableOpacity>
+                {slotValidationError && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8, paddingHorizontal: 4 }}>
+                    <Feather name="alert-circle" size={14} color={C.red} />
+                    <Text style={{ fontSize: 13, color: C.red, fontWeight: "600", flex: 1 }}>
+                      To send an order request, you must select a delivery slot.
+                    </Text>
+                  </View>
+                )}
+              </>
+=======
               <TouchableOpacity
                 style={s.slotPickBtn}
                 onPress={() => setSlotModalVisible(true)}
@@ -1638,6 +1800,7 @@ export default function CheckoutScreen() {
                 <Feather name="plus-circle" size={18} color={C.green} />
                 <Text style={s.slotPickText}>{t('checkout.chooseDeliveryWindow', 'Choose a delivery window')}</Text>
               </TouchableOpacity>
+>>>>>>> 3671524a374fccb6be54fc574a65ba1acbda356f
             )}
           </Section>
 
@@ -2072,8 +2235,9 @@ export default function CheckoutScreen() {
                 total={total}
                 canPlace={canPlace}
                 placing={placing}
-                onPress={orderStatus === "accepted" ? handlePayment : placeOrder}
+                onPress={vendorTimedOut ? handleRetryOrder : orderStatus === "accepted" ? handlePayment : placeOrder}
                 fs={fs}
+                vendorTimedOut={vendorTimedOut}
               />
             </View>
           )}
@@ -2113,6 +2277,7 @@ export default function CheckoutScreen() {
               placing={placing}
               onPress={orderStatus === "accepted" ? handlePayment : placeOrder}
               fs={fs}
+              vendorTimedOut={vendorTimedOut}
             />
           </View>
         )}
@@ -2384,6 +2549,35 @@ export default function CheckoutScreen() {
                 </TouchableOpacity>
               </>
             )}
+
+            {(orderStatus === "expired" || (orderStatus === "rejected" && vendorTimedOut)) && (
+              <>
+                <View style={negModal.pendingNote}>
+                  <Feather name="alert-triangle" size={13} color={C.gray600} />
+                  <Text style={[negModal.pendingNoteText, { color: C.gray600 }]}>
+                    The store didn't respond in time. You can retry sending your order request.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[negModal.proceedBtn, { marginTop: 10 }]}
+                  onPress={() => {
+                    setNegotiationModalVisible(false);
+                    handleRetryOrder();
+                  }}
+                  disabled={placing}
+                  activeOpacity={0.85}
+                >
+                  {placing ? (
+                    <ActivityIndicator size="small" color={C.white} />
+                  ) : (
+                    <>
+                      <Feather name="refresh-cw" size={16} color={C.white} />
+                      <Text style={negModal.proceedBtnText}>Retry Request</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
@@ -2446,6 +2640,18 @@ export default function CheckoutScreen() {
   );
 }
 // ─── Place Order Button (shared mobile + desktop) ─────────────────────────────
+<<<<<<< HEAD
+function PlaceOrderBtn({ status, total, canPlace, placing, onPress, fs = 1, vendorTimedOut }) {
+  const isAccepted = status === "accepted";
+  const label = vendorTimedOut
+    ? "Retry Request"
+    : isAccepted
+      ? "Pay Now"
+      : status === "pending"
+        ? "Waiting for store..."
+        : "Send Order Request";
+  const icon = vendorTimedOut ? "refresh-cw" : isAccepted ? "credit-card" : "send";
+=======
 function PlaceOrderBtn({ status, total, canPlace, placing, onPress, fs = 1 }) {
   const { t } = useTranslation();
   const isAccepted = status === "accepted";
@@ -2455,6 +2661,7 @@ function PlaceOrderBtn({ status, total, canPlace, placing, onPress, fs = 1 }) {
       ? t('checkout.waitingForStoreShort', 'Waiting for store...')
       : t('checkout.sendOrderRequest', 'Send Order Request');
   const icon = isAccepted ? "credit-card" : "send";
+>>>>>>> 3671524a374fccb6be54fc574a65ba1acbda356f
 
   return (
     <TouchableOpacity
@@ -2473,7 +2680,7 @@ function PlaceOrderBtn({ status, total, canPlace, placing, onPress, fs = 1 }) {
       ) : (
         <LinearGradient
           colors={
-            canPlace && status !== "pending"
+            canPlace && status !== "pending" || vendorTimedOut
               ? [C.green, C.greenDark]
               : [C.gray300, C.gray300]
           }

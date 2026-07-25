@@ -14,8 +14,8 @@ import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
+import AccountManagerModal from "../../components/common/AccountManagerModal";
 import LanguageSwitcher from "../../components/common/LanguageSwitcher";
-
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -437,6 +437,7 @@ export default function ProfileScreen() {
 
   const [showLogout, setShowLogout] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
+  const [showAccountManager, setShowAccountManager] = useState(false);
   const [editField, setEditField] = useState(null);
   const [saving, setSaving] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
@@ -709,6 +710,12 @@ export default function ProfileScreen() {
           {/* Account */}
           <SectionLabel title={t('profile.accountSection')} />
           <MenuItem
+            icon="users"
+            label="Manage Accounts"
+            sub="Switch role or link profiles"
+            onPress={() => setShowAccountManager(true)}
+          />
+          <MenuItem
             icon="log-out"
             label={t('profile.logout')}
             onPress={() => setShowLogout(true)}
@@ -743,6 +750,11 @@ export default function ProfileScreen() {
         onConfirm={handleLogout}
         onCancel={() => setShowLogout(false)}
       />
+      <AccountManagerModal
+        visible={showAccountManager}
+        onClose={() => setShowAccountManager(false)}
+      />
+
       {/* Language Picker Modal */}
       <Modal
         visible={showLanguage}
@@ -770,6 +782,7 @@ export default function ProfileScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
     </SafeAreaView>
   );
 }

@@ -139,6 +139,8 @@ export const inventoryService = {
           price: parseFloat(String(payload.price).replace(/[^0-9.]/g, "")) || 0,
           stock_qty: parseInt(payload.stock) || 0,
           type: payload.type || "packed",
+          mrp: payload.mrp || null,
+          barcode: payload.barcode || null,
           weight_options: payload.weight_options || null,
           image_url: payload.image_url || null,
         }),
