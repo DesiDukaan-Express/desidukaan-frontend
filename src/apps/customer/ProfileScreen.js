@@ -570,6 +570,9 @@ export default function ProfileScreen() {
               </View>
               <View style={s.statSep} />
               <View style={s.statItem}>
+                <View style={[s.statIconWrap, { backgroundColor: C.orangeLight }]}>
+                  <Feather name="credit-card" size={13} color={C.orangeDark} />
+                </View>
                 <Text style={s.statNum}>₹150</Text>
                 <Text style={s.statLabel}>{t('profile.credits')}</Text>
               </View>

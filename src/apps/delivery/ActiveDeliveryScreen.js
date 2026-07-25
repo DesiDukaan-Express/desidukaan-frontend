@@ -886,6 +886,8 @@ export default function ActiveDeliveryScreen({ navigation }) {
           backendStatus,
           pickup: d.order?.vendor?.shop_name,
           drop: d.order?.delivery_address?.address_line || d.order?.delivery_address?.city || 'Local',
+          total: d.order?.total,
+          quantity: d.order?.items?.length,
           meta: `₹${d.order?.total} · ${d.order?.items?.length || 0} ${t('delivery.items', 'items')}`,
           vendorLoc: d.order?.vendor ? { latitude: d.order.vendor.latitude, longitude: d.order.vendor.longitude } : null,
           dropLoc: d.order?.delivery_address ? { latitude: d.order.delivery_address.latitude, longitude: d.order.delivery_address.longitude } : null,
