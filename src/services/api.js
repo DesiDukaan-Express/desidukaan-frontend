@@ -48,13 +48,7 @@ const request = async (method, endpoint, body = null, token = null, _isRetry = f
   }
 
   if (!response.ok) {
-    let details = data.message || data.msg || "Something went wrong";
-    if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
-      details += `: ${data.errors.join(", ")}`;
-    } else if (typeof data.errors === "string") {
-      details += `: ${data.errors}`;
-    }
-    const err = new Error(details);
+    const err = new Error(data.message || data.msg || "Something went wrong");
     err.needsRegistration = data.needsRegistration || false;
     throw err;
   }
@@ -188,7 +182,6 @@ export const vendorsAPI = {
 // ─── Orders ───────────────────────────────────────────────────────────────────
 export const ordersAPI = {
   place:           (orderData, token)             => request("POST",  "/orders",                orderData, token),
-  retry:           (id, token)                    => request("PATCH", `/orders/${id}/retry`,     null,      token),
   getMyOrders:     (token, page = 1)              => request("GET",   `/orders/my?page=${page}`, null,    token),
   getById:         (id, token)                    => request("GET",   `/orders/${id}`,           null,    token),
   getVendorActive: (token)                        => request("GET",   "/orders/vendor/active",   null,    token),

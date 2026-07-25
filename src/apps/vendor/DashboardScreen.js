@@ -22,7 +22,6 @@ import useAuthStore from "../../store/authStore";
 import { LineChart } from "react-native-chart-kit";
 import { useNavigation } from "@react-navigation/native";
 import { TextInput } from "react-native";
-import AccountManagerModal from "../../components/common/AccountManagerModal";
 
 import { io } from "socket.io-client";
 import useOrderSound from "../../hooks/useOrderSound";
@@ -123,7 +122,6 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
   const [searchLoading, setSearchLoading] = useState(false);
   const [locModalVisible, setLocModalVisible] = useState(false);
   const [locInput, setLocInput] = useState("");
-  const [accountModalVisible, setAccountModalVisible] = useState(false);
 
   // Animations
   const greetFadeAnim = useRef(new Animated.Value(0)).current;
@@ -389,10 +387,8 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
 
   if (!stats) {
     return (
-      <View style={[styles.centered, { backgroundColor: C.bg, padding: 24 }]}>
-        <MaterialIcons name="error-outline" size={48} color={C.textLight} />
-        <Text style={[styles.emptyTitle, { marginTop: 12 }]}>{t('vendor.statsLoadError') || 'Could not load dashboard'}</Text>
-        <Text style={[styles.emptySubtitle, { textAlign: 'center', marginTop: 6 }]}>{t('vendor.statsLoadErrorSub') || 'Pull down to retry'}</Text>
+      <View style={[styles.centered, { backgroundColor: C.bg }]}>
+        <Text style={{ color: C.textSub }}>{t('common.error')}</Text>
       </View>
     );
   }
@@ -588,12 +584,6 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
     <View style={[styles.root, { backgroundColor: C.bg }]}>
       <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
 
-      {/* ── ACCOUNT MANAGER MODAL ───────────────────────────── */}
-      <AccountManagerModal
-        visible={accountModalVisible}
-        onClose={() => setAccountModalVisible(false)}
-      />
-
       {/* ── NAVBAR ──────────────────────────────────────────── */}
       <View
         style={{
@@ -701,7 +691,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 paddingHorizontal: 10,
                 paddingVertical: 6,
               }}
-              onPress={() => setAccountModalVisible(true)}
+              onPress={() => navigation.navigate("Profile")}
               activeOpacity={0.8}
             >
               <View
@@ -839,7 +829,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                     paddingHorizontal: rs(8, 10, 10),
                     paddingVertical: rs(5, 6, 6),
                   }}
-                  onPress={() => setAccountModalVisible(true)}
+                  onPress={() => navigation.navigate("Profile")}
                   activeOpacity={0.8}
                 >
                   <View
@@ -1261,45 +1251,36 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             </View>
           </View>
 
-          {stats.labels?.length && stats.chartValues?.some(v => isFinite(v)) ? (
-            <LineChart
-              data={{
-                labels: stats.labels,
-                datasets: [
-                  { data: stats.chartValues.map(v => isFinite(Number(v)) ? Number(v) : 0) },
-                ],
-              }}
-              width={chartW}
-              height={rs(150, 170, 185)}
-              yAxisSuffix="₹"
-              chartConfig={{
-                backgroundGradientFrom: C.surface,
-                backgroundGradientTo: C.surface,
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(14, 230, 39, ${opacity})`,
-                labelColor: () => C.textLight,
-                propsForDots: {
-                  r: "5",
-                  strokeWidth: "2",
-                  stroke: C.primary,
-                  fill: C.surface,
-                },
-                propsForBackgroundLines: {
-                  stroke: C.border,
-                  strokeDasharray: "4",
-                },
-              }}
-              bezier
-              style={{ borderRadius: 12, marginTop: 10, marginLeft: -8 }}
-            />
-          ) : (
-            <View style={{ height: rs(150, 170, 185), justifyContent: 'center', alignItems: 'center', marginTop: 10 }}>
-              <ActivityIndicator size="small" color={C.primary} />
-              <Text style={{ color: C.textLight, fontSize: rs(11, 12, 12), marginTop: 8 }}>
-                {t('common.loading') || 'Loading chart...'}
-              </Text>
-            </View>
-          )}
+          <LineChart
+            data={{
+              labels: stats.labels,
+              datasets: [
+                { data: stats.chartValues.length ? stats.chartValues : [0] },
+              ],
+            }}
+            width={chartW}
+            height={rs(150, 170, 185)}
+            yAxisSuffix="₹"
+            chartConfig={{
+              backgroundGradientFrom: C.surface,
+              backgroundGradientTo: C.surface,
+              decimalPlaces: 0,
+              color: (opacity = 1) => `rgba(14, 230, 39, ${opacity})`,
+              labelColor: () => C.textLight,
+              propsForDots: {
+                r: "5",
+                strokeWidth: "2",
+                stroke: C.primary,
+                fill: C.surface,
+              },
+              propsForBackgroundLines: {
+                stroke: C.border,
+                strokeDasharray: "4",
+              },
+            }}
+            bezier
+            style={{ borderRadius: 12, marginTop: 10, marginLeft: -8 }}
+          />
         </View>
 
         {/* ── GOAL + EFFICIENCY ─────────────────────────────── */}
@@ -2245,7 +2226,6 @@ function ProductRow({ rank, name, sold, revenue, tag, image, rs }) {
       </Text>
       <Image
         source={{ uri: image }}
-        resizeMode="cover"
         style={[
           styles.productImg,
           {
@@ -2925,7 +2905,7 @@ const styles = StyleSheet.create({
     borderTopColor: C.border,
   },
   productRank: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.textLight, width: 20 },
-  productImg: {},
+  productImg: { resizeMode: "cover" },
   productName: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text },
   productSold: { color: C.textSub, marginTop: 2 },
   productRevenue: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text },

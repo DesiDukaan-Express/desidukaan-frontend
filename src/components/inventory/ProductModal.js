@@ -116,7 +116,7 @@ function Field({ label, required, style, inputStyle, ...props }) {
   const [focused, setFocused] = useState(false);
   return (
     <View style={style}>
-      {!!label && <Label required={required}>{label}</Label>}
+      {label && <Label required={required}>{label}</Label>}
       <TextInput
         style={[
           fi.input,

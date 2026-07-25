@@ -2,10 +2,8 @@ import React, { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { useFonts, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold, PlusJakartaSans_600SemiBold, PlusJakartaSans_500Medium } from '@expo-google-fonts/plus-jakarta-sans';
 import Navigation from './src/navigation';
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import NetworkProvider from "./src/providers/NetworkProvider";
-import NotificationProvider from "./src/providers/NotificationProvider";
 
+// ── i18n: must be imported before any component using useTranslation ──────────
 import './src/i18n';
 
 import useAuthStore from './src/store/authStore';
@@ -35,13 +33,5 @@ export default function App() {
     );
   }
 
-  return (
-    <NetworkProvider>
-      <NotificationProvider>
-        <SafeAreaProvider>
-          <Navigation />
-        </SafeAreaProvider>
-      </NotificationProvider>
-    </NetworkProvider>
-  );
+  return <Navigation />;
 }

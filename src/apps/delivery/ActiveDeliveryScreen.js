@@ -868,7 +868,6 @@ export default function ActiveDeliveryScreen({ navigation }) {
   };
   // â”€â”€ Fetch & parse orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchOrders = async () => {
-    let foundActive = false;
     try {
       const [actRes, avlRes] = await Promise.all([
         fetch(`${API_BASE}/delivery/active`,    { headers: { Authorization: `Bearer ${token}` } }),
@@ -895,7 +894,6 @@ export default function ActiveDeliveryScreen({ navigation }) {
           vendorPhone: d.order?.vendor?.phone || d.order?.vendor?.mobile || null,
           items: d.order?.items || [],
         });
-        foundActive = true;
         // Restore persisted step, always respecting backend status as minimum floor
         const backendFloor = backendStatus === 'picked_up' ? 2 : 0;
         const cached = await loadStep(d.id);
@@ -918,7 +916,6 @@ export default function ActiveDeliveryScreen({ navigation }) {
     } catch (err) {
       console.log('fetchOrders error', err);
     }
-    return foundActive;
   };
 
   useFocusEffect(React.useCallback(() => { fetchOrders(); }, [token]));
@@ -971,12 +968,8 @@ export default function ActiveDeliveryScreen({ navigation }) {
     try {
       const res  = await fetch(`${API_BASE}/delivery/accept/${orderId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
-      if (data.success) {
-        fetchOrders();
-        navigation?.navigate('Active');
-      } else {
-        Alert.alert('Error', data.message);
-      }
+      if (data.success) { fetchOrders(); }
+      else Alert.alert('Error', data.message);
     } catch (e) { console.log(e); }
   };
 
@@ -986,12 +979,8 @@ export default function ActiveDeliveryScreen({ navigation }) {
       const res  = await fetch(`${API_BASE}/delivery/accept/${incomingOrder.orderId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       setIncomingOrder(null);
-      if (data.success) {
-        fetchOrders();
-        navigation?.navigate('Active');
-      } else {
-        Alert.alert('Error', data.message || 'Could not accept order');
-      }
+      if (data.success) fetchOrders();
+      else Alert.alert('Error', data.message || 'Could not accept order');
     } catch (e) { setIncomingOrder(null); }
   };
 

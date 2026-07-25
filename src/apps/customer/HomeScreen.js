@@ -2581,14 +2581,8 @@ export default function HomeScreen() {
     },
   ];
   const quickActions = [
-<<<<<<< HEAD
-    { icon: "shopping-bag", label: "Open Stores", onPress: () => navigation.navigate("Search") },
-    { icon: "location-on", label: "My Addresses", onPress: openAddressPicker },
-    { icon: "receipt-long", label: "My Orders", onPress: () => navigation.navigate("Orders") },
-=======
     { icon: "search", label: t("home.findStores"), onPress: goToSearch },
     { icon: "shopping-bag", label: t("home.openStores"), onPress: goToSearch },
->>>>>>> 3671524a374fccb6be54fc574a65ba1acbda356f
   ];
 
 
@@ -3507,28 +3501,17 @@ const s = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     backgroundColor: C.gray100,
-<<<<<<< HEAD
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: C.gray200,
-    paddingVertical: 13,
-=======
     borderRadius: 14,
     borderWidth: 1,
     borderColor: C.gray200,
     paddingVertical: 14,
->>>>>>> 3671524a374fccb6be54fc574a65ba1acbda356f
     paddingHorizontal: 16,
     marginRight: 10,
     minWidth: 80,
   },
-<<<<<<< HEAD
-  webSearchText: { flex: 1, fontSize: 14, color: C.gray400 },
-=======
   webSearchText: { flex: 1, fontSize: 15, color: C.gray400 },
->>>>>>> 3671524a374fccb6be54fc574a65ba1acbda356f
   accountBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -3615,25 +3598,16 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     backgroundColor: C.gray100,
-<<<<<<< HEAD
-    borderRadius: 30,
-    borderWidth: 1.5,
-    borderColor: C.greenBorder,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    marginBottom: 14,
-=======
     borderRadius: 9999,
     borderWidth: 0,
     paddingVertical: 16,
     paddingHorizontal: 20,
     marginBottom: 16,
->>>>>>> 3671524a374fccb6be54fc574a65ba1acbda356f
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
   mobileSearchText: { flex: 1, fontSize: 15, color: C.gray400 },
   scroll: { paddingBottom: 40 },
