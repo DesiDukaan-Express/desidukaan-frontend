@@ -8,6 +8,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
+import { useTranslation } from "react-i18next";
 
 const BASE_URL   = process.env.EXPO_PUBLIC_API_URL    || "http://localhost:3000/api";
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || (BASE_URL.includes('/api') ? BASE_URL.split('/api')[0] : "http://localhost:3000");
@@ -111,6 +112,7 @@ function PulseDot({ color = C.green }) {
 
 // ═══════════════════════════════════════════════════════════════════════════ //
 export default function TrackOrderScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const route      = useRoute();
   const { token }  = useAuthStore();
@@ -277,7 +279,7 @@ export default function TrackOrderScreen() {
       <View style={[s.root, { alignItems: "center", justifyContent: "center" }]}>
         <StatusBar barStyle="light-content" />
         <ActivityIndicator size="large" color={C.green} />
-        <Text style={{ marginTop: 12, color: C.gray400 }}>Loading order info…</Text>
+        <Text style={{ marginTop: 12, color: C.gray400 }}>{t('orders.loadingOrderInfo', 'Loading order info…')}</Text>
       </View>
     );
   }
@@ -296,7 +298,7 @@ export default function TrackOrderScreen() {
           <Feather name="arrow-left" size={18} color={C.white} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.headerTitle}>Track Delivery</Text>
+          <Text style={s.headerTitle}>{t('orders.trackDelivery', 'Track Delivery')}</Text>
           <Text style={s.headerSub}>{orderNumber || `Order #${orderId}`}</Text>
         </View>
         
@@ -313,7 +315,7 @@ export default function TrackOrderScreen() {
         {isActive && (
           <View style={s.livePill}>
             <PulseDot color={C.white} />
-            <Text style={s.liveText}>LIVE</Text>
+            <Text style={s.liveText}>{t('common.live', 'LIVE')}</Text>
           </View>
         )}
       </LinearGradient>
@@ -339,11 +341,11 @@ export default function TrackOrderScreen() {
         <View style={s.connectionRow}>
           <View style={[s.connDot, { backgroundColor: connected ? C.green : C.gray300 }]} />
           <Text style={s.connText}>
-            {connected ? "Connected — live updates active" : "Reconnecting…"}
+            {connected ? t('orders.connectedLive', 'Connected — live updates active') : t('orders.reconnecting', 'Reconnecting…')}
           </Text>
           {lastUpdate && (
             <Text style={s.lastUpdate}>
-              Last: {lastUpdate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              {t('orders.lastUpdate', 'Last')}: {lastUpdate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
             </Text>
           )}
         </View>
@@ -356,7 +358,7 @@ export default function TrackOrderScreen() {
                 <Feather name="clock" size={20} color={C.orange} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.etaTitleText}>Estimated Arrival</Text>
+                <Text style={s.etaTitleText}>{t('orders.estimatedArrival', 'Estimated Arrival')}</Text>
                 <Text style={s.etaValueText}>
                   {(() => {
                     let etaMins = order?.delivery_estimate_mins ?? null;
@@ -375,7 +377,7 @@ export default function TrackOrderScreen() {
               {order?.delivery_distance_km != null && (
                 <View style={s.etaBadge}>
                   <Feather name="map-pin" size={12} color={C.gray500} />
-                  <Text style={s.etaBadgeText}>{order.delivery_distance_km} km away</Text>
+                  <Text style={s.etaBadgeText}>{t('orders.kmAway', '{{dist}} km away', { dist: order.delivery_distance_km })}</Text>
                 </View>
               )}
             </View>
@@ -389,14 +391,14 @@ export default function TrackOrderScreen() {
               <Feather name="user" size={22} color={C.white} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.partnerLabel}>Delivery Partner Assigned</Text>
+              <Text style={s.partnerLabel}>{t('orders.deliveryPartnerAssigned', 'Delivery Partner Assigned')}</Text>
               <Text style={s.partnerTitle}>{partnerName}</Text>
               {partnerPos ? (
                 <Text style={s.partnerCoord}>
                   📍 {parseFloat(partnerPos.lat).toFixed(5)}, {parseFloat(partnerPos.lng).toFixed(5)}
                 </Text>
               ) : (
-                <Text style={s.partnerCoord}>Waiting for live location updates…</Text>
+                <Text style={s.partnerCoord}>{t('orders.waitingLiveLocation', 'Waiting for live location updates…')}</Text>
               )}
             </View>
             {partnerPhone && (
@@ -414,15 +416,15 @@ export default function TrackOrderScreen() {
           <View style={s.waitCard}>
             <Feather name="clock" size={18} color={C.amber} />
             <View style={{ flex: 1 }}>
-              <Text style={s.waitTitle}>Waiting for partner assignment…</Text>
-              <Text style={s.waitSub}>A delivery partner will be assigned to your order soon.</Text>
+              <Text style={s.waitTitle}>{t('orders.waitingPartnerAssignment', 'Waiting for partner assignment…')}</Text>
+              <Text style={s.waitSub}>{t('orders.partnerAssignedSoon', 'A delivery partner will be assigned to your order soon.')}</Text>
             </View>
           </View>
         )}
 
         {/* PROGRESS STEPS */}
         <View style={s.stepsCard}>
-          <Text style={s.stepsTitle}>Order Progress</Text>
+          <Text style={s.stepsTitle}>{t('orders.orderProgress', 'Order Progress')}</Text>
           {STATUS_STEPS.map((step, i) => {
             const done    = currentStepIdx >= 0 && i <= currentStepIdx;
             const current = i === currentStepIdx;
@@ -454,12 +456,12 @@ export default function TrackOrderScreen() {
                     current && { color: C.green,  fontWeight: "800" },
                     future  && { color: C.gray400 },
                   ]}>
-                    {step.label}
+                    {t(`orders.step.${step.key}`, step.label)}
                   </Text>
                   {current && (
                     <View style={s.currentBadge}>
                       <PulseDot color={C.green} />
-                      <Text style={s.currentBadgeText}>Current status</Text>
+                      <Text style={s.currentBadgeText}>{t('orders.currentStatus', 'Current status')}</Text>
                     </View>
                   )}
                 </View>
@@ -478,8 +480,8 @@ export default function TrackOrderScreen() {
             >
               <Feather name="check-circle" size={28} color={C.white} />
               <View style={{ flex: 1 }}>
-                <Text style={s.deliveredTitle}>Order Delivered! 🎉</Text>
-                <Text style={s.deliveredSub}>Your order has been delivered successfully</Text>
+                <Text style={s.deliveredTitle}>{t('orders.orderDeliveredTitle', 'Order Delivered! 🎉')}</Text>
+                <Text style={s.deliveredSub}>{t('orders.orderDeliveredSub', 'Your order has been delivered successfully')}</Text>
               </View>
             </LinearGradient>
           </View>
@@ -644,6 +646,7 @@ const s = StyleSheet.create({
 
 // ─── Order Detail Modal Helper ───────────────────────────────────────────────
 function OrderDetailModal({ visible, order, onClose }) {
+  const { t } = useTranslation();
   if (!order) return null;
   const items = order.items || order.order_items || [];
   const subtotal = order.subtotal || items.reduce((s, i) => s + (i.product_price || i.price || 0) * (i.quantity || 1), 0);
@@ -656,7 +659,7 @@ function OrderDetailModal({ visible, order, onClose }) {
         <Pressable style={od.sheet} onPress={() => {}}>
           <View style={od.handle} />
           <View style={od.header}>
-            <Text style={od.title}>Order Summary</Text>
+            <Text style={od.title}>{t('orders.orderSummary', 'Order Summary')}</Text>
             <TouchableOpacity onPress={onClose} style={od.closeBtn}>
               <Feather name="x" size={20} color={C.gray400} />
             </TouchableOpacity>
@@ -680,7 +683,7 @@ function OrderDetailModal({ visible, order, onClose }) {
                       <Feather name="clock" size={16} color={C.orange} />
                     </View>
                     <View>
-                      <Text style={od.etaBannerTitle}>Estimated Delivery</Text>
+                      <Text style={od.etaBannerTitle}>{t('orders.estimatedDelivery', 'Estimated Delivery')}</Text>
                       <Text style={od.etaBannerLabel}>~{etaMins} mins</Text>
                     </View>
                   </View>
@@ -694,7 +697,7 @@ function OrderDetailModal({ visible, order, onClose }) {
               );
             })()}
 
-            <Text style={od.sectionTitle}>Items</Text>
+            <Text style={od.sectionTitle}>{t('orders.items', 'Items')}</Text>
             {items.map((item, i) => (
               <View key={i} style={od.itemRow}>
                 <View style={{ flex: 1 }}>
@@ -708,21 +711,21 @@ function OrderDetailModal({ visible, order, onClose }) {
 
             <View style={od.billBox}>
               <View style={od.billRow}>
-                <Text style={od.billLabel}>Subtotal</Text>
+                <Text style={od.billLabel}>{t('orders.subtotal', 'Subtotal')}</Text>
                 <Text style={od.billValue}>₹{subtotal}</Text>
               </View>
               <View style={od.billRow}>
-                <Text style={od.billLabel}>Delivery Fee</Text>
+                <Text style={od.billLabel}>{t('orders.deliveryFee', 'Delivery Fee')}</Text>
                 <Text style={od.billValue}>₹{deliveryFee}</Text>
               </View>
               <View style={[od.billRow, { borderTopWidth: 1, borderTopColor: C.gray100, marginTop: 8, paddingTop: 8 }]}>
-                <Text style={[od.billLabel, { fontWeight: "800", color: C.gray900 }]}>Total Paid</Text>
+                <Text style={[od.billLabel, { fontWeight: "800", color: C.gray900 }]}>{t('orders.totalPaid', 'Total Paid')}</Text>
                 <Text style={[od.billValue, { fontWeight: "900", color: C.gray900, fontSize: 16 }]}>₹{total}</Text>
               </View>
             </View>
 
             <View style={od.statusBox}>
-              <Text style={od.statusLabel}>Current Status</Text>
+              <Text style={od.statusLabel}>{t('orders.currentStatus', 'Current Status')}</Text>
               <Text style={[od.statusValue, { color: C.green }]}>{(order.status || "").replace("_", " ").toUpperCase()}</Text>
             </View>
           </ScrollView>

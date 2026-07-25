@@ -58,12 +58,12 @@ const C = {
   amberText:  '#92400E',
 };
 
-function getLevelInfo(total) {
-  if (total >= 500) return { level: 5, label: 'Legend',   next: null,  progress: 1 };
-  if (total >= 200) return { level: 4, label: 'Expert',   next: 500,   progress: (total - 200) / 300 };
-  if (total >= 100) return { level: 3, label: 'Pro',      next: 200,   progress: (total - 100) / 100 };
-  if (total >= 30)  return { level: 2, label: 'Rising',   next: 100,   progress: (total - 30)  / 70  };
-  return              { level: 1, label: 'Starter', next: 30,    progress: total / 30 };
+function getLevelInfo(total, t) {
+  if (total >= 500) return { level: 5, label: t('delivery.levelLegend', 'Legend'),   next: null,  progress: 1 };
+  if (total >= 200) return { level: 4, label: t('delivery.levelExpert', 'Expert'),   next: 500,   progress: (total - 200) / 300 };
+  if (total >= 100) return { level: 3, label: t('delivery.levelPro', 'Pro'),      next: 200,   progress: (total - 100) / 100 };
+  if (total >= 30)  return { level: 2, label: t('delivery.levelRising', 'Rising'),   next: 100,   progress: (total - 30)  / 70  };
+  return              { level: 1, label: t('delivery.levelStarter', 'Starter'),  next: 30,    progress: total / 30 };
 }
 
 function InfoRow({ label, value, last }) {
@@ -155,10 +155,23 @@ export default function DeliveryProfileScreen({ navigation }) {
   useEffect(() => { fetchData(); }, [fetchData]);
   const onRefresh = () => { setRefreshing(true); fetchData(); };
 
+<<<<<<< HEAD
 const handleLogout = async () => {
   setShowLogout(false);
   await logout();
 };
+=======
+  const handleLogout = () => {
+    Alert.alert(
+      t('profile.logoutConfirmTitle', 'Log out'),
+      t('profile.logoutConfirmMsg', 'Are you sure you want to log out?'),
+      [
+        { text: t('delivery.cancel', 'Cancel'), style: 'cancel' },
+        { text: t('profile.logout', 'Log out'), style: 'destructive', onPress: () => logout?.() },
+      ]
+    );
+  };
+>>>>>>> 3671524a374fccb6be54fc574a65ba1acbda356f
 
   if (loading || !fontsLoaded) {
     return (
@@ -169,9 +182,8 @@ const handleLogout = async () => {
   }
 
   const totalDeliveries = stats?.totalDeliveries || profile?.total_deliveries || 0;
-  const levelInfo = getLevelInfo(totalDeliveries);
+  const levelInfo = getLevelInfo(totalDeliveries, t);
   const displayName = user?.name || profile?.user?.name || 'Partner';
-  const firstName = displayName.trim().split(' ')[0];
   const initials  = displayName.trim().split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
   const phone  = user?.phone  || profile?.user?.phone  || '—';
   const rating = stats?.rating ?? profile?.rating ?? null;
@@ -199,12 +211,12 @@ const handleLogout = async () => {
                 <Text style={p.heroName}>{displayName}</Text>
                 {isVerified && (
                   <View style={p.verifiedBadge}>
-                    <Text style={p.verifiedText}>✓ Verified</Text>
+                    <Text style={p.verifiedText}>{t('delivery.verified', '✓ Verified')}</Text>
                   </View>
                 )}
               </View>
               <Text style={p.heroPhone}>{phone}</Text>
-              <Text style={p.heroCluster}>{profile?.cluster?.name || 'Unassigned cluster'}</Text>
+              <Text style={p.heroCluster}>{profile?.cluster?.name || t('delivery.unassignedCluster', 'Unassigned cluster')}</Text>
             </View>
           </View>
 
@@ -212,17 +224,17 @@ const handleLogout = async () => {
           <View style={p.heroStats}>
             <View style={p.heroStat}>
               <Text style={p.heroStatValue}>{totalDeliveries}</Text>
-              <Text style={p.heroStatLabel}>Deliveries</Text>
+              <Text style={p.heroStatLabel}>{t('delivery.deliveriesStat', 'Deliveries')}</Text>
             </View>
             <View style={p.heroStatDivider} />
             <View style={p.heroStat}>
               <Text style={p.heroStatValue}>{stats?.acceptanceRate ?? 100}%</Text>
-              <Text style={p.heroStatLabel}>Accept rate</Text>
+              <Text style={p.heroStatLabel}>{t('delivery.acceptRate', 'Accept rate')}</Text>
             </View>
             <View style={p.heroStatDivider} />
             <View style={p.heroStat}>
               <Text style={p.heroStatValue}>{displayRating} ★</Text>
-              <Text style={p.heroStatLabel}>Rating</Text>
+              <Text style={p.heroStatLabel}>{t('delivery.rating', 'Rating')}</Text>
             </View>
             <View style={p.heroStatDivider} />
             <View style={p.heroStat}>
@@ -240,7 +252,7 @@ const handleLogout = async () => {
               <View>
                 <Text style={p.sectionTitle}>Level {levelInfo.level} · {levelInfo.label}</Text>
                 {levelInfo.next && (
-                  <Text style={p.levelSub}>{totalDeliveries} / {levelInfo.next} deliveries</Text>
+                  <Text style={p.levelSub}>{totalDeliveries} / {levelInfo.next} {t('delivery.deliveriesStat', 'deliveries').toLowerCase()}</Text>
                 )}
               </View>
               <View style={p.levelBadge}>
@@ -251,32 +263,32 @@ const handleLogout = async () => {
               <View style={[p.progressFill, { width: `${Math.round(levelInfo.progress * 100)}%` }]} />
             </View>
             {levelInfo.next ? (
-              <Text style={p.levelHint}>{levelInfo.next - totalDeliveries} more to reach Level {levelInfo.level + 1}</Text>
+              <Text style={p.levelHint}>{levelInfo.next - totalDeliveries} {t('delivery.moreToReach', { count: levelInfo.next - totalDeliveries, nextLevel: levelInfo.level + 1, defaultValue: `more to reach Level ${levelInfo.level + 1}` })}</Text>
             ) : (
-              <Text style={[p.levelHint, { color: C.greenDark }]}>Maximum level reached 🎉</Text>
+              <Text style={[p.levelHint, { color: C.greenDark }]}>{t('delivery.maxLevelReached', 'Maximum level reached 🎉')}</Text>
             )}
           </View>
 
           {/* ── Vehicle info ── */}
-          <SectionCard title="Vehicle">
-            <InfoRow label="Type"           value={profile?.vehicle_type ? profile.vehicle_type.charAt(0).toUpperCase() + profile.vehicle_type.slice(1) : null} />
-            <InfoRow label="Vehicle number" value={profile?.vehicle_number} />
-            <InfoRow label="Year"           value={profile?.vehicle_year} last />
+          <SectionCard title={t('delivery.vehicle', 'Vehicle')}>
+            <InfoRow label={t('delivery.vehicleType', 'Type')}           value={profile?.vehicle_type ? profile.vehicle_type.charAt(0).toUpperCase() + profile.vehicle_type.slice(1) : null} />
+            <InfoRow label={t('delivery.vehicleNumber', 'Vehicle number')} value={profile?.vehicle_number} />
+            <InfoRow label={t('delivery.vehicleYear', 'Year')}           value={profile?.vehicle_year} last />
           </SectionCard>
 
           {/* ── Documents ── */}
-          <SectionCard title="Documents">
-            <InfoRow label="Driving licence" value={profile?.license_number ? `${profile.license_number} · Exp ${profile.license_expiry || '—'}` : null} />
-            <InfoRow label="Aadhaar"          value={profile?.aadhar_number ? `****${profile.aadhar_number.slice(-4)}` : null} />
-            <InfoRow label="PAN"              value={profile?.pan_number} last />
+          <SectionCard title={t('delivery.documents', 'Documents')}>
+            <InfoRow label={t('delivery.drivingLicence', 'Driving licence')} value={profile?.license_number ? `${profile.license_number} · Exp ${profile.license_expiry || '—'}` : null} />
+            <InfoRow label={t('delivery.aadhaar', 'Aadhaar')}          value={profile?.aadhar_number ? `****${profile.aadhar_number.slice(-4)}` : null} />
+            <InfoRow label={t('delivery.pan', 'PAN')}              value={profile?.pan_number} last />
           </SectionCard>
 
           {/* ── Bank details ── */}
-          <SectionCard title="Bank account">
-            <InfoRow label="Account name"   value={profile?.bank_account_name} />
-            <InfoRow label="Bank"           value={profile?.bank_name} />
-            <InfoRow label="Account number" value={profile?.bank_account_number ? `****${profile.bank_account_number.slice(-4)}` : null} />
-            <InfoRow label="IFSC"           value={profile?.bank_ifsc} last />
+          <SectionCard title={t('delivery.bankAccount', 'Bank account')}>
+            <InfoRow label={t('delivery.accountName', 'Account name')}   value={profile?.bank_account_name} />
+            <InfoRow label={t('delivery.bank', 'Bank')}           value={profile?.bank_name} />
+            <InfoRow label={t('delivery.accountNumber', 'Account number')} value={profile?.bank_account_number ? `****${profile.bank_account_number.slice(-4)}` : null} />
+            <InfoRow label={t('delivery.ifsc', 'IFSC')}           value={profile?.bank_ifsc} last />
           </SectionCard>
 
           {/* ── Onboarding status ── */}
@@ -287,8 +299,8 @@ const handleLogout = async () => {
               activeOpacity={0.85}
             >
               <View>
-                <Text style={p.onboardingTitle}>Complete your profile</Text>
-                <Text style={p.onboardingSub}>Add documents and bank details to start earning</Text>
+                <Text style={p.onboardingTitle}>{t('delivery.completeYourProfile', 'Complete your profile')}</Text>
+                <Text style={p.onboardingSub}>{t('delivery.addDocumentsSub', 'Add documents and bank details to start earning')}</Text>
               </View>
               <Text style={p.onboardingArrow}>→</Text>
             </TouchableOpacity>
@@ -312,12 +324,21 @@ const handleLogout = async () => {
             <View style={p.langBtnLeft}>
               <Text style={p.langBtnIcon}>🌐</Text>
               <View>
-                <Text style={p.langBtnLabel}>{t('profile.language')}</Text>
-                <Text style={p.langBtnSub}>{t('profile.languageSub')}</Text>
+                <Text style={p.langBtnLabel}>{t('profile.language', 'Language')}</Text>
+                <Text style={p.langBtnSub}>{t('profile.languageSub', 'Change app language')}</Text>
               </View>
             </View>
             <Text style={p.langBtnArrow}>›</Text>
           </TouchableOpacity>
+<<<<<<< HEAD
+=======
+
+          {/* ── Log out ── */}
+          <TouchableOpacity style={p.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+            <Text style={p.logoutText}>{t('profile.logout', 'Log out')}</Text>
+          </TouchableOpacity>
+
+>>>>>>> 3671524a374fccb6be54fc574a65ba1acbda356f
         </View>
 
         <View style={{ height: 100 }} />
@@ -341,15 +362,22 @@ const handleLogout = async () => {
         onRequestClose={() => setShowLanguage(false)}
       >
         <Pressable
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}
           onPress={() => setShowLanguage(false)}
         >
           <Pressable
-            style={{ backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48 }}
-            onPress={() => {}}
+            style={{
+              backgroundColor: C.white,
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              padding: 24,
+              paddingBottom: 40,
+              maxHeight: '80%',
+            }}
+            onPress={(e) => e.stopPropagation?.()}
           >
-            <View style={{ width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
-            <LanguageSwitcher inline />
+            <View style={{ width: 44, height: 5, backgroundColor: C.gray200, borderRadius: 3, alignSelf: 'center', marginBottom: 16 }} />
+            <LanguageSwitcher inline onClose={() => setShowLanguage(false)} />
           </Pressable>
         </Pressable>
       </Modal>
