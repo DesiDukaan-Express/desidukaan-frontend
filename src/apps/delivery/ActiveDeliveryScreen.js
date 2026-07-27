@@ -1104,7 +1104,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
           if (activeOrder?.id) await clearStep(activeOrder.id);
           setDeliveryCount(c => c + 1);
           setEarnings(e => e + (activeOrder?.deliveryFee || 65));
-          setTimeout(() => { setActiveOrder(null); setStep(0); fetchOrders(); }, 800);
+          setTimeout(() => { setActiveOrder(null); setStep(0); fetchOrders(); navigation?.navigate('Home'); }, 800);
           return;
         }
       } catch (e) { Alert.alert('Error', 'Network error'); return; }
