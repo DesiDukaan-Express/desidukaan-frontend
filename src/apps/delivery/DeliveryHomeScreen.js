@@ -281,6 +281,9 @@ export default function DeliveryHomeScreen({ navigation }) {
     socket.on('delivery_status_update', () => { fetchStats(); fetchHistory(); });
     socket.on('new_delivery_request', fetchStats);
     socket.on('order:incoming', (data) => setIncomingOrder(data));
+    socket.on('order:removed', (data) => {
+      setIncomingOrder(prev => prev?.orderId === data.orderId ? null : prev);
+    });
     socketRef.current = socket;
     return () => { socket.disconnect(); socketRef.current = null; };
   }, [token]);

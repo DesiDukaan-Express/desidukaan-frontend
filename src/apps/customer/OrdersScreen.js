@@ -13,6 +13,7 @@ import {
   Modal,
   Pressable,
   Animated,
+  Linking,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -54,6 +55,8 @@ const C = {
   gray900: "#111827",
   red: "#DC2626",
   redLight: "#FEF2F2",
+  cyan: "#0891B2",
+  cyanLight: "#ECFEFF",
 };
 
 // ─── Status config — matches backend OrderStatus enum exactly ─────────────────
@@ -116,6 +119,41 @@ const stepIndex = (status) => {
   return TRACK_STEPS.findIndex((s) => s.key === status);
 };
 
+// ─── Haversine distance (km) between two lat/lng points ───────────────────────
+const haversineKm = (lat1, lng1, lat2, lng2) => {
+  if (!lat1 || !lng1 || !lat2 || !lng2) return null;
+  const R = 6371;
+  const toRad = d => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+// ─── Status → header message mapping ─────────────────────────────────────────
+const STATUS_HEADER_TEXTS = {
+  pending:   "Order Placed",
+  accepted:  "Order Accepted",
+  preparing: "Order is being prepared",
+  ready:     "Ready for pickup",
+  picked_up: "Order is on the way",
+  delivered: "Delivered!",
+  cancelled: "Order Cancelled",
+  rejected:  "Order Rejected",
+};
+const getHeaderText = (s) => STATUS_HEADER_TEXTS[s] || "Order Placed";
+
+// ─── Status → partner message mapping ────────────────────────────────────────
+const PARTNER_STATUS_MSGS = {
+  accepted:  "I have accepted your order and am heading to the store",
+  preparing: "I am at the store preparing your order",
+  ready:     "I have your order and am ready to head your way",
+  picked_up: "I have picked up your order and am on the way to your location",
+};
+const getPartnerMsg = (s) => PARTNER_STATUS_MSGS[s] || "Your delivery partner is on the way";
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const formatDate = (iso) => {
   if (!iso) return "";
@@ -159,7 +197,7 @@ const getETALabel = (status, mins) => {
   return `Est. delivery in ~${t}`;
 };
 
-function DriverLocationMap({ order, token }) {
+function DriverLocationMap({ order, token, partnerPos: externalPos, connected: externalConnected, lastUpdate: externalLastUpdate }) {
   const hasDriver = !!(
     order?.delivery_partner_id ||
     order?.delivery_partner ||
@@ -182,13 +220,17 @@ function DriverLocationMap({ order, token }) {
           }
         : null;
 
-  const { partnerPos, connected, lastUpdate } = useDriverLocation(
+  const hookData = useDriverLocation(
     order?.id,
     token,
     order?.status,
     hasDriver,
     initialLocation,
   );
+
+  const partnerPos  = externalPos  ?? hookData.partnerPos;
+  const connected   = externalConnected ?? hookData.connected;
+  const lastUpdate  = externalLastUpdate ?? hookData.lastUpdate;
 
   // Pulsing "LIVE" badge animation
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -431,6 +473,54 @@ function OrderDetailModal({ order, onClose }) {
     }
   };
 
+  // ── Live driver location & ETA — MUST be before early return (hooks rule) ──
+  const hasDriver = !!(
+    order?.delivery_partner_id ||
+    order?.delivery_partner ||
+    order?.delivery?.partner_id ||
+    order?.delivery?.partner
+  );
+  const initialLocation =
+    order?.delivery?.partner?.current_lat &&
+    order?.delivery?.partner?.current_lng
+      ? { lat: order.delivery.partner.current_lat, lng: order.delivery.partner.current_lng }
+      : order?.delivery_partner?.current_lat && order?.delivery_partner?.current_lng
+        ? { lat: order.delivery_partner.current_lat, lng: order.delivery_partner.current_lng }
+        : null;
+
+  // Ref-based callback ensures stale closures aren't passed to the hook
+  const fetchFullOrderRef = useRef(fetchFullOrder);
+  fetchFullOrderRef.current = fetchFullOrder;
+
+  const { partnerPos, connected, lastUpdate } = useDriverLocation(
+    order?.id,
+    token,
+    order?.status,
+    hasDriver,
+    initialLocation,
+    fetchFullOrderRef.current,
+  );
+
+  const destLat = order?.delivery_address?.latitude;
+  const destLng = order?.delivery_address?.longitude;
+
+  const rawDist = partnerPos?.lat ? haversineKm(partnerPos.lat, partnerPos.lng, destLat, destLng) : order?.delivery_distance_km;
+  const currentDistKm = rawDist != null ? Number(rawDist) : null;
+  const liveEtaMins = (() => {
+    if (currentDistKm != null && partnerPos?.lat && destLat && destLng) {
+      return Math.max(2, Math.round(currentDistKm * 4));
+    }
+    if (order?.status === 'picked_up') return 15;
+    if (order?.status === 'ready') return 20;
+    return 30;
+  })();
+
+  const isActive = order && !["delivered", "cancelled", "rejected"].includes(order.status);
+  const headerStatusText = getHeaderText(order?.status);
+  const partnerName = order?.delivery?.partner?.user?.name || order?.delivery_partner?.user?.name || "Delivery Partner";
+  const partnerPhone = order?.delivery?.partner?.user?.phone || order?.delivery_partner?.user?.phone;
+  const partnerMsg = getPartnerMsg(order?.status);
+
   if (!order) return null;
 
   // Use fullOrder if available for more details, otherwise fallback to order
@@ -439,8 +529,8 @@ function OrderDetailModal({ order, onClose }) {
   const st = getStatus(order.status);
   const stepIdx = stepIndex(order.status);
   const isFailed = order.status === "cancelled" || order.status === "rejected";
+  const isDelivered = order?.status === "delivered";
   const items = displayOrder.order_items || displayOrder.items || [];
-  // Backend stores subtotal, delivery_fee, total separately
   const subtotal = displayOrder.subtotal || 0;
   const deliveryFee = displayOrder.delivery_fee ?? 20;
   const total = displayOrder.total || subtotal + deliveryFee;
@@ -452,74 +542,100 @@ function OrderDetailModal({ order, onClose }) {
           <View style={od.handle} />
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Gradient header */}
-            <LinearGradient
-              colors={[C.orange, C.orangeDark, C.greenDark, C.green]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={od.sheetHeader}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={od.orderNum}>
-                  {order.order_number ||
-                    `#${order.id?.toString().slice(-6).toUpperCase()}`}
-                </Text>
-                <Text style={od.orderDate}>{formatDate(order.created_at)}</Text>
+            {/* ── Order number row (compact) — first ── */}
+            <View style={od.orderNumRow}>
+              <Feather name="package" size={14} color={C.gray400} />
+              <Text style={od.orderNumCompact}>
+                {order.order_number || `#${order.id?.toString().slice(-6).toUpperCase()}`}
+              </Text>
+              <Text style={od.orderDateCompact}>{formatDate(order.created_at)}</Text>
+            </View>
+
+            {/* ── Colored status banner ── */}
+            <View style={[od.statusCard, { backgroundColor: (() => {
+              const s = order?.status;
+              if (["accepted", "preparing", "ready", "delivered"].includes(s)) return C.green;
+              if (s === "picked_up") return "#0E7490";
+              if (s === "pending") return "#D97706";
+              if (["cancelled", "rejected"].includes(s)) return C.gray500;
+              return C.green;
+            })() }]}>
+              <View style={od.statusRow}>
+                <View style={od.statusIconBg}>
+                  <Feather name={order?.status === "picked_up" ? "truck" : order?.status === "delivered" ? "check-circle" : isFailed ? "x-circle" : "package"} size={26} color={C.white} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={od.statusLabel}>
+                    {order?.status === "delivered" ? "DELIVERED"
+                      : isFailed ? (order?.status || "").toUpperCase()
+                      : order?.status === "picked_up" ? "OUT FOR DELIVERY"
+                      : order?.status === "ready" ? "READY FOR PICKUP"
+                      : order?.status === "preparing" ? "PREPARING"
+                      : order?.status === "accepted" ? "ACCEPTED"
+                      : "ORDER PLACED"}
+                  </Text>
+                  <Text style={od.statusTitle}>
+                    {isActive
+                      ? partnerPos?.lat
+                        ? `Arriving in ~${liveEtaMins} ${liveEtaMins === 1 ? "min" : "mins"}`
+                        : hasDriver
+                          ? "Locating driver…"
+                          : order?.status === "ready"
+                            ? "Waiting for partner assignment…"
+                            : order?.status === "pending"
+                              ? "Waiting for vendor to confirm…"
+                              : "Preparing your order…"
+                      : order?.status === "delivered"
+                        ? "Order delivered successfully!"
+                        : order?.status === "cancelled" || order?.status === "rejected"
+                          ? `This order was ${order.status}`
+                          : ""}
+                  </Text>
+                </View>
+                {isActive && (
+                  <View style={od.statusLivePill}>
+                    <Animated.View style={od.statusLiveDot} />
+                    <Text style={od.statusLiveText}>LIVE</Text>
+                  </View>
+                )}
               </View>
-              <View
-                style={[
-                  od.statusChip,
-                  { backgroundColor: "rgba(255,255,255,0.2)" },
-                ]}
-              >
-                <Feather name={st.icon} size={13} color={C.white} />
-                <Text style={od.statusChipText}>{st.label}</Text>
-              </View>
-            </LinearGradient>
+            </View>
 
             <View style={od.body}>
-              {/* ── Live Driver Map — only for active delivery statuses ── */}
+              {/* ── Driver Location Map — only for active delivery statuses ── */}
               {showMap && (
-                <DriverLocationMap order={displayOrder} token={token} />
+                <DriverLocationMap
+                  order={displayOrder}
+                  token={token}
+                  partnerPos={partnerPos}
+                  connected={connected}
+                  lastUpdate={lastUpdate}
+                />
               )}
 
-              {/* ── ETA Banner — shown for all active orders ── */}
-              {(() => {
-                // Server-supplied estimate (requires backend restart)
-                let etaMins = order.delivery_estimate_mins ?? null;
-                const distKm  = order.delivery_distance_km  ?? null;
-
-                // Client-side fallback when backend field is absent
-                if (etaMins == null && ACTIVE_ETA_STATUSES.includes(order.status)) {
-                  if (order.status === 'picked_up') etaMins = 15;
-                  else if (order.status === 'ready') etaMins = 20;
-                  else etaMins = 30; // pending / accepted / preparing
-                }
-
-                const showBanner = ACTIVE_ETA_STATUSES.includes(order.status) && etaMins != null;
-                if (!showBanner) return null;
-
-                const label = getETALabel(order.status, etaMins);
-                return (
-                  <View style={od.etaBanner}>
-                    <View style={od.etaBannerLeft}>
-                      <View style={od.etaIconBg}>
-                        <Feather name="clock" size={16} color={C.orange} />
-                      </View>
-                      <View>
-                        <Text style={od.etaBannerTitle}>Estimated Delivery</Text>
-                        <Text style={od.etaBannerLabel}>{label}</Text>
-                      </View>
-                    </View>
-                    {distKm != null && (
-                      <View style={od.etaBadge}>
-                        <Feather name="map-pin" size={11} color={C.gray500} />
-                        <Text style={od.etaBadgeText}>{distKm} km</Text>
-                      </View>
-                    )}
+              {/* ── Delivery Partner Card — shown when partner is assigned ── */}
+              {hasDriver && isActive && (
+                <View style={od.partnerInfoCard}>
+                  <View style={od.partnerAvatar}>
+                    <Feather name="user" size={22} color={C.white} />
                   </View>
-                );
-              })()}
+                  <View style={{ flex: 1 }}>
+                    <Text style={od.partnerInfoName}>
+                      I{`'`}m {partnerName}, your delivery partner
+                    </Text>
+                    <Text style={od.partnerInfoMsg}>{partnerMsg}</Text>
+                  </View>
+                  {partnerPhone && (
+                    <TouchableOpacity
+                      style={od.partnerCallBtn}
+                      onPress={() => Linking.openURL(`tel:${partnerPhone}`)}
+                      activeOpacity={0.7}
+                    >
+                      <Feather name="phone" size={18} color={C.white} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
 
               {/* ── Order Tracking steps ── */}
               {!isFailed ? (
@@ -822,25 +938,130 @@ const od = StyleSheet.create({
     alignSelf: "center",
     marginTop: 10,
   },
-  sheetHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 18,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+  // Polished status header (colored banner)
+  statusCard: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
-  orderNum: { fontSize: 17, fontWeight: "900", color: C.white },
-  orderDate: { fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 3 },
-  statusChip: {
+  statusCardDelivered: {
+    backgroundColor: C.green,
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  statusIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusIconGreen: { backgroundColor: "rgba(255,255,255,0.18)" },
+  statusIconBlue: { backgroundColor: "rgba(255,255,255,0.18)" },
+  statusIconRed: { backgroundColor: "rgba(255,255,255,0.18)" },
+  statusLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.75)",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 3,
+  },
+  statusTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: C.white,
+    lineHeight: 21,
+  },
+  statusLivePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  statusLiveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: C.white,
+  },
+  statusLiveText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: C.white,
+    letterSpacing: 0.8,
+  },
+  // Compact order number row
+  orderNumRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    marginBottom: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
   },
-  statusChipText: { fontSize: 12, fontWeight: "700", color: C.white },
+  orderNumCompact: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.gray600,
+  },
+  orderDateCompact: {
+    fontSize: 11,
+    color: C.gray400,
+    marginLeft: "auto",
+  },
+  // Partner info card
+  partnerInfoCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: C.white,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: C.greenBorder,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  partnerAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: C.green,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  partnerInfoName: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: C.gray900,
+    marginBottom: 3,
+  },
+  partnerInfoMsg: {
+    fontSize: 12,
+    color: C.gray500,
+    lineHeight: 17,
+  },
+  partnerCallBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: C.green,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
   body: { padding: 20 },
   sectionTitle: {
     fontSize: 15,
@@ -1126,7 +1347,18 @@ function OrderCard({ order, onPress, onRate, alreadyRated, onReorder, onDownload
 
   let statusTitle = st.label;
   if (order.status === "delivered") {
-    statusTitle = `Arrived in ${order.delivery_time_mins || (10 + (order.id % 15))} minutes`;
+    const createdTs = order.created_at ? new Date(order.created_at) : null;
+    const deliveredTs = order.actual_delivery_time
+      ? new Date(order.actual_delivery_time)
+      : order.delivery?.delivered_at
+        ? new Date(order.delivery.delivered_at)
+        : null;
+    if (createdTs && deliveredTs) {
+      const elapsedMins = Math.round((deliveredTs - createdTs) / 60000);
+      statusTitle = `Arrived in ${elapsedMins} ${elapsedMins === 1 ? 'minute' : 'minutes'}`;
+    } else {
+      statusTitle = "Delivered";
+    }
   } else if (order.status === "picked_up") {
     statusTitle = "Arriving soon / Out for delivery";
   } else if (order.status === "preparing") {
@@ -1167,14 +1399,21 @@ function OrderCard({ order, onPress, onRate, alreadyRated, onReorder, onDownload
 
   const showDownloadInvoice = order.status === "delivered" && isFirstDelivered;
 
-  // ETA chip data — prefer server value, fall back to stage-based defaults
-  let etaMins = order.delivery_estimate_mins ?? null;
-  if (etaMins == null && ACTIVE_ETA_STATUSES.includes(order.status)) {
-    if (order.status === 'picked_up') etaMins = 15;
-    else if (order.status === 'ready') etaMins = 20;
-    else etaMins = 30; // pending / accepted / preparing
+  // ETA chip — prefers distance-based haversine ETA (matches live tracking calc),
+  // then server estimate, then stage-based fallback
+  let etaMins = null;
+  if (ACTIVE_ETA_STATUSES.includes(order.status)) {
+    if (order.delivery_distance_km != null) {
+      etaMins = Math.max(2, Math.round(order.delivery_distance_km * 4));
+    } else if (order.delivery_estimate_mins != null) {
+      etaMins = order.delivery_estimate_mins;
+    } else {
+      if (order.status === 'picked_up') etaMins = 15;
+      else if (order.status === 'ready') etaMins = 20;
+      else etaMins = 30;
+    }
   }
-  const showETA  = ACTIVE_ETA_STATUSES.includes(order.status) && etaMins != null;
+  const showETA  = etaMins != null;
   const etaLabel = showETA ? getETALabel(order.status, etaMins) : null;
   const distKm   = order.delivery_distance_km ?? null;
 
