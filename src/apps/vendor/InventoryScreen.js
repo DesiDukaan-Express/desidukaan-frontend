@@ -410,7 +410,9 @@ export default function InventoryScreen() {
               <Text style={s.backBtnText}>← {t('vendor.back')}</Text>
             </TouchableOpacity>
             <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={s.heading} numberOfLines={1}>{selectedCategory}</Text>
+              <Text style={s.heading} numberOfLines={1}>
+                {selectedCategory === "Other" ? t('vendor.otherCategory', 'Other') : t(`category.${selectedCategory}`, selectedCategory)}
+              </Text>
               <Text style={s.subheading}>{t('vendor.productsInCategory')}</Text>
             </View>
           </>
@@ -443,7 +445,7 @@ export default function InventoryScreen() {
             onChangeText={inv.setSearch}
             placeholder={
               selectedCategory !== null
-                ? `${t('vendor.searchInCategoryPlaceholder')} ${selectedCategory}…`
+                ? `${t('vendor.searchInCategoryPlaceholder')} ${selectedCategory === "Other" ? t('vendor.otherCategory', 'Other') : t(`category.${selectedCategory}`, selectedCategory)}…`
                 : t('vendor.searchPlaceholderInventory')
             }
             placeholderTextColor={TEXT_XLIGHT}
@@ -553,10 +555,10 @@ export default function InventoryScreen() {
                       <MaterialIcons name={getCategoryIcon(cat.name)} size={28} color={GREEN} />
                     </View>
                     <Text style={s.folderName} numberOfLines={1}>
-                      {cat.name}
+                      {cat.name === "Other" ? t('vendor.otherCategory', 'Other') : t(`category.${cat.name}`, cat.name)}
                     </Text>
                     <Text style={s.folderCount}>
-                      {cat.count} product{cat.count !== 1 ? "s" : ""}
+                      {cat.count} {cat.count === 1 ? t('vendor.product', 'product') : t('vendor.products', 'products')}
                     </Text>
                   </TouchableOpacity>
                 ))}
