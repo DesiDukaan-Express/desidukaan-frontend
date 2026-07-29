@@ -244,6 +244,7 @@ export default {
     windDown: "Wind Down",
     eveningSub: "Wrapping up strong today!",
     loadingDashboard: "Loading your dashboard\u2026",
+    chartUnavailable: "Chart unavailable",
     welcomeTitle: "Welcome to KwikPik!",
     welcomeSub: "You haven't completed your shop registration yet. Complete it now to start selling!",
     completeRegistration: "Complete Registration",

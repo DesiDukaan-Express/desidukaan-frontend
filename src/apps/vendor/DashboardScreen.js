@@ -90,6 +90,28 @@ const getGreetingConfig = (t) => {
   };
 };
 
+class ChartSafeBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { crashed: false };
+  }
+  static getDerivedStateFromError() {
+    return { crashed: true };
+  }
+  render() {
+    if (this.state.crashed) {
+      return (
+        <View style={{ height: 170, justifyContent: "center", alignItems: "center" }}>
+          <Text style={{ color: "#94A3B8", fontSize: 12 }}>
+            {this.props.t?.("vendor.chartUnavailable") || "Chart unavailable"}
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
   const { token, user } = useAuthStore();
   const { t } = useTranslation();
@@ -1261,45 +1283,47 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             </View>
           </View>
 
-          {stats.labels?.length && stats.chartValues?.some(v => isFinite(v)) ? (
-            <LineChart
-              data={{
-                labels: stats.labels,
-                datasets: [
-                  { data: stats.chartValues.map(v => isFinite(Number(v)) ? Number(v) : 0) },
-                ],
-              }}
-              width={chartW}
-              height={rs(150, 170, 185)}
-              yAxisSuffix="₹"
-              chartConfig={{
-                backgroundGradientFrom: C.surface,
-                backgroundGradientTo: C.surface,
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(14, 230, 39, ${opacity})`,
-                labelColor: () => C.textLight,
-                propsForDots: {
-                  r: "5",
-                  strokeWidth: "2",
-                  stroke: C.primary,
-                  fill: C.surface,
-                },
-                propsForBackgroundLines: {
-                  stroke: C.border,
-                  strokeDasharray: "4",
-                },
-              }}
-              bezier
-              style={{ borderRadius: 12, marginTop: 10, marginLeft: -8 }}
-            />
-          ) : (
-            <View style={{ height: rs(150, 170, 185), justifyContent: 'center', alignItems: 'center', marginTop: 10 }}>
-              <ActivityIndicator size="small" color={C.primary} />
-              <Text style={{ color: C.textLight, fontSize: rs(11, 12, 12), marginTop: 8 }}>
-                {t('common.loading') || 'Loading chart...'}
-              </Text>
-            </View>
-          )}
+          <ChartSafeBoundary t={t}>
+            {stats.labels?.length && stats.chartValues?.some(v => isFinite(v)) ? (
+              <LineChart
+                data={{
+                  labels: stats.labels,
+                  datasets: [
+                    { data: stats.chartValues.map(v => isFinite(Number(v)) ? Number(v) : 0) },
+                  ],
+                }}
+                width={chartW}
+                height={rs(150, 170, 185)}
+                yAxisSuffix="₹"
+                chartConfig={{
+                  backgroundGradientFrom: C.surface,
+                  backgroundGradientTo: C.surface,
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => `rgba(14, 230, 39, ${opacity})`,
+                  labelColor: () => C.textLight,
+                  propsForDots: {
+                    r: "5",
+                    strokeWidth: "2",
+                    stroke: C.primary,
+                    fill: C.surface,
+                  },
+                  propsForBackgroundLines: {
+                    stroke: C.border,
+                    strokeDasharray: "4",
+                  },
+                }}
+                bezier
+                style={{ borderRadius: 12, marginTop: 10, marginLeft: -8 }}
+              />
+            ) : (
+              <View style={{ height: rs(150, 170, 185), justifyContent: 'center', alignItems: 'center', marginTop: 10 }}>
+                <ActivityIndicator size="small" color={C.primary} />
+                <Text style={{ color: C.textLight, fontSize: rs(11, 12, 12), marginTop: 8 }}>
+                  {t('common.loading') || 'Loading chart...'}
+                </Text>
+              </View>
+            )}
+          </ChartSafeBoundary>
         </View>
 
         {/* ── GOAL + EFFICIENCY ─────────────────────────────── */}

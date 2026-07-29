@@ -1684,7 +1684,6 @@ export default function MyOrdersScreen() {
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
-  const [reviewDone, setReviewDone] = useState({}); // { [orderId]: true }
 
   const submitReview = async () => {
     if (reviewRating === 0) {
@@ -1706,10 +1705,10 @@ export default function MyOrdersScreen() {
       });
       const data = await res.json();
       if (data.success) {
-        setReviewDone((prev) => ({ ...prev, [reviewOrder.id]: true }));
         setReviewOrder(null);
         setReviewRating(0);
         setReviewComment("");
+        fetchOrders(true);
         Alert.alert("Thank you!", "Your review has been submitted.");
       }
     } catch (e) {
@@ -2047,7 +2046,7 @@ export default function MyOrdersScreen() {
                 setReviewRating(0);
                 setReviewComment("");
               }}
-              alreadyRated={!!reviewDone[order.id]}
+              alreadyRated={!!order.has_reviewed}
               onReorder={() => handleReorder(order)}
               onDownloadInvoice={() => handleDownloadInvoice(order)}
               isFirstDelivered={order.id === firstDeliveredId}

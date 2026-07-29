@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Animated, PanResponder, Dimensions,
-  StatusBar, Platform,
+  StatusBar, Platform, Pressable, Modal, TextInput,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -817,6 +817,12 @@ export default function ActiveDeliveryScreen({ navigation }) {
   const [step, setStep]                       = useState(0);
   const socketRef = useRef(null);
 
+  // Partner review customer
+  const [partnerReviewOrder, setPartnerReviewOrder] = useState(null);
+  const [partnerReviewRating, setPartnerReviewRating] = useState(0);
+  const [partnerReviewComment, setPartnerReviewComment] = useState("");
+  const [partnerReviewLoading, setPartnerReviewLoading] = useState(false);
+
 
   // -- AsyncStorage helpers: persist the local UI step per delivery --
   const STEP_KEY = (id) => `delivery_step_${id}`;
@@ -1079,7 +1085,10 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
           if (activeOrder?.id) await clearStep(activeOrder.id);
           setDeliveryCount(c => c + 1);
           setEarnings(e => e + (activeOrder?.deliveryFee || 65));
-          setTimeout(() => { setActiveOrder(null); setStep(0); fetchOrders(); }, 800);
+          // Show rating modal for customer
+          setPartnerReviewOrder(activeOrder);
+          setPartnerReviewRating(0);
+          setPartnerReviewComment("");
           return;
         }
       } catch (e) { Alert.alert('Error', 'Network error'); return; }
@@ -1223,6 +1232,180 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
           </>
         )}
       </ScrollView>
+
+      {/* â”€â”€ PARTNER REVIEW CUSTOMER MODAL â”€â”€ */}
+      <Modal
+        visible={!!partnerReviewOrder}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPartnerReviewOrder(null)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "flex-end",
+          }}
+          onPress={() => setPartnerReviewOrder(null)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 24,
+              paddingBottom: 40,
+            }}
+            onPress={() => {}}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 4,
+                backgroundColor: "#E2E8F0",
+                borderRadius: 2,
+                alignSelf: "center",
+                marginBottom: 20,
+              }}
+            />
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "900",
+                color: "#111827",
+                marginBottom: 4,
+              }}
+            >
+              Rate Customer
+            </Text>
+            <Text style={{ fontSize: 13, color: "#6B7280", marginBottom: 20 }}>
+              {partnerReviewOrder?.customerName || "Customer"}
+            </Text>
+
+            {/* Star picker */}
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 10,
+                marginBottom: 20,
+                justifyContent: "center",
+              }}
+            >
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity
+                  key={star}
+                  onPress={() => setPartnerReviewRating(star)}
+                >
+                  <Text
+                    style={{
+                      fontSize: 36,
+                      opacity: star <= partnerReviewRating ? 1 : 0.25,
+                    }}
+                  >
+                    ⭐
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Comment input */}
+            <TextInput
+              style={{
+                backgroundColor: "#F3F4F6",
+                borderRadius: 12,
+                padding: 14,
+                fontSize: 14,
+                color: "#111827",
+                minHeight: 80,
+                textAlignVertical: "top",
+                marginBottom: 20,
+                borderWidth: 1,
+                borderColor: "#E5E7EB",
+              }}
+              placeholder="Tell us about the customer experience (optional)"
+              placeholderTextColor="#9CA3AF"
+              multiline
+              value={partnerReviewComment}
+              onChangeText={setPartnerReviewComment}
+            />
+
+            <TouchableOpacity
+              onPress={async () => {
+                if (partnerReviewRating === 0) {
+                  Alert.alert("Please select a rating");
+                  return;
+                }
+                setPartnerReviewLoading(true);
+                try {
+                  const res = await fetch(
+                    `${API_BASE}/orders/${partnerReviewOrder.orderIdRaw}/partner-review`,
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify({
+                        partner_review_rating: partnerReviewRating,
+                        partner_review_comment: partnerReviewComment,
+                      }),
+                    }
+                  );
+                  const data = await res.json();
+                  if (data.success) {
+                    setPartnerReviewOrder(null);
+                    setPartnerReviewRating(0);
+                    setPartnerReviewComment("");
+                  }
+                } catch (e) {
+                  console.log("Partner review error", e);
+                } finally {
+                  setPartnerReviewLoading(false);
+                }
+                // Clear the active order after review attempt
+                setActiveOrder(null);
+                setStep(0);
+                fetchOrders();
+              }}
+              disabled={partnerReviewLoading}
+              style={{
+                backgroundColor: partnerReviewLoading ? "#E5E7EB" : "#2E7D32",
+                borderRadius: 14,
+                padding: 16,
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{
+                  color: "#fff",
+                  fontSize: 16,
+                  fontWeight: "800",
+                }}
+              >
+                {partnerReviewLoading ? "Submitting..." : "Submit Review"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                setPartnerReviewOrder(null);
+                setActiveOrder(null);
+                setStep(0);
+                fetchOrders();
+              }}
+              style={{
+                alignItems: "center",
+                paddingVertical: 12,
+                marginTop: 8,
+              }}
+            >
+              <Text style={{ color: "#6B7280", fontSize: 14, fontWeight: "600" }}>
+                Skip
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </>
   );
 }

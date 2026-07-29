@@ -367,8 +367,9 @@ export default function DeliveryHomeScreen({ navigation }) {
     ? `${Math.round(totalDistanceKm)} km`
     : '—';
 
-  const displayRating = rating != null && rating > 0
-    ? `${Number(rating).toFixed(1)} ★`
+  const totalRatings = stats?.totalRatings ?? 0;
+  const displayRating = totalRatings > 0
+    ? `${Number(rating || 0).toFixed(1)} ★`
     : '— ★';
 
   const displayEarnings = todayEarnings.toLocaleString('en-IN', {
