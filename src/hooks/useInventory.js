@@ -200,14 +200,14 @@ export default function useInventory() {
       p.id === String(productId)
         ? {
             ...p,
-            inventory: { ...(p.inventory || {}), stock_qty: available ? 1 : 0 },
-            rawStock: available ? 1 : 0,
+            is_active: available,
+            status: available ? "Available" : "Unavailable",
           }
         : p
     )
   );
   try {
-    await inventoryService.toggleAvailability(token, productId, available, vendorId);
+    await inventoryService.toggleAvailability(token, productId, available);
   } catch (err) {
     console.error("Toggle failed, reverting:", err.message);
     // Revert
@@ -216,8 +216,8 @@ export default function useInventory() {
         p.id === String(productId)
           ? {
               ...p,
-              inventory: { ...(p.inventory || {}), stock_qty: available ? 0 : 1 },
-              rawStock: available ? 0 : 1,
+              is_active: !available,
+              status: !available ? "Available" : "Unavailable",
             }
           : p
       )

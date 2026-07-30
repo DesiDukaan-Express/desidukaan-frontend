@@ -622,7 +622,6 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
         subcategoryName: editing.subcategory || "",
         barcode:        editing.barcode      || "",
         brand:          editing.brand        || "",
-        stock:          String(editing.rawStock || 0),
         price:          String(editing.price    || 0),
         mrp:            String(editing.mrp     || ""),
         selling_price:  String(editing.selling_price || ""),
@@ -634,7 +633,7 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
     : {
         name: "", description: "", categoryName: "", subcategoryId: null,
         subcategoryName: "", barcode: "", brand: "", unit: "kg",
-        stock: "", price: "", mrp: "", selling_price: "",
+        price: "", mrp: "", selling_price: "",
         type: "packed", weight_options: [], image_url: "",
       };
 
@@ -740,8 +739,8 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
   };
 
   const handleSubmit = async () => {
-    if (!form.name.trim() || !form.stock.trim() || !form.price.trim()) {
-      setErr("Name, Stock and Price are required.");
+    if (!form.name.trim() || !form.price.trim()) {
+      setErr("Name and Price are required.");
       return;
     }
     if (!selectedTopCat) {
@@ -940,18 +939,9 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
 
             <View style={s.divider} />
 
-            {/* Stock & Pricing */}
+            {/* Pricing */}
             <View style={s.section}>
               <View style={s.row}>
-                <Field
-                  label="Stock"
-                  required
-                  style={{ flex: 1 }}
-                  value={form.stock}
-                  onChangeText={(v) => set("stock", v)}
-                  placeholder="e.g. 45"
-                  keyboardType="numeric"
-                />
                 <Field
                   label="Selling Price (₹)"
                   required
@@ -961,16 +951,16 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
                   placeholder="e.g. 40"
                   keyboardType="numeric"
                 />
+                <Field
+                  label="MRP (₹)"
+                  style={{ marginTop: 12 }}
+                  value={form.mrp}
+                  onChangeText={(v) => set("mrp", v)}
+                  placeholder="e.g. 50"
+                  keyboardType="numeric"
+                />
+                </View>
               </View>
-              <Field
-                label="MRP (₹)"
-                style={{ marginTop: 12 }}
-                value={form.mrp}
-                onChangeText={(v) => set("mrp", v)}
-                placeholder="e.g. 50"
-                keyboardType="numeric"
-              />
-            </View>
 
             {/* Barcode */}
             <View style={[s.section, { marginTop: 0 }]}>

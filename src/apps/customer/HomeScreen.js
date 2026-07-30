@@ -609,7 +609,7 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
 
   const vendorsWithItem = vendors.filter((v) =>
     v._inventory?.some(
-      (inv) => inv.product?.id === item.id && inv.stock_qty > 0,
+      (inv) => inv.product?.id === item.id && (inv.is_active ?? true),
     ),
   );
 
@@ -2329,7 +2329,7 @@ export default function HomeScreen() {
     const items = [];
     vendors.forEach((v) => {
       (v._inventory || []).forEach((inv) => {
-        if (inv.stock_qty > 0 && inv.product) {
+        if ((inv.is_active ?? true) && inv.product) {
           items.push({ ...inv, _vendorId: v.id, _vendorName: v.shop_name });
         }
       });

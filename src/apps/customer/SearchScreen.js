@@ -304,7 +304,7 @@ function ProductCard({ product, vendorId, vendorName, onSeeStores }) {
     product.mrp && product.mrp > product.price
       ? Math.round((1 - product.price / product.mrp) * 100)
       : null;
-  const outOfStock = product.stock_qty != null && product.stock_qty <= 0;
+  const outOfStock = !(product.is_active ?? true);
 
   return (
     <View style={[pc.card, outOfStock && pc.cardOos]}>
@@ -1249,7 +1249,7 @@ export default function SearchScreen() {
               const p = inv.product;
               if (!p) continue;
               const key = p.name?.toLowerCase() || p.id;
-              const inStock = inv.stock_qty > 0;
+              const inStock = inv.is_active ?? true;
               const existing = productMap.get(key);
               // Prefer in-stock over OOS; among same stock status, prefer cheapest
               if (
@@ -1261,7 +1261,7 @@ export default function SearchScreen() {
                   ...p,
                   vendor_id: vendor.id,
                   vendor: vendor,
-                  stock_qty: inv.stock_qty,
+                  is_active: inv.is_active,
                   _inStock: inStock,
                   _allVendorIds: existing?._allVendorIds || [],
                 });
@@ -1281,12 +1281,12 @@ export default function SearchScreen() {
             const p = inv.product;
             if (!p) continue;
             const key = p.name?.toLowerCase() || p.id;
-            if (!productMap.has(key) && inv.stock_qty <= 0) {
+            if (!productMap.has(key) && !(inv.is_active ?? true)) {
               productMap.set(key, {
                 ...p,
                 vendor_id: vendor.id,
                 vendor,
-                stock_qty: inv.stock_qty,
+                is_active: inv.is_active,
                 _inStock: false,
                 _allVendorIds: [vendor.id],
               });

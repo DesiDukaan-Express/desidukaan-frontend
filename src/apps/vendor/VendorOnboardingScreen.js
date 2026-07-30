@@ -171,9 +171,9 @@ const EMPTY_PRODUCT = {
   stock: '', type: 'loose', weight_options: [],
 };
 
-const SAMPLE_CSV = `name,mrp,sp,unit,category,stock_qty,type
-Loose Basmati Rice,85,80,kg,Grocery,100,loose
-Amul Milk 500ml,30,28,litre,Dairy,50,packed`;
+const SAMPLE_CSV = `name,mrp,sp,unit,category,type
+Loose Basmati Rice,85,80,kg,Grocery,loose
+Amul Milk 500ml,30,28,litre,Dairy,packed`;
 
 // ─── Auto-geocode helper ──────────────────────────────────────────────────────
 // Converts pincode + city → lat/lng using Nominatim (free, no API key needed)
@@ -582,7 +582,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
             unit: product.unit || 'kg',
             category: product.category?.name || product.cat || currentCategory?.name || '',
             category_id: product.category_id || currentCategory?.id,
-            stock_qty: parseInt(product.stock || product.stock_qty || 0),
+            stock_qty: parseInt(product.stock || 0),
             type: product.item_type || product.type || 'packed',
             image_url: product.image_url || product.image || null,
             weight_options: (() => {
@@ -1307,9 +1307,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
                       <Text style={styles.inventoryMrp}>MRP ₹{product.mrp}</Text>
                       <Text style={styles.inventoryPrice}>SP ₹{product.sp || product.price}</Text>
                       <Text style={styles.inventoryStock}>
-                        {(product.stock || product.stock_qty) > 0
-                          ? `${product.stock || product.stock_qty} in stock`
-                          : 'Stock not set'}
+                        {product.is_active !== false ? "Available" : "Unavailable"}
                       </Text>
                     </View>
                   </View>

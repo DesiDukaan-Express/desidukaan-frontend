@@ -46,37 +46,6 @@ const TEXT = "#18181B";
 const TEXT_LIGHT = "#71717A";
 const TEXT_XLIGHT = "#A1A1AA";
 
-function stockStatus(product) {
-  const qty = product.inventory?.stock_qty ?? product.stock_qty ?? 0;
-  const threshold =
-    product.inventory?.low_stock_threshold ?? product.low_stock_threshold ?? 5;
-  if (qty === 0) return "outofstock";
-  if (qty <= threshold) return "lowstock";
-  return "instock";
-}
-
-function stockColor(status) {
-  if (status === "outofstock") return RED;
-  if (status === "lowstock") return ORANGE;
-  return GREEN;
-}
-
-function stockLabel(status) {
-  if (status === "outofstock") return "Out of Stock";
-  if (status === "lowstock") return "Low Stock";
-  return "In Stock";
-}
-
-function stockQty(product) {
-  return product.inventory?.stock_qty ?? product.stock_qty ?? 0;
-}
-
-function stockMax(product) {
-  const threshold =
-    product.inventory?.low_stock_threshold ?? product.low_stock_threshold ?? 5;
-  // Use a generous max for progress bar — at least 20, or 4× threshold
-  return Math.max(20, threshold * 4, stockQty(product) * 1.2);
-}
 
 const getCategoryIcon = (catName) => {
   const name = String(catName || "").toLowerCase();
@@ -126,7 +95,7 @@ function ProductCard({
   onPressMenu,
 }) {
   const { t } = useTranslation();
-  const isAvailable = (product.inventory?.stock_qty ?? product.stock_qty ?? 0) > 0;
+  const isAvailable = product.is_active ?? true;
 
   return (
     <View style={[s.card, !isAvailable && s.cardUnavailable]}>
@@ -166,9 +135,6 @@ function ProductCard({
         {/* Price & Unit */}
         <Text style={[s.cardPrice, !isAvailable && { color: TEXT_XLIGHT }]}>
           ₹{product.price} / {product.unit}
-        </Text>
-        <Text style={[s.cardStock, !isAvailable && { color: TEXT_XLIGHT }]}>
-          Stock: {stockQty(product)} {product.unit}
         </Text>
 
         {/* Toggle Availability Switch */}
@@ -279,8 +245,7 @@ export default function InventoryScreen() {
   };
 
   const handleToggleAvailability = (product) => {
-    const currentQty = product.inventory?.stock_qty ?? product.stock_qty ?? 0;
-    const isCurrentlyAvailable = currentQty > 0;
+    const isCurrentlyAvailable = product.is_active ?? true;
     setConfirmSheet({ product, makingAvailable: !isCurrentlyAvailable });
   };
 
@@ -332,10 +297,7 @@ export default function InventoryScreen() {
       data = [...data].sort((a, b) => {
         let av = a[inv.sortKey];
         let bv = b[inv.sortKey];
-        if (inv.sortKey === "stock") {
-          av = a.rawStock ?? 0;
-          bv = b.rawStock ?? 0;
-        }
+
         if (typeof av === "number" && typeof bv === "number") {
           return inv.sortDir === "asc" ? av - bv : bv - av;
         }
@@ -364,10 +326,7 @@ export default function InventoryScreen() {
       data = [...data].sort((a, b) => {
         let av = a[inv.sortKey];
         let bv = b[inv.sortKey];
-        if (inv.sortKey === "stock") {
-          av = a.rawStock ?? 0;
-          bv = b.rawStock ?? 0;
-        }
+
         if (typeof av === "number" && typeof bv === "number") {
           return inv.sortDir === "asc" ? av - bv : bv - av;
         }
@@ -474,8 +433,7 @@ export default function InventoryScreen() {
               {[
                 { label: t('vendor.priceLowHigh'), key: "price", dir: "asc" },
                 { label: t('vendor.priceHighLow'), key: "price", dir: "desc" },
-                { label: t('vendor.stockLowHigh'), key: "stock", dir: "asc" },
-                { label: t('vendor.stockHighLow'), key: "stock", dir: "desc" },
+
               ].map((opt) => {
                 const active = inv.sortKey === opt.key && inv.sortDir === opt.dir;
                 return (
@@ -580,8 +538,7 @@ export default function InventoryScreen() {
               {[
                 { label: t('vendor.priceLowHigh'), key: "price", dir: "asc" },
                 { label: t('vendor.priceHighLow'), key: "price", dir: "desc" },
-                { label: t('vendor.stockLowHigh'), key: "stock", dir: "asc" },
-                { label: t('vendor.stockHighLow'), key: "stock", dir: "desc" },
+
               ].map((opt) => {
                 const active = inv.sortKey === opt.key && inv.sortDir === opt.dir;
                 return (
