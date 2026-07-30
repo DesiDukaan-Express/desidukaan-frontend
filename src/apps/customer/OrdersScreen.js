@@ -22,6 +22,7 @@ import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import { TextInput, Alert } from "react-native";
+import { useTranslation } from "react-i18next";
 
 const SOCKET_URL =
   process.env.EXPO_PUBLIC_SOCKET_URL ||
@@ -431,6 +432,7 @@ const dlm = StyleSheet.create({
 
 // ─── Order Detail Modal ───────────────────────────────────────────────────────
 function OrderDetailModal({ order, onClose }) {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const { token } = useAuthStore();
   const [fullOrder, setFullOrder] = useState(null);
@@ -1338,6 +1340,7 @@ const formatCardDate = (iso) => {
 
 
 function OrderCard({ order, onPress, onRate, alreadyRated, onReorder, onDownloadInvoice, isFirstDelivered }) {
+  const { t } = useTranslation();
   const st = getStatus(order.status);
   const stepIdx = stepIndex(order.status);
   const items = order.order_items || order.items || [];
@@ -1359,16 +1362,18 @@ function OrderCard({ order, onPress, onRate, alreadyRated, onReorder, onDownload
     } else {
       statusTitle = "Delivered";
     }
+    const mins = order.delivery_time_mins || (10 + (order.id % 15));
+    statusTitle = t('orders.arrivedInMins', { mins, defaultValue: `Arrived in ${mins} minutes` });
   } else if (order.status === "picked_up") {
-    statusTitle = "Arriving soon / Out for delivery";
+    statusTitle = t('orders.arrivingSoon', 'Arriving soon / Out for delivery');
   } else if (order.status === "preparing") {
-    statusTitle = "Preparing in shop";
+    statusTitle = t('orders.preparingInShop', 'Preparing in shop');
   } else if (order.status === "ready") {
-    statusTitle = "Ready for pickup";
+    statusTitle = t('orders.readyForPickup', 'Ready for pickup');
   } else if (order.status === "accepted") {
-    statusTitle = "Order accepted";
+    statusTitle = t('orders.orderAccepted', 'Order accepted');
   } else if (order.status === "pending") {
-    statusTitle = "Order placed";
+    statusTitle = t('orders.orderPlaced', 'Order placed');
   }
 
   let iconBg = C.greenLight;
@@ -1441,7 +1446,7 @@ function OrderCard({ order, onPress, onRate, alreadyRated, onReorder, onDownload
             <Feather name="clock" size={12} color={C.orange} />
             <Text style={oc.etaChipText}>{etaLabel}</Text>
             {distKm != null && (
-              <Text style={oc.etaDistText}>· {distKm} km</Text>
+              <Text style={oc.etaDistText}>· {t('orders.kmAway', { dist: distKm, defaultValue: `${distKm} km` })}</Text>
             )}
           </View>
         </View>
@@ -1491,11 +1496,11 @@ function OrderCard({ order, onPress, onRate, alreadyRated, onReorder, onDownload
           <>
             {showDownloadInvoice ? (
               <TouchableOpacity style={oc.actionBtn} onPress={onDownloadInvoice} activeOpacity={0.7}>
-                <Text style={oc.actionBtnText}>Download invoice</Text>
+                <Text style={oc.actionBtnText}>{t('orders.downloadInvoice', 'Download invoice')}</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity style={oc.actionBtn} onPress={onReorder} activeOpacity={0.7}>
-                <Text style={oc.actionBtnText}>Reorder</Text>
+                <Text style={oc.actionBtnText}>{t('orders.reorder', 'Reorder')}</Text>
               </TouchableOpacity>
             )}
             
@@ -1507,7 +1512,7 @@ function OrderCard({ order, onPress, onRate, alreadyRated, onReorder, onDownload
               activeOpacity={alreadyRated ? 1 : 0.7}
             >
               <Text style={[oc.actionBtnText, alreadyRated && { color: C.gray400 }]}>
-                {alreadyRated ? "Rated ⭐" : "Rate order"}
+                {alreadyRated ? t('orders.rated', 'Rated ⭐') : t('orders.rateOrder', 'Rate order')}
               </Text>
             </TouchableOpacity>
           </>
@@ -1516,18 +1521,18 @@ function OrderCard({ order, onPress, onRate, alreadyRated, onReorder, onDownload
             {["accepted", "preparing", "ready", "picked_up"].includes(order.status) &&
             (order.delivery_partner_id || order.delivery_partner) ? (
               <TouchableOpacity style={oc.actionBtn} onPress={onPress} activeOpacity={0.7}>
-                <Text style={oc.actionBtnText}>Track Order</Text>
+                <Text style={oc.actionBtnText}>{t('orders.trackOrder', 'Track Order')}</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity style={oc.actionBtn} onPress={onPress} activeOpacity={0.7}>
-                <Text style={oc.actionBtnText}>View Details</Text>
+                <Text style={oc.actionBtnText}>{t('orders.viewDetails', 'View Details')}</Text>
               </TouchableOpacity>
             )}
             
             <View style={oc.actionDivider} />
 
             <TouchableOpacity style={oc.actionBtn} onPress={onPress} activeOpacity={0.7}>
-              <Text style={oc.actionBtnText}>Support</Text>
+              <Text style={oc.actionBtnText}>{t('orders.support', 'Support')}</Text>
             </TouchableOpacity>
           </>
         )}
@@ -1669,6 +1674,7 @@ const oc = StyleSheet.create({
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function MyOrdersScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const { token } = useAuthStore();
   const { addItem, updateQty, clearCart } = useCartStore();
@@ -1898,7 +1904,7 @@ export default function MyOrdersScreen() {
         >
           <Feather name="arrow-left" size={20} color={C.gray800} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Order History</Text>
+        <Text style={s.headerTitle}>{t('orders.myOrders') || 'Order History'}</Text>
         <TouchableOpacity
           style={s.refreshBtn}
           onPress={() => fetchOrders(true)}
@@ -1914,7 +1920,7 @@ export default function MyOrdersScreen() {
           <Feather name="search" size={18} color={C.gray400} style={s.searchIcon} />
           <TextInput
             style={s.searchInput}
-            placeholder="Search your grocery orders"
+            placeholder={t('orders.searchPlaceholder', 'Search your grocery orders')}
             placeholderTextColor={C.gray400}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -1931,9 +1937,9 @@ export default function MyOrdersScreen() {
       {/* TABS */}
       <View style={s.tabs}>
         {[
-          { key: "all", label: "All", count: orders.length },
-          { key: "active", label: "Active", count: activeCount },
-          { key: "past", label: "Past", count: pastCount },
+          { key: "all", label: t('orders.tabAll', 'All'), count: orders.length },
+          { key: "active", label: t('orders.active', 'Active'), count: activeCount },
+          { key: "past", label: t('orders.past', 'Past'), count: pastCount },
         ].map((tab) => (
           <TouchableOpacity
             key={tab.key}
@@ -1971,7 +1977,7 @@ export default function MyOrdersScreen() {
       {loading ? (
         <View style={s.centered}>
           <ActivityIndicator size="large" color={C.green} />
-          <Text style={s.loadingText}>Fetching your orders…</Text>
+          <Text style={s.loadingText}>{t('orders.fetchingOrders', 'Fetching your orders…')}</Text>
         </View>
       ) : filtered.length === 0 ? (
         <View style={s.emptyWrap}>
@@ -1980,10 +1986,10 @@ export default function MyOrdersScreen() {
           </View>
           <Text style={s.emptyTitle}>
             {activeTab === "active"
-              ? "No active orders"
+              ? t('orders.noActiveOrders', 'No active orders')
               : activeTab === "past"
-                ? "No past orders"
-                : "No orders yet"}
+                ? t('orders.noPastOrders', 'No past orders')
+                : t('orders.noOrders', 'No orders yet')}
           </Text>
           <Text style={s.emptySub}>
             {activeTab === "all"
@@ -2253,6 +2259,7 @@ const s = StyleSheet.create({
     color: C.gray900,
     fontWeight: "600",
     padding: 0,
+    outlineStyle: "none",
   },
   clearBtn: {
     padding: 4,

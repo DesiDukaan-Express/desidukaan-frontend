@@ -23,7 +23,6 @@ import { useTranslation } from "react-i18next";
 import useAuthStore from "../../store/authStore";
 import * as ImagePicker from "expo-image-picker";
 import { uploadAPI } from "../../services/api";
-import AccountManagerModal from "../../components/common/AccountManagerModal";
 import LanguageSwitcher from "../../components/common/LanguageSwitcher";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
@@ -76,7 +75,6 @@ export default function VendorProfileScreen() {
   const [editModal, setEditModal]       = useState(false);
   const [logoutModal, setLogoutModal]   = useState(false);
   const [categoryModal, setCategoryModal] = useState(false);
-  const [showAccountManager, setShowAccountManager] = useState(false);
 
   // Edit fields
   const [activeField, setActiveField] = useState("");
@@ -455,8 +453,7 @@ export default function VendorProfileScreen() {
                 isWide={isWide}
                 t={t}
               />
-
-              <AccountSettingsCard rs={rs} isWide={isWide} onPressManage={() => setShowAccountManager(true)} />
+              <AccountSettingsCard rs={rs} isWide={isWide} />
               <LogoutButton onPress={() => setLogoutModal(true)} rs={rs} isWide={isWide} t={t} />
             </View>
           </View>
@@ -483,7 +480,7 @@ export default function VendorProfileScreen() {
               isWide={isWide}
               t={t}
             />
-            <AccountSettingsCard rs={rs} isWide={isWide} onPressManage={() => setShowAccountManager(true)} />
+            <AccountSettingsCard rs={rs} isWide={isWide} />
             <LogoutButton onPress={() => setLogoutModal(true)} rs={rs} isWide={isWide} t={t} />
           </View>
         )}
@@ -748,10 +745,6 @@ export default function VendorProfileScreen() {
           ))}
         </View>
       </Modal>
-      <AccountManagerModal
-        visible={showAccountManager}
-        onClose={() => setShowAccountManager(false)}
-      />
     </View>
   );
 }
@@ -1133,12 +1126,11 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
   );
 }
 
-function AccountSettingsCard({ rs, isWide, onPressManage }) {
+function AccountSettingsCard({ rs, isWide }) {
   const { t } = useTranslation();
   const [showLanguage, setShowLanguage] = React.useState(false);
 
   const items = [
-    { icon: "switch-account", label: "Manage Accounts", sub: "Switch profile or link accounts", color: "#6366F1", bg: "#EEF2FF", action: "manage" },
     { icon: "account-balance", label: t('profile.bankAccount'), sub: t('profile.bankAccountSub'), color: "#059669", bg: "#ECFDF5" },
     { icon: "payments", label: t('profile.payoutSettings'), sub: t('profile.payoutSettingsSub'), color: C.blue, bg: C.blueDim },
     { icon: "verified-user", label: t('profile.kycVerification'), sub: t('profile.kycVerificationSub'), color: "#7C3AED", bg: "#EDE9FE", right: t('profile.verified') },
@@ -1172,7 +1164,6 @@ function AccountSettingsCard({ rs, isWide, onPressManage }) {
           key={item.label}
           style={[styles.settingRow, i === items.length - 1 && { borderBottomWidth: 0 }]}
           activeOpacity={0.6}
-          onPress={() => item.action === "manage" ? onPressManage() : null}
         >
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
             <View style={[styles.settingIconBox, { backgroundColor: item.bg }]}>
@@ -1199,14 +1190,21 @@ function AccountSettingsCard({ rs, isWide, onPressManage }) {
         onRequestClose={() => setShowLanguage(false)}
       >
         <Pressable
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}
           onPress={() => setShowLanguage(false)}
         >
           <Pressable
-            style={{ backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48 }}
-            onPress={() => {}}
+            style={{
+              backgroundColor: C.surface,
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              padding: 24,
+              paddingBottom: 40,
+              maxHeight: '80%',
+            }}
+            onPress={(e) => e.stopPropagation?.()}
           >
-            <View style={{ width: 40, height: 4, backgroundColor: '#E5E7EB', borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
+            <View style={{ width: 44, height: 5, backgroundColor: '#E5E7EB', borderRadius: 3, alignSelf: 'center', marginBottom: 16 }} />
             <LanguageSwitcher inline onClose={() => setShowLanguage(false)} />
           </Pressable>
         </Pressable>

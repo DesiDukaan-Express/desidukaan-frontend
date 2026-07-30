@@ -11,6 +11,7 @@ import { io } from "socket.io-client";
 import useCartStore    from "../../store/cartStore";
 import useAuthStore    from "../../store/authStore";
 import useAddressStore from "../../store/addressStore";
+import { useTranslation } from "react-i18next";
 
 const BASE_URL   = process.env.EXPO_PUBLIC_API_URL    || "http://localhost:3000/api";
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
@@ -125,6 +126,7 @@ const fm = StyleSheet.create({
 
 // ═══════════════════════════════════════════════════════════════════════════ //
 export default function CartScreen() {
+  const { t }        = useTranslation();
   const navigation   = useNavigation();
   const cart         = useCartStore();
   const { token }    = useAuthStore();
@@ -138,8 +140,50 @@ export default function CartScreen() {
   const [loadingInfo,      setLoadingInfo]      = useState(false);
 
   const subtotal   = items.reduce((s, i) => s + i.price * (i.qty || i.quantity || 0), 0);
-  const activeFee  = deliveryInfo?.delivery_fee ?? 30;
+  const activeFee  = deliveryInfo?.delivery_fee ?? "failed to fetch";
   const grandTotal = subtotal + activeFee;
+
+  //   ─── Fetch real delivery fee as soon as Cart loads ─────────────────────────────────────────
+  // Triggers whenever address selection, coordinates, or subtotal changes
+
+  useEffect(() => {
+    if (!vendorId) return;
+
+    // Get the customer's default/selected address from local memory
+    const saved = (addressStore?.addresses || []).find(a => a.id === addressStore?.selectedId);
+    if (!saved?.lat || !saved?.lng) return; // Skip if they haven't saved a real address yet
+
+    const ctrl = new AbortController();
+    setLoadingInfo(true);
+    
+    (async () => {
+      try {
+        const queryParamsObj = {
+          vendor_id: vendorId,
+          customer_lat: saved.lat,
+          customer_lng: saved.lng,
+          subtotal: subtotal,
+        };
+        const params = new URLSearchParams(queryParamsObj);
+        const res = await fetch(`${BASE_URL}/slots/delivery-info?${params}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          signal: ctrl.signal,
+        });
+        const json = await res.json();
+        
+        if (res.ok && json.data) {
+          setDeliveryInfo(json.data); 
+        }
+      } catch (e) {
+        if (e.name !== 'AbortError') console.error('cart delivery-info fetch failed:', e.message);
+      } finally {
+        // setLoadingInfo(false);
+      }
+    })();
+
+    return () => ctrl.abort();
+  }, [vendorId, addressStore?.selectedId, subtotal, token]);
+
 
   // Qty helpers ────────────────────────────────────────────────────────────
   const handleIncrease = useCallback((item) => {
@@ -182,15 +226,15 @@ export default function CartScreen() {
           <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
             <Feather name="arrow-left" size={20} color={C.gray900} />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>My Cart</Text>
+          <Text style={s.headerTitle}>{t('cart.title')}</Text>
         </View>
         <View style={s.emptyWrap}>
           <Text style={s.emptyEmoji}>🛒</Text>
-          <Text style={s.emptyTitle}>Your cart is empty</Text>
-          <Text style={s.emptySub}>Add items from a store to get started</Text>
+          <Text style={s.emptyTitle}>{t('cart.empty')}</Text>
+          <Text style={s.emptySub}>{t('cart.emptySubtitle')}</Text>
           <TouchableOpacity style={s.shopBtn} onPress={() => navigation.goBack()} activeOpacity={0.85}>
             <LinearGradient colors={[C.orange, C.green]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.shopBtnGrad}>
-              <Text style={s.shopBtnText}>Browse Stores</Text>
+              <Text style={s.shopBtnText}>{t('cart.browseStores') || 'Browse Stores'}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -211,7 +255,7 @@ export default function CartScreen() {
           <Feather name="arrow-left" size={20} color={C.gray900} />
         </TouchableOpacity>
         <View style={s.headerMid}>
-          <Text style={[s.headerTitle, { fontSize: Math.round(20 * fs) }]}>My Cart</Text>
+          <Text style={[s.headerTitle, { fontSize: Math.round(20 * fs) }]}>{t('cart.title')}</Text>
           <Text style={[s.headerSub, { fontSize: Math.round(12 * fs) }]}>{vendorName}</Text>
         </View>
         <View style={s.headerBadge}>
@@ -241,7 +285,7 @@ export default function CartScreen() {
                   <Feather name="shopping-bag" size={20} color={C.white} />
                 </View>
                 <View>
-                  <Text style={s.orderingFrom}>Ordering from</Text>
+                  <Text style={s.orderingFrom}>{t('cart.orderingFrom') || 'Ordering from'}</Text>
                   <Text style={s.vendorNameText}>{vendorName}</Text>
                 </View>
               </View>
@@ -328,7 +372,7 @@ export default function CartScreen() {
             <View style={[s.proceedBar, { paddingHorizontal: px }]}>
               <View>
                 <Text style={[s.proceedTotal, { fontSize: Math.round(20 * fs) }]}>₹{grandTotal}</Text>
-                <Text style={[s.proceedSub, { fontSize: Math.round(11 * fs) }]}>total</Text>
+                <Text style={[s.proceedSub, { fontSize: Math.round(11 * fs) }]}>{t('cart.total')}</Text>
               </View>
 
               <TouchableOpacity 
@@ -341,7 +385,7 @@ export default function CartScreen() {
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                   style={[s.proceedGrad, { borderRadius: Math.round(14 * fs) }]}
                 >
-                  <Text style={[s.proceedText, { fontSize: Math.round(15 * fs) }]}>Proceed to checkout</Text>
+                  <Text style={[s.proceedText, { fontSize: Math.round(15 * fs) }]}>{t('cart.proceedToCheckout') || 'Proceed to checkout'}</Text>
                   <Feather name="arrow-right" size={16} color={C.white} />
                 </LinearGradient>
               </TouchableOpacity>
@@ -355,7 +399,7 @@ export default function CartScreen() {
 
             {/* Bill card */}
             <View style={[s.billCard, s.billCardSide]}>
-              <Text style={s.sideCardTitle}>Order Summary</Text>
+              <Text style={s.sideCardTitle}>{t('cart.orderSummary') || 'Order Summary'}</Text>
               <BillSummary
                 subtotal={subtotal}
                 activeFee={activeFee}
@@ -372,7 +416,7 @@ export default function CartScreen() {
               style={s.proceedBtnSide}
             >
               <LinearGradient colors={[C.green, C.greenDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.proceedGradSide}>
-                <Text style={s.proceedTextSide}>Proceed to checkout</Text>
+                <Text style={s.proceedTextSide}>{t('cart.proceedToCheckout') || 'Proceed to checkout'}</Text>
                 <Feather name="arrow-right" size={18} color={C.white} />
               </LinearGradient>
             </TouchableOpacity>
@@ -389,24 +433,25 @@ export default function CartScreen() {
 
 // ─── BillSummary (shared between inline and sidebar) ──────────────────────────
 function BillSummary({ subtotal, activeFee, grandTotal, fs = 1 }) {
+  const { t } = useTranslation();
   return (
     <>
       <View style={bs.row}>
-        <Text style={[bs.label, { fontSize: Math.round(14 * fs) }]}>Items total</Text>
+        <Text style={[bs.label, { fontSize: Math.round(14 * fs) }]}>{t('cart.itemsTotal') || 'Items total'}</Text>
         <Text style={[bs.value, { fontSize: Math.round(14 * fs) }]}>₹{subtotal}</Text>
       </View>
       <View style={bs.row}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
-          <Text style={[bs.label, { fontSize: Math.round(14 * fs) }]}>Delivery fee</Text>
+          <Text style={[bs.label, { fontSize: Math.round(14 * fs) }]}>{t('cart.deliveryFee') || 'Delivery fee'}</Text>
         </View>
         {activeFee === 0
-          ? <Text style={[bs.value, { color: C.green, fontSize: Math.round(14 * fs) }]}>FREE</Text>
+          ? <Text style={[bs.value, { color: C.green, fontSize: Math.round(14 * fs) }]}>{t('cart.free') || 'FREE'}</Text>
           : <Text style={[bs.value, { fontSize: Math.round(14 * fs) }]}>₹{activeFee}</Text>}
       </View>
 
       <View style={bs.divider} />
       <View style={bs.row}>
-        <Text style={[bs.grandLabel, { fontSize: Math.round(16 * fs) }]}>Grand total</Text>
+        <Text style={[bs.grandLabel, { fontSize: Math.round(16 * fs) }]}>{t('cart.grandTotal') || 'Grand Total'}</Text>
         <Text style={[bs.grandLabel, { fontSize: Math.round(16 * fs) }]}>₹{grandTotal}</Text>
       </View>
     </>

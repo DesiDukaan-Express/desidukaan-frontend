@@ -26,42 +26,48 @@ export default function LanguageSwitcher({ triggerStyle, triggerTextStyle, inlin
   // ── Inline mode: just render the language grid directly ────────────────────
   if (inline) {
     return (
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <View style={{ maxHeight: 520 }}>
         <View style={[s.header, { marginBottom: 16 }]}>
           <Text style={s.headerTitle}>{t('common.selectLanguage')}</Text>
           {onClose && (
-            <TouchableOpacity style={s.closeBtn} onPress={onClose}>
+            <TouchableOpacity
+              style={s.closeBtn}
+              onPress={onClose}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
               <Text style={s.closeBtnText}>✕</Text>
             </TouchableOpacity>
           )}
         </View>
-        <View style={s.grid}>
-          {LANGUAGES.map((lang) => {
-            const isActive = i18n.language === lang.code;
-            return (
-              <TouchableOpacity
-                key={lang.code}
-                style={[s.langCard, isActive && s.langCardActive]}
-                onPress={() => handleSelect(lang.code)}
-                activeOpacity={0.8}
-              >
-                <Text style={s.langFlag}>{lang.flag}</Text>
-                <Text style={[s.langName, isActive && s.langNameActive]}>
-                  {lang.name}
-                </Text>
-                <Text style={[s.langNative, isActive && s.langNativeActive]}>
-                  {lang.nativeName}
-                </Text>
-                {isActive && (
-                  <View style={s.checkBadge}>
-                    <Text style={s.checkIcon}>✓</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </ScrollView>
+        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+          <View style={s.grid}>
+            {LANGUAGES.map((lang) => {
+              const isActive = i18n.language === lang.code;
+              return (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[s.langCard, isActive && s.langCardActive]}
+                  onPress={() => handleSelect(lang.code)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={s.langFlag}>{lang.flag}</Text>
+                  <Text style={[s.langName, isActive && s.langNameActive]}>
+                    {lang.name}
+                  </Text>
+                  <Text style={[s.langNative, isActive && s.langNativeActive]}>
+                    {lang.nativeName}
+                  </Text>
+                  {isActive && (
+                    <View style={s.checkBadge}>
+                      <Text style={s.checkIcon}>✓</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </View>
     );
   }
 

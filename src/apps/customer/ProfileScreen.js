@@ -14,8 +14,8 @@ import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
-import AccountManagerModal from "../../components/common/AccountManagerModal";
 import LanguageSwitcher from "../../components/common/LanguageSwitcher";
+
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -437,7 +437,6 @@ export default function ProfileScreen() {
 
   const [showLogout, setShowLogout] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
-  const [showAccountManager, setShowAccountManager] = useState(false);
   const [editField, setEditField] = useState(null);
   const [saving, setSaving] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
@@ -571,6 +570,9 @@ export default function ProfileScreen() {
               </View>
               <View style={s.statSep} />
               <View style={s.statItem}>
+                <View style={[s.statIconWrap, { backgroundColor: C.orangeLight }]}>
+                  <Feather name="credit-card" size={13} color={C.orangeDark} />
+                </View>
                 <Text style={s.statNum}>₹150</Text>
                 <Text style={s.statLabel}>{t('profile.credits')}</Text>
               </View>
@@ -710,12 +712,6 @@ export default function ProfileScreen() {
           {/* Account */}
           <SectionLabel title={t('profile.accountSection')} />
           <MenuItem
-            icon="users"
-            label="Manage Accounts"
-            sub="Switch role or link profiles"
-            onPress={() => setShowAccountManager(true)}
-          />
-          <MenuItem
             icon="log-out"
             label={t('profile.logout')}
             onPress={() => setShowLogout(true)}
@@ -750,11 +746,6 @@ export default function ProfileScreen() {
         onConfirm={handleLogout}
         onCancel={() => setShowLogout(false)}
       />
-      <AccountManagerModal
-        visible={showAccountManager}
-        onClose={() => setShowAccountManager(false)}
-      />
-
       {/* Language Picker Modal */}
       <Modal
         visible={showLanguage}
@@ -762,14 +753,26 @@ export default function ProfileScreen() {
         animationType="slide"
         onRequestClose={() => setShowLanguage(false)}
       >
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }} onPress={() => setShowLanguage(false)}>
-          <Pressable style={{ backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 48 }} onPress={() => { }}>
-            <View style={{ width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
-            <LanguageSwitcher inline />
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}
+          onPress={() => setShowLanguage(false)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: C.white,
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              padding: 24,
+              paddingBottom: 40,
+              maxHeight: '80%',
+            }}
+            onPress={(e) => e.stopPropagation?.()}
+          >
+            <View style={{ width: 44, height: 5, backgroundColor: C.gray200, borderRadius: 3, alignSelf: 'center', marginBottom: 16 }} />
+            <LanguageSwitcher inline onClose={() => setShowLanguage(false)} />
           </Pressable>
         </Pressable>
       </Modal>
-
     </SafeAreaView>
   );
 }

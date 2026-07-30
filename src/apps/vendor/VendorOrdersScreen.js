@@ -835,7 +835,18 @@ export default function VendorOrdersScreen() {
   };
   const formatStatus = (status) => {
     if (!status) return "";
-    return status.charAt(0).toUpperCase() + status.slice(1);
+    const keyMap = {
+      pending: t('vendor.statusPending', 'Pending'),
+      accepted: t('vendor.statusAccepted', 'Accepted'),
+      preparing: t('vendor.statusPreparing', 'Preparing'),
+      ready: t('vendor.statusReady', 'Ready'),
+      picked_up: t('vendor.statusPickedUp', 'Picked Up'),
+      delivered: t('vendor.statusDelivered', 'Delivered'),
+      cancelled: t('vendor.statusCancelled', 'Cancelled'),
+      rejected: t('vendor.statusRejected', 'Rejected'),
+      countered: t('vendor.statusCountered', 'Countered'),
+    };
+    return keyMap[status] || (status.charAt(0).toUpperCase() + status.slice(1));
   };
 
   // Groups a flat order array by customer name, sorted by most recent activity
@@ -1336,28 +1347,35 @@ export default function VendorOrdersScreen() {
                         {formatOrderTime(order.created_at)}
                       </Text>
                     </View>
-                    <View style={{ alignItems: "flex-end", gap: 4 }}>
+                    <View style={{ alignItems: "flex-end", gap: 6 }}>
                       <Text style={styles.totalPillText}>₹{order.total}</Text>
-                      {order.delivery_slot && (
-                        <View style={[styles.slotBadge, { marginTop: 0 }]}>
-                          <Text style={styles.slotBadgeText}>
-                            {new Date(
-                              order.delivery_slot.slot_start ||
-                                order.delivery_slot.start,
-                            ).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </Text>
-                        </View>
-                      )}
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: "#ECFDF5",
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 8,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 3,
+                          borderWidth: 1,
+                          borderColor: "#A7F3D0",
+                        }}
+                        onPress={() => {
+                          setSelectedOrder(order);
+                          setModalVisible(true);
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#047857" }}>
+                          {t('vendor.showMore', 'Show More')}
+                        </Text>
+                        <MaterialIcons
+                          name="chevron-right"
+                          size={14}
+                          color="#047857"
+                        />
+                      </TouchableOpacity>
                     </View>
-                    <MaterialIcons
-                      name="chevron-right"
-                      size={18}
-                      color="#9CA3AF"
-                      style={{ marginLeft: 4 }}
-                    />
                   </TouchableOpacity>
                 ))}
             </View>
@@ -1376,7 +1394,7 @@ export default function VendorOrdersScreen() {
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={[styles.requestTitle, { color: "#D97706" }]}>
-                    New Order Request
+                    {t('vendor.requests', 'New Order Request')}
                   </Text>
                   <Text style={styles.requestCustomer}>
                     {item.customer?.name || `Customer #${item.customer_id}`}
@@ -1387,31 +1405,39 @@ export default function VendorOrdersScreen() {
                 </Text>
               </View>
 
-              <View style={styles.requestDetails}>
-                <Text style={styles.slotRange} numberOfLines={1}>
-                  {(item.items || []).map((i) => `${i.quantity}× ${i.product_name}`).join(" · ")}
-                </Text>
+              <View style={[styles.requestDetails, { alignItems: "center", justifyContent: "space-between" }]}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={styles.slotRange} numberOfLines={1}>
+                    {(item.items || []).map((i) => `${i.quantity}× ${i.product_name}`).join(" · ")}
+                  </Text>
+                </View>
                 <Text style={styles.slotDay}>
                   ₹{item.total}
                 </Text>
               </View>
 
-              <View style={styles.requestActions}>
+              <View style={{ marginTop: 10, alignItems: "flex-end" }}>
                 <TouchableOpacity
-                  style={[styles.actionBtn, styles.rejectBtn]}
+                  style={{
+                    backgroundColor: "#ECFDF5",
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 10,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 4,
+                    borderWidth: 1,
+                    borderColor: "#A7F3D0",
+                  }}
                   onPress={() => {
-                    updateOrderStatus(item.id, "rejected");
+                    setSelectedOrder(item);
+                    setModalVisible(true);
                   }}
                 >
-                  <Text style={styles.rejectBtnText}>Reject</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.approveBtn]}
-                  onPress={() => {
-                    updateOrderStatus(item.id, "accepted");
-                  }}
-                >
-                  <Text style={styles.approveBtnText}>Accept</Text>
+                  <Text style={{ fontSize: 13, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#047857" }}>
+                    {t('vendor.showMore', 'Show More')}
+                  </Text>
+                  <MaterialIcons name="chevron-right" size={16} color="#047857" />
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
@@ -1480,8 +1506,11 @@ export default function VendorOrdersScreen() {
                             },
                           ]}
                         >
-                          {req.status.charAt(0).toUpperCase() +
-                            req.status.slice(1)}
+                          {req.status === "approved"
+                            ? t('vendor.statusAccepted', 'Accepted')
+                            : req.status === "rejected"
+                              ? t('vendor.statusRejected', 'Rejected')
+                              : t('vendor.statusPending', 'Pending')}
                         </Text>
                       </View>
                     </View>
@@ -1507,7 +1536,7 @@ export default function VendorOrdersScreen() {
                         onPress={() => handlePhoneRequest(req.id, "rejected")}
                       >
                         <Text style={[styles.rejectBtnText, { fontSize: 12 }]}>
-                          Reject
+                          {t('vendor.reject', 'Reject')}
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -1524,7 +1553,7 @@ export default function VendorOrdersScreen() {
                         onPress={() => handlePhoneRequest(req.id, "approved")}
                       >
                         <Text style={[styles.approveBtnText, { fontSize: 12 }]}>
-                          Approve
+                          {t('vendor.accept', 'Accept')}
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -1569,8 +1598,8 @@ export default function VendorOrdersScreen() {
                   <Text style={styles.slotDay}>
                     {new Date(item.start).toDateString() ===
                     new Date().toDateString()
-                      ? "Today"
-                      : "Tomorrow"}
+                      ? t('vendor.today', 'Today')
+                      : t('vendor.tomorrow', 'Tomorrow')}
                   </Text>
                 </View>
               )}
@@ -1584,7 +1613,7 @@ export default function VendorOrdersScreen() {
                       : handleSlotRequest(item.id, "reject")
                   }
                 >
-                  <Text style={styles.rejectBtnText}>Reject</Text>
+                  <Text style={styles.rejectBtnText}>{t('vendor.reject', 'Reject')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionBtn, styles.approveBtn]}
@@ -1594,7 +1623,7 @@ export default function VendorOrdersScreen() {
                       : handleSlotRequest(item.id, "confirm")
                   }
                 >
-                  <Text style={styles.approveBtnText}>Approve</Text>
+                  <Text style={styles.approveBtnText}>{t('vendor.accept', 'Accept')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1617,14 +1646,14 @@ export default function VendorOrdersScreen() {
               <MaterialIcons name="arrow-back" size={20} color="#fff" />
             </TouchableOpacity>
             <View style={{ flex: 1 }}>
-              <Text style={dmStyles.headerTitle}>Assign Rider</Text>
+              <Text style={dmStyles.headerTitle}>{t('vendor.assignRider', 'Assign Rider')}</Text>
               <Text style={dmStyles.headerSub}>
                 {selectedOrder?.order_number}
               </Text>
             </View>
             <View style={dmStyles.headerBadge}>
               <View style={dmStyles.headerBadgeDot} />
-              <Text style={dmStyles.headerBadgeText}>LIVE</Text>
+              <Text style={dmStyles.headerBadgeText}>{t('vendor.live', 'LIVE')}</Text>
             </View>
           </View>
 
@@ -1659,6 +1688,7 @@ export default function VendorOrdersScreen() {
               </Text>
             </View>
           </View>
+
           <ScrollView
             bounces={false}
             style={{ flex: 1 }}
@@ -1682,7 +1712,7 @@ export default function VendorOrdersScreen() {
               <View style={dmStyles.mapOverlayBadge}>
                 <MaterialIcons name="people" size={14} color="#147538" />
                 <Text style={dmStyles.mapOverlayText}>
-                  {riders.length} partner{riders.length !== 1 ? "s" : ""} nearby
+                  {t('vendor.partnersNearby', '{{count}} partners nearby', { count: riders.length })}
                 </Text>
               </View>
             </View>
@@ -1690,10 +1720,10 @@ export default function VendorOrdersScreen() {
             {/* ── RIDERS SECTION ── */}
             <View style={dmStyles.section}>
               <View style={dmStyles.sectionHeader}>
-                <Text style={dmStyles.sectionTitle}>Available Riders</Text>
+                <Text style={dmStyles.sectionTitle}>{t('vendor.availableRiders', 'Available Riders')}</Text>
                 <View style={dmStyles.liveChip}>
                   <View style={dmStyles.liveDot} />
-                  <Text style={dmStyles.liveText}>LIVE</Text>
+                  <Text style={dmStyles.liveText}>{t('vendor.live', 'LIVE')}</Text>
                 </View>
               </View>
 
@@ -1708,16 +1738,17 @@ export default function VendorOrdersScreen() {
                     />
                     <View style={{ flex: 1 }}>
                       <Text style={dmStyles.slotBannerTitle}>
-                        Slot not started yet
+                        {t('vendor.slotNotStartedYet', 'Slot not started yet')}
                       </Text>
                       <Text style={dmStyles.slotBannerSub}>
-                        Starts at{" "}
-                        {new Date(
-                          selectedOrder.delivery_slot.vendor_slot_start ||
-                            selectedOrder.delivery_slot.slot_start,
-                        ).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
+                        {t('vendor.startsAt', 'Starts at {{time}}', {
+                          time: new Date(
+                            selectedOrder.delivery_slot.vendor_slot_start ||
+                              selectedOrder.delivery_slot.slot_start,
+                          ).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }),
                         })}
                       </Text>
                     </View>
@@ -1729,7 +1760,7 @@ export default function VendorOrdersScreen() {
                   <View style={dmStyles.slotBannerActive}>
                     <View style={dmStyles.slotBannerActiveDot} />
                     <Text style={dmStyles.slotBannerActiveText}>
-                      Slot is active — assign a rider now
+                      {t('vendor.slotIsActiveAssignNow', 'Slot is active — assign a rider now')}
                     </Text>
                   </View>
                 )}
@@ -1758,8 +1789,8 @@ export default function VendorOrdersScreen() {
                   </View>
                   <Text style={dmStyles.autoBtnText}>
                     {autoAssigning
-                      ? "Broadcasting to riders…"
-                      : "Auto Assign Nearby Rider"}
+                      ? t('vendor.broadcastingToRiders', 'Broadcasting to riders…')
+                      : t('vendor.autoAssignNearbyRider', 'Auto Assign Nearby Rider')}
                   </Text>
                   <MaterialIcons
                     name="chevron-right"
@@ -1978,7 +2009,11 @@ export default function VendorOrdersScreen() {
                 <MaterialIcons name="close" size={18} color="#64748B" />
               </TouchableOpacity>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 32 }}
+            >
               {/* Customer Card */}
               <View style={omStyles.customerCard}>
                 <View style={omStyles.customerAvatarLg}>
@@ -2003,7 +2038,7 @@ export default function VendorOrdersScreen() {
 
               {/* Items */}
               <View style={omStyles.section}>
-                <Text style={omStyles.sectionLabel}>Order Items</Text>
+                <Text style={omStyles.sectionLabel}>{t('vendor.orderItems', 'Order Items')}</Text>
                 {(selectedOrder?.items || []).map((item, i) => (
                   <View key={i} style={omStyles.itemRow}>
                     <Image
@@ -2028,13 +2063,13 @@ export default function VendorOrdersScreen() {
               {/* Price Breakdown */}
               <View style={omStyles.priceCard}>
                 <View style={omStyles.priceRow}>
-                  <Text style={omStyles.priceLabel}>Subtotal</Text>
+                  <Text style={omStyles.priceLabel}>{t('vendor.subtotal', 'Subtotal')}</Text>
                   <Text style={omStyles.priceValue}>
                     ₹{selectedOrder?.subtotal}
                   </Text>
                 </View>
                 <View style={omStyles.priceRow}>
-                  <Text style={omStyles.priceLabel}>Delivery Fee</Text>
+                  <Text style={omStyles.priceLabel}>{t('vendor.deliveryFee', 'Delivery Fee')}</Text>
                   <Text style={omStyles.priceValue}>
                     ₹{selectedOrder?.delivery_fee}
                   </Text>
@@ -2042,7 +2077,7 @@ export default function VendorOrdersScreen() {
                 {selectedOrder?.discount > 0 && (
                   <View style={omStyles.priceRow}>
                     <Text style={[omStyles.priceLabel, { color: "#16A34A" }]}>
-                      Discount
+                      {t('orders.discount', 'Discount')}
                     </Text>
                     <Text style={[omStyles.priceValue, { color: "#16A34A" }]}>
                       -₹{selectedOrder?.discount}
@@ -2051,7 +2086,7 @@ export default function VendorOrdersScreen() {
                 )}
                 <View style={omStyles.priceDivider} />
                 <View style={omStyles.priceRow}>
-                  <Text style={omStyles.priceTotalLabel}>Total</Text>
+                  <Text style={omStyles.priceTotalLabel}>{t('vendor.orderTotal', 'Total')}</Text>
                   <Text style={omStyles.priceTotalValue}>
                     ₹{selectedOrder?.total}
                   </Text>
@@ -2064,7 +2099,7 @@ export default function VendorOrdersScreen() {
                   <MaterialIcons name="schedule" size={18} color="#059669" />
                   <View style={{ flex: 1 }}>
                     <Text style={omStyles.slotLabel}>
-                      Requested Delivery Slot
+                      {t('vendor.deliverySlotRequested', 'Requested Delivery Slot')}
                     </Text>
                     <Text style={omStyles.slotTime}>
                       {new Date(
@@ -2126,7 +2161,7 @@ export default function VendorOrdersScreen() {
                 selectedOrder?.status,
               ) && (
                 <View style={omStyles.actionsWrap}>
-                  <Text style={omStyles.actionsLabel}>Manage Order</Text>
+                  <Text style={omStyles.actionsLabel}>{t('vendor.manageOrder', 'Manage Order')}</Text>
                   <TouchableOpacity
                     style={omStyles.acceptBtn}
                     onPress={() => {
@@ -2136,7 +2171,7 @@ export default function VendorOrdersScreen() {
                     activeOpacity={0.85}
                   >
                     <MaterialIcons name="person-pin" size={20} color="#fff" />
-                    <Text style={omStyles.acceptBtnText}>Manage Delivery</Text>
+                    <Text style={omStyles.acceptBtnText}>{t('vendor.manageDelivery', 'Manage Delivery')}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -2161,7 +2196,7 @@ export default function VendorOrdersScreen() {
                         fontSize: 14,
                         fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}
                     >
-                      I'll assign later
+                      {t('vendor.assignLater', "I'll assign later")}
                     </Text>
                   </TouchableOpacity>
 
@@ -2180,7 +2215,7 @@ export default function VendorOrdersScreen() {
                           color="#2563EB"
                         />
                         <Text style={omStyles.counterBtnText}>
-                          Mark Preparing
+                          {t('vendor.markPreparing', 'Mark Preparing')}
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -2207,7 +2242,7 @@ export default function VendorOrdersScreen() {
                             { color: "#16A34A" },
                           ]}
                         >
-                          Mark Ready
+                          {t('vendor.markReady', 'Mark Ready')}
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -2229,7 +2264,7 @@ export default function VendorOrdersScreen() {
                         size={20}
                         color="#fff"
                       />
-                      <Text style={omStyles.acceptBtnText}>Mark as Ready</Text>
+                      <Text style={omStyles.acceptBtnText}>{t('vendor.markReady', 'Mark as Ready')}</Text>
                     </TouchableOpacity>
                   )}
                   {selectedOrder?.status === "ready" && (
@@ -2249,7 +2284,7 @@ export default function VendorOrdersScreen() {
                         size={20}
                         color="#fff"
                       />
-                      <Text style={omStyles.acceptBtnText}>Deliver It Yourself (Self Delivery)</Text>
+                      <Text style={omStyles.acceptBtnText}>{t('vendor.deliverMyselfSelf', 'Deliver It Yourself (Self Delivery)')}</Text>
                     </TouchableOpacity>
                   )}
 
@@ -2276,7 +2311,7 @@ export default function VendorOrdersScreen() {
                         size={20}
                         color="#fff"
                       />
-                      <Text style={omStyles.acceptBtnText}>Mark as Delivered</Text>
+                      <Text style={omStyles.acceptBtnText}>{t('vendor.markAsDelivered', 'Mark as Delivered')}</Text>
                     </TouchableOpacity>
                   )}
 
@@ -2286,7 +2321,7 @@ export default function VendorOrdersScreen() {
               {/* Actions — only for pending */}
               {selectedOrder?.status === "pending" && (
                 <View style={omStyles.actionsWrap}>
-                  <Text style={omStyles.actionsLabel}>Respond to Order</Text>
+                  <Text style={omStyles.actionsLabel}>{t('vendor.respondToOrder', 'Respond to Order')}</Text>
 
                   {/* Accept */}
                   <TouchableOpacity
@@ -2309,7 +2344,7 @@ export default function VendorOrdersScreen() {
                     activeOpacity={0.85}
                   >
                     <MaterialIcons name="check-circle" size={20} color="#fff" />
-                    <Text style={omStyles.acceptBtnText}>Accept Order</Text>
+                    <Text style={omStyles.acceptBtnText}>{t('vendor.acceptOrder', 'Accept Order')}</Text>
                   </TouchableOpacity>
 
                   {/* Counter + Decline row */}
@@ -2324,7 +2359,7 @@ export default function VendorOrdersScreen() {
                         size={18}
                         color="#2563EB"
                       />
-                      <Text style={omStyles.counterBtnText}>Counter Offer</Text>
+                      <Text style={omStyles.counterBtnText}>{t('vendor.counterOffer', 'Counter Offer')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -2366,10 +2401,9 @@ export default function VendorOrdersScreen() {
                 <MaterialIcons name="check-circle" size={52} color="#147538" />
               </View>
 
-              <Text style={amStyles.title}>Order Accepted!</Text>
+              <Text style={amStyles.title}>{t('vendor.orderAcceptedTitle', 'Order Accepted!')}</Text>
               <Text style={amStyles.subtitle}>
-                {selectedOrder?.order_number} has been confirmed.{"\n"}
-                The customer has been notified.
+                {t('vendor.orderAcceptedSubtitle', '{{orderNumber}} has been confirmed.\nThe customer has been notified.', { orderNumber: selectedOrder?.order_number })}
               </Text>
 
               {/* Slot info */}
@@ -2380,7 +2414,7 @@ export default function VendorOrdersScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={amStyles.slotCardLabel}>
-                      Delivery Slot Requested
+                      {t('vendor.deliverySlotRequested', 'Delivery Slot Requested')}
                     </Text>
                     <Text style={amStyles.slotCardTime}>
                       {new Date(
@@ -2401,8 +2435,8 @@ export default function VendorOrdersScreen() {
                       {new Date(
                         selectedOrder.delivery_slot.slot_start,
                       ).toDateString() === new Date().toDateString()
-                        ? "Today"
-                        : "Tomorrow"}
+                        ? t('vendor.today', 'Today')
+                        : t('vendor.tomorrow', 'Tomorrow')}
                     </Text>
                   </View>
                   {/* Live countdown */}
@@ -2413,13 +2447,13 @@ export default function VendorOrdersScreen() {
                         size={14}
                         color="#D97706"
                       />
-                      <Text style={amStyles.slotLockText}>Not yet</Text>
+                      <Text style={amStyles.slotLockText}>{t('vendor.notYet', 'Not yet')}</Text>
                     </View>
                   )}
                   {isSlotActive(selectedOrder?.delivery_slot) && (
                     <View style={amStyles.slotActiveBadge}>
                       <View style={amStyles.slotActiveDot} />
-                      <Text style={amStyles.slotActiveText}>Active</Text>
+                      <Text style={amStyles.slotActiveText}>{t('vendor.active', 'Active')}</Text>
                     </View>
                   )}
                 </View>
@@ -2446,7 +2480,7 @@ export default function VendorOrdersScreen() {
                     <Text
                       style={[amStyles.slotCardLabel, { color: "#64748B" }]}
                     >
-                      No specific slot requested
+                      {t('vendor.noSlotRequested', 'No specific slot requested')}
                     </Text>
                     <Text
                       style={[
@@ -2454,7 +2488,7 @@ export default function VendorOrdersScreen() {
                         { color: "#1F2937", fontSize: 13 },
                       ]}
                     >
-                      Deliver as soon as possible
+                      {t('vendor.deliverAsap', 'Deliver as soon as possible')}
                     </Text>
                   </View>
                 </View>
@@ -2462,11 +2496,11 @@ export default function VendorOrdersScreen() {
 
               {/* What happens next */}
               <View style={amStyles.nextStepsCard}>
-                <Text style={amStyles.nextStepsTitle}>What happens next?</Text>
+                <Text style={amStyles.nextStepsTitle}>{t('vendor.whatHappensNext', 'What happens next?')}</Text>
                 <View style={amStyles.nextStep}>
                   <View style={amStyles.nextStepDot} />
                   <Text style={amStyles.nextStepText}>
-                    Prepare the order items
+                    {t('vendor.stepPrepareItems', 'Prepare the order items')}
                   </Text>
                 </View>
                 <View style={amStyles.nextStep}>
@@ -2474,14 +2508,14 @@ export default function VendorOrdersScreen() {
                   <Text style={amStyles.nextStepText}>
                     {selectedOrder?.delivery_slot &&
                     !isSlotActive(selectedOrder?.delivery_slot)
-                      ? "Assign a rider once the slot begins"
-                      : "Assign a delivery rider now"}
+                      ? t('vendor.stepAssignRiderSlot', 'Assign a rider once the slot begins')
+                      : t('vendor.stepAssignRiderNow', 'Assign a delivery rider now')}
                   </Text>
                 </View>
                 <View style={amStyles.nextStep}>
                   <View style={amStyles.nextStepDot} />
                   <Text style={amStyles.nextStepText}>
-                    Mark order ready when packed
+                    {t('vendor.stepMarkReady', 'Mark order ready when packed')}
                   </Text>
                 </View>
               </View>
@@ -2497,7 +2531,7 @@ export default function VendorOrdersScreen() {
               >
                 <MaterialIcons name="person-pin" size={18} color="#fff" />
                 <Text style={amStyles.primaryBtnText}>
-                  Assign Delivery Rider
+                  {t('vendor.assignDeliveryRider', 'Assign Delivery Rider')}
                 </Text>
               </TouchableOpacity>
 
@@ -2517,7 +2551,7 @@ export default function VendorOrdersScreen() {
                 }}
                 activeOpacity={0.85}
               >
-                <Text style={amStyles.secondaryBtnText}>I'll assign later</Text>
+                <Text style={amStyles.secondaryBtnText}>{t('vendor.assignLater', "I'll assign later")}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -2723,7 +2757,7 @@ export default function VendorOrdersScreen() {
                     letterSpacing: -0.3,
                   }}
                 >
-                  Counter Offer
+                  {t('vendor.counterOffer', 'Counter Offer')}
                 </Text>
                 <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
                   {selectedOrder?.order_number}
@@ -2743,6 +2777,7 @@ export default function VendorOrdersScreen() {
                 <MaterialIcons name="close" size={18} color="#64748B" />
               </TouchableOpacity>
             </View>
+
             <ScrollView
               contentContainerStyle={{ paddingBottom: 32 }}
               showsVerticalScrollIndicator={false}
@@ -2768,7 +2803,7 @@ export default function VendorOrdersScreen() {
                       textTransform: "uppercase",
                     }}
                   >
-                    New Total
+                    {t('vendor.newTotal', 'New Total')}
                   </Text>
                   <Text
                     style={{
@@ -2802,7 +2837,7 @@ export default function VendorOrdersScreen() {
                     <Text
                       style={{ color: "rgba(255,255,255,0.7)", fontSize: 12 }}
                     >
-                      Items: ₹
+                      {t('vendor.items', 'Items')}: ₹
                       {counterItems
                         .reduce(
                           (sum, item) =>
@@ -2825,7 +2860,7 @@ export default function VendorOrdersScreen() {
                     <Text
                       style={{ color: "rgba(255,255,255,0.7)", fontSize: 12 }}
                     >
-                      Delivery: ₹
+                      {t('vendor.deliveryFee', 'Delivery')}: ₹
                       {parseFloat(counterDeliveryFee || 0).toFixed(0)}
                     </Text>
                   </View>
@@ -2843,7 +2878,7 @@ export default function VendorOrdersScreen() {
                     marginBottom: 10,
                   }}
                 >
-                  Adjust Items
+                  {t('vendor.adjustItems', 'Adjust Items')}
                 </Text>
                 {counterItems.map((item, index) => (
                   <View
@@ -2923,7 +2958,7 @@ export default function VendorOrdersScreen() {
                             }}
                           />
                           <Text style={{ fontSize: 12, color: "#94A3B8" }}>
-                            Orig: {item.quantity}
+                            {t('vendor.orig', 'Orig')}: {item.quantity}
                           </Text>
                         </View>
                         {item.new_quantity > 0 && (
@@ -2934,7 +2969,7 @@ export default function VendorOrdersScreen() {
                               marginTop: 2,
                             }}
                           >
-                            Subtotal: ₹
+                            {t('vendor.subtotal', 'Subtotal')}: ₹
                             {(item.new_quantity * item.product_price).toFixed(
                               0,
                             )}
@@ -2960,7 +2995,7 @@ export default function VendorOrdersScreen() {
                                 color: "#EF4444",
                                 fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}
                             >
-                              Removed from order
+                              {t('vendor.removedFromOrder', 'Removed from order')}
                             </Text>
                           </View>
                         )}
@@ -3070,7 +3105,7 @@ export default function VendorOrdersScreen() {
                               color: "#64748B",
                               fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold"}}
                           >
-                            Reset
+                            {t('vendor.reset', 'Reset')}
                           </Text>
                         </TouchableOpacity>
                       )}
@@ -3090,7 +3125,7 @@ export default function VendorOrdersScreen() {
                     marginBottom: 10,
                   }}
                 >
-                  Delivery Fee
+                  {t('vendor.deliveryFee', 'Delivery Fee')}
                 </Text>
                 <View
                   style={{
@@ -3149,7 +3184,7 @@ export default function VendorOrdersScreen() {
                             color: "#D97706",
                             fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"}}
                         >
-                          Was ₹{selectedOrder?.delivery_fee}
+                          {t('vendor.wasFee', 'Was ₹{{fee}}', { fee: selectedOrder?.delivery_fee })}
                         </Text>
                       </View>
                     )}
@@ -3167,7 +3202,7 @@ export default function VendorOrdersScreen() {
                     marginBottom: 6,
                   }}
                 >
-                  Delivery Slot
+                  {t('vendor.deliverySlot', 'Delivery Slot')}
                 </Text>
                 {selectedOrder?.delivery_slot?.slot_start && (
                   <View
@@ -3192,7 +3227,7 @@ export default function VendorOrdersScreen() {
                         fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", flex: 1,
                       }}
                     >
-                      Customer requested:{" "}
+                      {t('vendor.customerRequested', 'Customer requested')}:{" "}
                       <Text style={{ fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"}}>
                         {new Date(
                           selectedOrder.delivery_slot.slot_start,
@@ -3251,7 +3286,7 @@ export default function VendorOrdersScreen() {
                               counterSlotDay === day ? "#147538" : "#64748B",
                           }}
                         >
-                          {day.charAt(0).toUpperCase() + day.slice(1)}
+                          {day === "today" ? t('vendor.today', 'Today') : t('vendor.tomorrow', 'Tomorrow')}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -3276,7 +3311,7 @@ export default function VendorOrdersScreen() {
                           letterSpacing: 0.5,
                         }}
                       >
-                        Start
+                        {t('vendor.start', 'Start')}
                       </Text>
                       <View
                         style={{
@@ -3327,7 +3362,7 @@ export default function VendorOrdersScreen() {
                           letterSpacing: 0.5,
                         }}
                       >
-                        End
+                        {t('vendor.end', 'End')}
                       </Text>
                       <View
                         style={{
@@ -3433,7 +3468,7 @@ export default function VendorOrdersScreen() {
                           fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#6B7280",
                         }}
                       >
-                        Clear
+                        {t('vendor.clear', 'Clear')}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -3451,7 +3486,7 @@ export default function VendorOrdersScreen() {
                     marginBottom: 10,
                   }}
                 >
-                  Note to Customer (Optional)
+                  {t('vendor.noteToCustomer', 'Note to Customer (Optional)')}
                 </Text>
                 <TextInput
                   style={{
@@ -3469,7 +3504,7 @@ export default function VendorOrdersScreen() {
                   value={counterNote}
                   onChangeText={setCounterNote}
                   multiline
-                  placeholder="E.g. Some items are out of stock, adjusted quantities accordingly..."
+                  placeholder={t('vendor.notePlaceholder', 'E.g. Some items are out of stock, adjusted quantities accordingly...')}
                   placeholderTextColor="#CBD5E1"
                   numberOfLines={3}
                 />
@@ -3498,7 +3533,7 @@ export default function VendorOrdersScreen() {
                   <Text
                     style={{ color: "#fff", fontSize: 16, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"}}
                   >
-                    Send Counter Offer
+                    {t('vendor.sendCounterOffer', 'Send Counter Offer')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -3512,20 +3547,20 @@ export default function VendorOrdersScreen() {
         <View style={styles.modalContainer}>
           <View style={[styles.modalContent, { paddingBottom: 40 }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Reject Order</Text>
+              <Text style={styles.modalTitle}>{t('vendor.rejectOrderTitle', 'Reject Order')}</Text>
               <TouchableOpacity onPress={() => setRejectModalVisible(false)}>
                 <Text style={styles.closeBtn}>✕</Text>
               </TouchableOpacity>
             </View>
             <Text style={{ marginBottom: 12, color: "#4B5563", fontSize: 15 }}>
-              Please provide a reason for declining this order.
+              {t('vendor.rejectReasonInstruction', 'Please provide a reason for declining this order.')}
             </Text>
             <TextInput
               style={styles.note}
               value={rejectReason}
               onChangeText={setRejectReason}
               multiline
-              placeholder="e.g. Items out of stock, shop closing soon..."
+              placeholder={t('vendor.rejectReasonPlaceholder', 'e.g. Items out of stock, shop closing soon...')}
               numberOfLines={4}
             />
             <TouchableOpacity
@@ -3542,8 +3577,8 @@ export default function VendorOrdersScreen() {
               onPress={() => {
                 if (rejectReason.trim().length === 0) {
                   Alert.alert(
-                    "Reason Required",
-                    "Please provide a reason for rejecting.",
+                    t('vendor.reasonRequired', 'Reason Required'),
+                    t('vendor.pleaseProvideReason', 'Please provide a reason for rejecting.'),
                   );
                   return;
                 }
@@ -3562,7 +3597,7 @@ export default function VendorOrdersScreen() {
               <Text
                 style={[styles.rejectText, { color: "#fff", fontSize: 16 }]}
               >
-                Confirm Rejection
+                {t('vendor.confirmRejection', 'Confirm Rejection')}
               </Text>
             </TouchableOpacity>
           </View>

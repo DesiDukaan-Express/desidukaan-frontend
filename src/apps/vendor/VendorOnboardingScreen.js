@@ -11,7 +11,6 @@ import useAuthStore from '../../store/authStore';
 import AddressMapView from "../../components/AddressMapView";
 import { uploadAPI } from '../../services/api';
 import { MaterialIcons } from '@expo/vector-icons';
-import AccountManagerModal from '../../components/common/AccountManagerModal';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const PRIMARY = '#1ca049';
@@ -206,29 +205,8 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const [geocoding, setGeocoding] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [autoApproved, setAutoApproved] = useState(false);
-  const [accountModalVisible, setAccountModalVisible] = useState(false);
-  const [hasOtherProfiles, setHasOtherProfiles] = useState(false);
 
   const scrollRef = useRef(null);
-
-  // Check if user has other profiles to switch to (only show switcher if yes)
-  useEffect(() => {
-    const checkProfiles = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/auth/profiles`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        if (res.ok) {
-          const others = (data.profiles || []).filter(
-            (p) => p.role !== (user?.role || 'vendor')
-          );
-          setHasOtherProfiles(others.length > 0);
-        }
-      } catch (_) { /* silently fail */ }
-    };
-    checkProfiles();
-  }, [token]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -555,8 +533,8 @@ export default function VendorOnboardingScreen({ onComplete }) {
         alt_phone: altPhone || null,
         fssai_number: fssai || null,
         gst_number: gst || null,
-        aadhar_number: aadhar ? aadhar.replace(/\D/g, '').slice(0, 12) : null,
-        pan_number: pan ? pan.toUpperCase().trim() : null,
+        aadhar_number: aadhar || null,
+        pan_number: pan || null,
         trade_license_number: tradeLicense || null,
         fssai_license_url: docUrls.fssai || null,
         gst_certificate_url: docUrls.gst || null,
@@ -564,8 +542,8 @@ export default function VendorOnboardingScreen({ onComplete }) {
         landmark: landmark || null,
         city,
         pincode,
-        latitude: latitude ?? null,
-        longitude: longitude ?? null,
+        latitude: latitude || null,
+        longitude: longitude || null,
         upi_id: upiId || null,
         bank_account_name: accountName || null,
         bank_account_number: accountNumber || null,
@@ -585,10 +563,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
       });
 
       const vendorData = await vendorRes.json();
-      if (!vendorRes.ok) {
-        const detail = vendorData.errors?.join('\n') || vendorData.msg || vendorData.message || 'Failed to create shop';
-        throw new Error(detail);
-      }
+      if (!vendorRes.ok) throw new Error(vendorData.msg || vendorData.message || 'Failed to create shop');
 
       // Capture auto-approve flag from backend (response: { data: { vendor: { auto_approved, ... } } })
       setAutoApproved(vendorData.data?.vendor?.auto_approved === true);
@@ -644,14 +619,6 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
   return (
     <View style={styles.container}>
-
-      {/* Account Switcher Modal — only if other profiles exist */}
-      {hasOtherProfiles && (
-        <AccountManagerModal
-          visible={accountModalVisible}
-          onClose={() => setAccountModalVisible(false)}
-        />
-      )}
 
       {/* ── SUCCESS POPUP ── */}
       <Modal visible={showSuccess} transparent animationType="fade">
@@ -722,13 +689,10 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
             <TouchableOpacity
               style={styles.successBtn}
-              onPress={() => {
-                setShowSuccess(false);
-                if (onComplete) onComplete();
-              }}
+              onPress={() => { setShowSuccess(false); navigation.navigate('Dashboard'); }}
               activeOpacity={0.88}
             >
-              <Text style={styles.successBtnText}>Continue →</Text>
+              <Text style={styles.successBtnText}>Go to Dashboard →</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -736,26 +700,13 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
       {/* Top bar */}
       <View style={styles.topBar}>
-        {/* Account Switcher pill — only visible when user has other profiles to switch to */}
-        {hasOtherProfiles && (
-          <TouchableOpacity
-            onPress={() => setAccountModalVisible(true)}
-            style={styles.switchAccountBtn}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="account-circle" size={16} color={PRIMARY} />
-            <Text style={styles.switchAccountTxt}>Switch</Text>
-          </TouchableOpacity>
-        )}
-
-        <View style={[styles.brandRow, { flex: 1, justifyContent: 'center' }]}>
-          <MaterialIcons name="storefront" size={20} color={PRIMARY} style={{ marginRight: 5 }} />
+        <View style={styles.brandRow}>
+          <MaterialIcons name="storefront" size={24} color={PRIMARY} style={{ marginRight: 6 }} />
           <View>
-            <Text style={[styles.brandName, { fontSize: 13 }]}>DesiDukaan</Text>
-            <Text style={[styles.brandSub, { fontSize: 10 }]}>Vendor Account • Setup</Text>
+            <Text style={styles.brandName}>DesiDukaan</Text>
+            <Text style={styles.brandSub}>Seller Registration</Text>
           </View>
         </View>
-
         <Text style={styles.stepCount}>{currentStep} of {STEPS.length}</Text>
       </View>
 
@@ -804,7 +755,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
           {/* Step header */}
           <View style={styles.stepHeader}>
-            <Text style={styles.stepIcon}>{STEPS[currentStep - 1].icon}</Text>
+            <MaterialIcons name={`${STEPS[currentStep - 1].icon}`} style={styles.stepIcon} />
             <View>
               <Text style={styles.stepTitle}>{STEPS[currentStep - 1].title}</Text>
               <Text style={styles.stepDesc}>{STEPS[currentStep - 1].desc}</Text>
@@ -1459,14 +1410,6 @@ const styles = StyleSheet.create({
   brandName: { fontSize: 17, fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#fff' },
   brandSub: { fontSize: 11, color: 'rgba(255,255,255,0.75)' },
   stepCount: { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" },
-  switchAccountBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 6,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)',
-    marginRight: 4,
-  },
-  switchAccountTxt: { fontSize: 11, color: '#fff', fontWeight: '700', letterSpacing: 0.3 },
 
   progressTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.25)' },
   progressFill: { height: 3, backgroundColor: '#fff' },
@@ -1496,12 +1439,12 @@ const styles = StyleSheet.create({
 
   label: { fontSize: 13, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold", color: '#444', marginBottom: 6, marginTop: 14 },
   sectionLabel: { fontSize: 15, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#222', marginTop: 12, marginBottom: 4 },
-  sectionSep: { fontSize: 14, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#333', marginTop: 20, marginBottom: 6, paddingTop: 14, borderTopWidth: 0.5, borderTopColor: '#eee' },
+  sectionSep: { fontSize: 14, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#333', marginTop: 20, marginBottom: 6, paddingTop: 0, borderTopWidth: 0.5, borderTopColor: '#eee' },
   req: { color: '#e53935' },
   hintText: { fontSize: 11, color: '#999', marginTop: -4, marginBottom: 6 },
   input: {
     backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e0e0e0',
-    borderRadius: 10, padding: 13, fontSize: 14, color: '#333', marginBottom: 6,
+    borderRadius: 10, padding: 13, fontSize: 14, color: '#333', marginBottom: 6, placeholderTextColor:"#999"
   },
   textArea: { height: 80, textAlignVertical: 'top' },
   row: { flexDirection: 'row' },
