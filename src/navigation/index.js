@@ -7,7 +7,7 @@ import useAuthStore from "../store/authStore";
 import { USER_ROLES } from "../constants";
 import { colors } from "../styles/colors";
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http:localhost:3000/api";
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 import LoginScreen from "../apps/customer/LoginScreen";
 import CustomerTabs from "./CustomerTabs";
