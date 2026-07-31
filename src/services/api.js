@@ -127,14 +127,44 @@ export const uploadAPI = {
   },
 };
 
+// ─── Products ─────────────────────────────────────────────────────────────────
+export const productsAPI = {
+  getPopular: (lat, lng, radius_km = 10, limit = 12, token) =>
+    request("GET", `/products/popular?lat=${lat}&lng=${lng}&radius_km=${radius_km}&limit=${limit}`, null, token),
+  getVendors: (productId, token) =>
+    request("GET", `/products/${productId}/vendors`, null, token),
+};
+
+// ─── Inventory ────────────────────────────────────────────────────────────────
+export const inventoryAPI = {
+  getVendorInventory: (vendorId, token) =>
+    request("GET", `/inventory/vendor/${vendorId}`, null, token),
+};
+
+// ─── Slots ────────────────────────────────────────────────────────────────────
+export const slotsAPI = {
+  getDeliveryInfo: (params, token) =>
+    request("GET", `/slots/delivery-info?${params}`, null, token),
+  requestPhone: (vendorId, token) =>
+    request("POST", "/slots/phone-request", { vendor_id: vendorId }, token),
+  getVendorRequests: (token) =>
+    request("GET", "/slots/vendor/requests", null, token),
+};
+
+// ─── Payments ─────────────────────────────────────────────────────────────────
+export const paymentsAPI = {
+  verifyUpi: (upiId, token) =>
+    request("POST", "/payments/verify-upi", { upi_id: upiId }, token),
+};
+
 // ─── Categories ───────────────────────────────────────────────────────────────
 export const categoriesAPI = {
   getAll: () => request("GET", "/products/categories"),
   getSubcategories: (parentId) => request("GET", `/products/subcategories/${parentId}`),
 };
 
-// ─── Products ─────────────────────────────────────────────────────────────────
-export const productsAPI = {
+// ─── Products (extended) ──────────────────────────────────────────────────────
+export const productsExtendedAPI = {
   getTrending: (lat = null, lng = null, limit = 12) => {
     let url = `/products/trending?limit=${limit}`;
     if (lat != null && lng != null) url += `&lat=${lat}&lng=${lng}`;
@@ -200,6 +230,12 @@ export const deliveryAPI = {
   updateLocation:     (lat, lng, token)  => request("POST",  "/delivery/location",           { latitude: lat, longitude: lng }, token),
   onboard:            (payload, token)   => request("POST",  "/delivery/onboard",            payload,                          token),
   getMyProfile:       (token)            => request("GET",   "/delivery/me/profile",         null,                             token),
+  assign:             (orderId, partnerId, token) => request("POST", `/delivery/assign/${orderId}`, { partnerId }, token),
+  autoAssign:         (orderId, radius_km, token) => request("POST", `/delivery/auto-assign/${orderId}`, { radius_km }, token),
+  decline:            (orderId, token)   => request("POST",  `/delivery/decline/${orderId}`,  null,                             token),
+  getNearbyRiders:    (latitude, longitude, radius_km = 10, token) => request("GET", `/delivery/nearby?latitude=${latitude}&longitude=${longitude}&radius_km=${radius_km}`, null, token),
+  getVendorNotifications: (token)        => request("GET",   "/delivery/vendor-notifications", null,                            token),
+  markNotificationsRead:  (token)        => request("PATCH", "/delivery/vendor-notifications/read", null,                        token),
 };
 
 // ─── Search ───────────────────────────────────────────────────────────────────

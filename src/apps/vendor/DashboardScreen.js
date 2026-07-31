@@ -30,6 +30,17 @@ const SOCKET_URL =
   process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
+function timeAgo(dateString) {
+  if (!dateString) return "";
+  const diffSec = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return `${Math.floor(diffHr / 24)}d ago`;
+}
+
 // ─── Color Tokens ───────────────────────────────────────────────
 const C = {
   bg: "#F0F4F8",
@@ -282,6 +293,30 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         }
 
         setNotifications(builtNotifs);
+
+        // Fetch persisted notifications from DB (covers offline declines)
+        try {
+          const notifRes = await fetch(`${API_BASE}/delivery/vendor-notifications`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const notifData = await notifRes.json();
+          if (notifData.success && notifData.data?.notifications?.length) {
+            const dbNotifs = notifData.data.notifications.map(n => ({
+              type: n.type === "delivery_declined" ? "delivery" : "system",
+              title: n.title,
+              body: n.body,
+              time: timeAgo(n.created_at),
+              read: n.read,
+              action: "orders",
+              _fromDb: true,
+            }));
+            setNotifications(prev => {
+              const existing = prev.filter(n => n._fromDb);
+              const nonDb = prev.filter(n => !n._fromDb);
+              return [...dbNotifs, ...nonDb];
+            });
+          }
+        } catch (_) {}
       } catch (err) {
         console.error("Dashboard Fetch Error:", err);
       } finally {
@@ -348,6 +383,116 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         total: null,
         _type: "phone",
       });
+    });
+
+    socket.on("slot:request", (data) => {
+      playOrderSound();
+      setNotifications((prev) => [
+        {
+          type: "system",
+          title: "New delivery slot request",
+          body: "A customer wants a specific delivery time.",
+          time: "Just now",
+          read: false,
+          action: "requests",
+        },
+        ...prev,
+      ]);
+      showNewOrderBanner({
+        order_number: null,
+        order_id: null,
+        total: null,
+        _type: "slot",
+      });
+    });
+
+    socket.on("order:update", (data) => {
+      setNotifications((prev) => [
+        {
+          type: "order",
+          title: `Order ${data.order_number || "#" + data.order_id} updated`,
+          body: `Status: ${data.status}`,
+          time: "Just now",
+          read: false,
+          action: "orders",
+        },
+        ...prev,
+      ]);
+    });
+
+    socket.on("order:countered", (data) => {
+      playOrderSound();
+      setNotifications((prev) => [
+        {
+          type: "order",
+          title: `Counter offer for order ${data.order_number || "#" + data.order_id}`,
+          body: `${data.shop_name || "Vendor"} sent a counter offer.`,
+          time: "Just now",
+          read: false,
+          action: "orders",
+        },
+        ...prev,
+      ]);
+    });
+
+    socket.on("fee:request", (data) => {
+      playOrderSound();
+      setNotifications((prev) => [
+        {
+          type: "system",
+          title: "New fee negotiation",
+          body: "A customer proposed a different delivery fee.",
+          time: "Just now",
+          read: false,
+          action: "requests",
+        },
+        ...prev,
+      ]);
+    });
+
+    socket.on("slot:confirmed", (data) => {
+      setNotifications((prev) => [
+        {
+          type: "system",
+          title: "Delivery slot confirmed",
+          body: "A customer confirmed the delivery time.",
+          time: "Just now",
+          read: false,
+          action: "orders",
+        },
+        ...prev,
+      ]);
+    });
+
+    socket.on("fee:confirmed", (data) => {
+      setNotifications((prev) => [
+        {
+          type: "system",
+          title: "Fee negotiation confirmed",
+          body: "A customer accepted the delivery fee.",
+          time: "Just now",
+          read: false,
+          action: "orders",
+        },
+        ...prev,
+      ]);
+    });
+
+    socket.on("delivery:declined", (data) => {
+      console.log("[Dashboard] 🚫 delivery:declined → notification added", JSON.stringify(data));
+      playOrderSound();
+      const declinedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      setNotifications((prev) => [
+        {
+          type: "delivery",
+          title: `Order #${data.order_id} — Rider declined`,
+          body: `${data.partner_name} declined at ${declinedAt}. Tap to reassign.`,
+          time: "Just now",
+          read: false,
+          action: "orders",
+        },
+        ...prev,
+      ]);
     });
 
     return () => socket.disconnect();

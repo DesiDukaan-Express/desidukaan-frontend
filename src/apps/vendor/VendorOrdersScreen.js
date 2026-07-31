@@ -27,6 +27,7 @@ import { useTranslation } from "react-i18next";
 const { width } = Dimensions.get("window");
 
 import useAuthStore from "../../store/authStore";
+import { deliveryAPI, slotsAPI } from "../../services/api";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const SOCKET_URL =
@@ -134,28 +135,52 @@ export default function VendorOrdersScreen() {
     );
   };
 
-  // Fetch nearby riders when modal opens and storeLocation is available
+  // Fetch nearby riders + check for decline notifications when modal opens
   useEffect(() => {
     if (isDeliveryModalVisible && storeLocation) {
       fetchNearbyRiders();
       setBroadcastStatus(null);
+
+      // Check DB for a recent decline on this order
+      if (selectedOrder?.id) {
+        fetch(`${API_BASE}/delivery/vendor-notifications`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success && data.data?.notifications?.length) {
+              const decline = data.data.notifications.find(
+                n => n.type === "delivery_declined" && Number(n.order_id) === Number(selectedOrder.id)
+              );
+              if (decline) {
+                const declinedAt = new Date(decline.created_at).toLocaleTimeString([], {
+                  hour: "2-digit", minute: "2-digit",
+                });
+                setBroadcastStatus({
+                  count: 0,
+                  message: `Partner declined at ${declinedAt}`,
+                  type: "declined",
+                  partnerName: decline.body.split(" declined")[0] || "Partner",
+                  partnerPhone: null,
+                  orderId: decline.order_id,
+                  declinedAt,
+                });
+              }
+            }
+          })
+          .catch(() => {});
+      }
     }
   }, [isDeliveryModalVisible]);
 
   const fetchNearbyRiders = async () => {
     try {
-      const res = await fetch(
-        `${API_BASE}/delivery/nearby?latitude=${storeLocation.latitude}&longitude=${storeLocation.longitude}&radius_km=10&_t=${Date.now()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            Pragma: "no-cache",
-            Expires: "0",
-          },
-        },
+      const result = await deliveryAPI.getNearbyRiders(
+        storeLocation.latitude,
+        storeLocation.longitude,
+        10,
+        token
       );
-      const result = await res.json();
       if (result.success) {
         setNearbyRiders(result.data.riders || []);
       }
@@ -191,7 +216,9 @@ export default function VendorOrdersScreen() {
     : nearbyRiders.map((r, i) => ({
         id: r.id,
         name: r.name || "Partner",
-        status: "Available",
+        status: r.is_busy ? `On Delivery (${r.active_deliveries})` : "Available",
+        is_busy: r.is_busy,
+        active_deliveries: r.active_deliveries || 0,
         image: "https://cdn-icons-png.flaticon.com/512/3208/3208726.png",
         coordinate: {
           latitude: r.latitude,
@@ -401,15 +428,7 @@ export default function VendorOrdersScreen() {
   const fetchRequests = async () => {
     setLoadingRequests(true);
     try {
-      const res = await fetch(`${API_BASE}/slots/vendor/requests?_t=${Date.now()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          Pragma: "no-cache",
-          Expires: "0",
-        },
-      });
-      const result = await res.json();
+      const result = await slotsAPI.getVendorRequests(token);
       if (result.data) {
         setRequests(result.data);
       }
@@ -464,7 +483,34 @@ export default function VendorOrdersScreen() {
     fetchOrders();
     fetchRequests();
     fetchHistory();
-  }, []);
+    // Fetch recent decline notifications on mount
+    fetch(`${API_BASE}/delivery/vendor-notifications`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && data.data?.notifications?.length) {
+          const recentDecline = data.data.notifications.find(
+            n => n.type === "delivery_declined" && !n.read
+          );
+          if (recentDecline && !broadcastStatus) {
+            const declinedAt = new Date(recentDecline.created_at).toLocaleTimeString([], {
+              hour: "2-digit", minute: "2-digit",
+            });
+            setBroadcastStatus({
+              count: 0,
+              message: `${recentDecline.title.split("—")[1]?.trim() || "Partner"} declined at ${declinedAt}`,
+              type: "declined",
+              partnerName: recentDecline.body.split(" declined")[0],
+              partnerPhone: null,
+              orderId: recentDecline.order_id,
+              declinedAt,
+            });
+          }
+        }
+      })
+      .catch(() => {});
+  }, [token]);
 
   // Socket setup for real-time negotiation
   useEffect(() => {
@@ -472,17 +518,22 @@ export default function VendorOrdersScreen() {
 
     const socket = io(SOCKET_URL, {
       auth: { token },
-      transports: ["websocket"],
+      transports: ["websocket", "polling"],
     });
 
     socket.on("delivery:declined", (data) => {
-      console.log("Delivery declined:", data);
+      console.log("[VendorOrdersScreen] ★★★ delivery:declined ★★★", JSON.stringify(data));
       fetchOrdersRef.current?.();
+      const declinedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       if (selectedOrderRef.current && Number(selectedOrderRef.current.id) === Number(data.order_id)) {
         setBroadcastStatus({
           count: 0,
-          message: `${data.partner_name} has declined this request.`,
+          message: `${data.partner_name} declined at ${declinedAt}`,
           type: "declined",
+          partnerName: data.partner_name,
+          partnerPhone: data.partner_phone,
+          orderId: data.order_id,
+          declinedAt,
         });
       }
 
@@ -1771,32 +1822,39 @@ export default function VendorOrdersScreen() {
                 </TouchableOpacity>
               )}
 
-              {broadcastStatus && (
-                <View
-                  style={[
-                    dmStyles.broadcastBanner,
-                    broadcastStatus.type === "declined" && {
-                      backgroundColor: "#FEE2E2",
-                      borderColor: "#FCA5A5",
-                    },
-                  ]}
-                >
-                  <View
-                    style={[
-                      dmStyles.broadcastDot,
-                      broadcastStatus.type === "declined" && {
-                        backgroundColor: "#EF4444",
-                      },
-                    ]}
-                  />
-                  <Text
-                    style={[
-                      dmStyles.broadcastText,
-                      broadcastStatus.type === "declined" && {
-                        color: "#991B1B",
-                      },
-                    ]}
+              {broadcastStatus && broadcastStatus.type === "declined" && (
+                <View style={dmStyles.declinedBanner}>
+                  <View style={dmStyles.declinedHeader}>
+                    <View style={dmStyles.declinedDot} />
+                    <Text style={dmStyles.declinedTitle}>Delivery Declined</Text>
+                    <Text style={dmStyles.declinedTime}>{broadcastStatus.declinedAt}</Text>
+                  </View>
+                  <Text style={dmStyles.declinedMessage}>
+                    {broadcastStatus.partnerName} declined this delivery request.
+                  </Text>
+                  {broadcastStatus.partnerPhone && (
+                    <Text style={dmStyles.declinedPhone}>Phone: {broadcastStatus.partnerPhone}</Text>
+                  )}
+                  <TouchableOpacity
+                    style={dmStyles.reassignBtn}
+                    onPress={() => {
+                      setBroadcastStatus(null);
+                      setIsDeliveryModalVisible(true);
+                    }}
+                    activeOpacity={0.85}
                   >
+                    <MaterialIcons name="replay" size={16} color="#fff" />
+                    <Text style={dmStyles.reassignBtnText}>Reassign to Another Rider</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {broadcastStatus && broadcastStatus.type !== "declined" && (
+                <View
+                  style={[dmStyles.broadcastBanner]}
+                >
+                  <View style={[dmStyles.broadcastDot]} />
+                  <Text style={[dmStyles.broadcastText]}>
                     {broadcastStatus.message}
                   </Text>
                 </View>
@@ -1851,10 +1909,11 @@ export default function VendorOrdersScreen() {
                           color="#147538"
                         />
                       </TouchableOpacity>
-                      {rider.status === "Available" && (
+                      {rider.status === "Available" || rider.is_busy ? (
                         <TouchableOpacity
                           style={[
                             dmStyles.assignBtn,
+                            rider.is_busy && { backgroundColor: '#F59E0B' },
                             !isSlotActive(selectedOrder?.delivery_slot) &&
                               dmStyles.assignBtnDisabled,
                           ]}
@@ -1864,10 +1923,12 @@ export default function VendorOrdersScreen() {
                           <Text style={dmStyles.assignBtnText}>
                             {!isSlotActive(selectedOrder?.delivery_slot)
                               ? "Locked"
-                              : "Assign"}
+                              : rider.is_busy
+                                ? "Queue"
+                                : "Assign"}
                           </Text>
                         </TouchableOpacity>
-                      )}
+                      ) : null}
                     </View>
                   </View>
                 ))
@@ -3702,6 +3763,65 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#166534",
     fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", flex: 1,
+  },
+
+  declinedBanner: {
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 10,
+  },
+  declinedHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  declinedDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#EF4444",
+    marginRight: 8,
+  },
+  declinedTitle: {
+    fontSize: 13,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold",
+    color: "#991B1B",
+    flex: 1,
+  },
+  declinedTime: {
+    fontSize: 11,
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold",
+    color: "#B91C1C",
+  },
+  declinedMessage: {
+    fontSize: 12,
+    color: "#991B1B",
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium",
+    marginBottom: 4,
+  },
+  declinedPhone: {
+    fontSize: 11,
+    color: "#B91C1C",
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium",
+    marginBottom: 10,
+  },
+  reassignBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#DC2626",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    gap: 6,
+  },
+  reassignBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold",
   },
 
   counterItem: {

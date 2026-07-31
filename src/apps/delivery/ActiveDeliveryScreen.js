@@ -46,6 +46,7 @@ const openPhoneCall = (phone) => {
 import useAuthStore from '../../store/authStore';
 import DeliveryMapView from '../../components/DeliveryMapView';
 import IncomingOrderSheet from '../../components/IncomingOrderSheet';
+import { deliveryAPI } from '../../services/api';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
@@ -1005,40 +1006,52 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
 };
 
 
-  const handleDeclineActiveOrder = () => {
-    Alert.alert(
-      "Decline Delivery",
-      "Are you sure you want to decline this delivery request? It will be unassigned from you.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Decline",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const res = await fetch(`${API_BASE}/delivery/decline/${activeOrder.orderIdRaw}`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}` }
-              });
-              const data = await res.json();
-              if (data.success) {
-                Alert.alert("Declined", "You have successfully declined this delivery.");
-                if (activeOrder?.id) {
-                  await clearStep(activeOrder.id);
-                }
-                setActiveOrder(null);
-                setStep(0);
-                fetchOrders();
-              } else {
-                Alert.alert("Error", data.message || "Failed to decline delivery.");
-              }
-            } catch (e) {
-              Alert.alert("Error", "Network error.");
-            }
-          }
+  const handleDeclineActiveOrder = async () => {
+    console.log(`[ActiveDelivery] Declining order ${activeOrder?.orderIdRaw}`);
+    const confirmed = Platform.OS === 'web'
+      ? window.confirm("Are you sure you want to decline this delivery request? It will be unassigned from you.")
+      : await new Promise(resolve => {
+          Alert.alert(
+            "Decline Delivery",
+            "Are you sure you want to decline this delivery request? It will be unassigned from you.",
+            [
+              { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+              { text: "Decline", style: "destructive", onPress: () => resolve(true) },
+            ]
+          );
+        });
+
+    if (!confirmed) return;
+
+    try {
+      const data = await deliveryAPI.decline(activeOrder.orderIdRaw, token);
+      console.log(`[ActiveDelivery] Decline response:`, JSON.stringify(data));
+      if (data.success) {
+        if (Platform.OS === 'web') {
+          window.alert("Declined. You have successfully declined this delivery.");
+        } else {
+          Alert.alert("Declined", "You have successfully declined this delivery.");
         }
-      ]
-    );
+        if (activeOrder?.id) {
+          await clearStep(activeOrder.id);
+        }
+        setActiveOrder(null);
+        setStep(0);
+        fetchOrders();
+      } else {
+        if (Platform.OS !== 'web') {
+          Alert.alert("Error", data.message || "Failed to decline delivery.");
+        } else {
+          window.alert(data.message || "Failed to decline delivery.");
+        }
+      }
+    } catch (e) {
+      if (Platform.OS !== 'web') {
+        Alert.alert("Error", e.message || "Network error.");
+      } else {
+        window.alert(e.message || "Network error.");
+      }
+    }
   };
 
   const handleStepComplete = async () => {

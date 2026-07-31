@@ -348,6 +348,20 @@ export default function QueueScreen({ navigation }) {
       });
     });
 
+    socket.on('order:assigned', (data) => {
+      Vibration.vibrate([0, 200, 100, 200]);
+      playOrderSound();
+      fetchQueuedOrders();
+    });
+
+    socket.on('order:assigned_flash', (data) => {
+      if (data.isQueued) {
+        Vibration.vibrate([0, 200, 100, 200]);
+        playOrderSound();
+        fetchQueuedOrders();
+      }
+    });
+
     socket.on('order_assigned_to_delivery', (data) => {
       setQueue(prev => prev.filter(o => o.orderId !== data.order?.id));
     });
@@ -378,7 +392,21 @@ export default function QueueScreen({ navigation }) {
     }
   };
 
-  const handleDecline = (orderId) => {
+  const handleDecline = async (orderId) => {
+    console.log(`[QueueScreen] Declining order ${orderId}`);
+    try {
+      const res = await fetch(`${API_BASE}/delivery/decline/${orderId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      console.log(`[QueueScreen] Decline response:`, JSON.stringify(data));
+      if (!data.success) {
+        console.log(`[QueueScreen] Decline FAILED:`, data.message);
+      }
+    } catch (err) {
+      console.log('[QueueScreen] decline error:', err);
+    }
     setQueue(prev => prev.filter(o => o.orderId !== orderId));
     declinedRef.current += 1;
     setSessionStats({ accepted: acceptedRef.current, declined: declinedRef.current });
