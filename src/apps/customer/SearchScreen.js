@@ -34,7 +34,6 @@ import {
   searchAPI,
   vendorsAPI,
   productsAPI,
-  productsExtendedAPI,
 } from "../../services/api";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
@@ -1049,7 +1048,7 @@ export default function SearchScreen() {
         : null;
 
   useEffect(() => {
-    productsExtendedAPI
+    productsAPI
       .getTrending(userCoords?.lat, userCoords?.lng, 10)
       .then((res) => setTrendingItems(res.data || []))
       .catch(() => setTrendingItems([]));
