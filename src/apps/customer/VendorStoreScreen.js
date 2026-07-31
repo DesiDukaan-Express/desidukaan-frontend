@@ -519,7 +519,7 @@ const pm = StyleSheet.create({
 function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
   const { t } = useTranslation();
   const p = item.product || {};
-  const inStock = item.is_active ?? true;
+  const inStock = item.product?.is_active;
   const loose = isLooseItem(p);
   const discount = p.mrp && p.mrp > p.price
     ? Math.round((1 - p.price / p.mrp) * 100) : null;
@@ -530,6 +530,7 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
       style={[pc.card, { width: cardW }, !inStock && { opacity: 0.5 }]}
       onPress={onPress}
       activeOpacity={0.88}
+      disabled={!inStock}
     >
       {/* Image */}
       <View style={[pc.imgWrap, { height: imgH }]}>
@@ -539,6 +540,7 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
         />
         <TouchableOpacity
           style={pc.eyeBtn}
+          disabled={!inStock}
           onPress={(e) => { e.stopPropagation?.(); onPress?.(); }}
           activeOpacity={0.7}
         >
