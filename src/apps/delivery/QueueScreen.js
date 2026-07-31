@@ -369,6 +369,44 @@ export default function QueueScreen({ navigation }) {
     return () => { socket.disconnect(); socketRef.current = null; };
   }, [token]);
 
+  const fetchQueuedOrders = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/delivery/queued`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && data.data?.orders) {
+        const mapped = data.data.orders.map((d) => ({
+          orderId: d.order.id,
+          orderNumber: `#${d.order.id}`,
+          total: d.order.total,
+          deliveryFee: d.delivery_fee,
+          pickup: {
+            name: d.order.vendor?.shop_name || d.order.vendor?.user?.name || '',
+            lat: d.order.vendor?.latitude,
+            lng: d.order.vendor?.longitude,
+          },
+          dropoff: {
+            address: d.order.customer?.address || '',
+            city: d.order.customer?.city || '',
+          },
+          status: d.status,
+        }));
+        setQueue((prev) => {
+          const existingIds = new Set(prev.map((o) => o.orderId));
+          const newOrders = mapped.filter((o) => !existingIds.has(o.orderId));
+          return [...newOrders, ...prev];
+        });
+      }
+    } catch (err) {
+      console.log('[QueueScreen] fetchQueuedOrders error:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (token) fetchQueuedOrders();
+  }, [token]);
+
   const handleAccept = async (orderId) => {
     setAcceptingId(orderId);
     try {
