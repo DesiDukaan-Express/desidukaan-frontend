@@ -348,6 +348,10 @@ export default function QueueScreen({ navigation }) {
       });
     });
 
+    socket.on('order:removed', (data) => {
+      setQueue(prev => prev.filter(o => o.orderId !== data.orderId));
+    });
+
     socket.on('order_assigned_to_delivery', (data) => {
       setQueue(prev => prev.filter(o => o.orderId !== data.order?.id));
     });

@@ -45,6 +45,7 @@ export default function CustomerMapView({ partnerPos, destLat, destLng }) {
   const mapRef        = useRef(null);   // Leaflet map instance
   const driverMarker  = useRef(null);   // Leaflet Marker for driver
   const destMarker    = useRef(null);   // Leaflet Marker for destination
+  const routeLine     = useRef(null);   // Leaflet Polyline for route
   const [ready, setReady] = useState(false);
 
   // ── 1. Bootstrap Leaflet (CSS + JS) once ────────────────────────────────
@@ -79,6 +80,7 @@ export default function CustomerMapView({ partnerPos, destLat, destLng }) {
         mapRef.current = null;
         driverMarker.current = null;
         destMarker.current = null;
+        routeLine.current = null;
       }
     };
   }, []);
@@ -143,6 +145,22 @@ export default function CustomerMapView({ partnerPos, destLat, destLng }) {
         .bindTooltip("Your Location", { permanent: false, direction: "top" });
     }
 
+    // ── Route polyline between driver and destination ──
+    if (partnerPos && destLat && destLng) {
+      routeLine.current = L.polyline(
+        [
+          [partnerPos.lat, partnerPos.lng],
+          [destLat, destLng],
+        ],
+        {
+          color: "#3B82F6",
+          weight: 3,
+          dashArray: "6 8",
+          opacity: 0.8,
+        },
+      ).addTo(map);
+    }
+
     mapRef.current = map;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
@@ -175,6 +193,23 @@ export default function CustomerMapView({ partnerPos, destLat, destLng }) {
       })
         .addTo(map)
         .bindTooltip("Partner", { permanent: false, direction: "top" });
+    }
+
+    // Update route polyline to keep it anchored to the moving driver
+    if (routeLine.current && destLat && destLng) {
+      routeLine.current.setLatLngs([
+        newLatLng,
+        L.latLng(destLat, destLng),
+      ]);
+    } else if (!routeLine.current && destLat && destLng) {
+      // Create polyline if it doesn't exist yet (driver pos arrived after init)
+      routeLine.current = L.polyline(
+        [
+          newLatLng,
+          L.latLng(destLat, destLng),
+        ],
+        { color: "#3B82F6", weight: 3, dashArray: "6 8", opacity: 0.8 },
+      ).addTo(map);
     }
 
     // Pan map to keep driver centered (with slight animation)

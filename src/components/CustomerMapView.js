@@ -10,7 +10,7 @@
 
 import React from "react";
 import { View, StyleSheet, Text } from "react-native";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, Polyline } from "react-native-maps";
 
 const DEFAULT_DELTA = { latitudeDelta: 0.03, longitudeDelta: 0.03 };
 const DEFAULT_CENTER = { latitude: 28.6139, longitude: 77.2090 };
@@ -53,6 +53,19 @@ export default function CustomerMapView({ partnerPos, destLat, destLng }) {
               <Text style={styles.destPinText}>📍</Text>
             </View>
           </Marker>
+        )}
+
+        {/* Route polyline between driver and destination */}
+        {partnerPos && destLat && destLng && (
+          <Polyline
+            coordinates={[
+              { latitude: partnerPos.lat, longitude: partnerPos.lng },
+              { latitude: destLat, longitude: destLng },
+            ]}
+            strokeColor="#3B82F6"
+            strokeWidth={3}
+            lineDashPattern={[6, 3]}
+          />
         )}
       </MapView>
     </View>

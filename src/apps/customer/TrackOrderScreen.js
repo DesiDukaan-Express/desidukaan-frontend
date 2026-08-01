@@ -8,6 +8,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
+import CustomerMapView from "../../components/CustomerMapView";
 import { useTranslation } from "react-i18next";
 
 const BASE_URL   = process.env.EXPO_PUBLIC_API_URL    || "http://localhost:3000/api";
@@ -41,55 +42,20 @@ const stepIndex = (status) => {
   return STATUS_STEPS.findIndex(s => s.key === status);
 };
 
-// ─── Map component — Web: uses iframe with OpenStreetMap, Native: placeholder ──
-function DeliveryMap({ partnerLat, partnerLng, destLat, destLng }) {
-  if (Platform.OS === "web") {
-    const centerLat = partnerLat ?? destLat ?? 28.6139;
-    const centerLng = partnerLng ?? destLng ?? 77.2090;
-    const zoom = 14;
-    // Build an iframe with two markers using OpenStreetMap + Leaflet via public tile
-    const markerParam = partnerLat && partnerLng
-      ? `&marker=${partnerLat},${partnerLng}`
-      : "";
-    const destParam  = destLat && destLng
-      ? `&marker=${destLat},${destLng}`
-      : "";
-    // Using embed.openstreetmap.org for simplicity (no API key needed)
-    const src = `https://www.openstreetmap.org/export/embed.html?bbox=${centerLng - 0.02},${centerLat - 0.02},${centerLng + 0.02},${centerLat + 0.02}&layer=mapnik${markerParam}${destParam}`;
-    return (
-      <View style={mapS.wrap}>
-        <iframe
-          src={src}
-          style={{ width: "100%", height: "100%", border: "none", borderRadius: 16 }}
-          title="Delivery Tracking Map"
-          allowFullScreen
-        />
-        {/* Overlay labels */}
-        {partnerLat && (
-          <View style={mapS.partnerBadge}>
-            <Feather name="truck" size={13} color={C.white} />
-            <Text style={mapS.badgeText}>Partner</Text>
-          </View>
-        )}
-      </View>
-    );
-  }
+// ─── Haversine distance (km) between two lat/lng points ───────────────────────
+const haversineKm = (lat1, lng1, lat2, lng2) => {
+  if (!lat1 || !lng1 || !lat2 || !lng2) return null;
+  const R = 6371;
+  const toRad = d => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
 
-  // Native fallback — map placeholder with pulsing dot
-  return (
-    <View style={[mapS.wrap, { alignItems: "center", justifyContent: "center", backgroundColor: C.gray100 }]}>
-      <Feather name="map" size={48} color={C.gray300} />
-      <Text style={{ marginTop: 12, fontSize: 14, color: C.gray400, textAlign: "center" }}>
-        Live map available on web.{"\n"}Partner location is updating below.
-      </Text>
-    </View>
-  );
-}
-const mapS = StyleSheet.create({
-  wrap:         { height: 280, borderRadius: 16, overflow: "hidden", backgroundColor: C.gray200, marginBottom: 16, position: "relative" },
-  partnerBadge: { position: "absolute", bottom: 12, left: 12, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.green, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
-  badgeText:    { fontSize: 12, fontWeight: "700", color: C.white },
-});
+
 
 // ─── Pulsing dot for live indicator ──────────────────────────────────────────
 function PulseDot({ color = C.green }) {
@@ -272,6 +238,50 @@ export default function TrackOrderScreen() {
   const partnerName    = partner?.user?.name || "Delivery Partner";
   const partnerPhone   = partner?.user?.phone;
 
+  // ── Real-time distance & ETA from driver position ──────────────────────────
+  const rawDist = partnerPos?.lat ? haversineKm(partnerPos.lat, partnerPos.lng, destLat, destLng) : order?.delivery_distance_km;
+  const currentDistKm = rawDist != null ? Number(rawDist) : null;
+  const liveEtaMins = (() => {
+    if (currentDistKm != null && partnerPos?.lat && destLat && destLng) {
+      const MINS_PER_KM = 4;
+      return Math.max(2, Math.round(currentDistKm * MINS_PER_KM));
+    }
+    if (order?.status === 'picked_up') return 15;
+    if (order?.status === 'ready') return 20;
+    return 30;
+  })();
+
+  // ── Status header content (icon, label, title) per order state ─────────────
+  const getStatusHeader = () => {
+    if (!order) return { icon: "clock", label: "ORDER PLACED", title: "Processing…" };
+    const s = order.status;
+    const hasPartner = !!partner;
+    const etaStr = `Arriving in ~${liveEtaMins} ${liveEtaMins === 1 ? "min" : "mins"}`;
+    if (s === "pending") return { icon: "clipboard", label: "ORDER PLACED", title: "Waiting for vendor to confirm…" };
+    if (s === "accepted" || s === "preparing") {
+      return { icon: "package", label: s === "preparing" ? "PREPARING" : "ACCEPTED", title: hasPartner ? etaStr : "Preparing your order…" };
+    }
+    if (s === "ready") {
+      return { icon: "package", label: "READY FOR PICKUP", title: hasPartner ? etaStr : "Waiting for partner assignment…" };
+    }
+    if (s === "picked_up") return { icon: "truck", label: "OUT FOR DELIVERY", title: etaStr };
+    if (s === "delivered") return { icon: "check-circle", label: "DELIVERED", title: "Order delivered successfully!" };
+    if (["cancelled", "rejected"].includes(s)) return { icon: "x-circle", label: s.toUpperCase(), title: `This order was ${s}` };
+    return { icon: "clock", label: s.replace("_", " ").toUpperCase(), title: "Processing…" };
+  };
+  const statusH = getStatusHeader();
+
+  const getStatusBgColor = (s) => {
+    if (["accepted", "preparing"].includes(s)) return C.green;
+    if (s === "ready") return C.green;
+    if (s === "picked_up") return "#0E7490";
+    if (s === "delivered") return C.greenDark;
+    if (s === "pending") return "#D97706";
+    if (["cancelled", "rejected"].includes(s)) return C.gray500;
+    return C.green;
+  };
+  const bannerBg = getStatusBgColor(order?.status);
+
   const [showDetails,   setShowDetails]   = useState(false);
 
   if (loading) {
@@ -329,10 +339,58 @@ export default function TrackOrderScreen() {
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={s.body}>
 
-        {/* MAP */}
-        <DeliveryMap
-          partnerLat={partnerPos?.lat}
-          partnerLng={partnerPos?.lng}
+        {/* STATUS HEADER — colored banner above map for all statuses */}
+        <View style={[s.statusBanner, { backgroundColor: bannerBg }]}>
+          <View style={s.statusBannerInner}>
+            <View style={s.statusIconWrap}>
+              <Feather name={statusH.icon} size={26} color={C.white} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.statusBannerLabel}>{statusH.label}</Text>
+              <Text style={s.statusBannerTitle}>{statusH.title}</Text>
+            </View>
+            {isActive && (
+              <View style={s.bannerLivePill}>
+                <PulseDot color={C.white} />
+                <Text style={s.bannerLiveText}>LIVE</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* ETA CARD — moved above map, uses live driver coords when available */}
+        {isActive && (
+          <View style={s.etaCard}>
+            <View style={s.etaCardHeader}>
+              <View style={s.etaIconBg}>
+                <Feather name="clock" size={20} color={C.orange} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.etaTitleText}>Estimated Arrival</Text>
+                <Text style={s.etaValueText}>
+                  {(() => {
+                    if (liveEtaMins < 60) return `~${liveEtaMins} mins`;
+                    const h = Math.floor(liveEtaMins / 60);
+                    const m = liveEtaMins % 60;
+                    return m > 0 ? `~${h}h ${m}m` : `~${h}h`;
+                  })()}
+                </Text>
+              </View>
+              {currentDistKm != null && (
+                <View style={s.etaBadge}>
+                  <Feather name="map-pin" size={12} color={C.gray500} />
+                  <Text style={s.etaBadgeText}>
+                    {partnerPos?.lat ? `${currentDistKm.toFixed(1)} km away` : `${currentDistKm} km away`}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* MAP — uses CustomerMapView for smooth Leaflet markers on web, react-native-maps on native */}
+        <CustomerMapView
+          partnerPos={partnerPos}
           destLat={destLat}
           destLng={destLng}
         />
@@ -590,6 +648,56 @@ const s = StyleSheet.create({
   deliveredGrad: { flexDirection: "row", alignItems: "center", gap: 14, padding: 20 },
   deliveredTitle: { fontSize: 17, fontWeight: "900", color: C.white },
   deliveredSub:   { fontSize: 13, color: "rgba(255,255,255,0.85)", marginTop: 2 },
+
+  // Status Banner
+  statusBanner: {
+    paddingVertical: 18,
+    paddingHorizontal: 18,
+    marginTop: 16,
+    marginBottom: 14,
+  },
+  statusBannerInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  statusIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusBannerLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.75)",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 3,
+  },
+  statusBannerTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: C.white,
+    lineHeight: 23,
+  },
+  bannerLivePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  bannerLiveText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: C.white,
+    letterSpacing: 0.8,
+  },
 
   // ETA Card
   etaCard: {
