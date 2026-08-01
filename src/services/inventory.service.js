@@ -120,7 +120,8 @@ export const inventoryService = {
           category_id: payload.category_id || null,
           unit: payload.unit || "kg",
           price: parseFloat(String(payload.price).replace(/[^0-9.]/g, "")) || 0,
-          type: payload.type || "packed",
+          mrp: payload.mrp ? parseFloat(String(payload.mrp).replace(/[^0-9.]/g, "")) : null,
+          barcode: payload.barcode || null,
           type: payload.type || "packed",
           weight_options: payload.weight_options || null,
           image_url: payload.image_url || null,
@@ -154,6 +155,7 @@ export const inventoryService = {
           parseFloat(String(payload.price).replace(/[^0-9.]/g, "")) || 0;
       if (payload.mrp !== undefined) body.mrp = payload.mrp;
       if (payload.type !== undefined) body.item_type = payload.type;
+      if (payload.barcode !== undefined) body.barcode = payload.barcode;
       if (payload.weight_options !== undefined)
         body.weight_options = payload.weight_options;
       if (payload.image_url !== undefined) body.image_url = payload.image_url;

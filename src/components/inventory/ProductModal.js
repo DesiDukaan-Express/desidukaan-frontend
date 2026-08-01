@@ -667,14 +667,20 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
-        const cats = (data.data?.categories || []).filter((c) => c.parent_id === null);
-        setTopCategories(
-          cats.length > 0
-            ? cats
-            : FALLBACK_CATEGORIES.map((n, i) => ({ id: -(i + 1), name: n, parent_id: null }))
-        );
+        const dbCats = (data.data?.categories || []).filter((c) => c.parent_id === null);
+        
+        // Merge DB categories with missing fallback categories
+        let finalCats = [...dbCats];
+        FALLBACK_CATEGORIES.forEach((fallbackName, i) => {
+          if (!finalCats.some(c => c.name.toLowerCase() === fallbackName.toLowerCase())) {
+            finalCats.push({ id: -(i + 1), name: fallbackName, parent_id: null });
+          }
+        });
+        
+        setTopCategories(finalCats);
+
         if (editing?.category) {
-          const match = cats.find((c) => c.name === editing.category);
+          const match = finalCats.find((c) => c.name === editing.category);
           if (match) setSelectedTopCat(match);
         }
       })
