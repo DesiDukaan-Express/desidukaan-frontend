@@ -58,18 +58,6 @@ const C = {
   errorText:    "#EF4444",
 };
 
-const ROLE_KEYS = [
-  { key: "customer", icon: "shopping-bag" },
-  { key: "vendor",   icon: "home" },
-  { key: "delivery", icon: "truck" },
-];
-
-const ROLE_HOME = {
-  customer: "CustomerApp",
-  vendor:   "VendorApp",
-  delivery: "DeliveryApp",
-};
-
 const isValidIndianMobile = (num) => /^[6-9]\d{9}$/.test(num);
 
 export default function LoginScreen({ navigation }) {
@@ -77,7 +65,6 @@ export default function LoginScreen({ navigation }) {
   const [mobile, setMobile]           = useState("");
   const [otp, setOtp]                 = useState("");
   const [step, setStep]               = useState("mobile");
-  const [selectedRole, setSelectedRole] = useState("customer");
   const [focusedField, setFocusedField] = useState(null);
   const [resendTimer, setResendTimer] = useState(0);
   const [error, setError]             = useState("");
@@ -162,22 +149,22 @@ export default function LoginScreen({ navigation }) {
       const res  = await fetch(`${BASE_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: mobile, role: selectedRole }),
+        body: JSON.stringify({ phone: mobile }),
       });
       const data = await res.json();
       if (res.status === 404 || data.userExists === false) {
-        navigation.navigate("Signup", { phone: mobile, role: selectedRole });
+        navigation.navigate("Signup", { phone: mobile });
         return;
       }
       if (!res.ok) throw new Error(data.msg || t("auth.failedToSendOtp"));
 
       // Testing mode: server returns tokens directly — skip OTP step
+      // After login, RolePickerScreen will handle routing (activeRole is null)
       if (data.accessToken) {
-        login(data.user, data.accessToken, data.refreshToken);
+        await login(data.user, data.accessToken, data.refreshToken);
         const addrStore = useAddressStore.getState();
         await addrStore.loadAddresses(data.accessToken);
-        navigation.replace(ROLE_HOME[selectedRole] || "CustomerApp");
-        return;
+        return; // Navigation auto-updates via auth store state change
       }
 
       // Production mode: server returns { msg: 'OTP sent' } — show OTP step
@@ -193,13 +180,14 @@ export default function LoginScreen({ navigation }) {
       const res  = await fetch(`${BASE_URL}/auth/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: mobile, code: otp, role: selectedRole }),
+        body: JSON.stringify({ phone: mobile, code: otp }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.msg || t("auth.invalidOtp"));
       const addrStore = useAddressStore.getState();
       await login(data.user, data.accessToken, data.refreshToken);
       await addrStore.loadAddresses(data.accessToken);
+      // Navigation auto-updates — RolePickerScreen shows (activeRole is null)
     } catch (e) { setError(e.message); shakeError(); }
     finally { setLoading(false); }
   };
@@ -211,7 +199,7 @@ export default function LoginScreen({ navigation }) {
       await fetch(`${BASE_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: mobile, role: selectedRole }),
+        body: JSON.stringify({ phone: mobile }),
       });
     } catch (_) {}
   };
@@ -265,24 +253,7 @@ export default function LoginScreen({ navigation }) {
             <Animated.View
               style={[s.formCard, { opacity: formOpacity, transform: [{ translateY: formAnim }] }]}
             >
-              {/* Role Tabs */}
-              <View style={s.tabBar}>
-                {ROLE_KEYS.map((role) => {
-                  const active = selectedRole === role.key;
-                  return (
-                    <TouchableOpacity
-                      key={role.key}
-                      style={[s.tab, active && s.tabActive]}
-                      onPress={() => { setSelectedRole(role.key); setError(""); }}
-                      activeOpacity={0.75}
-                    >
-                      <Text style={[s.tabText, active && s.tabTextActive]}>
-                        {t(`roles.${role.key}`)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+  
 
               {/* Form body */}
               <View style={s.formBody}>
@@ -435,7 +406,7 @@ export default function LoginScreen({ navigation }) {
 
                 {/* Create account */}
                 <TouchableOpacity
-                  onPress={() => navigation.navigate("Signup", { role: selectedRole })}
+                  onPress={() => navigation.navigate("Signup")}
                 >
                   <Text style={s.registerText}>
                     {t("auth.newHere")}

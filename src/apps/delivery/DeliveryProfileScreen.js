@@ -75,7 +75,7 @@ function SectionCard({ title, children }) {
 }
 
 export default function DeliveryProfileScreen({ navigation }) {
-  const { token, user, logout } = useAuthStore();
+  const { token, user, logout, setActiveRole } = useAuthStore();
   const { t } = useTranslation();
   const [showLanguage, setShowLanguage] = useState(false);
 
@@ -271,6 +271,15 @@ export default function DeliveryProfileScreen({ navigation }) {
               </View>
             </View>
             <Text style={p.langBtnArrow}>›</Text>
+          </TouchableOpacity>
+
+          {/* ── Switch Profile ── */}
+          <TouchableOpacity
+            style={[p.logoutBtn, { borderColor: '#BFDBFE', backgroundColor: '#EFF6FF', marginBottom: 8 }]}
+            onPress={async () => { await setActiveRole(null); }}
+            activeOpacity={0.8}
+          >
+            <Text style={[p.logoutText, { color: '#3B82F6' }]}>Switch Profile</Text>
           </TouchableOpacity>
 
           {/* ── Log out ── */}

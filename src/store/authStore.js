@@ -10,6 +10,7 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 // expo-secure-store is not supported on web; we fall back to AsyncStorage there.
 
 const REFRESH_KEY = "refresh_token";
+const ACTIVE_ROLE_KEY = "active_role";
 
 const secureGet = async (key) => {
   if (Platform.OS === "web") return AsyncStorage.getItem(key);
@@ -56,7 +57,11 @@ export const tryRefreshToken = async () => {
     await secureSet(REFRESH_KEY, data.refreshToken);
     if (data.user) {
       await AsyncStorage.setItem("user", JSON.stringify(data.user));
-      useAuthStore.setState({ user: data.user, role: data.user.role });
+      useAuthStore.setState({
+        user: data.user,
+        role: data.user.role,
+        enabledRoles: data.user.roles || [data.user.role],
+      });
     }
 
     return { token: data.accessToken, user: data.user };
@@ -72,11 +77,57 @@ const useAuthStore = create((set, get) => ({
   // accessToken lives in memory ONLY — never written to disk
   token: null,
   role: null,
+  // activeRole: the role currently being used in the UI (set from role picker)
+  // null means the picker hasn't been shown yet this session
+  activeRole: null,
+  // enabledRoles: all roles this user has unlocked
+  enabledRoles: ["customer"],
   isAuthenticated: false,
   isLoading: true,
 
   // Internal setter used by tryRefreshToken without triggering a full re-login
   _setAccessToken: (accessToken) => set({ token: accessToken }),
+
+  // ── Set active role (called by role picker) ──────────────────────────────
+  setActiveRole: async (role) => {
+    if (role === null || role === undefined) {
+      // Clear active role → will trigger role picker to appear
+      await AsyncStorage.removeItem(ACTIVE_ROLE_KEY);
+      set({ activeRole: null });
+    } else {
+      await AsyncStorage.setItem(ACTIVE_ROLE_KEY, role);
+      set({ activeRole: role });
+    }
+  },
+
+  // ── Enable a new role via API, then set it as active ─────────────────────
+  enableRole: async (role) => {
+    const { token } = get();
+    try {
+      const res = await fetch(`${BASE_URL}/auth/me/roles`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ role }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        set((state) => ({
+          enabledRoles: data.roles || [...state.enabledRoles, role],
+          user: data.user ? data.user : state.user,
+        }));
+        if (data.user) {
+          await AsyncStorage.setItem("user", JSON.stringify(data.user));
+        }
+        return { success: true };
+      }
+      return { success: false, msg: data.msg };
+    } catch {
+      return { success: false, msg: "Network error" };
+    }
+  },
 
   // ── Hydrate: called on app start ──────────────────────────────────────────
   // We only persist the user object + refresh token.
@@ -94,10 +145,14 @@ const useAuthStore = create((set, get) => ({
 
       if (refreshResult && refreshResult.token) {
         const currentUser = refreshResult.user;
+        // Read last active role from storage (will be null = force show picker)
+        // We intentionally set activeRole to null here so the picker always shows on app open
         set({
           token: refreshResult.token,
           user: currentUser,
           role: currentUser ? currentUser.role : null,
+          enabledRoles: currentUser?.roles || (currentUser ? [currentUser.role] : ["customer"]),
+          activeRole: null,   // ← always null on app open → triggers role picker
           isAuthenticated: true,
           isLoading: false,
         });
@@ -105,6 +160,7 @@ const useAuthStore = create((set, get) => ({
       } else if (refreshResult && refreshResult.error === "INVALID_TOKEN") {
         // Refresh token explicitly expired or invalid — clear session
         await AsyncStorage.removeItem("user");
+        await AsyncStorage.removeItem(ACTIVE_ROLE_KEY);
         await secureDelete(REFRESH_KEY);
         set({ isLoading: false });
       } else {
@@ -116,6 +172,8 @@ const useAuthStore = create((set, get) => ({
           set({
             user,
             role: user.role,
+            enabledRoles: user.roles || [user.role],
+            activeRole: null,   // ← always null on app open → triggers role picker
             isAuthenticated: true,
             isLoading: false,
           });
@@ -135,10 +193,13 @@ const useAuthStore = create((set, get) => ({
     // user goes to AsyncStorage (not sensitive)
     await AsyncStorage.setItem("user", JSON.stringify(userData));
     if (refreshToken) await secureSet(REFRESH_KEY, refreshToken);
+    // activeRole is null → role picker will be shown
     set({
       user: userData,
       token: accessToken,
       role: userData.role,
+      enabledRoles: userData.roles || [userData.role],
+      activeRole: null,   // picker will show after login
       isAuthenticated: true,
     });
   },
@@ -157,9 +218,10 @@ const useAuthStore = create((set, get) => ({
       }
     } finally {
       await AsyncStorage.removeItem("user");
+      await AsyncStorage.removeItem(ACTIVE_ROLE_KEY);
       await secureDelete(REFRESH_KEY);
       useAddressStore.getState().clearAddresses();
-      set({ user: null, token: null, role: null, isAuthenticated: false });
+      set({ user: null, token: null, role: null, activeRole: null, enabledRoles: ["customer"], isAuthenticated: false });
     }
   },
 

@@ -62,36 +62,22 @@ const C = {
   errorText:    "#EF4444",
 };
 
-const ROLES = [
-  { key: "customer", label: "Customer", icon: "shopping-bag" },
-  { key: "vendor", label: "Vendor", icon: "home" },
-  { key: "delivery", label: "Delivery", icon: "truck" },
-];
+const isValidIndianMobile = (num) => /^[6-9]\d{9}$/.test(num);
 
 const GENDERS = [
-  { key: "male", label: "Male", icon: "mars" },
+  { key: "male",   label: "Male",   icon: "mars" },
   { key: "female", label: "Female", icon: "venus" },
-  { key: "other", label: "Other", icon: "genderless" },
+  { key: "other",  label: "Other",  icon: "genderless" },
 ];
-
-const ROLE_HOME = {
-  customer: "CustomerApp",
-  vendor: "VendorApp",
-  delivery: "DeliveryApp",
-};
-
-const isValidIndianMobile = (num) => /^[6-9]\d{9}$/.test(num);
 
 export default function SignupScreen({ navigation, route }) {
   const { t } = useTranslation();
   const prefillPhone = route?.params?.phone || "";
-  const prefillRole = route?.params?.role || "customer";
 
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState(prefillPhone);
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
-  const [selectedRole, setSelectedRole] = useState(prefillRole);
   const [focusedField, setFocusedField] = useState(null);
   const [agreed, setAgreed] = useState(false);
 
@@ -206,17 +192,16 @@ export default function SignupScreen({ navigation, route }) {
         body: JSON.stringify({
           name: name.trim(), phone: mobile,
           age: ageNum,
-          gender, role: selectedRole,
+          gender,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.msg || "Registration failed");
 
-      // Testing mode: server returns tokens directly
+      // Testing mode: server returns tokens directly — role picker handles routing
       if (data.accessToken) {
-        login(data.user, data.accessToken, data.refreshToken);
-        navigation.replace(ROLE_HOME[selectedRole] || "CustomerApp");
-        return;
+        await login(data.user, data.accessToken, data.refreshToken);
+        return; // Navigation auto-updates via auth store
       }
 
       // Production mode: OTP sent — show OTP step
@@ -241,8 +226,8 @@ export default function SignupScreen({ navigation, route }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.msg || "Invalid OTP");
-      login(data.user, data.accessToken, data.refreshToken);
-      navigation.replace(ROLE_HOME[selectedRole] || "CustomerApp");
+      await login(data.user, data.accessToken, data.refreshToken);
+      // Navigation auto-updates — RolePickerScreen shows (activeRole is null)
     } catch (e) { setError(e.message); shakeError(); }
     finally { setLoading(false); }
   };
@@ -254,7 +239,7 @@ export default function SignupScreen({ navigation, route }) {
       await fetch(`${BASE_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: mobile, role: selectedRole }),
+        body: JSON.stringify({ phone: mobile }),
       });
     } catch (_) { }
   };
@@ -318,25 +303,6 @@ export default function SignupScreen({ navigation, route }) {
                       <Text style={[s.formHeading, { fontSize: headingSize }]}>Create account</Text>
                       <Text style={s.formSubheading}>Tell us a little about yourself</Text>
 
-                      {/* Role tabs */}
-                      <View style={s.roleContainer}>
-                        {ROLES.map((role) => {
-                          const active = selectedRole === role.key;
-                          return (
-                            <TouchableOpacity
-                              key={role.key}
-                              style={[s.roleTab, active && s.roleTabActive]}
-                              onPress={() => setSelectedRole(role.key)}
-                              activeOpacity={0.7}
-                            >
-                              <Feather name={role.icon} size={12} color={active ? C.white : C.gray500} />
-                              <Text style={[s.roleTabText, active && s.roleTabTextActive]}>
-                                {t(`roles.${role.key}`)}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
 
                       {/* Full Name */}
                       <Field label="Full Name">
