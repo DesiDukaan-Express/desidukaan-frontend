@@ -51,7 +51,7 @@ const C = {
 };
 
 export default function VendorProfileScreen() {
-  const { token, logout } = useAuthStore();
+  const { token, logout, setActiveRole } = useAuthStore();
   const { t } = useTranslation();
   const { width: SCREEN_W } = useWindowDimensions();
 
@@ -481,6 +481,7 @@ export default function VendorProfileScreen() {
               t={t}
             />
             <AccountSettingsCard rs={rs} isWide={isWide} />
+            <SwitchProfileButton onPress={async () => { await setActiveRole(null); }} rs={rs} isWide={isWide} t={t} />
             <LogoutButton onPress={() => setLogoutModal(true)} rs={rs} isWide={isWide} t={t} />
           </View>
         )}
@@ -1210,6 +1211,24 @@ function AccountSettingsCard({ rs, isWide }) {
         </Pressable>
       </Modal>
     </SectionCard>
+  );
+}
+
+function SwitchProfileButton({ onPress, rs, isWide, t }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[
+        styles.logoutBtn,
+        { paddingVertical: isWide ? 16 : rs(13, 14, 15), backgroundColor: "#EFF6FF", borderColor: "#BFDBFE", marginBottom: 10 },
+      ]}
+      activeOpacity={0.8}
+    >
+      <MaterialIcons name="swap-horiz" size={isWide ? 20 : rs(16, 18, 18)} color="#3B82F6" />
+      <Text style={[styles.logoutText, { fontSize: isWide ? 15 : rs(13, 14, 15), color: "#3B82F6" }]}>
+        Switch Profile
+      </Text>
+    </TouchableOpacity>
   );
 }
 
