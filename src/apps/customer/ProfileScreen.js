@@ -426,7 +426,7 @@ const pm2 = StyleSheet.create({
 export default function ProfileScreen() {
   const navigation = useNavigation();
   const { t } = useTranslation();
-  const { user, token, logout, updateUser } = useAuthStore();
+  const { user, token, logout, updateUser, setActiveRole } = useAuthStore();
   const { clearCart } = useCartStore();
   const addressStore = useAddressStore();
   const { width: winW } = useWindowDimensions();
@@ -711,6 +711,13 @@ export default function ProfileScreen() {
 
           {/* Account */}
           <SectionLabel title={t('profile.accountSection')} />
+          <MenuItem
+            icon="shuffle"
+            label="Switch Profile"
+            sub="Switch between Customer, Vendor & Delivery"
+            tint="blue"
+            onPress={async () => { await setActiveRole(null); }}
+          />
           <MenuItem
             icon="log-out"
             label={t('profile.logout')}

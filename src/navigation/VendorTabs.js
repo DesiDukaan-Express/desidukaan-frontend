@@ -1,46 +1,19 @@
-import React, { useState, useRef, useEffect } from "react";
+import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { View, Text, StyleSheet, Platform, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
-import { io } from "socket.io-client";
 
-import useAuthStore from "../store/authStore";
 import DashboardScreen from "../apps/vendor/DashboardScreen";
 import InventoryScreen from "../apps/vendor/InventoryScreen";
 import VendorOrdersScreen from "../apps/vendor/VendorOrdersScreen";
 import EarningsScreen from "../apps/vendor/EarningsScreen";
 import VendorProfileScreen from "../apps/vendor/VendorProfileScreen";
 
-const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 const Tab = createBottomTabNavigator();
 
 export default function VendorTabs() {
   const { t } = useTranslation();
-  const { token } = useAuthStore();
-  const [flash, setFlash] = useState({ visible: false, message: "", orderId: null });
-  const flashTimer = useRef(null);
-  const navRef = useRef(null);
-
-  useEffect(() => {
-    if (!token) return;
-    const socket = io(SOCKET_URL, {
-      auth: { token },
-      transports: ["websocket", "polling"],
-    });
-
-    socket.on("delivery:declined", (data) => {
-      console.log("[VendorTabs] delivery:declined", data);
-      const msg = `Reassign Order #${data.order_id} — ${data.partner_name} declined`;
-      if (flashTimer.current) clearTimeout(flashTimer.current);
-      setFlash({ visible: true, message: msg, orderId: data.order_id });
-    });
-
-    return () => {
-      if (flashTimer.current) clearTimeout(flashTimer.current);
-      socket.disconnect();
-    };
-  }, [token]);
 
   const TABS = [
     { name: "Dashboard", icon: "bar-chart",    label: t('vendor.dashboard'), component: DashboardScreen },
@@ -50,40 +23,10 @@ export default function VendorTabs() {
     { name: "Profile",   icon: "person",       label: t('profile.title'),    component: VendorProfileScreen },
   ];
 
-  const handleFlashPress = () => {
-    if (flashTimer.current) clearTimeout(flashTimer.current);
-    setFlash({ visible: false, message: "", orderId: null });
-    navRef.current?.navigate("Orders");
-  };
-
-  const handleFlashDismiss = () => {
-    if (flashTimer.current) clearTimeout(flashTimer.current);
-    setFlash({ visible: false, message: "", orderId: null });
-  };
-
   return (
     <View style={styles.root}>
-      {flash.visible && (
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={handleFlashPress}
-          style={styles.flashBanner}
-        >
-          <MaterialIcons name="replay" size={18} color="#FCA5A5" style={{ marginRight: 8 }} />
-          <Text style={styles.flashText} numberOfLines={2}>{flash.message}</Text>
-          <Text style={styles.flashAction}>TAP TO ASSIGN</Text>
-          <TouchableOpacity
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            onPress={handleFlashDismiss}
-          >
-            <MaterialIcons name="close" size={18} color="#FCA5A5" />
-          </TouchableOpacity>
-        </TouchableOpacity>
-      )}
-
       <View style={styles.tabContainer}>
         <Tab.Navigator
-          ref={navRef}
           lazy={false}
           screenOptions={({ route }) => {
             const tab = TABS.find((t) => t.name === route.name);
@@ -114,27 +57,6 @@ export default function VendorTabs() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-  },
-  flashBanner: {
-    backgroundColor: "#7F1D1D",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  flashText: {
-    color: "#FCA5A5",
-    fontSize: 13,
-    fontWeight: "600",
-    flex: 1,
-  },
-  flashAction: {
-    color: "#FCA5A5",
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-    marginRight: 10,
-    textDecorationLine: "underline",
   },
   tabContainer: {
     flex: 1,

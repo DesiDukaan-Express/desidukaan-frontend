@@ -75,7 +75,7 @@ function SectionCard({ title, children }) {
 }
 
 export default function DeliveryProfileScreen({ navigation }) {
-  const { token, user, logout } = useAuthStore();
+  const { token, user, logout, setActiveRole } = useAuthStore();
   const { t } = useTranslation();
   const [showLanguage, setShowLanguage] = useState(false);
 
@@ -137,7 +137,8 @@ export default function DeliveryProfileScreen({ navigation }) {
   const initials  = displayName.trim().split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
   const phone  = user?.phone  || profile?.user?.phone  || '—';
   const rating = stats?.rating ?? profile?.rating ?? null;
-  const displayRating = rating && rating > 0 ? Number(rating).toFixed(1) : '—';
+  const totalRatings = stats?.totalRatings ?? profile?.total_ratings ?? 0;
+  const displayRating = totalRatings > 0 ? Number(rating || 0).toFixed(1) : '—';
 
   const onboardingDone = profile?.onboarding_submitted;
   const isVerified = profile?.is_certified;
@@ -270,6 +271,15 @@ export default function DeliveryProfileScreen({ navigation }) {
               </View>
             </View>
             <Text style={p.langBtnArrow}>›</Text>
+          </TouchableOpacity>
+
+          {/* ── Switch Profile ── */}
+          <TouchableOpacity
+            style={[p.logoutBtn, { borderColor: '#BFDBFE', backgroundColor: '#EFF6FF', marginBottom: 8 }]}
+            onPress={async () => { await setActiveRole(null); }}
+            activeOpacity={0.8}
+          >
+            <Text style={[p.logoutText, { color: '#3B82F6' }]}>Switch Profile</Text>
           </TouchableOpacity>
 
           {/* ── Log out ── */}
