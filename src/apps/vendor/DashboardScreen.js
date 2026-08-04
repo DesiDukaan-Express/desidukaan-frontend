@@ -419,6 +419,18 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
   const currStats = [stats.today, stats.weekly, stats.monthly][currIndex];
   const chartW = SCREEN_W - 64;
 
+  // ── LineChart guard ──────────────────────────────────────────────────────
+  // react-native-chart-kit's LineChart crashes (NaN in its y-axis math) when
+  // given all-zero or empty data. This must stay safe no matter how often the
+  // dashboard remounts or stats changes (e.g. rapid suspend/reactivate flips):
+  // we only draw the chart when there are at least 2 labels, at least 2 values
+  // and at least one value strictly > 0. Otherwise we show an empty state.
+  const hasChartData = !!(
+    stats.labels?.length >= 2 &&
+    stats.chartValues?.length >= 2 &&
+    stats.chartValues.some((v) => isFinite(Number(v)) && Number(v) > 0)
+  );
+
   const displayReviews = stats.recentReviews?.length ? stats.recentReviews : [];
   const displayPartners = stats.deliveryPartners?.length
     ? stats.deliveryPartners
@@ -1264,7 +1276,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             </View>
           </View>
 
-          {stats.labels?.length && stats.chartValues?.some(v => isFinite(v)) ? (
+          {hasChartData ? (
             <LineChart
               data={{
                 labels: stats.labels,
@@ -1297,9 +1309,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             />
           ) : (
             <View style={{ height: rs(150, 170, 185), justifyContent: 'center', alignItems: 'center', marginTop: 10 }}>
-              <ActivityIndicator size="small" color={C.primary} />
+              <MaterialIcons name="bar-chart" size={22} color={C.textLight} />
               <Text style={{ color: C.textLight, fontSize: rs(11, 12, 12), marginTop: 8 }}>
-                {t('common.loading') || 'Loading chart...'}
+                {t('vendor.noChartData') || 'No sales data yet'}
               </Text>
             </View>
           )}
