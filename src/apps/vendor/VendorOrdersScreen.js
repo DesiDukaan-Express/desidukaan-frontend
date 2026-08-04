@@ -14,6 +14,7 @@ import {
   Dimensions,
   Alert,
   Platform,
+  Pressable,
 } from "react-native";
 import { Linking } from "react-native";
 
@@ -66,6 +67,12 @@ export default function VendorOrdersScreen() {
   const [historyTotal, setHistoryTotal] = useState(0);
   const [acceptedModalVisible, setAcceptedModalVisible] = useState(false);
   const [expandedCustomers, setExpandedCustomers] = useState({});
+
+  // Vendor review delivery partner
+  const [vendorReviewOrder, setVendorReviewOrder] = useState(null);
+  const [vendorReviewRating, setVendorReviewRating] = useState(0);
+  const [vendorReviewComment, setVendorReviewComment] = useState("");
+  const [vendorReviewLoading, setVendorReviewLoading] = useState(false);
 
   // ── Demand Surcharge (vendor can set surge % for rain/peak hours) ─────────
   const [demandSurcharge, setDemandSurcharge] = useState(0);   // current %
@@ -436,8 +443,9 @@ export default function VendorOrdersScreen() {
       );
       const result = await res.json();
       if (result.success) {
-        const orders = result.data?.data || result.data?.orders || [];
-        setHistoryTotal(result.data?.total || 0);
+        const responseData = result.data || {};
+        const orders = responseData.orders || responseData.data || [];
+        setHistoryTotal(responseData.total || result.pagination?.total || 0);
         if (page === 1) {
           setHistory(orders);
         } else {
@@ -1204,7 +1212,28 @@ export default function VendorOrdersScreen() {
                       {formatOrderTime(order.created_at)}
                     </Text>
                   </View>
-                  <Text style={styles.historyOrderTotal}>₹{order.total}</Text>
+                  <View style={{ alignItems: "flex-end", gap: 4 }}>
+                    <Text style={styles.historyOrderTotal}>₹{order.total}</Text>
+                    {order.can_rate_partner && !order.has_rated_partner && (
+                      <TouchableOpacity
+                        style={styles.ratePartnerBtn}
+                        onPress={() => {
+                          if (order.delivery?.partner) {
+                            setVendorReviewOrder(order);
+                            setVendorReviewRating(0);
+                            setVendorReviewComment("");
+                          }
+                        }}
+                      >
+                        <Text style={styles.ratePartnerBtnText}>Rate</Text>
+                      </TouchableOpacity>
+                    )}
+                    {order.can_rate_partner && order.has_rated_partner && (
+                      <View style={styles.ratedBadge}>
+                        <Text style={styles.ratedBadgeText}>Rated ⭐</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
               ))}
             </View>
@@ -2105,6 +2134,28 @@ export default function VendorOrdersScreen() {
                 </View>
               )}
 
+              {/* Rate delivery partner — for delivered orders */}
+              {selectedOrder?.status === "delivered" && selectedOrder?.delivery?.partner && (
+                <View style={omStyles.actionsWrap}>
+                  <Text style={omStyles.actionsLabel}>Delivery Partner</Text>
+                  <TouchableOpacity
+                    style={[omStyles.acceptBtn, { backgroundColor: "#D97706" }]}
+                    onPress={() => {
+                      setModalVisible(false);
+                      setVendorReviewOrder(selectedOrder);
+                      setVendorReviewRating(0);
+                      setVendorReviewComment("");
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <MaterialIcons name="star" size={20} color="#fff" />
+                    <Text style={omStyles.acceptBtnText}>
+                      Rate {selectedOrder?.delivery?.partner?.user?.name || "Delivery Partner"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Actions — for accepted/preparing/ready */}
               {["accepted", "preparing", "ready", "picked_up"].includes(
                 selectedOrder?.status,
@@ -2243,9 +2294,15 @@ export default function VendorOrdersScreen() {
                         omStyles.acceptBtn,
                         { backgroundColor: "#16A34A", marginTop: 8 },
                       ]}
-                      onPress={() => {
-                        updateOrderStatus(selectedOrder.id, "delivered");
+                      onPress={async () => {
+                        await updateOrderStatus(selectedOrder.id, "delivered");
                         setModalVisible(false);
+                        // Show rating modal for delivery partner if one was assigned
+                        if (selectedOrder?.delivery?.partner) {
+                          setVendorReviewOrder(selectedOrder);
+                          setVendorReviewRating(0);
+                          setVendorReviewComment("");
+                        }
                       }}
                       activeOpacity={0.85}
                     >
@@ -2499,6 +2556,162 @@ export default function VendorOrdersScreen() {
             </ScrollView>
           </View>
         </View>
+      </Modal>
+
+      {/* ── VENDOR REVIEW DELIVERY PARTNER MODAL ── */}
+      <Modal
+        visible={!!vendorReviewOrder}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setVendorReviewOrder(null)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "flex-end",
+          }}
+          onPress={() => setVendorReviewOrder(null)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 24,
+              paddingBottom: 40,
+            }}
+            onPress={() => {}}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 4,
+                backgroundColor: "#E2E8F0",
+                borderRadius: 2,
+                alignSelf: "center",
+                marginBottom: 20,
+              }}
+            />
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "900",
+                fontFamily: "PlusJakartaSans_800ExtraBold",
+                color: "#0F172A",
+                marginBottom: 4,
+              }}
+            >
+              Rate Delivery Partner
+            </Text>
+            <Text style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
+              {vendorReviewOrder?.delivery?.partner?.user?.name || "Delivery Partner"}
+            </Text>
+
+            {/* Star picker */}
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 10,
+                marginBottom: 20,
+                justifyContent: "center",
+              }}
+            >
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity
+                  key={star}
+                  onPress={() => setVendorReviewRating(star)}
+                >
+                  <Text
+                    style={{
+                      fontSize: 36,
+                      opacity: star <= vendorReviewRating ? 1 : 0.25,
+                    }}
+                  >
+                    ⭐
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Comment input */}
+            <TextInput
+              style={{
+                backgroundColor: "#F3F4F6",
+                borderRadius: 12,
+                padding: 14,
+                fontSize: 14,
+                color: "#111827",
+                minHeight: 80,
+                textAlignVertical: "top",
+                marginBottom: 20,
+                borderWidth: 1,
+                borderColor: "#E5E7EB",
+              }}
+              placeholder="Tell us about the delivery experience (optional)"
+              placeholderTextColor="#9CA3AF"
+              multiline
+              value={vendorReviewComment}
+              onChangeText={setVendorReviewComment}
+            />
+
+            <TouchableOpacity
+              onPress={async () => {
+                if (vendorReviewRating === 0) {
+                  Alert.alert("Please select a rating");
+                  return;
+                }
+                setVendorReviewLoading(true);
+                try {
+                  const res = await fetch(
+                    `${API_BASE}/orders/${vendorReviewOrder.id}/vendor-review`,
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify({
+                        vendor_review_rating: vendorReviewRating,
+                        vendor_review_comment: vendorReviewComment,
+                      }),
+                    }
+                  );
+                  const data = await res.json();
+                  if (data.success) {
+                    setVendorReviewOrder(null);
+                    setVendorReviewRating(0);
+                    setVendorReviewComment("");
+                    fetchHistory(1);
+                    Alert.alert("Thank you!", "Your review has been submitted.");
+                  }
+                } catch (e) {
+                  Alert.alert("Error", "Failed to submit review.");
+                } finally {
+                  setVendorReviewLoading(false);
+                }
+              }}
+              disabled={vendorReviewLoading}
+              style={{
+                backgroundColor: vendorReviewLoading ? "#E5E7EB" : "#16A34A",
+                borderRadius: 14,
+                padding: 16,
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{
+                  color: "#fff",
+                  fontSize: 16,
+                  fontWeight: "800",
+                  fontFamily: "PlusJakartaSans_800ExtraBold",
+                }}
+              >
+                {vendorReviewLoading ? "Submitting..." : "Submit Review"}
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {/* COUNTER MODAL */}
@@ -4507,6 +4720,30 @@ const styles = StyleSheet.create({
   historyOrderTotal: {
     fontSize: 15,
     fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#1F2937",
+  },
+  ratePartnerBtn: {
+    backgroundColor: "#FEF3C7",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  ratePartnerBtnText: {
+    fontSize: 11,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#D97706",
+  },
+  ratedBadge: {
+    backgroundColor: "#DCFCE7",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+  },
+  ratedBadgeText: {
+    fontSize: 11,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: "#16A34A",
   },
   activeOrderRow: {
     flexDirection: "row",

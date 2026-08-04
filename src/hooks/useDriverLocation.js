@@ -24,13 +24,15 @@ const ACTIVE_DELIVERY_STATUSES = ["accepted", "preparing", "ready", "picked_up"]
 
 const POLL_INTERVAL_MS = 15_000; // 15 seconds
 
-export default function useDriverLocation(orderId, token, orderStatus, hasDriver, initialLocation) {
+export default function useDriverLocation(orderId, token, orderStatus, hasDriver, initialLocation, onOrderUpdate) {
   const [partnerPos,  setPartnerPos]  = useState(initialLocation || null);   // { lat, lng }
   const [connected,   setConnected]   = useState(false);
   const [lastUpdate,  setLastUpdate]  = useState(null);   // Date
 
-  const socketRef   = useRef(null);
-  const pollTimerRef = useRef(null);
+  const socketRef     = useRef(null);
+  const pollTimerRef  = useRef(null);
+  const onUpdateRef   = useRef(onOrderUpdate);
+  onUpdateRef.current = onOrderUpdate;
 
   // Sync initial location if it arrives after mounting
   useEffect(() => {
@@ -103,6 +105,21 @@ export default function useDriverLocation(orderId, token, orderStatus, hasDriver
         setPartnerPos({ lat, lng });
         setLastUpdate(new Date());
       }
+    });
+
+    // Listen for order status / delivery assignment changes — notifies
+    // parent (e.g. OrderDetailModal) to re-fetch the order so hasDriver,
+    // headerStatusText, etc. update in real time.
+    socket.on("order:update", (data) => {
+      const oid = data.order_id || data.orderId;
+      if (oid && String(oid) !== String(orderId)) return;
+      if (typeof onUpdateRef.current === "function") onUpdateRef.current();
+    });
+
+    socket.on("delivery_assigned", (data) => {
+      const oid = data.order_id || data.orderId;
+      if (oid && String(oid) !== String(orderId)) return;
+      if (typeof onUpdateRef.current === "function") onUpdateRef.current();
     });
 
     // 3. Start fallback poll (only when driver assigned — avoids repeated 404s)

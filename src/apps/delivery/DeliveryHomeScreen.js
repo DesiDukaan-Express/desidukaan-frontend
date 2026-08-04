@@ -281,6 +281,9 @@ export default function DeliveryHomeScreen({ navigation }) {
     socket.on('delivery_status_update', () => { fetchStats(); fetchHistory(); });
     socket.on('new_delivery_request', fetchStats);
     socket.on('order:incoming', (data) => setIncomingOrder(data));
+    socket.on('order:removed', (data) => {
+      setIncomingOrder(prev => prev?.orderId === data.orderId ? null : prev);
+    });
     socketRef.current = socket;
     return () => { socket.disconnect(); socketRef.current = null; };
   }, [token]);
@@ -364,8 +367,9 @@ export default function DeliveryHomeScreen({ navigation }) {
     ? `${Math.round(totalDistanceKm)} km`
     : '—';
 
-  const displayRating = rating != null && rating > 0
-    ? `${Number(rating).toFixed(1)} ★`
+  const totalRatings = stats?.totalRatings ?? 0;
+  const displayRating = totalRatings > 0
+    ? `${Number(rating || 0).toFixed(1)} ★`
     : '— ★';
 
   const displayEarnings = todayEarnings.toLocaleString('en-IN', {
