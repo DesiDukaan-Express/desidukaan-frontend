@@ -55,6 +55,7 @@ export default function VendorOrdersScreen() {
   const [nearbyRiders, setNearbyRiders] = useState([]);
   const [autoAssigning, setAutoAssigning] = useState(false);
   const [broadcastStatus, setBroadcastStatus] = useState(null); // { count, message }
+  const [declinedOrders, setDeclinedOrders] = useState({}); // { [order_id]: { partnerName, partnerPhone, declinedAt, message } }
 
   const route = useRoute?.() || {};
   const [activeTab, setActiveTab] = useState(
@@ -163,15 +164,15 @@ export default function VendorOrdersScreen() {
                 const declinedAt = new Date(decline.created_at).toLocaleTimeString([], {
                   hour: "2-digit", minute: "2-digit",
                 });
-                setBroadcastStatus({
-                  count: 0,
-                  message: `Partner declined at ${declinedAt}`,
-                  type: "declined",
-                  partnerName: decline.body.split(" declined")[0] || "Partner",
-                  partnerPhone: null,
-                  orderId: decline.order_id,
-                  declinedAt,
-                });
+                setDeclinedOrders(prev => ({
+                  ...prev,
+                  [String(decline.order_id)]: {
+                    partnerName: decline.body?.split(" declined")[0]?.trim() || "A delivery partner",
+                    partnerPhone: null,
+                    declinedAt,
+                    message: decline.body || decline.title || "Delivery request declined",
+                  },
+                }));
               }
             }
           })
@@ -498,23 +499,20 @@ export default function VendorOrdersScreen() {
       .then(r => r.json())
       .then(data => {
         if (data.success && data.data?.notifications?.length) {
-          const recentDecline = data.data.notifications.find(
-            n => n.type === "delivery_declined" && !n.read
-          );
-          if (recentDecline && !broadcastStatus) {
-            const declinedAt = new Date(recentDecline.created_at).toLocaleTimeString([], {
+          const map = {};
+          data.data.notifications.forEach(n => {
+            if (n.type !== "delivery_declined" || n.order_id == null) return;
+            const declinedAt = new Date(n.created_at).toLocaleTimeString([], {
               hour: "2-digit", minute: "2-digit",
             });
-            setBroadcastStatus({
-              count: 0,
-              message: `${recentDecline.title.split("—")[1]?.trim() || "Partner"} declined at ${declinedAt}`,
-              type: "declined",
-              partnerName: recentDecline.body.split(" declined")[0],
+            map[String(n.order_id)] = {
+              partnerName: n.body?.split(" declined")[0]?.trim() || "A delivery partner",
               partnerPhone: null,
-              orderId: recentDecline.order_id,
               declinedAt,
-            });
-          }
+              message: n.body || n.title || "Delivery request declined",
+            };
+          });
+          setDeclinedOrders(prev => ({ ...prev, ...map }));
         }
       })
       .catch(() => {});
@@ -533,17 +531,15 @@ export default function VendorOrdersScreen() {
       console.log("[VendorOrdersScreen] ★★★ delivery:declined ★★★", JSON.stringify(data));
       fetchOrdersRef.current?.();
       const declinedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      if (selectedOrderRef.current && Number(selectedOrderRef.current.id) === Number(data.order_id)) {
-        setBroadcastStatus({
-          count: 0,
-          message: `${data.partner_name} declined at ${declinedAt}`,
-          type: "declined",
+      setDeclinedOrders(prev => ({
+        ...prev,
+        [String(data.order_id)]: {
           partnerName: data.partner_name,
           partnerPhone: data.partner_phone,
-          orderId: data.order_id,
           declinedAt,
-        });
-      }
+          message: data.message || `${data.partner_name} declined the delivery request`,
+        },
+      }));
 
       let customerPhone = null;
       let customerName = "the customer";
@@ -1352,10 +1348,22 @@ export default function VendorOrdersScreen() {
                         {order.status === "pending" && (
                           <View style={styles.pendingDot} />
                         )}
+                        {declinedOrders[String(order.id)] &&
+                          !order.delivery?.partner && (
+                            <View style={styles.declinedDot}>
+                              <MaterialIcons
+                                name="error"
+                                size={9}
+                                color="#fff"
+                              />
+                            </View>
+                          )}
                         <Text
                           style={[
                             styles.historyOrderNumber,
                             order.status === "pending" && { color: "#D97706" },
+                            declinedOrders[String(order.id)] &&
+                              !order.delivery?.partner && { color: "#DC2626" },
                           ]}
                         >
                           {order.order_number || `#${order.id}`}
@@ -1851,30 +1859,51 @@ export default function VendorOrdersScreen() {
                 </TouchableOpacity>
               )}
 
-              {broadcastStatus && broadcastStatus.type === "declined" && (
-                <View style={dmStyles.declinedBanner}>
-                  <View style={dmStyles.declinedHeader}>
-                    <View style={dmStyles.declinedDot} />
-                    <Text style={dmStyles.declinedTitle}>Delivery Declined</Text>
-                    <Text style={dmStyles.declinedTime}>{broadcastStatus.declinedAt}</Text>
+              {selectedOrder && declinedOrders[String(selectedOrder.id)] && (
+                <View style={dmStyles.declinedCard}>
+                  <View style={dmStyles.declinedCardHeader}>
+                    <View style={dmStyles.declinedCardIconWrap}>
+                      <MaterialIcons name="error-outline" size={16} color="#DC2626" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={dmStyles.declinedCardTitle}>Delivery Declined</Text>
+                      <Text style={dmStyles.declinedCardTime}>
+                        {declinedOrders[String(selectedOrder.id)].declinedAt}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={() =>
+                        setDeclinedOrders(prev => {
+                          const next = { ...prev };
+                          delete next[String(selectedOrder.id)];
+                          return next;
+                        })
+                      }
+                    >
+                      <MaterialIcons name="close" size={18} color="#9F1239" />
+                    </TouchableOpacity>
                   </View>
-                  <Text style={dmStyles.declinedMessage}>
-                    {broadcastStatus.partnerName} declined this delivery request.
+                  <Text style={dmStyles.declinedCardMsg}>
+                    {declinedOrders[String(selectedOrder.id)].partnerName} declined this
+                    delivery request.
                   </Text>
-                  {broadcastStatus.partnerPhone && (
-                    <Text style={dmStyles.declinedPhone}>Phone: {broadcastStatus.partnerPhone}</Text>
-                  )}
-                  <TouchableOpacity
-                    style={dmStyles.reassignBtn}
-                    onPress={() => {
-                      setBroadcastStatus(null);
-                      setIsDeliveryModalVisible(true);
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <MaterialIcons name="replay" size={16} color="#fff" />
-                    <Text style={dmStyles.reassignBtnText}>Reassign to Another Rider</Text>
-                  </TouchableOpacity>
+                  {declinedOrders[String(selectedOrder.id)].partnerPhone &&
+                    declinedOrders[String(selectedOrder.id)].partnerPhone !== "N/A" && (
+                      <View style={dmStyles.declinedCardPhoneRow}>
+                        <MaterialIcons name="phone" size={12} color="#9F1239" />
+                        <Text style={dmStyles.declinedCardPhone}>
+                          {declinedOrders[String(selectedOrder.id)].partnerPhone}
+                        </Text>
+                      </View>
+                    )}
+                  <View style={dmStyles.declinedCardDivider} />
+                  <View style={dmStyles.declinedCardFooter}>
+                    <MaterialIcons name="info-outline" size={14} color="#9F1239" />
+                    <Text style={dmStyles.declinedCardFooterText}>
+                      Assign a new rider below to get this order moving again.
+                    </Text>
+                  </View>
                 </View>
               )}
 
@@ -2194,6 +2223,39 @@ export default function VendorOrdersScreen() {
                   </Text>
                 </View>
               )}
+
+              {/* Declined delivery notice */}
+              {declinedOrders[String(selectedOrder?.id)] &&
+                !selectedOrder?.delivery?.partner && (
+                  <View style={omStyles.declinedNotice}>
+                    <View style={omStyles.declinedNoticeIconWrap}>
+                      <MaterialIcons name="error-outline" size={16} color="#DC2626" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={omStyles.declinedNoticeTitle}>
+                        Delivery Declined
+                      </Text>
+                      <Text style={omStyles.declinedNoticeMsg}>
+                        {declinedOrders[String(selectedOrder.id)].partnerName} declined
+                        the delivery request at{" "}
+                        {declinedOrders[String(selectedOrder.id)].declinedAt}.
+                      </Text>
+                      <TouchableOpacity
+                        style={omStyles.declinedNoticeBtn}
+                        onPress={() => {
+                          setModalVisible(false);
+                          setIsDeliveryModalVisible(true);
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        <MaterialIcons name="replay" size={14} color="#fff" />
+                        <Text style={omStyles.declinedNoticeBtnText}>
+                          {t('vendor.reassignNow', 'Reassign a Rider Now')}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
 
               {/* Rate delivery partner — for delivered orders */}
               {selectedOrder?.status === "delivered" && selectedOrder?.delivery?.partner && (
@@ -3736,6 +3798,16 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
 
+  declinedDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#DC2626",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 2,
+  },
+
   orderId: {
     fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", fontSize: 15,
     color: "#1F2937",
@@ -3978,63 +4050,72 @@ const styles = StyleSheet.create({
     fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", flex: 1,
   },
 
-  declinedBanner: {
+  declinedCard: {
     backgroundColor: "#FEF2F2",
     borderWidth: 1,
     borderColor: "#FECACA",
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 14,
-    marginTop: 10,
+    marginTop: 12,
+    marginHorizontal: 16,
   },
-  declinedHeader: {
+  declinedCardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
   },
-  declinedDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#EF4444",
-    marginRight: 8,
+  declinedCardIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#FEE2E2",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
   },
-  declinedTitle: {
-    fontSize: 13,
-    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold",
+  declinedCardTitle: {
+    fontSize: 14,
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold",
     color: "#991B1B",
-    flex: 1,
   },
-  declinedTime: {
+  declinedCardTime: {
     fontSize: 11,
     fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold",
     color: "#B91C1C",
+    marginTop: 1,
   },
-  declinedMessage: {
-    fontSize: 12,
+  declinedCardMsg: {
+    fontSize: 13,
     color: "#991B1B",
     fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium",
-    marginBottom: 4,
+    marginTop: 10,
+    lineHeight: 19,
   },
-  declinedPhone: {
-    fontSize: 11,
-    color: "#B91C1C",
-    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium",
-    marginBottom: 10,
-  },
-  reassignBtn: {
+  declinedCardPhoneRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#DC2626",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
+    gap: 5,
+    marginTop: 6,
+  },
+  declinedCardPhone: {
+    fontSize: 12,
+    color: "#9F1239",
+    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold",
+  },
+  declinedCardDivider: {
+    height: 1,
+    backgroundColor: "#FECACA",
+    marginVertical: 10,
+  },
+  declinedCardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
-  reassignBtnText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold",
+  declinedCardFooterText: {
+    flex: 1,
+    fontSize: 11,
+    color: "#9F1239",
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium",
   },
 
   counterItem: {
@@ -5644,6 +5725,55 @@ const omStyles = StyleSheet.create({
     color: "#92400E",
     fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium", flex: 1,
     lineHeight: 20,
+  },
+  declinedNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: "#FEF2F2",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+  },
+  declinedNoticeIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#FEE2E2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  declinedNoticeTitle: {
+    fontSize: 13,
+    fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold",
+    color: "#991B1B",
+  },
+  declinedNoticeMsg: {
+    fontSize: 12,
+    color: "#991B1B",
+    fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium",
+    marginTop: 2,
+    lineHeight: 18,
+  },
+  declinedNoticeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    backgroundColor: "#DC2626",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 9,
+    marginTop: 10,
+  },
+  declinedNoticeBtnText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold",
   },
   actionsWrap: {
     marginHorizontal: 16,
