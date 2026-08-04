@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from "react";
-import { View, ActivityIndicator } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, ActivityIndicator, AppState } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { io } from "socket.io-client";
 import SignupScreen from "../apps/customer/SignUpScreen";
 import useAuthStore from "../store/authStore";
 import { colors } from "../styles/colors";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http:localhost:3000/api";
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
 import LoginScreen from "../apps/customer/LoginScreen";
 import CustomerTabs from "./CustomerTabs";
@@ -20,6 +22,8 @@ import DashboardScreen from "../apps/vendor/DashboardScreen";
 import DeliveryOnboardingScreen from "../apps/delivery/DeliveryOnboardingScreen";
 import DeliveryPendingScreen from "../apps/delivery/DeliveryPendingScreen";
 import RolePickerScreen from "../apps/RolePickerScreen";
+import AccountDeactivatedScreen from "../apps/AccountDeactivatedScreen";
+import AccountSuspendedScreen from "../apps/AccountSuspendedScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -29,6 +33,14 @@ export default function Navigation() {
   const isLoading       = useAuthStore((s) => s.isLoading);
   const token           = useAuthStore((s) => s.token);
   const setActiveRole   = useAuthStore((s) => s.setActiveRole);
+  const accountDeactivated = useAuthStore((s) => s.accountDeactivated);
+  const checkAccountStatus = useAuthStore((s) => s.checkAccountStatus);
+  const flagDeactivated     = useAuthStore((s) => s.flagDeactivated);
+  const clearDeactivation   = useAuthStore((s) => s.clearDeactivation);
+  const vendorSuspended = useAuthStore((s) => s.vendorSuspended);
+  const checkVendorStatus = useAuthStore((s) => s.checkVendorStatus);
+  const flagVendorSuspended = useAuthStore((s) => s.flagVendorSuspended);
+  const clearVendorSuspended = useAuthStore((s) => s.clearVendorSuspended);
 
   const [vendorOnboarded,    setVendorOnboarded]    = useState(null);
   const [deliveryOnboarded,  setDeliveryOnboarded]  = useState(null);
@@ -36,18 +48,11 @@ export default function Navigation() {
   const [vendorStatus,       setVendorStatus]       = useState(null);
   const [vendorMissingDocs,  setVendorMissingDocs]  = useState([]);
 
-  // When the active role changes, check onboarding if needed
-  useEffect(() => {
-    if (isAuthenticated && activeRole) {
-      if (activeRole === "vendor") {
-        checkVendorProfile();
-      } else if (activeRole === "delivery") {
-        checkDeliveryProfile();
-      }
-    }
-  }, [isAuthenticated, activeRole]);
-
-  const checkVendorProfile = async () => {
+  // Fetch the vendor profile. Also acts as the login-time / reload fallback:
+  // if the vendor is suspended, it flags the full-screen block so the app
+  // never opens the vendor dashboard. Declared before the effects below so
+  // the socket/poll effects can reference it (via useCallback, stable).
+  const checkVendorProfile = useCallback(async () => {
     setCheckingOnboard(true);
     try {
       const res = await fetch(`${API_BASE}/vendors/me/profile`, {
@@ -66,12 +71,100 @@ export default function Navigation() {
       });
       setVendorStatus(vendor?.onboarding_status || null);
       setVendorMissingDocs(vendor?.missing_docs || []);
+
+      // Suspended vendors get the full-screen block instead of the app.
+      if (
+        vendor?.is_active === false ||
+        vendor?.onboarding_status === "suspended"
+      ) {
+        flagVendorSuspended();
+      } else {
+        clearVendorSuspended();
+      }
     } catch (err) {
       setVendorOnboarded(false);
     } finally {
       setCheckingOnboard(false);
     }
-  };
+  }, [token, flagVendorSuspended, clearVendorSuspended]);
+
+  // When the active role changes, check onboarding if needed
+  useEffect(() => {
+    if (isAuthenticated && activeRole) {
+      if (activeRole === "vendor") {
+        checkVendorProfile();
+      } else if (activeRole === "delivery") {
+        checkDeliveryProfile();
+      }
+    }
+  }, [isAuthenticated, activeRole]);
+
+  // ── Live account-status check (admin deactivation / vendor suspension) ────
+  // Polls /auth/me (and the vendor profile when the vendor role is active)
+  // while authenticated so a deactivated customer or a suspended vendor is
+  // blocked immediately (no reload required). Stops once the account itself
+  // is deactivated.
+  useEffect(() => {
+    if (!isAuthenticated || accountDeactivated) return;
+    checkAccountStatus();
+    if (activeRole === "vendor") checkVendorStatus();
+    const interval = setInterval(() => {
+      checkAccountStatus();
+      if (activeRole === "vendor") checkVendorStatus();
+    }, 25000);
+    const appStateSub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        checkAccountStatus();
+        if (activeRole === "vendor") checkVendorStatus();
+      }
+    });
+    return () => {
+      clearInterval(interval);
+      appStateSub.remove();
+    };
+  }, [isAuthenticated, accountDeactivated, activeRole, checkAccountStatus, checkVendorStatus]);
+
+  // ── Real-time account push (Socket.io) ──────────────────────────────────
+  // Uses the same connection pattern as every other socket in the app. The
+  // backend auto-joins this socket to user:{id}; when an admin deactivates
+  // the account it emits 'account:deactivated' to that room and we block the
+  // app immediately — and 'account:reactivated' returns to normal. This
+  // socket deliberately stays connected even while the block screen is shown
+  // (accountDeactivated is NOT a dependency), so reactivation is received
+  // live without a reload.
+  useEffect(() => {
+    if (!isAuthenticated || !token) return;
+
+    let socket = null;
+    try {
+      socket = io(SOCKET_URL, { auth: { token }, transports: ["websocket"] });
+      socket.on("account:deactivated", () => {
+        flagDeactivated();
+      });
+      socket.on("account:reactivated", () => {
+        clearDeactivation();
+      });
+      // Vendor suspend/unsuspend: the backend auto-joins this socket to the
+      // vendor:{id} room. The block only applies to the vendor role, so we
+      // ignore it while the same user is using the customer/delivery role.
+      socket.on("vendor:suspended", () => {
+        if (activeRole === "vendor") {
+          flagVendorSuspended();
+          checkVendorProfile();
+        }
+      });
+      socket.on("vendor:reactivated", () => {
+        clearVendorSuspended();
+        if (activeRole === "vendor") checkVendorProfile();
+      });
+    } catch (err) {
+      // Socket init failed — poll + login/refresh checks still cover both directions.
+    }
+
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [isAuthenticated, token, activeRole, flagDeactivated, clearDeactivation, flagVendorSuspended, clearVendorSuspended, checkVendorProfile]);
 
   const checkDeliveryProfile = async () => {
     setCheckingOnboard(true);
@@ -110,6 +203,16 @@ export default function Navigation() {
         <ActivityIndicator size="large" color="white" />
       </View>
     );
+  }
+
+  // ── Hard gate: account deactivated → block the entire app ────────────────
+  if (accountDeactivated) {
+    return <AccountDeactivatedScreen />;
+  }
+
+  // ── Hard gate: vendor shop suspended → block the vendor app ──────────────
+  if (vendorSuspended && activeRole === "vendor") {
+    return <AccountSuspendedScreen />;
   }
 
   // After role is picked, wait for onboarding check if needed

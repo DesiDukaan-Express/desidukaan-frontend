@@ -53,6 +53,22 @@ export default {
     failedToSendOtp: "Failed to send OTP",
   },
 
+  // ── Account deactivated ──
+  deactivated: {
+    title: "Account Deactivated",
+    message: "Your account has been deactivated by the admin. You are not able to use the app until your account is reactivated.",
+    reload: "Reload",
+    supportHint: "If you believe this is a mistake, please contact support.",
+  },
+
+  // ── Vendor account suspended ──
+  suspended: {
+    title: "Account Suspended",
+    message: "Your shop account has been suspended by the admin. You are not able to use the app until your account is reactivated.",
+    reload: "Reload",
+    supportHint: "If you believe this is a mistake, please contact support.",
+  },
+
   // ── Roles ──
   roles: {
     customer: "Customer",
@@ -511,6 +527,7 @@ export default {
     windDown: "Wind Down",
     eveningSub: "Wrapping up strong today!",
     loadingDashboard: "Loading your dashboard\u2026",
+    noChartData: "No sales data yet",
     chartUnavailable: "Chart unavailable",
     welcomeTitle: "Welcome to KwikPik!",
     welcomeSub: "You haven't completed your shop registration yet. Complete it now to start selling!",
