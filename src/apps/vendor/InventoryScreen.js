@@ -167,6 +167,8 @@ export default function InventoryScreen() {
   const [bulkDel, setBulkDel] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [confirmSheet, setConfirmSheet] = useState(null); // { product, makingAvailable }
+  const [actionSheetProduct, setActionSheetProduct] = useState(null);
+  const [productToDelete, setProductToDelete] = useState(null);
 
   // Clear selection on page change
   const productIdStr = inv.products.map((p) => p.id).join(",");
@@ -198,21 +200,7 @@ export default function InventoryScreen() {
   };
 
   const handleDelete = (id) => {
-    Alert.alert(
-      t('vendor.deleteProduct'),
-      t('vendor.deleteProductDesc'),
-      [
-        { text: t('vendor.cancel'), style: "cancel" },
-        {
-          text: t('vendor.delete'),
-          style: "destructive",
-          onPress: async () => {
-            await inv.deleteProduct(id);
-            showToast("Product deleted");
-          },
-        },
-      ],
-    );
+    setProductToDelete(id);
   };
 
   const handleDeleteCategory = (catName) => {
@@ -339,15 +327,7 @@ export default function InventoryScreen() {
   }, [inv.rawProducts, selectedCategory, inv.search, inv.sortKey, inv.sortDir]);
 
   const handleProductPress = (product) => {
-    Alert.alert(
-      product.name,
-      t('vendor.chooseAction'),
-      [
-        { text: t('vendor.cancel'), style: "cancel" },
-        { text: t('vendor.editProduct'), onPress: () => setModal(product) },
-        { text: t('vendor.deleteProduct'), style: "destructive", onPress: () => handleDelete(product.id) },
-      ]
-    );
+    setActionSheetProduct(product);
   };
 
   return (
@@ -614,7 +594,65 @@ export default function InventoryScreen() {
         />
       )}
 
+      {productToDelete && (
+        <BulkDeleteDialog
+          count={1}
+          onConfirm={async () => {
+            await inv.deleteProduct(productToDelete);
+            showToast("Product deleted");
+            setProductToDelete(null);
+          }}
+          onCancel={() => setProductToDelete(null)}
+          saving={inv.saving}
+        />
+      )}
 
+
+      {/* ── Action Sheet ── */}
+      {actionSheetProduct && (
+        <View style={s.sheetOverlay}>
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setActionSheetProduct(null)}
+          />
+          <View style={s.sheetCard}>
+            {/* Icon */}
+            <View style={[s.sheetIconBox, { backgroundColor: GRAY_BG }]}>
+              <Feather name="settings" size={28} color={TEXT} />
+            </View>
+
+            {/* Text */}
+            <Text style={s.sheetTitle}>{actionSheetProduct.name}</Text>
+
+            {/* Buttons */}
+            <View style={s.sheetBtnRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  const productId = actionSheetProduct.id;
+                  setActionSheetProduct(null);
+                  handleDelete(productId);
+                }}
+                style={[ s.sheetCancelBtn, {backgroundColor: RED }]}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.sheetCancelText, {color: "#fff"} ]}>{t('vendor.delete')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  const productToEdit = actionSheetProduct;
+                  setActionSheetProduct(null);
+                  setModal(productToEdit);
+                }}
+                style={[s.sheetConfirmBtn, { backgroundColor: GREEN }]}
+                activeOpacity={0.85}
+              >
+                <Text style={s.sheetConfirmText}>{t('vendor.editProduct')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* ── Confirm Sheet ── */}
       {confirmSheet && (
