@@ -156,6 +156,10 @@ export default function LoginScreen({ navigation }) {
         navigation.navigate("Signup", { phone: mobile });
         return;
       }
+      if (data.error === "ACCOUNT_DEACTIVATED") {
+        useAuthStore.getState().flagDeactivated();
+        return;
+      }
       if (!res.ok) throw new Error(data.msg || t("auth.failedToSendOtp"));
 
       // Testing mode: server returns tokens directly — skip OTP step
@@ -183,6 +187,10 @@ export default function LoginScreen({ navigation }) {
         body: JSON.stringify({ phone: mobile, code: otp }),
       });
       const data = await res.json();
+      if (data.error === "ACCOUNT_DEACTIVATED") {
+        useAuthStore.getState().flagDeactivated();
+        return;
+      }
       if (!res.ok) throw new Error(data.msg || t("auth.invalidOtp"));
       const addrStore = useAddressStore.getState();
       await login(data.user, data.accessToken, data.refreshToken);

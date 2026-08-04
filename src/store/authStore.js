@@ -46,6 +46,9 @@ export const tryRefreshToken = async () => {
 
     const data = await res.json();
     if (!res.ok) {
+      if (res.status === 403 && data.error === "ACCOUNT_DEACTIVATED") {
+        return { error: "ACCOUNT_DEACTIVATED" };
+      }
       if (res.status === 401 || res.status === 403) {
         return { error: "INVALID_TOKEN" };
       }
@@ -61,6 +64,7 @@ export const tryRefreshToken = async () => {
         user: data.user,
         role: data.user.role,
         enabledRoles: data.user.roles || [data.user.role],
+        accountDeactivated: false,
       });
     }
 
@@ -84,6 +88,13 @@ const useAuthStore = create((set, get) => ({
   enabledRoles: ["customer"],
   isAuthenticated: false,
   isLoading: true,
+  // accountDeactivated: true → the full-screen "Account Deactivated" block
+  // screen is shown and all app interaction is prevented.
+  accountDeactivated: false,
+  // vendorSuspended: true → the full-screen "Account Suspended" block screen
+  // is shown to the vendor role. Scoped to the vendor role only (a suspended
+  // shop does not block the same user from using the app as a customer).
+  vendorSuspended: false,
 
   // Internal setter used by tryRefreshToken without triggering a full re-login
   _setAccessToken: (accessToken) => set({ token: accessToken }),
@@ -154,9 +165,15 @@ const useAuthStore = create((set, get) => ({
           enabledRoles: currentUser?.roles || (currentUser ? [currentUser.role] : ["customer"]),
           activeRole: null,   // ← always null on app open → triggers role picker
           isAuthenticated: true,
+          accountDeactivated: false,
           isLoading: false,
         });
         await useAddressStore.getState().loadAddresses(refreshResult.token);
+      } else if (refreshResult && refreshResult.error === "ACCOUNT_DEACTIVATED") {
+        // Account has been deactivated by an admin — show the full-screen block.
+        // Keep the refresh token so a reload after reactivation can restore the
+        // session automatically (the backend rejects issuance while inactive).
+        set({ accountDeactivated: true, isLoading: false });
       } else if (refreshResult && refreshResult.error === "INVALID_TOKEN") {
         // Refresh token explicitly expired or invalid — clear session
         await AsyncStorage.removeItem("user");
@@ -201,6 +218,7 @@ const useAuthStore = create((set, get) => ({
       enabledRoles: userData.roles || [userData.role],
       activeRole: null,   // picker will show after login
       isAuthenticated: true,
+      accountDeactivated: false,
     });
   },
 
@@ -221,7 +239,7 @@ const useAuthStore = create((set, get) => ({
       await AsyncStorage.removeItem(ACTIVE_ROLE_KEY);
       await secureDelete(REFRESH_KEY);
       useAddressStore.getState().clearAddresses();
-      set({ user: null, token: null, role: null, activeRole: null, enabledRoles: ["customer"], isAuthenticated: false });
+      set({ user: null, token: null, role: null, activeRole: null, enabledRoles: ["customer"], isAuthenticated: false, accountDeactivated: false });
     }
   },
 
@@ -229,6 +247,74 @@ const useAuthStore = create((set, get) => ({
     set((state) => ({
       user: { ...state.user, ...updates },
     })),
+
+  // ── Flag account as deactivated (called by login screens / live poll) ────
+  flagDeactivated: () => set({ accountDeactivated: true }),
+
+  // ── Clear the deactivated block (called on live "account:reactivated") ───
+  clearDeactivation: () => set({ accountDeactivated: false }),
+
+  // ── Flag the vendor's shop as suspended (socket "vendor:suspended") ──────
+  flagVendorSuspended: () => set({ vendorSuspended: true }),
+
+  // ── Clear the vendor suspension block (socket "vendor:reactivated") ──────
+  clearVendorSuspended: () => set({ vendorSuspended: false }),
+
+  // ── Live vendor-status check ─────────────────────────────────────────────
+  // Called periodically + on app foreground while authenticated as a vendor,
+  // as a fallback in case the vendor's socket wasn't connected when the admin
+  // suspended the shop. If the backend reports is_active=false or
+  // onboarding_status="suspended", we flag it so the block appears immediately
+  // (no reload required).
+  checkVendorStatus: async () => {
+    const { token, isAuthenticated, activeRole, vendorSuspended } = get();
+    // Only relevant when the user is using the vendor role.
+    if (!token || !isAuthenticated || activeRole !== "vendor") return;
+
+    try {
+      const res = await fetch(`${BASE_URL}/vendors/me/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return; // ignore TOKEN_EXPIRED etc. — normal refresh flow handles it
+      const data = await res.json();
+      const vendor = data?.data?.vendor;
+      if (!vendor) return;
+
+      const isSuspended =
+        vendor.is_active === false || vendor.onboarding_status === "suspended";
+      if (isSuspended !== vendorSuspended) {
+        set({ vendorSuspended: isSuspended });
+      }
+    } catch {
+      // network error — leave as-is, retry on next tick
+    }
+  },
+
+  // ── Live account-status check ─────────────────────────────────────────────
+  // Called periodically + on app foreground while authenticated. If the
+  // backend reports is_active=false (admin deactivated the account), we flag
+  // it so the full-screen block appears immediately, without needing a reload.
+  checkAccountStatus: async () => {
+    const { token, isAuthenticated, accountDeactivated } = get();
+    if (!token || !isAuthenticated || accountDeactivated) return;
+
+    try {
+      const res = await fetch(`${BASE_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return; // ignore TOKEN_EXPIRED etc. — normal refresh flow handles it
+      const data = await res.json();
+      if (data.user && data.user.is_active === false) {
+        set({ accountDeactivated: true });
+        return;
+      }
+      if (data.user && JSON.stringify(data.user) !== JSON.stringify(get().user)) {
+        set({ user: data.user, role: data.user.role });
+      }
+    } catch {
+      // network error — leave as-is, retry on next tick
+    }
+  },
 }));
 
 export default useAuthStore;
