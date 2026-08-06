@@ -20,34 +20,39 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTranslation } from "react-i18next";
+import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
 import * as ImagePicker from "expo-image-picker";
 import { uploadAPI } from "../../services/api";
 import LanguageSwitcher from "../../components/common/LanguageSwitcher";
+import AlarmTimePicker from "../../components/vendor/AlarmTimePicker";
+import DistanceSliderModal from "../../components/vendor/DistanceSlider";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
-// ── Color tokens (matches Dashboard) ─────────────────────────
+// ── Color tokens — ink/marigold/teal design language ───────
 const C = {
-  bg: "#F0F4F8",
+  bg: "#F4F5F7",
   surface: "#FFFFFF",
-  primary: "#0EE627",
-  primaryDim: "#0EE62718",
-  primaryDark: "#09a81c",
-  green: "#147538",
-  greenDim: "#14753818",
-  accent: "#0F172A",
-  text: "#0F172A",
-  textSub: "#64748B",
-  textLight: "#94A3B8",
-  border: "#E2E8F0",
+  primary: "#E8871E",
+  primaryDim: "#E8871E18",
+  primaryDark: "#A85C0B",
+  ink: "#12141C",
+  teal: "#0F766E",
+  tealDim: "#F0FDFA",
+  tealIcon: "#0B5D56",
+  green: "#16A34A",
+  greenDim: "#F0FDF4",
+  amber: "#B45309",
+  amberDim: "#FEF3C7",
+  text: "#12141C",
+  textSub: "#626A78",
+  textLight: "#98A0AC",
+  border: "#E6E8EC",
   borderDark: "#CBD5E0",
   red: "#EF4444",
   redDim: "#FEF2F2",
-  blue: "#3B82F6",
-  blueDim: "#EFF6FF",
-  orange: "#F97316",
-  orangeDim: "#FFF7ED",
 };
 
 export default function VendorProfileScreen() {
@@ -75,6 +80,13 @@ export default function VendorProfileScreen() {
   const [editModal, setEditModal]       = useState(false);
   const [logoutModal, setLogoutModal]   = useState(false);
   const [categoryModal, setCategoryModal] = useState(false);
+  const [distanceModal, setDistanceModal] = useState(false);
+
+  // Time / distance pickers
+  const [timeField, setTimeField] = useState("opening_time");
+  const [timeLabel, setTimeLabel] = useState("");
+  const [timeValue, setTimeValue] = useState("");
+  const [distanceValue, setDistanceValue] = useState(2);
 
   // Edit fields
   const [activeField, setActiveField] = useState("");
@@ -86,6 +98,38 @@ export default function VendorProfileScreen() {
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  // ── Real-time store settings sync (admin ↔ vendor) ─────────────────────────
+  // The backend emits 'store:settings_updated' to vendor:{id} whenever settings
+  // change — either from the admin Store Settings page or this app itself.
+  // Reflect those changes immediately so both sides stay in sync.
+  useEffect(() => {
+    if (!token || !vendor) return;
+    let socket;
+    try {
+      socket = io(SOCKET_URL, { auth: { token }, transports: ["websocket"] });
+      socket.on("store:settings_updated", (data) => {
+        console.log("[vendor] store:settings_updated received", data); // DEBUG: remove after sync verified
+        if (!data || data.vendorId !== vendor.id) return;
+        if (data.is_open !== undefined) setStoreOpen(data.is_open);
+        if (data.is_bad_weather !== undefined) setBadWeather(data.is_bad_weather);
+        const keys = [
+          "is_open", "is_bad_weather", "opening_time", "closing_time",
+          "min_order_value", "quick_delivery_fee", "weather_surcharge",
+          "delivery_base_km", "delivery_fee_base", "delivery_fee_per_km",
+          "free_delivery_threshold",
+        ];
+        const changed = {};
+        keys.forEach((k) => { if (data[k] !== undefined) changed[k] = data[k]; });
+        if (Object.keys(changed).length) {
+          setVendor((prev) => (prev ? { ...prev, ...changed } : prev));
+        }
+      });
+    } catch {
+      // socket best-effort — polling/refresh still covers sync
+    }
+    return () => { if (socket) socket.disconnect(); };
+  }, [token, vendor?.id]);
 
   const fetchProfile = async () => {
     try {
@@ -194,6 +238,28 @@ export default function VendorProfileScreen() {
     setEditModal(false);
   };
 
+  const openTimePicker = (field, label, currentValue) => {
+    setTimeField(field);
+    setTimeLabel(label);
+    setTimeValue(String(currentValue ?? ""));
+    setTimeModal(true);
+  };
+
+  const saveTime = (time24) => {
+    handleUpdateField(timeField, time24);
+    setTimeModal(false);
+  };
+
+  const openDistancePicker = (currentValue) => {
+    setDistanceValue(Number(currentValue) || 2);
+    setDistanceModal(true);
+  };
+
+  const saveDistance = (km) => {
+    handleUpdateField("delivery_base_km", String(km));
+    setDistanceModal(false);
+  };
+
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -234,7 +300,7 @@ export default function VendorProfileScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={C.green} />
+        <ActivityIndicator size="large" color={C.primary} />
         <Text style={{ color: C.textSub, marginTop: 12 }}>{t('vendor.loadingProfile')}</Text>
       </View>
     );
@@ -254,7 +320,7 @@ export default function VendorProfileScreen() {
     <>
       {/* ── HERO HEADER ──────────────────────────────────── */}
       <LinearGradient
-        colors={["#147538", "#0d5a29"]}
+        colors={["#1B1F2B", "#12141C"]}
         style={[
           styles.hero,
           {
@@ -312,7 +378,7 @@ export default function VendorProfileScreen() {
               />
             </View>
             <View style={styles.cameraBadge}>
-              <MaterialIcons name="camera-alt" size={13} color={C.green} />
+              <MaterialIcons name="camera-alt" size={13} color={C.primary} />
             </View>
           </TouchableOpacity>
 
@@ -350,7 +416,7 @@ export default function VendorProfileScreen() {
               styles.statusBadge,
               {
                 backgroundColor: storeOpen
-                  ? "rgba(14,230,39,0.18)"
+                  ? "rgba(22,163,74,0.16)"
                   : "rgba(255,255,255,0.1)",
               },
             ]}
@@ -358,13 +424,13 @@ export default function VendorProfileScreen() {
             <View
               style={[
                 styles.statusDot,
-                { backgroundColor: storeOpen ? C.primary : "#94a3b8" },
+                { backgroundColor: storeOpen ? C.green : "#94a3b8" },
               ]}
             />
             <Text
               style={[
                 styles.statusText,
-                { color: storeOpen ? C.primary : "#94a3b8", fontSize: rs(11, 12, 12) },
+                { color: storeOpen ? "#4ADE80" : "#94a3b8", fontSize: rs(11, 12, 12) },
               ]}
             >
               {storeOpen ? t('vendor.storeOpen') : t('vendor.storeClosed')}
@@ -410,7 +476,7 @@ export default function VendorProfileScreen() {
           <StatStripItem
             value={vendor.onboarding_status === "approved" ? "✓" : t('profile.pending')}
             label={t('profile.kyc')}
-            color={vendor.onboarding_status === "approved" ? C.primary : "#F59E0B"}
+            color={vendor.onboarding_status === "approved" ? "#4ADE80" : "#FBBF24"}
             rs={rs}
             isWide={isWide}
           />
@@ -448,6 +514,8 @@ export default function VendorProfileScreen() {
                 badWeather={badWeather}
                 onToggleBadWeather={handleToggleBadWeather}
                 onEdit={openEdit}
+                onTimePress={openTimePicker}
+                onDistancePress={openDistancePicker}
                 onDeliveryPress={() => setDeliveryModal(true)}
                 rs={rs}
                 isWide={isWide}
@@ -475,6 +543,8 @@ export default function VendorProfileScreen() {
               badWeather={badWeather}
               onToggleBadWeather={handleToggleBadWeather}
               onEdit={openEdit}
+              onTimePress={openTimePicker}
+              onDistancePress={openDistancePicker}
               onDeliveryPress={() => setDeliveryModal(true)}
               rs={rs}
               isWide={isWide}
@@ -491,7 +561,7 @@ export default function VendorProfileScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <StatusBar barStyle="light-content" backgroundColor="#147538" />
+      <StatusBar barStyle="light-content" backgroundColor="#12141C" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {content}
       </ScrollView>
@@ -561,11 +631,11 @@ export default function VendorProfileScreen() {
             onPress={pickImage}
             disabled={uploading}
           >
-            <View style={[styles.sheetOptionIcon, { backgroundColor: C.greenDim }]}>
+            <View style={[styles.sheetOptionIcon, { backgroundColor: C.primaryDim }]}>
               {uploading ? (
-                <ActivityIndicator size="small" color={C.green} />
+                <ActivityIndicator size="small" color={C.primary} />
               ) : (
-                <MaterialIcons name="photo-library" size={20} color={C.green} />
+                <MaterialIcons name="photo-library" size={20} color={C.primaryDark} />
               )}
             </View>
             <View>
@@ -576,8 +646,8 @@ export default function VendorProfileScreen() {
 
           <View style={[styles.sheetOption, { flexDirection: "column", alignItems: "stretch", gap: 10 }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <View style={[styles.sheetOptionIcon, { backgroundColor: C.blueDim }]}>
-                <MaterialIcons name="link" size={20} color={C.blue} />
+              <View style={[styles.sheetOptionIcon, { backgroundColor: C.tealDim }]}>
+                <MaterialIcons name="link" size={20} color={C.tealIcon} />
               </View>
               <Text style={styles.sheetOptionTitle}>{t('vendor.pasteImageUrl')}</Text>
             </View>
@@ -634,7 +704,7 @@ export default function VendorProfileScreen() {
               style={[
                 styles.sheetOption,
                 vendor.delivery_type === opt.value && {
-                  backgroundColor: C.greenDim,
+                  backgroundColor: C.tealDim,
                 },
               ]}
               onPress={() => {
@@ -642,15 +712,15 @@ export default function VendorProfileScreen() {
                 setDeliveryModal(false);
               }}
             >
-              <View style={[styles.sheetOptionIcon, { backgroundColor: C.greenDim }]}>
-                <MaterialIcons name={opt.icon} size={20} color={C.green} />
+              <View style={[styles.sheetOptionIcon, { backgroundColor: C.tealDim }]}>
+                <MaterialIcons name={opt.icon} size={20} color={C.tealIcon} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.sheetOptionTitle}>{opt.label}</Text>
                 <Text style={styles.sheetOptionSub}>{opt.sub}</Text>
               </View>
               {vendor.delivery_type === opt.value && (
-                <MaterialIcons name="check-circle" size={20} color={C.green} />
+                <MaterialIcons name="check-circle" size={20} color={C.tealIcon} />
               )}
             </TouchableOpacity>
           ))}
@@ -725,27 +795,44 @@ export default function VendorProfileScreen() {
               key={opt.value}
               style={[
                 styles.sheetOption,
-                vendor.store_category === opt.value && { backgroundColor: C.greenDim },
+                vendor.store_category === opt.value && { backgroundColor: C.tealDim },
               ]}
               onPress={() => {
                 handleUpdateField("store_category", opt.value);
                 setCategoryModal(false);
               }}
             >
-              <View style={[styles.sheetOptionIcon, { backgroundColor: C.greenDim }]}>
-                <MaterialIcons name={opt.icon} size={20} color={C.green} />
+              <View style={[styles.sheetOptionIcon, { backgroundColor: C.tealDim }]}>
+                <MaterialIcons name={opt.icon} size={20} color={C.tealIcon} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.sheetOptionTitle}>{opt.label}</Text>
                 <Text style={styles.sheetOptionSub}>{opt.sub}</Text>
               </View>
               {vendor.store_category === opt.value && (
-                <MaterialIcons name="check-circle" size={20} color={C.green} />
+                <MaterialIcons name="check-circle" size={20} color={C.tealIcon} />
               )}
             </TouchableOpacity>
           ))}
         </View>
       </Modal>
+
+      {/* ── ALARM TIME PICKER ─────────────────────────────── */}
+      <AlarmTimePicker
+        visible={timeModal}
+        value={timeValue}
+        title={timeLabel}
+        onClose={() => setTimeModal(false)}
+        onSave={saveTime}
+      />
+
+      {/* ── DISTANCE SLIDER ───────────────────────────────── */}
+      <DistanceSliderModal
+        visible={distanceModal}
+        value={distanceValue}
+        onClose={() => setDistanceModal(false)}
+        onSave={saveDistance}
+      />
     </View>
   );
 }
@@ -813,7 +900,7 @@ function InfoRow({ icon, label, value, onEdit, editable = true, rs, isWide }) {
       </View>
       {editable ? (
         <TouchableOpacity onPress={onEdit} style={styles.editIconBtn}>
-          <MaterialIcons name="edit" size={16} color={C.green} />
+          <MaterialIcons name="edit" size={16} color={C.primary} />
         </TouchableOpacity>
       ) : (
         <View style={[styles.editIconBtn, { backgroundColor: C.bg }]}>
@@ -908,13 +995,13 @@ function StoreInfoCard({ vendor, onEdit, onCategoryPress, rs, isWide, t }) {
   );
 }
 
-function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBadWeather, onEdit, onDeliveryPress, rs, isWide, t }) {
+function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBadWeather, onEdit, onTimePress, onDistancePress, onDeliveryPress, rs, isWide, t }) {
   return (
     <SectionCard title={t('vendor.storeSettings')} overline={t('vendor.operations').toUpperCase()} rs={rs} isWide={isWide}>
       {/* Store toggle */}
       <View style={styles.settingRow}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <View style={[styles.settingIconBox, { backgroundColor: storeOpen ? "#DCFCE7" : C.bg }]}>
+          <View style={[styles.settingIconBox, { backgroundColor: storeOpen ? C.greenDim : C.bg }]}>
             <MaterialIcons
               name="storefront"
               size={18}
@@ -931,7 +1018,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
         <Switch
           value={storeOpen}
           onValueChange={onToggle}
-          trackColor={{ true: "#22c55e", false: C.border }}
+          trackColor={{ true: C.green, false: C.border }}
           thumbColor={storeOpen ? "#fff" : "#fff"}
         />
       </View>
@@ -939,37 +1026,43 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
       {/* Opening time */}
       <TouchableOpacity
         style={styles.settingRow}
-        onPress={() => onEdit("opening_time", t('vendor.openingTime'), vendor.opening_time)}
+        onPress={() => onTimePress("opening_time", t('vendor.openingTime'), vendor.opening_time)}
         activeOpacity={0.6}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <View style={[styles.settingIconBox, { backgroundColor: C.orangeDim }]}>
-            <MaterialIcons name="wb-sunny" size={18} color={C.orange} />
+          <View style={[styles.settingIconBox, { backgroundColor: C.primaryDim }]}>
+            <MaterialIcons name="alarm" size={18} color={C.primaryDark} />
           </View>
           <View>
             <Text style={styles.settingTitle}>{t('vendor.openingTime')}</Text>
             <Text style={styles.settingSub}>{vendor.opening_time || t('vendor.notSet')}</Text>
           </View>
         </View>
-        <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
+        <View style={styles.timeChip}>
+          <MaterialIcons name="alarm-on" size={14} color={C.primaryDark} />
+          <Text style={styles.timeChipText}>Set</Text>
+        </View>
       </TouchableOpacity>
 
       {/* Closing time */}
       <TouchableOpacity
         style={styles.settingRow}
-        onPress={() => onEdit("closing_time", t('vendor.closingTime'), vendor.closing_time)}
+        onPress={() => onTimePress("closing_time", t('vendor.closingTime'), vendor.closing_time)}
         activeOpacity={0.6}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <View style={[styles.settingIconBox, { backgroundColor: "#EDE9FE" }]}>
-            <MaterialIcons name="nights-stay" size={18} color="#7C3AED" />
+          <View style={[styles.settingIconBox, { backgroundColor: C.tealDim }]}>
+            <MaterialIcons name="alarm-off" size={18} color={C.tealIcon} />
           </View>
           <View>
             <Text style={styles.settingTitle}>{t('vendor.closingTime')}</Text>
             <Text style={styles.settingSub}>{vendor.closing_time || t('vendor.notSet')}</Text>
           </View>
         </View>
-        <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
+        <View style={styles.timeChip}>
+          <MaterialIcons name="alarm-on" size={14} color={C.tealIcon} />
+          <Text style={styles.timeChipText}>Set</Text>
+        </View>
       </TouchableOpacity>
 
       {/* Minimum Order Value */}
@@ -979,8 +1072,8 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
         activeOpacity={0.6}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <View style={[styles.settingIconBox, { backgroundColor: "#FEF3C7" }]}>
-            <MaterialIcons name="shopping-basket" size={18} color="#D97706" />
+          <View style={[styles.settingIconBox, { backgroundColor: C.amberDim }]}>
+            <MaterialIcons name="shopping-basket" size={18} color={C.amber} />
           </View>
           <View>
             <Text style={styles.settingTitle}>{t('vendor.minOrderValue')}</Text>
@@ -997,8 +1090,8 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
         activeOpacity={0.6}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <View style={[styles.settingIconBox, { backgroundColor: "#EFF6FF" }]}>
-            <MaterialIcons name="flash-on" size={18} color="#2563EB" />
+          <View style={[styles.settingIconBox, { backgroundColor: C.tealDim }]}>
+            <MaterialIcons name="flash-on" size={18} color={C.tealIcon} />
           </View>
           <View>
             <Text style={styles.settingTitle}>{t('vendor.flatQuickDeliveryFee')}</Text>
@@ -1015,8 +1108,8 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
         activeOpacity={0.6}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <View style={[styles.settingIconBox, { backgroundColor: "#FCE7F3" }]}>
-            <MaterialIcons name="umbrella" size={18} color="#DB2777" />
+          <View style={[styles.settingIconBox, { backgroundColor: C.amberDim }]}>
+            <MaterialIcons name="umbrella" size={18} color={C.amber} />
           </View>
           <View>
             <Text style={styles.settingTitle}>{t('vendor.badWeatherSurcharge')}</Text>
@@ -1029,8 +1122,8 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
       {/* Bad Weather Toggle Switch */}
       <View style={styles.settingRow}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <View style={[styles.settingIconBox, { backgroundColor: badWeather ? "#FEE2E2" : C.bg }]}>
-            <MaterialIcons name="cloudy-snowing" size={18} color={badWeather ? "#EF4444" : C.textLight} />
+          <View style={[styles.settingIconBox, { backgroundColor: badWeather ? C.redDim : C.bg }]}>
+            <MaterialIcons name="cloudy-snowing" size={18} color={badWeather ? C.red : C.textLight} />
           </View>
           <View>
             <Text style={styles.settingTitle}>{t('vendor.activeBadWeather')}</Text>
@@ -1040,7 +1133,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
         <Switch
           value={badWeather}
           onValueChange={onToggleBadWeather}
-          trackColor={{ true: "#EF4444", false: C.border }}
+          trackColor={{ true: C.red, false: C.border }}
           thumbColor={badWeather ? "#fff" : "#fff"}
         />
       </View>
@@ -1051,19 +1144,29 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
           {/* Base Delivery Distance */}
           <TouchableOpacity
             style={styles.settingRow}
-            onPress={() => onEdit("delivery_base_km", "Base Delivery Distance (km)", vendor.delivery_base_km)}
+            onPress={() => onDistancePress(vendor.delivery_base_km)}
             activeOpacity={0.6}
           >
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <View style={[styles.settingIconBox, { backgroundColor: "#E0F2FE" }]}>
-                <MaterialIcons name="edit-road" size={18} color="#0369A1" />
+              <View style={[styles.settingIconBox, { backgroundColor: C.tealDim }]}>
+                <MaterialIcons name="edit-road" size={18} color={C.tealIcon} />
               </View>
               <View>
                 <Text style={styles.settingTitle}>{t('vendor.baseDeliveryDistance')}</Text>
                 <Text style={styles.settingSub}>{vendor.delivery_base_km ?? 2} km</Text>
               </View>
             </View>
-            <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
+            <View style={styles.sliderMini}>
+              <View style={styles.sliderMiniTrack}>
+                <View
+                  style={[
+                    styles.sliderMiniFill,
+                    { width: `${Math.min(((Number(vendor.delivery_base_km) || 2) / 20) * 100, 100)}%` },
+                  ]}
+                />
+              </View>
+              <MaterialIcons name="tune" size={16} color={C.tealIcon} />
+            </View>
           </TouchableOpacity>
 
           {/* Base Delivery Fee */}
@@ -1073,8 +1176,8 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
             activeOpacity={0.6}
           >
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <View style={[styles.settingIconBox, { backgroundColor: "#E0F2FE" }]}>
-                <MaterialIcons name="payments" size={18} color="#0369A1" />
+              <View style={[styles.settingIconBox, { backgroundColor: C.tealDim }]}>
+                <MaterialIcons name="payments" size={18} color={C.tealIcon} />
               </View>
               <View>
                 <Text style={styles.settingTitle}>{t('vendor.baseDeliveryFee')}</Text>
@@ -1091,8 +1194,8 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
             activeOpacity={0.6}
           >
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <View style={[styles.settingIconBox, { backgroundColor: "#E0F2FE" }]}>
-                <MaterialIcons name="add-road" size={18} color="#0369A1" />
+              <View style={[styles.settingIconBox, { backgroundColor: C.tealDim }]}>
+                <MaterialIcons name="add-road" size={18} color={C.tealIcon} />
               </View>
               <View>
                 <Text style={styles.settingTitle}>{t('vendor.extraFeePerKm')}</Text>
@@ -1111,8 +1214,8 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
         activeOpacity={0.6}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <View style={[styles.settingIconBox, { backgroundColor: C.blueDim }]}>
-            <MaterialIcons name="local-shipping" size={18} color={C.blue} />
+          <View style={[styles.settingIconBox, { backgroundColor: C.tealDim }]}>
+            <MaterialIcons name="local-shipping" size={18} color={C.tealIcon} />
           </View>
           <View>
             <Text style={styles.settingTitle}>{t('vendor.deliveryMethod')}</Text>
@@ -1132,10 +1235,10 @@ function AccountSettingsCard({ rs, isWide }) {
   const [showLanguage, setShowLanguage] = React.useState(false);
 
   const items = [
-    { icon: "account-balance", label: t('profile.bankAccount'), sub: t('profile.bankAccountSub'), color: "#059669", bg: "#ECFDF5" },
-    { icon: "payments", label: t('profile.payoutSettings'), sub: t('profile.payoutSettingsSub'), color: C.blue, bg: C.blueDim },
-    { icon: "verified-user", label: t('profile.kycVerification'), sub: t('profile.kycVerificationSub'), color: "#7C3AED", bg: "#EDE9FE", right: t('profile.verified') },
-    { icon: "help-outline", label: t('profile.helpSupport'), sub: t('profile.helpSupportSub'), color: C.orange, bg: C.orangeDim },
+    { icon: "account-balance", label: t('profile.bankAccount'), sub: t('profile.bankAccountSub'), color: C.primaryDark, bg: C.primaryDim },
+    { icon: "payments", label: t('profile.payoutSettings'), sub: t('profile.payoutSettingsSub'), color: C.tealIcon, bg: C.tealDim },
+    { icon: "verified-user", label: t('profile.kycVerification'), sub: t('profile.kycVerificationSub'), color: C.tealIcon, bg: C.tealDim, right: t('profile.verified') },
+    { icon: "help-outline", label: t('profile.helpSupport'), sub: t('profile.helpSupportSub'), color: C.primaryDark, bg: C.primaryDim },
     { icon: "privacy-tip", label: t('auth.privacyPolicy'), sub: t('profile.privacySub'), color: C.textSub, bg: C.bg },
     { icon: "description", label: t('profile.termsConditions'), sub: t('profile.termsSub'), color: C.textSub, bg: C.bg },
   ];
@@ -1149,8 +1252,8 @@ function AccountSettingsCard({ rs, isWide }) {
         activeOpacity={0.6}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <View style={[styles.settingIconBox, { backgroundColor: "#EFF6FF" }]}>
-            <MaterialIcons name="language" size={18} color={C.blue} />
+          <View style={[styles.settingIconBox, { backgroundColor: C.tealDim }]}>
+            <MaterialIcons name="language" size={18} color={C.tealIcon} />
           </View>
           <View>
             <Text style={styles.settingTitle}>{t('profile.language')}</Text>
@@ -1176,7 +1279,7 @@ function AccountSettingsCard({ rs, isWide }) {
             </View>
           </View>
           {item.right ? (
-            <Text style={{ fontSize: 12, color: "#059669", fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"}}>{item.right}</Text>
+            <Text style={{ fontSize: 12, color: C.green, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"}}>{item.right}</Text>
           ) : (
             <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
           )}
@@ -1220,12 +1323,12 @@ function SwitchProfileButton({ onPress, rs, isWide, t }) {
       onPress={onPress}
       style={[
         styles.logoutBtn,
-        { paddingVertical: isWide ? 16 : rs(13, 14, 15), backgroundColor: "#EFF6FF", borderColor: "#BFDBFE", marginBottom: 10 },
+        { paddingVertical: isWide ? 16 : rs(13, 14, 15), backgroundColor: C.tealDim, borderColor: "#BFD8D5", marginBottom: 10 },
       ]}
       activeOpacity={0.8}
     >
-      <MaterialIcons name="swap-horiz" size={isWide ? 20 : rs(16, 18, 18)} color="#3B82F6" />
-      <Text style={[styles.logoutText, { fontSize: isWide ? 15 : rs(13, 14, 15), color: "#3B82F6" }]}>
+      <MaterialIcons name="swap-horiz" size={isWide ? 20 : rs(16, 18, 18)} color={C.tealIcon} />
+      <Text style={[styles.logoutText, { fontSize: isWide ? 15 : rs(13, 14, 15), color: C.tealIcon }]}>
         Switch Profile
       </Text>
     </TouchableOpacity>
@@ -1285,7 +1388,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "#147538",
+    borderColor: "#12141C",
   },
   heroName: { fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff", letterSpacing: -0.5, marginBottom: 6 },
   heroPhonePill: {
@@ -1379,7 +1482,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: C.primaryDim,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1403,6 +1506,42 @@ const styles = StyleSheet.create({
   },
   settingTitle: { fontSize: 14, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text },
   settingSub: { fontSize: 12, color: C.textSub, marginTop: 1 },
+  timeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: C.bg,
+  },
+  timeChipText: {
+    fontSize: 11,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+    color: C.textSub,
+  },
+  sliderMini: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: C.tealDim,
+  },
+  sliderMiniTrack: {
+    width: 42,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: "#D5E5E3",
+    overflow: "hidden",
+  },
+  sliderMiniFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: C.tealIcon,
+  },
 
   // Logout button
   logoutBtn: {
@@ -1484,7 +1623,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: "#0EE627",
+    backgroundColor: C.primary,
     alignItems: "center",
   },
 

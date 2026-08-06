@@ -4,6 +4,7 @@ import React, {
   useRef,
   useCallback,
   useMemo,
+  useReducer,
 } from "react";
 import {
   View,
@@ -31,6 +32,7 @@ import { useTranslation } from "react-i18next";
 import { vendorsAPI, ordersAPI, categoriesAPI } from "../../services/api";
 import ChatWidget from "./ChatWidget";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
+import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
 
 // Use env var works on device, emulator, and web
 // In your .env: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api
@@ -2219,6 +2221,48 @@ export default function HomeScreen() {
     }
   }, [locationCoords?.lat, locationCoords?.lng]);
 
+  // ── Auto-refresh store open/closed status (no manual refresh needed) ─────────
+  // Every 60s: force a re-render so the time-based OPEN/CLOSED check flips at the
+  // minute boundary, and lightly re-pull the vendor list (status fields only — no
+  // inventory re-fetch) to pick up toggle / hour changes from the vendor or admin.
+  const [, forceStatusRefresh] = useReducer((x) => x + 1, 0);
+  const refreshVendorStatus = useCallback(async () => {
+    if (!locationCoords) return;
+    try {
+      const res = await vendorsAPI.getNearby(
+        locationCoords.lat,
+        locationCoords.lng,
+        10,
+        selectedStoreCategory,
+      );
+      const fresh = res.data || [];
+      setVendors((prev) =>
+        prev.map((v) => {
+          const f = fresh.find((x) => x.id === v.id);
+          return f
+            ? {
+                ...v,
+                is_open: f.is_open,
+                opening_time: f.opening_time,
+                closing_time: f.closing_time,
+                is_currently_open: f.is_currently_open,
+              }
+            : v;
+        }),
+      );
+    } catch {
+      // keep current statuses; the local time check still re-runs each minute
+    }
+  }, [locationCoords, selectedStoreCategory]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      forceStatusRefresh();
+      refreshVendorStatus();
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [refreshVendorStatus]);
+
   useEffect(() => {
     if (token) fetchRecentOrders();
   }, [token]);
@@ -2552,7 +2596,7 @@ export default function HomeScreen() {
 
   const showCategories = !loadingInventory && dynamicCategories.length > 0;
   const showPopular = !loadingInventory && popularItems.length > 0;
-  const openStoreCount = vendors.filter((vendor) => vendor.is_open).length;
+  const openStoreCount = vendors.filter((vendor) => isStoreCurrentlyOpen(vendor)).length;
   const nearestStoreDistance = vendors
     .map((vendor) => Number(vendor.distance_km))
     .filter((distance) => Number.isFinite(distance))
@@ -2994,6 +3038,13 @@ export default function HomeScreen() {
                 }
                 activeOpacity={0.88}
               >
+                {/* Everything except the CLOSED badge — dimmed when closed */}
+                <View
+                  style={[
+                    s.cardContent,
+                    !isStoreCurrentlyOpen(vendor) && s.cardContentClosed,
+                  ]}
+                >
                 <View style={s.storeImgWrap}>
                   <Image
                     source={{
@@ -3007,21 +3058,6 @@ export default function HomeScreen() {
                     colors={["transparent", "rgba(0,0,0,0.5)"]}
                     style={s.storeImgOverlay}
                   />
-                  {/* OPEN/CLOSED pill — solid, no dot */}
-                  <View
-                    style={[
-                      s.statusBadge,
-                      {
-                        backgroundColor: vendor.is_open
-                          ? C.green
-                          : "rgba(0,0,0,0.6)",
-                      },
-                    ]}
-                  >
-                    <Text style={s.statusText}>
-                      {vendor.is_open ? t("home.open") : t("home.closed")}
-                    </Text>
-                  </View>
                   <View style={s.ratingBadge}>
                     <MaterialIcons name="star" size={10} color="#FBBF24" />
                     <Text style={s.ratingText}>
@@ -3053,7 +3089,7 @@ export default function HomeScreen() {
                         {t("home.minOrder", { min: vendor.min_order || 99 })}
                       </Text>
                     </View>
-                    {vendor.is_open && (
+                    {isStoreCurrentlyOpen(vendor) && (
                       <View
                         style={[
                           s.storeTag,
@@ -3090,6 +3126,25 @@ export default function HomeScreen() {
                         </View>
                       )}
                   </View>
+                </View>
+                </View>
+
+                {/* OPEN/CLOSED pill — solid, no dot. Kept OUTSIDE the dimmed
+                    wrapper so it always renders at full opacity and stays
+                    clearly legible even on a CLOSED (dimmed) card. */}
+                <View
+                  style={[
+                    s.statusBadge,
+                    {
+                      backgroundColor: isStoreCurrentlyOpen(vendor)
+                        ? C.green
+                        : "rgba(0,0,0,0.72)",
+                    },
+                  ]}
+                >
+                  <Text style={s.statusText}>
+                    {isStoreCurrentlyOpen(vendor) ? t("home.open") : t("home.closed")}
+                  </Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -3849,6 +3904,11 @@ const s = StyleSheet.create({
   emptySub: { fontSize: 13, color: C.gray400, marginTop: 3 },
   storeImgWrap: { position: "relative" },
   storeImg: { width: "100%", height: 180 },
+  // CLOSED cards dim all inner content (image, name, meta, tags) to ~50% so they
+  // read as clearly unavailable at a glance. The CLOSED badge is a sibling of
+  // this wrapper (not a descendant) so React Native's group-opacity can't fade it.
+  cardContent: { opacity: 1 },
+  cardContentClosed: { opacity: 0.5 },
   storeImgOverlay: {
     position: "absolute",
     bottom: 0,
@@ -3910,6 +3970,7 @@ const s = StyleSheet.create({
   },
   storeTagText: { fontSize: 10, color: C.gray600, fontWeight: "600" },
   storeCard: {
+    position: "relative",
     width: 280,
     marginRight: 18,
     marginBottom: 4,
