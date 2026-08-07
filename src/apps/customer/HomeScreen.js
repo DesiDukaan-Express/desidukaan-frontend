@@ -1690,9 +1690,18 @@ const ic = StyleSheet.create({
 // ─── Weight Picker Modal ───────────────────────────────────────────────────
 function WeightPickerModal({ item, onClose, onAdd }) {
   const { t } = useTranslation();
-  if (!item) return null;
-  const weightOptions = parseWeightOptions(item) || [item.unit || "1 pc"];
+  const safeItem = item || {};
+  const weightOptions = parseWeightOptions(safeItem) || [safeItem.unit || "1 pc"];
   const [selected, setSelected] = useState(weightOptions[0]);
+
+  useEffect(() => {
+    if (item) {
+      const opts = parseWeightOptions(item) || [item.unit || "1 pc"];
+      setSelected(opts[0]);
+    }
+  }, [item]);
+
+  if (!item) return null;
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
