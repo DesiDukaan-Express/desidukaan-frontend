@@ -11,6 +11,7 @@ import useCartStore from "../../store/cartStore";
 import useAuthStore from "../../store/authStore";
 import { categoriesAPI } from "../../services/api";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
+import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
 import { useTranslation } from "react-i18next";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
@@ -1081,16 +1082,16 @@ export default function VendorStoreScreen() {
           <Text style={s.appName}>KwikPik</Text>
           <Text style={s.shopName} numberOfLines={1}>{vendor?.shop_name || vendorName}</Text>
           <View style={s.shopMetaRow}>
-            <View style={[s.statusDot, { backgroundColor: vendor?.is_open ? "#4ADE80" : "#F87171" }]} />
-            <Text style={s.metaText}>{vendor?.is_open ? t('vendorStore.open') : t('vendorStore.closed')}</Text>
+            <View style={[s.statusDot, { backgroundColor: isStoreCurrentlyOpen(vendor) ? "#4ADE80" : "#F87171" }]} />
+            <Text style={s.metaText}>{isStoreCurrentlyOpen(vendor) ? t('vendorStore.open') : t('vendorStore.closed')}</Text>
             <Text style={s.metaSep}>·</Text>
             <Text style={s.metaText}>{t('vendorStore.inStock', { count: inStockTotal })}</Text>
           </View>
         </View>
-        <View style={[s.statusChip, !vendor?.is_open && s.statusChipClosed]}>
-          <View style={[s.statusDot, { backgroundColor: vendor?.is_open ? C.greenFixed : "#F87171" }]} />
-          <Text style={[s.statusText, !vendor?.is_open && s.statusTextClosed]}>
-            {vendor?.is_open ? t('vendorStore.open') : t('vendorStore.closed')}
+        <View style={[s.statusChip, !isStoreCurrentlyOpen(vendor) && s.statusChipClosed]}>
+          <View style={[s.statusDot, { backgroundColor: isStoreCurrentlyOpen(vendor) ? C.greenFixed : "#F87171" }]} />
+          <Text style={[s.statusText, !isStoreCurrentlyOpen(vendor) && s.statusTextClosed]}>
+            {isStoreCurrentlyOpen(vendor) ? t('vendorStore.open') : t('vendorStore.closed')}
           </Text>
         </View>
         <TouchableOpacity

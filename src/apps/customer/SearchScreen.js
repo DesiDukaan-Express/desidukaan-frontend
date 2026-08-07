@@ -29,6 +29,7 @@ import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
+import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
 import {
   categoriesAPI,
   searchAPI,
@@ -479,7 +480,7 @@ const pc = StyleSheet.create({
 
 // ─── Vendor card (places tab) ─────────────────────────────────────────────────
 function VendorCard({ vendor, distKm: dist, matchCount, onPress, tooFar }) {
-  const isOpen = vendor.is_open;
+  const isOpen = isStoreCurrentlyOpen(vendor);
   return (
     <TouchableOpacity
       style={[vc.card, tooFar && vc.cardFar]}
