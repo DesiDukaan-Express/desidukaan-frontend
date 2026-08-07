@@ -211,6 +211,7 @@ export default function DeliveryHomeScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [toggling,     setToggling]     = useState(false);
   const [incomingOrder, setIncomingOrder] = useState(null);
+  const processedOrderIds = useRef(new Set());
   const socketRef = useRef(null);
 
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -280,7 +281,10 @@ export default function DeliveryHomeScreen({ navigation }) {
     const socket = io(SOCKET_URL, { auth: { token }, transports: ['websocket'] });
     socket.on('delivery_status_update', () => { fetchStats(); fetchHistory(); });
     socket.on('new_delivery_request', fetchStats);
-    socket.on('order:incoming', (data) => setIncomingOrder(data));
+    socket.on('order:incoming', (data) => {
+      if (processedOrderIds.current.has(data.orderId)) return;
+      setIncomingOrder(data);
+    });
     socket.on('order:removed', (data) => {
       setIncomingOrder(prev => prev?.orderId === data.orderId ? null : prev);
     });
@@ -315,6 +319,7 @@ export default function DeliveryHomeScreen({ navigation }) {
 
   const handleAcceptIncoming = async () => {
     if (!incomingOrder) return;
+    processedOrderIds.current.add(incomingOrder.orderId);
     try {
       const res = await fetch(`${API_BASE}/delivery/accept/${incomingOrder.orderId}`, {
         method: 'POST',
@@ -331,7 +336,22 @@ export default function DeliveryHomeScreen({ navigation }) {
     } catch { setIncomingOrder(null); }
   };
 
-  const handleDeclineIncoming = () => setIncomingOrder(null);
+  const handleDeclineIncoming = () => {
+    if (incomingOrder) processedOrderIds.current.add(incomingOrder.orderId);
+    setIncomingOrder(null);
+  };
+
+  const handleIgnoreIncoming = async () => {
+    if (!incomingOrder) return;
+    processedOrderIds.current.add(incomingOrder.orderId);
+    try {
+      await fetch(`${API_BASE}/delivery/ignore/${incomingOrder.orderId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (_) {}
+    setIncomingOrder(null);
+  };
 
   if (loading || !fontsLoaded) {
     return (
@@ -384,6 +404,7 @@ export default function DeliveryHomeScreen({ navigation }) {
         order={incomingOrder}
         onAccept={handleAcceptIncoming}
         onDecline={handleDeclineIncoming}
+        onIgnore={handleIgnoreIncoming}
       />
 
       <ScrollView

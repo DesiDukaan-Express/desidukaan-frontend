@@ -504,11 +504,16 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
       console.log("[Dashboard] 🚫 delivery:declined → notification added", JSON.stringify(data));
       playOrderSound();
       const declinedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      const count = data.decline_count || 1;
       setNotifications((prev) => [
         {
           type: "delivery",
-          title: `Order #${data.order_id} — Rider declined`,
-          body: `${data.partner_name} declined at ${declinedAt}. Tap to reassign.`,
+          title: count > 1
+            ? `Order #${data.order_id} — ${count} riders declined`
+            : `Order #${data.order_id} — Rider declined`,
+          body: count > 1
+            ? `${count} riders declined at ${declinedAt}. Tap to reassign.`
+            : `${data.partner_name} declined at ${declinedAt}. Tap to reassign.`,
           time: "Just now",
           read: false,
           action: "orders",
@@ -1749,7 +1754,10 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         <View
           style={[
             styles.sheet,
-            { paddingBottom: Platform.OS === "ios" ? 34 : 20 },
+            {
+              maxHeight: "85%",
+              paddingBottom: Platform.OS === "ios" ? 34 : 20,
+            },
           ]}
         >
           <View style={styles.sheetHandle} />

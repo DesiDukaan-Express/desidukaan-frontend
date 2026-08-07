@@ -113,7 +113,7 @@ const sp = StyleSheet.create({
 });
 
 // ── Queue card ────────────────────────────────────────────────────────────────
-function QueueCard({ order, onAccept, onDecline, isAccepting }) {
+function QueueCard({ order, onAccept, onDecline, onIgnore, isAccepting }) {
   const { t } = useTranslation();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
@@ -180,8 +180,8 @@ function QueueCard({ order, onAccept, onDecline, isAccepting }) {
         </View>
       </View>
 
-      {/* Timer */}
-      <TimerBar seconds={60} onComplete={() => onDecline(order.orderId)} />
+      {/* Timer — 15 minutes */}
+      <TimerBar seconds={900} onComplete={() => onIgnore(order.orderId)} />
 
       {/* Buttons */}
       <View style={qc.btnRow}>
@@ -366,6 +366,10 @@ export default function QueueScreen({ navigation }) {
       setQueue(prev => prev.filter(o => o.orderId !== data.order?.id));
     });
 
+    socket.on('order:removed', (data) => {
+      setQueue(prev => prev.filter(o => o.orderId !== data.orderId));
+    });
+
     return () => { socket.disconnect(); socketRef.current = null; };
   }, [token]);
 
@@ -450,6 +454,23 @@ export default function QueueScreen({ navigation }) {
     setSessionStats({ accepted: acceptedRef.current, declined: declinedRef.current });
   };
 
+  const handleIgnore = async (orderId) => {
+    console.log(`[QueueScreen] Ignoring order ${orderId}`);
+    try {
+      const res = await fetch(`${API_BASE}/delivery/ignore/${orderId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      console.log(`[QueueScreen] Ignore response:`, JSON.stringify(data));
+    } catch (err) {
+      console.log('[QueueScreen] ignore error:', err);
+    }
+    setQueue(prev => prev.filter(o => o.orderId !== orderId));
+    declinedRef.current += 1;
+    setSessionStats({ accepted: acceptedRef.current, declined: declinedRef.current });
+  };
+
   const acceptRate = sessionStats.accepted + sessionStats.declined === 0
     ? '—'
     : `${Math.round((sessionStats.accepted / (sessionStats.accepted + sessionStats.declined)) * 100)}%`;
@@ -527,6 +548,7 @@ export default function QueueScreen({ navigation }) {
               order={order}
               onAccept={handleAccept}
               onDecline={handleDecline}
+              onIgnore={handleIgnore}
               isAccepting={acceptingId === order.orderId}
             />
           ))

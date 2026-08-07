@@ -809,30 +809,7 @@ function StepContent({ step, activeOrder, myLocation }) {
 }
 
 // â”€â”€ Available Order Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function AvailableOrderCard({ order, onAccept }) {
-  const { t } = useTranslation();
-  return (
-    <View style={styles.orderCard}>
-      <View style={styles.orderTop}>
-        <Text style={styles.orderId}>{order.displayId}</Text>
-        <View style={styles.newBadge}><Text style={styles.newBadgeText}>{t('delivery.new', 'New')}</Text></View>
-      </View>
-      <View style={styles.routeRow}>
-        <View style={[styles.routeDot, { backgroundColor: C.blue }]} />
-        <Text style={styles.routeText} numberOfLines={1}>{order.pickup}</Text>
-        <View style={styles.routeLine} />
-        <View style={[styles.routeDot, { backgroundColor: C.red }]} />
-        <Text style={styles.routeText} numberOfLines={1}>{order.drop}</Text>
-      </View>
-      <View style={styles.orderBottom}>
-        <Text style={styles.orderMeta}>{order.meta}</Text>
-        <TouchableOpacity style={styles.btnAccept} onPress={() => onAccept(order.orderIdRaw)} activeOpacity={0.85}>
-          <Text style={styles.btnAcceptText}>{t('delivery.accept', 'Accept')}</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
+
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 export default function ActiveDeliveryScreen({ navigation }) {
@@ -843,7 +820,6 @@ export default function ActiveDeliveryScreen({ navigation }) {
 
 
   const [activeOrder, setActiveOrder]         = useState(null);
-  const [availableOrders, setAvailableOrders] = useState([]);
   const [partner, setPartner]                 = useState({ name: 'Loading...', id: '...', initials: '' });
   const [myLocation, setMyLocation]           = useState(null);
   const [deliveryCount, setDeliveryCount]     = useState(0);
@@ -876,12 +852,8 @@ export default function ActiveDeliveryScreen({ navigation }) {
   // â”€â”€ Fetch & parse orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fetchOrders = async () => {
     try {
-      const [actRes, avlRes] = await Promise.all([
-        fetch(`${API_BASE}/delivery/active`,    { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API_BASE}/delivery/available`, { headers: { Authorization: `Bearer ${token}` } }),
-      ]);
+      const actRes = await fetch(`${API_BASE}/delivery/active`, { headers: { Authorization: `Bearer ${token}` } });
       const actResult = await actRes.json();
-      const avlResult = await avlRes.json();
 
       if (actResult.success && actResult.data.delivery) {
         const d = actResult.data.delivery;
@@ -910,17 +882,6 @@ export default function ActiveDeliveryScreen({ navigation }) {
       } else {
         setActiveOrder(null);
         setStep(0);
-      }
-
-      if (avlResult.success && avlResult.data.orders) {
-        setAvailableOrders(avlResult.data.orders.map(o => ({
-          id: o.id,
-          orderIdRaw: o.id,
-          displayId: o.order_number,
-          pickup: o.vendor.shop_name,
-          drop: o.delivery_address?.address_line || o.delivery_address?.city || 'Local',
-          meta: `₹${o.total} · ${o._count?.items || 0} ${t('delivery.items', 'items')}`,
-        })));
       }
     } catch (err) {
       console.log('fetchOrders error', err);
@@ -972,15 +933,6 @@ export default function ActiveDeliveryScreen({ navigation }) {
     if (sub?.remove) setTimeout(() => { try { sub.remove(); } catch (_) {} }, 0);
   };
 }, [token]);
-
-  const handleAccept = async (orderId) => {
-    try {
-      const res  = await fetch(`${API_BASE}/delivery/accept/${orderId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      if (data.success) { fetchOrders(); }
-      else Alert.alert('Error', data.message);
-    } catch (e) { console.log(e); }
-  };
 
   const handleAcceptIncoming = async () => {
     if (!incomingOrder) return;
@@ -1213,7 +1165,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
                     }}
                     onPress={handleDeclineActiveOrder}
                   >
-                    <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>{t('delivery.decline', 'Decline')}</Text>
+                    <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>{t('delivery.cancel', 'Cancel')}</Text>
                   </TouchableOpacity>
                 )}
                 <View style={styles.stepBadge}>
@@ -1254,19 +1206,6 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
                 markers={myLocation ? [{ coordinate: myLocation, title: 'You' }] : []}
               />
             </View>
-
-            <Text style={styles.sectionTitle}>{t('delivery.availableOrders', 'Available orders')}</Text>
-
-            {availableOrders.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <MaterialIcons name="delivery-dining" size={48} color={C.textLight} />
-                <Text style={styles.emptyText}>{t('delivery.noOrdersRightNow', 'No orders right now')}</Text>
-              </View>
-            ) : (
-              availableOrders.map(order => (
-                <AvailableOrderCard key={order.id} order={order} onAccept={handleAccept} />
-              ))
-            )}
           </>
         )}
       </ScrollView>
@@ -1529,21 +1468,4 @@ const styles = StyleSheet.create({
 
   // No-active-order state
   mapBox:       { margin: 16, backgroundColor: C.white, borderRadius: 16, height: 180, overflow: 'hidden', borderWidth: 1, borderColor: C.border },
-  sectionTitle: { fontSize: 13, fontWeight: '600', color: C.textSecond, marginBottom: 10, paddingHorizontal: 16 },
-  orderCard:    { backgroundColor: C.white, borderRadius: 16, padding: 14, marginHorizontal: 16, marginBottom: 10, borderWidth: 1, borderColor: C.border },
-  orderTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  orderId:      { fontSize: 13, fontWeight: '700', color: C.textPrimary },
-  newBadge:     { backgroundColor: C.blueLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
-  newBadgeText: { fontSize: 11, fontWeight: '700', color: C.blueText },
-  routeRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  routeDot:     { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
-  routeText:    { fontSize: 12, fontWeight: '500', color: C.textPrimary, flexShrink: 1, maxWidth: '40%' },
-  routeLine:    { flex: 1, height: 1, backgroundColor: C.border },
-  orderBottom:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  orderMeta:    { fontSize: 11, fontWeight: '500', color: C.textLight, flex: 1 },
-  btnAccept:    { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, backgroundColor: C.primary },
-  btnAcceptText:{ fontSize: 12, color: C.white, fontWeight: '700' },
-  emptyBox:     { alignItems: 'center', paddingVertical: 40 },
-  emptyEmoji:   { fontSize: 40, marginBottom: 10 },
-  emptyText:    { fontSize: 14, fontWeight: '500', color: C.textLight },
 });

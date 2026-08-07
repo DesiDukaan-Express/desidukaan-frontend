@@ -390,7 +390,7 @@ const sl = StyleSheet.create({
   },
 });
 // ── Main Component ─────────────────────────────────────────────────────────────
-export default function IncomingOrderSheet({ order, onAccept, onDecline }) {
+export default function IncomingOrderSheet({ order, onAccept, onDecline, onIgnore }) {
   const slideAnim = useRef(new Animated.Value(400)).current;
 
   useEffect(() => {
@@ -412,6 +412,14 @@ export default function IncomingOrderSheet({ order, onAccept, onDecline }) {
     }).start(() => onDecline?.());
   };
 
+  const handleIgnore = () => {
+    Animated.timing(slideAnim, {
+      toValue: 400,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => (onIgnore || onDecline)?.());
+  };
+
   if (!order) return null;
 
   return (
@@ -429,7 +437,7 @@ export default function IncomingOrderSheet({ order, onAccept, onDecline }) {
               <Text style={s.headerTitle}>New Delivery Request</Text>
               <Text style={s.headerSub}>{order.orderNumber}</Text>
             </View>
-            <CountdownRing seconds={60} onExpire={handleDecline} />
+            <CountdownRing seconds={60} onExpire={handleIgnore} />
           </View>
 
           {/* Route card */}

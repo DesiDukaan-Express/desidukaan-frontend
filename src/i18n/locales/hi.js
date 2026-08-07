@@ -599,6 +599,8 @@ export default {
     "orderItems": "ऑर्डर के सामान",
     "specialInstructions": "विशेष निर्देश",
     "manageOrder": "ऑर्डर प्रबंधित करें",
+    "manageOrderDeclinedSingle": "ऑर्डर प्रबंधित करें — {{name}} डिलीवरी पार्टनर ने अस्वीकार किया",
+    "manageOrderDeclinedMultiple": "ऑर्डर प्रबंधित करें — {{count}} डिलीवरी पार्टनरों ने अस्वीकार किया",
     "manageDelivery": "डिलीवरी प्रबंधित करें",
     "markPreparing": "तैयारी चिह्नित करें",
     "markReady": "तैयार चिह्नित करें",
