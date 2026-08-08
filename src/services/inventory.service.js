@@ -128,7 +128,7 @@ export const inventoryService = {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to create product");
+      if (!res.ok) throw new Error(data.error || data.message || "Failed to create product");
       return data;
     } catch (err) {
       console.error("createProduct error:", err);

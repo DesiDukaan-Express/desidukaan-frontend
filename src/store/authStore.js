@@ -28,13 +28,15 @@ const secureDelete = async (key) => {
   return SecureStore.deleteItemAsync(key);
 };
 
+const ALL_ROLES = ["customer", "vendor", "delivery"];
+
 const loadPersistedEnabledRoles = async (userRoles = []) => {
   try {
     const stored = await AsyncStorage.getItem(ENABLED_ROLES_KEY);
     const parsed = stored ? JSON.parse(stored) : [];
-    return Array.from(new Set(["customer", ...userRoles, ...parsed].filter(Boolean)));
+    return Array.from(new Set([...ALL_ROLES, ...userRoles, ...parsed].filter(Boolean)));
   } catch {
-    return Array.from(new Set(["customer", ...userRoles].filter(Boolean)));
+    return Array.from(new Set([...ALL_ROLES, ...userRoles].filter(Boolean)));
   }
 };
 
@@ -99,7 +101,7 @@ const useAuthStore = create((set, get) => ({
   // null means the picker hasn't been shown yet this session
   activeRole: null,
   // enabledRoles: all roles this user has unlocked
-  enabledRoles: ["customer"],
+  enabledRoles: ["customer", "vendor", "delivery"],
   isAuthenticated: false,
   isLoading: true,
   // accountDeactivated: true → the full-screen "Account Deactivated" block
@@ -270,7 +272,7 @@ const useAuthStore = create((set, get) => ({
       await AsyncStorage.removeItem(ENABLED_ROLES_KEY);
       await secureDelete(REFRESH_KEY);
       useAddressStore.getState().clearAddresses();
-      set({ user: null, token: null, role: null, activeRole: null, enabledRoles: ["customer"], isAuthenticated: false, accountDeactivated: false });
+      set({ user: null, token: null, role: null, activeRole: null, enabledRoles: ["customer", "vendor", "delivery"], isAuthenticated: false, accountDeactivated: false });
     }
   },
 
