@@ -61,6 +61,10 @@ export default function Navigation() {
       const data = await res.json();
       const vendor = data.data?.vendor;
 
+      if (vendor) {
+        useAuthStore.getState().addEnabledRole("vendor");
+      }
+
       setVendorOnboarded(
         !!(vendor?.shop_name && vendor?.onboarding_status === "approved"),
       );
@@ -174,6 +178,9 @@ export default function Navigation() {
       });
       const data = await res.json();
       const profile = data.data?.profile;
+      if (profile) {
+        useAuthStore.getState().addEnabledRole("delivery");
+      }
       if (!profile?.onboarding_submitted) {
         setDeliveryOnboarded('not_submitted');
       } else if (profile?.is_certified) {

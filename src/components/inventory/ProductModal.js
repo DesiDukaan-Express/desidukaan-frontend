@@ -452,8 +452,6 @@ function CategoryPicker({
   return (
     <View style={cp.wrap}>
       <Label>Category</Label>
-      
-      {/* Drop Box for Top Category */}
       <TouchableOpacity
         style={cp.dropdownBox}
         onPress={() => { setCatOpen(!catOpen); setSubOpen(false); }}
@@ -490,11 +488,9 @@ function CategoryPicker({
         </View>
       )}
 
-      {/* Subcategory selection dropdown */}
       {selectedTopCat && (
         <View style={cp.subSection}>
           <Text style={cp.subLabel}>Subcategory</Text>
-          
           <TouchableOpacity
             style={cp.dropdownBox}
             onPress={() => { setSubOpen(!subOpen); setCatOpen(false); }}
@@ -539,8 +535,7 @@ function CategoryPicker({
         </View>
       )}
 
-      {/* Breadcrumb */}
-      {categoryName && (
+      {categoryName ? (
         <View style={[cp.breadcrumb, { flexDirection: "row", alignItems: "center", gap: 5 }]}>
           <Feather name="folder" size={13} color={PRIMARY_D} />
           <Text style={cp.breadcrumbText}>
@@ -548,7 +543,7 @@ function CategoryPicker({
             {selectedSubName ? ` › ${selectedSubName}` : ""}
           </Text>
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
