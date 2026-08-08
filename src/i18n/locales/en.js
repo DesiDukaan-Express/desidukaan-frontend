@@ -53,6 +53,22 @@ export default {
     failedToSendOtp: "Failed to send OTP",
   },
 
+  // ── Account deactivated ──
+  deactivated: {
+    title: "Account Deactivated",
+    message: "Your account has been deactivated by the admin. You are not able to use the app until your account is reactivated.",
+    reload: "Reload",
+    supportHint: "If you believe this is a mistake, please contact support.",
+  },
+
+  // ── Vendor account suspended ──
+  suspended: {
+    title: "Account Suspended",
+    message: "Your shop account has been suspended by the admin. You are not able to use the app until your account is reactivated.",
+    reload: "Reload",
+    supportHint: "If you believe this is a mistake, please contact support.",
+  },
+
   // ── Roles ──
   roles: {
     customer: "Customer",
@@ -188,31 +204,34 @@ export default {
 
   // ── Vendor Store ──
   vendorStore: {
-    searchIn: "Search in {{name}}...",
-    sort: "SORT:",
-    default: "Default",
-    priceLowHigh: "Price: Low to High",
-    priceHighLow: "Price: High to Low",
-    nameAZ: "Name: A-Z",
-    all: "All",
-    other: "Other",
-    add: "ADD",
-    select: "SELECT",
-    outOfStock: "Out of Stock",
-    inStock: "{{count}} in stock",
-    open: "Open",
-    closed: "Closed",
-    loose: "Loose",
-    off: "OFF",
-    selectWeight: "Select Weight",
-    selectQuantity: "Select quantity",
-    looseItem: "Loose item",
-    perUnit: "per {{unit}}",
-    addWeightToCart: "Add {{weight}} to Cart",
-    onlyLeft: "Only {{count}} left — order soon!",
-    description: "Description",
-    youSave: "You save ₹{{amount}} per item",
-    totalPayable: "Total Payable",
+  searchIn: "Search in {{name}}...",
+  sort: "SORT:",
+  default: "Default",
+  priceLowHigh: "Price: Low to High",
+  priceHighLow: "Price: High to Low",
+  nameAZ: "Name: A-Z",
+  nameZA: "Name: Z-A",
+  bestDiscount: "Best Discount",
+
+  all: "All",
+  other: "Other",
+  add: "ADD",
+  select: "SELECT",
+  outOfStock: "Out of Stock",
+  inStock: "{{count}} in stock",
+  open: "Open",
+  closed: "Closed",
+  loose: "Loose",
+  off: "OFF",
+  selectWeight: "Select Weight",
+  selectQuantity: "Select quantity",
+  looseItem: "Loose item",
+  perUnit: "per {{unit}}",
+  addWeightToCart: "Add {{weight}} to Cart",
+  onlyLeft: "Only {{count}} left — order soon!",
+  description: "Description",
+  youSave: "You save ₹{{amount}} per item",
+  totalPayable: "Total Payable",
   },
 
   // ── Checkout & Payment ──
@@ -511,6 +530,7 @@ export default {
     windDown: "Wind Down",
     eveningSub: "Wrapping up strong today!",
     loadingDashboard: "Loading your dashboard\u2026",
+    noChartData: "No sales data yet",
     chartUnavailable: "Chart unavailable",
     welcomeTitle: "Welcome to KwikPik!",
     welcomeSub: "You haven't completed your shop registration yet. Complete it now to start selling!",
