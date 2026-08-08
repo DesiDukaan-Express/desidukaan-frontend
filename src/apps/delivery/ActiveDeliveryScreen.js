@@ -945,6 +945,18 @@ export default function ActiveDeliveryScreen({ navigation }) {
     } catch (e) { setIncomingOrder(null); }
   };
 
+  const handleDeclineIncoming = async () => {
+    if (!incomingOrder) return;
+    try {
+      const data = await deliveryAPI.decline(incomingOrder.orderId, token);
+      setIncomingOrder(null);
+      if (data.success) fetchOrders();
+      else Alert.alert('Error', data.message || 'Could not decline order');
+    } catch (e) {
+      setIncomingOrder(null);
+    }
+  };
+
 
 
 const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
@@ -1100,7 +1112,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
       <IncomingOrderSheet
         order={incomingOrder}
         onAccept={handleAcceptIncoming}
-        onDecline={() => setIncomingOrder(null)}
+        onDecline={handleDeclineIncoming}
       />
 
       <ScrollView
