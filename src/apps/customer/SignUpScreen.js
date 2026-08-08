@@ -225,6 +225,10 @@ export default function SignupScreen({ navigation, route }) {
         body: JSON.stringify({ phone: mobile, code: otp }),
       });
       const data = await res.json();
+      if (data.error === "ACCOUNT_DEACTIVATED") {
+        useAuthStore.getState().flagDeactivated();
+        return;
+      }
       if (!res.ok) throw new Error(data.msg || "Invalid OTP");
       await login(data.user, data.accessToken, data.refreshToken);
       // Navigation auto-updates — RolePickerScreen shows (activeRole is null)

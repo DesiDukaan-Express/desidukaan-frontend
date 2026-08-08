@@ -1076,11 +1076,15 @@ export default function VendorOrdersScreen() {
           >
             {t('vendor.activeOrders')}
           </Text>
-          {orders.length > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{orders.length}</Text>
-            </View>
-          )}
+          {(() => {
+            const pendingOrdersCount = orders.filter(o => o.status === "pending" || o.status === "countered").length;
+            const activeOrdersCount = orders.filter(o => o.status !== "pending" && o.status !== "countered").length;
+            return activeOrdersCount > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{activeOrdersCount}</Text>
+              </View>
+            ) : null;
+          })()}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -1095,13 +1099,17 @@ export default function VendorOrdersScreen() {
           >
             {t('vendor.requests')}
           </Text>
-          {requests.phones.length + requests.slots.length > 0 && (
-            <View style={[styles.badge, { backgroundColor: "#D97706" }]}>
-              <Text style={styles.badgeText}>
-                {requests.phones.length + requests.slots.length}
-              </Text>
-            </View>
-          )}
+          {(() => {
+            const pendingOrdersCount = orders.filter(o => o.status === "pending" || o.status === "countered").length;
+            const totalRequestsCount = pendingOrdersCount + requests.phones.length + requests.slots.length;
+            return totalRequestsCount > 0 ? (
+              <View style={[styles.badge, { backgroundColor: "#D97706" }]}>
+                <Text style={styles.badgeText}>
+                  {totalRequestsCount}
+                </Text>
+              </View>
+            ) : null;
+          })()}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -1164,7 +1172,10 @@ export default function VendorOrdersScreen() {
             refreshing={refreshing || loadingRequests || loadingHistory}
             onRefresh={() => {
               if (activeTab === "orders") onRefresh();
-              else if (activeTab === "requests") fetchRequests();
+              else if (activeTab === "requests") {
+                onRefresh();
+                fetchRequests();
+              }
               else fetchHistory();
             }}
           />

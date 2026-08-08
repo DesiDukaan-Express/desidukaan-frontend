@@ -38,6 +38,13 @@ const request = async (method, endpoint, body = null, token = null, _isRetry = f
       useAuthStore.getState()._setAccessToken(newAccessToken);
       // Retry the original request with the fresh token
       return request(method, endpoint, body, newAccessToken, true);
+    } else if (refreshResult?.error === "ACCOUNT_DEACTIVATED") {
+      // Account deactivated by admin → block the app (keep refresh token so a
+      // reload after reactivation restores the session automatically).
+      useAuthStore.getState().flagDeactivated();
+      const err = new Error("Your account has been deactivated.");
+      err.accountDeactivated = true;
+      throw err;
     } else {
       // Refresh token also expired/revoked → force logout
       useAuthStore.getState().logout();

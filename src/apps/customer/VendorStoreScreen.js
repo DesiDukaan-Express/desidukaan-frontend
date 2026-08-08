@@ -11,6 +11,7 @@ import useCartStore from "../../store/cartStore";
 import useAuthStore from "../../store/authStore";
 import { categoriesAPI } from "../../services/api";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
+import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
 import { useTranslation } from "react-i18next";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
@@ -764,6 +765,9 @@ export default function VendorStoreScreen() {
   const searchInputRef = useRef(null);
   const [activeCat, setActiveCat] = useState("All");
   const [sortBy, setSortBy] = useState("default");
+  useEffect(() => {
+  console.log("Sort Changed:", sortBy);
+}, [sortBy]);
   const [detailItem, setDetailItem] = useState(null);
   const [loosePickerItem, setLoosePickerItem] = useState(null); // weight picker
 
@@ -895,29 +899,94 @@ export default function VendorStoreScreen() {
   }), [inventory, search, activeCat, getCatName, parentOfMap]);
 
   const inStock = useMemo(() => {
-    let list = filtered.filter(i => i.stock_qty > 0);
-    if (sortBy === "price_asc") {
-      list.sort((a, b) => (a.price || 0) - (b.price || 0));
-    } else if (sortBy === "price_desc") {
-      list.sort((a, b) => (b.price || 0) - (a.price || 0));
-    } else if (sortBy === "name_asc") {
-      list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-    }
-    return list;
-  }, [filtered, sortBy]);
+  let list = [...filtered.filter(i => i.stock_qty > 0)];
+
+  switch (sortBy) {
+    case "price_asc":
+      list.sort((a, b) => (a.product?.price || 0) - (b.product?.price || 0));
+      break;
+
+    case "price_desc":
+      list.sort((a, b) => (b.product?.price || 0) - (a.product?.price || 0));
+      break;
+
+    case "discount":
+      list.sort((a, b) => {
+        const discountA =
+          ((a.product?.mrp || a.product?.price || 0) -
+            (a.product?.price || 0));
+
+        const discountB =
+          ((b.product?.mrp || b.product?.price || 0) -
+            (b.product?.price || 0));
+
+        return discountB - discountA;
+      });
+      break;
+
+    case "name_asc":
+      list.sort((a, b) =>
+        (a.product?.name || "").localeCompare(b.product?.name || "")
+      );
+      break;
+
+    case "name_desc":
+      list.sort((a, b) =>
+        (b.product?.name || "").localeCompare(a.product?.name || "")
+      );
+      break;
+
+    default:
+      break;
+  }
+
+  return list;
+}, [filtered, sortBy]);
 
   const outStock = useMemo(() => {
-    let list = filtered.filter(i => i.stock_qty <= 0);
-    if (sortBy === "price_asc") {
-      list.sort((a, b) => (a.price || 0) - (b.price || 0));
-    } else if (sortBy === "price_desc") {
-      list.sort((a, b) => (b.price || 0) - (a.price || 0));
-    } else if (sortBy === "name_asc") {
-      list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-    }
-    return list;
-  }, [filtered, sortBy]);
+  let list = [...filtered.filter(i => i.stock_qty <= 0)];
 
+  switch (sortBy) {
+    case "price_asc":
+      list.sort((a, b) => (a.product?.price || 0) - (b.product?.price || 0));
+      break;
+
+    case "price_desc":
+      list.sort((a, b) => (b.product?.price || 0) - (a.product?.price || 0));
+      break;
+
+    case "discount":
+      list.sort((a, b) => {
+        const discountA =
+          ((a.product?.mrp || a.product?.price || 0) -
+            (a.product?.price || 0));
+
+        const discountB =
+          ((b.product?.mrp || b.product?.price || 0) -
+            (b.product?.price || 0));
+
+        return discountB - discountA;
+      });
+      break;
+
+    case "name_asc":
+      list.sort((a, b) =>
+        (a.product?.name || "").localeCompare(b.product?.name || "")
+      );
+      break;
+
+    case "name_desc":
+      list.sort((a, b) =>
+        (b.product?.name || "").localeCompare(a.product?.name || "")
+      );
+      break;
+
+    default:
+      break;
+  }
+
+  return list;
+}, [filtered, sortBy]);
 
 
   // ── Cart helpers ──────────────────────────────────────────────────────────
@@ -1016,16 +1085,16 @@ export default function VendorStoreScreen() {
           <Text style={s.appName}>KwikPik</Text>
           <Text style={s.shopName} numberOfLines={1}>{vendor?.shop_name || vendorName}</Text>
           <View style={s.shopMetaRow}>
-            <View style={[s.statusDot, { backgroundColor: vendor?.is_open ? "#4ADE80" : "#F87171" }]} />
-            <Text style={s.metaText}>{vendor?.is_open ? t('vendorStore.open') : t('vendorStore.closed')}</Text>
+            <View style={[s.statusDot, { backgroundColor: isStoreCurrentlyOpen(vendor) ? "#4ADE80" : "#F87171" }]} />
+            <Text style={s.metaText}>{isStoreCurrentlyOpen(vendor) ? t('vendorStore.open') : t('vendorStore.closed')}</Text>
             <Text style={s.metaSep}>·</Text>
             <Text style={s.metaText}>{t('vendorStore.inStock', { count: inStockTotal })}</Text>
           </View>
         </View>
-        <View style={[s.statusChip, !vendor?.is_open && s.statusChipClosed]}>
-          <View style={[s.statusDot, { backgroundColor: vendor?.is_open ? C.greenFixed : "#F87171" }]} />
-          <Text style={[s.statusText, !vendor?.is_open && s.statusTextClosed]}>
-            {vendor?.is_open ? t('vendorStore.open') : t('vendorStore.closed')}
+        <View style={[s.statusChip, !isStoreCurrentlyOpen(vendor) && s.statusChipClosed]}>
+          <View style={[s.statusDot, { backgroundColor: isStoreCurrentlyOpen(vendor) ? C.greenFixed : "#F87171" }]} />
+          <Text style={[s.statusText, !isStoreCurrentlyOpen(vendor) && s.statusTextClosed]}>
+            {isStoreCurrentlyOpen(vendor) ? t('vendorStore.open') : t('vendorStore.closed')}
           </Text>
         </View>
         <TouchableOpacity
@@ -1068,12 +1137,16 @@ export default function VendorStoreScreen() {
           <Text style={s.sortTitle}>{t('vendorStore.sort')}</Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.sortRow}>
-          {[
-            { key: "default", label: t('vendorStore.default') },
-            { key: "price_asc", label: t('vendorStore.priceLowHigh'), icon: "arrow-up" },
-            { key: "price_desc", label: t('vendorStore.priceHighLow'), icon: "arrow-down" },
-            { key: "name_asc", label: t('vendorStore.nameAZ') },
-          ].map((opt) => {
+         {[
+  { key: "default", label: t('vendorStore.default') },
+  { key: "price_asc", label: t('vendorStore.priceLowHigh'), icon: "arrow-up" },
+  { key: "price_desc", label: t('vendorStore.priceHighLow'), icon: "arrow-down" },
+  { key: "discount", label: t('vendorStore.bestDiscount'), icon: "percent" },
+  { key: "name_asc", label: t('vendorStore.nameAZ') },
+  { key: "name_desc", label: t('vendorStore.nameZA') },
+]
+
+.map((opt) => {
             const active = sortBy === opt.key;
             return (
               <TouchableOpacity
