@@ -9,7 +9,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import useCartStore from "../../store/cartStore";
 import useAuthStore from "../../store/authStore";
-import { categoriesAPI } from "../../services/api";
+import { categoriesAPI, wishlistAPI } from "../../services/api";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { useTranslation } from "react-i18next";
 
@@ -521,7 +521,17 @@ const pm = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════ //
 // ─── Product Card — responsive 2-5 col grid ──────────────────────────────── //
 // ═══════════════════════════════════════════════════════════════════════════ //
-function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
+function ProductCard({
+  item,
+  onPress,
+  onAdd,
+  onRemove,
+  qty,
+  cardW,
+  isWishlisted,
+  wishlistLoading,
+  onToggleWishlist,
+}) {
   const { t } = useTranslation();
   const p = item.product || {};
   const inStock = item.stock_qty > 0;
@@ -547,6 +557,21 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
           onPress={(e) => { e.stopPropagation?.(); onPress?.(); }}
           activeOpacity={0.7}
         >
+          <TouchableOpacity
+  style={pc.wishlistBtn}
+  onPress={(e) => {
+    e.stopPropagation?.();
+    onToggleWishlist?.(item.product_id);
+  }}
+  activeOpacity={0.7}
+  disabled={wishlistLoading}
+>
+  <MaterialIcons
+    name={isWishlisted ? "favorite" : "favorite-border"}
+    size={20}
+    color={isWishlisted ? "#EF4444" : C.gray700}
+  />
+</TouchableOpacity>
           <Feather name="eye" size={14} color={C.white} />
         </TouchableOpacity>
         {discount && inStock && (
@@ -645,6 +670,23 @@ const pc = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     zIndex: 2,
   },
+  wishlistBtn: {
+  position: "absolute",
+  top: 8,
+  right: 46,
+  width: 34,
+  height: 34,
+  borderRadius: 17,
+  backgroundColor: "rgba(255,255,255,0.95)",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 3,
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.12,
+  shadowRadius: 4,
+  elevation: 3,
+},
   info: { padding: 12, flex: 1 },
   name: { fontSize: 16, fontWeight: "800", color: C.gray900, lineHeight: 21, marginBottom: 2 },
   unit: { fontSize: 11, color: C.gray500, marginBottom: 6 },
@@ -718,17 +760,27 @@ function CatTabPill({ cat, count, isActive, onPress }) {
   );
 }
 const ct = StyleSheet.create({
-  pill: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999,
-    borderWidth: 1, borderColor: C.outlineVar,
-    backgroundColor: C.surfaceLowest, marginRight: 8,
-  },
-  pillActive: {
-    backgroundColor: C.greenDark, borderColor: C.greenDark,
-    shadowColor: C.green, shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3, shadowRadius: 7, elevation: 4,
-  },
+ pill: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 6,
+  paddingHorizontal: 15,
+  paddingVertical: 10,
+  borderRadius: 999,
+  borderWidth: 1,
+  borderColor: C.gray200,
+  backgroundColor: C.white,
+  marginRight: 8,
+},
+ pillActive: {
+  backgroundColor: C.green,
+  borderColor: C.green,
+  shadowColor: C.green,
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.2,
+  shadowRadius: 6,
+  elevation: 3,
+},
   emoji: { fontSize: 14 },
   label: { fontSize: 12, fontWeight: "700", color: C.gray600 },
   labelActive: { color: C.white },
@@ -741,7 +793,7 @@ const ct = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════════════════════ //
-// ─── Main Screen ─────────────────────────────────────────────────────────── //
+// ─── MAIN SCREEN ─────────────────────────────────────────────────────────── //
 // ═══════════════════════════════════════════════════════════════════════════ //
 export default function VendorStoreScreen() {
   const { t } = useTranslation();
@@ -764,11 +816,11 @@ export default function VendorStoreScreen() {
   const searchInputRef = useRef(null);
   const [activeCat, setActiveCat] = useState("All");
   const [sortBy, setSortBy] = useState("default");
-  useEffect(() => {
-  console.log("Sort Changed:", sortBy);
-}, [sortBy]);
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
   const [loosePickerItem, setLoosePickerItem] = useState(null); // weight picker
+  const [wishlistIds, setWishlistIds] = useState(new Set());
+const [wishlistLoading, setWishlistLoading] = useState({});
 
   // Fetch category tree on mount
   useEffect(() => {
@@ -817,7 +869,60 @@ export default function VendorStoreScreen() {
       finally { setLoading(false); }
     })();
   }, [vendorId, token]);
+    // ── Wishlist toggle ───────────────────────────────────────────
+  const toggleWishlist = useCallback(async (productId) => {
+    if (!token || !productId || wishlistLoading[productId]) return;
 
+    const id = Number(productId);
+    const isWishlisted = wishlistIds.has(id);
+
+    setWishlistLoading((prev) => ({
+      ...prev,
+      [id]: true,
+    }));
+
+    // Optimistic UI update
+    setWishlistIds((prev) => {
+      const next = new Set(prev);
+
+      if (isWishlisted) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+
+      return next;
+    });
+
+    try {
+      if (isWishlisted) {
+        await wishlistAPI.remove(id, token);
+      } else {
+        await wishlistAPI.add(id, token);
+      }
+    } catch (error) {
+      console.error("Wishlist update failed:", error);
+
+      // Roll back UI if API failed
+      setWishlistIds((prev) => {
+        const next = new Set(prev);
+
+        if (isWishlisted) {
+          next.add(id);
+        } else {
+          next.delete(id);
+        }
+
+        return next;
+      });
+    } finally {
+      setWishlistLoading((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
+  }, [token, wishlistIds, wishlistLoading]);
   // ── Derived data ──────────────────────────────────────────────────────────
   const getCatName = useCallback((item) => {
     const p = item.product;
@@ -855,8 +960,12 @@ export default function VendorStoreScreen() {
   );
 
   const categories = useMemo(() => {
-    return ["All", ...Object.keys(categoryHierarchy).sort()];
-  }, [categoryHierarchy]);
+  const categoryNames = Object.keys(categoryHierarchy)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+
+  return ["All", ...new Set(categoryNames)];
+}, [categoryHierarchy]);
 
   const inStockTotal = useMemo(() => inventory.filter(i => i.stock_qty > 0).length, [inventory]);
 
@@ -1036,13 +1145,18 @@ export default function VendorStoreScreen() {
   const renderProductGrid = (items) => (
     <View style={[s.grid, { gap }]}>
       {items.map(item => (
-        <ProductCard
-          key={item.product_id} item={item}
-          qty={getQty(item.product_id)}
-          onPress={() => setDetailItem(item)}
-          onAdd={handleAdd} onRemove={handleRemove}
-          cardW={cardW}
-        />
+       <ProductCard
+  key={item.product_id}
+  item={item}
+  qty={getQty(item.product_id)}
+  onPress={() => setDetailItem(item)}
+  onAdd={handleAdd}
+  onRemove={handleRemove}
+  cardW={cardW}
+  isWishlisted={wishlistIds.has(Number(item.product_id))}
+  wishlistLoading={wishlistLoading[Number(item.product_id)]}
+  onToggleWishlist={toggleWishlist}
+/>
       ))}
     </View>
   );
@@ -1105,62 +1219,161 @@ export default function VendorStoreScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* SEARCH */}
-      <View style={s.searchWrap}>
-        <View style={[s.searchBox, searchFocus && s.searchBoxActive]}>
-          <Feather name="search" size={15} color={searchFocus ? C.green : C.gray400} />
-          <TextInput
-            ref={searchInputRef}
-            style={s.searchInput}
-            placeholder={t('vendorStore.searchIn', { name: vendor?.shop_name || "store" })}
-            placeholderTextColor={C.gray400}
-            value={search}
-            onChangeText={t => setSearch(t)}
-            onFocus={() => setSearchFocus(true)}
-            onBlur={() => setSearchFocus(false)}
-            underlineColorAndroid="transparent"
-            selectionColor={C.green}
+    {/* SEARCH */}
+<View style={[s.searchBox, searchFocus && s.searchBoxActive]}>
+  <Feather
+    name="search"
+    size={17}
+    color={searchFocus ? C.green : C.gray400}
+  />
+
+  <TextInput
+    ref={searchInputRef}
+    style={s.searchInput}
+    placeholder={t("vendorStore.searchIn", {
+      name: vendor?.shop_name || "store",
+    })}
+    placeholderTextColor={C.gray400}
+    value={search}
+    onChangeText={(text) => setSearch(text)}
+    onFocus={() => setSearchFocus(true)}
+    onBlur={() => setSearchFocus(false)}
+    underlineColorAndroid="transparent"
+    selectionColor={C.green}
+  />
+
+  {search.length > 0 && (
+    <TouchableOpacity
+      style={s.searchClearBtn}
+      onPress={() => setSearch("")}
+      activeOpacity={0.7}
+    >
+      <Feather
+        name="x"
+        size={16}
+        color={C.gray500}
+      />
+    </TouchableOpacity>
+  )}
+</View>
+
+{/* SORT OPTIONS */}
+<View style={s.sortContainer}>
+  <TouchableOpacity
+    style={s.sortButton}
+    onPress={() => setSortMenuOpen(true)}
+    activeOpacity={0.8}
+  >
+    <MaterialIcons
+      name="sort"
+      size={18}
+      color={C.green}
+    />
+
+    <Text style={s.sortButtonText}>
+      {t("vendorStore.sort")}
+    </Text>
+
+    <MaterialIcons
+      name="keyboard-arrow-down"
+      size={18}
+      color={C.gray500}
+    />
+  </TouchableOpacity>
+</View>
+
+{/* SORT MENU */}
+{sortMenuOpen && (
+  <>
+    <Pressable
+      style={s.sortMenuBackdrop}
+      onPress={() => setSortMenuOpen(false)}
+    />
+
+    <View style={s.sortMenu}>
+      <View style={s.sortMenuHeader}>
+        <Text style={s.sortMenuTitle}>
+          {t("vendorStore.sort")}
+        </Text>
+
+        <TouchableOpacity
+          onPress={() => setSortMenuOpen(false)}
+          activeOpacity={0.7}
+        >
+          <Feather
+            name="x"
+            size={20}
+            color={C.gray500}
           />
-          {search.length > 0 && (
-            <TouchableOpacity style={s.searchClearBtn} onPress={() => setSearch("")}>
-              <Feather name="x" size={12} color={C.gray600} />
-            </TouchableOpacity>
-          )}
-        </View>
+        </TouchableOpacity>
       </View>
 
-      {/* SORT OPTIONS */}
-      <View style={s.sortWrap}>
-        <View style={s.sortHeader}>
-          <Feather name="sliders" size={12} color={C.gray500} />
-          <Text style={s.sortTitle}>{t('vendorStore.sort')}</Text>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.sortRow}>
-         {[
-  { key: "default", label: t('vendorStore.default') },
-  { key: "price_asc", label: t('vendorStore.priceLowHigh'), icon: "arrow-up" },
-  { key: "price_desc", label: t('vendorStore.priceHighLow'), icon: "arrow-down" },
-  { key: "discount", label: t('vendorStore.bestDiscount'), icon: "percent" },
-  { key: "name_asc", label: t('vendorStore.nameAZ') },
-  { key: "name_desc", label: t('vendorStore.nameZA') },
-]
+      {[
+        {
+          key: "default",
+          label: t("vendorStore.default"),
+        },
+        {
+          key: "price_asc",
+          label: t("vendorStore.priceLowHigh"),
+        },
+        {
+          key: "price_desc",
+          label: t("vendorStore.priceHighLow"),
+        },
+        {
+          key: "discount",
+          label: t("vendorStore.bestDiscount"),
+        },
+        {
+          key: "name_asc",
+          label: t("vendorStore.nameAZ"),
+        },
+        {
+          key: "name_desc",
+          label: t("vendorStore.nameZA"),
+        },
+      ].map((opt) => {
+        const active = sortBy === opt.key;
 
-.map((opt) => {
-            const active = sortBy === opt.key;
-            return (
-              <TouchableOpacity
-                key={opt.key}
-                onPress={() => setSortBy(opt.key)}
-                style={[s.sortPill, active && s.sortPillActive]}
-                activeOpacity={0.8}
-              >
-                {opt.icon && <Feather name={opt.icon} size={10} color={active ? C.white : C.gray600} style={{ marginRight: 4 }} />}
-                <Text style={[s.sortPillText, active && s.sortPillTextActive]}>{opt.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+        return (
+          <TouchableOpacity
+            key={opt.key}
+            style={[
+              s.sortMenuOption,
+              active && s.sortMenuOptionActive,
+            ]}
+            onPress={() => {
+              setSortBy(opt.key);
+              setSortMenuOpen(false);
+            }}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[
+                s.sortMenuOptionText,
+                active && s.sortMenuOptionTextActive,
+              ]}
+            >
+              {opt.label}
+            </Text>
+
+            <View
+              style={[
+                s.sortRadio,
+                active && s.sortRadioActive,
+              ]}
+            >
+              {active && (
+                <View style={s.sortRadioDot} />
+              )}
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  </>
+)}
 
       {/* CATEGORY TABS — hidden on wide screens where sidebar shows */}
       {!search && categories.length > 0 && !(isWide && categories.length > 2) && (
@@ -1334,6 +1547,122 @@ const s = StyleSheet.create({
   centered: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500" },
 
+  sortContainer: {
+  alignItems: "flex-end",
+  marginTop: 10,
+  marginBottom: 8,
+},
+
+sortButton: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 6,
+  paddingHorizontal: 14,
+  paddingVertical: 9,
+  borderRadius: 12,
+  backgroundColor: C.surface,
+  borderWidth: 1,
+  borderColor: C.border,
+},
+
+sortButtonText: {
+  fontSize: 13,
+  fontWeight: "700",
+  color: C.gray700,
+},
+
+sortMenuBackdrop: {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: "rgba(0,0,0,0.18)",
+  zIndex: 50,
+},
+
+sortMenu: {
+  position: "absolute",
+  top: 115,
+  right: 16,
+  width: 260,
+  backgroundColor: C.white,
+  borderRadius: 18,
+  paddingVertical: 8,
+  paddingHorizontal: 8,
+  zIndex: 51,
+
+  shadowColor: "#000",
+  shadowOffset: {
+    width: 0,
+    height: 6,
+  },
+  shadowOpacity: 0.15,
+  shadowRadius: 14,
+  elevation: 10,
+},
+
+sortMenuHeader: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingHorizontal: 12,
+  paddingVertical: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: C.border,
+  marginBottom: 4,
+},
+
+sortMenuTitle: {
+  fontSize: 16,
+  fontWeight: "800",
+  color: C.gray900,
+},
+
+sortMenuOption: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingHorizontal: 12,
+  paddingVertical: 13,
+  borderRadius: 12,
+},
+
+sortMenuOptionActive: {
+  backgroundColor: "rgba(34,197,94,0.08)",
+},
+
+sortMenuOptionText: {
+  fontSize: 14,
+  fontWeight: "600",
+  color: C.gray700,
+},
+
+sortMenuOptionTextActive: {
+  color: C.green,
+  fontWeight: "800",
+},
+
+sortRadio: {
+  width: 18,
+  height: 18,
+  borderRadius: 9,
+  borderWidth: 2,
+  borderColor: C.gray300,
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+sortRadioActive: {
+  borderColor: C.green,
+},
+
+sortRadioDot: {
+  width: 8,
+  height: 8,
+  borderRadius: 4,
+  backgroundColor: C.green,
+},
   // ── Header — white surface card style ──
   header: {
     paddingHorizontal: 24,
@@ -1409,60 +1738,19 @@ const s = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 14, color: C.gray900, ...Platform.select({ web: { outlineStyle: "none" } }) },
   searchClearBtn: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.gray300, alignItems: "center", justifyContent: "center" },
 
-  // ── Sort Options ──
-  sortWrap: {
-    paddingHorizontal: 24,
-    paddingBottom: 10,
-    backgroundColor: C.bg,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  sortHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  sortTitle: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: C.gray500,
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  },
-  sortRow: {
-    flexDirection: "row",
-    gap: 6,
-    paddingLeft: 4,
-  },
-  sortPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: C.gray200,
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: C.white,
-  },
-  sortPillActive: {
-    borderColor: C.green,
-    backgroundColor: C.green,
-  },
-  sortPillText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: C.gray600,
-  },
-  sortPillTextActive: {
-    color: C.white,
-    fontWeight: "700",
-  },
-
   // ── Category tabs ──
-  catTabsWrap: { backgroundColor: C.bg },
-  catTabsRow: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 10, flexDirection: "row" },
+  catTabsWrap: {
+  backgroundColor: C.bg,
+  borderBottomWidth: 1,
+  borderBottomColor: C.gray100,
+},
 
+catTabsRow: {
+  paddingHorizontal: 24,
+  paddingTop: 10,
+  paddingBottom: 12,
+  flexDirection: "row",
+},
   loadingHeader: { paddingHorizontal: 16, paddingTop: Platform.OS === "android" ? 14 : 52, paddingBottom: 14, flexDirection: "row", alignItems: "center", gap: 12 },
 
   // Desktop layout
