@@ -29,6 +29,7 @@ import { T } from "../../components/common/tokens";
 // ── Inventory Components ──────────────────────────────────────────────────────
 import BulkDeleteDialog from "../../components/inventory/BulkDeleteDialog";
 import ProductModal from "../../components/inventory/ProductModal";
+import CatalogueModal from "../../components/inventory/CatalogueModal";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -201,6 +202,7 @@ export default function InventoryScreen() {
   const [bulkDel, setBulkDel] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [confirmSheet, setConfirmSheet] = useState(null); // { product, makingAvailable }
+  const [showCatalogueModal, setShowCatalogueModal] = useState(false);
 
   // Clear selection on page change
   const productIdStr = inv.products.map((p) => p.id).join(",");
@@ -422,13 +424,22 @@ export default function InventoryScreen() {
             <Text style={s.subheading}>{t('vendor.manageCategoriesProducts')}</Text>
           </View>
         )}
-        <TouchableOpacity
-          onPress={() => setModal("add")}
-          style={s.addBtn}
-          activeOpacity={0.85}
-        >
-          <Text style={s.addBtnText}>+ {t('vendor.addProduct')}</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={() => setShowCatalogueModal(true)}
+            style={[s.addBtn, { backgroundColor: '#F97316' }]}
+            activeOpacity={0.85}
+          >
+            <Text style={s.addBtnText}>📦 Add from Catalogue</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setModal("add")}
+            style={s.addBtn}
+            activeOpacity={0.85}
+          >
+            <Text style={s.addBtnText}>+ {t('vendor.addProduct')}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -656,6 +667,15 @@ export default function InventoryScreen() {
           saving={inv.saving}
         />
       )}
+
+      <CatalogueModal
+        visible={showCatalogueModal}
+        onClose={() => setShowCatalogueModal(false)}
+        onSuccess={() => {
+          inv.reload();
+          showToast("Products imported from catalogue!");
+        }}
+      />
 
 
 
