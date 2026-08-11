@@ -70,9 +70,38 @@ export default function VendorOrdersScreen() {
 
   // Vendor review delivery partner
   const [vendorReviewOrder, setVendorReviewOrder] = useState(null);
+  const [viewVendorRatingOrder, setViewVendorRatingOrder] = useState(null);
+  const [viewVendorRatingLoading, setViewVendorRatingLoading] = useState(false);
+  const [fetchedVendorRating, setFetchedVendorRating] = useState(null);
   const [vendorReviewRating, setVendorReviewRating] = useState(0);
   const [vendorReviewComment, setVendorReviewComment] = useState("");
   const [vendorReviewLoading, setVendorReviewLoading] = useState(false);
+
+  const handleOpenViewVendorRating = async (order) => {
+    setViewVendorRatingOrder(order);
+    setViewVendorRatingLoading(true);
+    const initialRating = order.vendor_rating || (order.reviews?.[0]?.vendor_review_rating) || 5;
+    const initialComment = order.vendor_review_comment || (order.reviews?.[0]?.vendor_review_comment) || (order.reviews?.[0]?.comment) || "";
+    setFetchedVendorRating({ rating: initialRating, comment: initialComment });
+
+    try {
+      const res = await fetch(`${API_BASE}/orders/${order.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      const o = data.data?.order || data.order;
+      if (o) {
+        setFetchedVendorRating({
+          rating: o.vendor_rating ?? o.reviews?.[0]?.vendor_review_rating ?? initialRating,
+          comment: o.vendor_review_comment ?? o.reviews?.[0]?.vendor_review_comment ?? o.reviews?.[0]?.comment ?? initialComment,
+        });
+      }
+    } catch (e) {
+      console.error("Fetch vendor rating error:", e);
+    } finally {
+      setViewVendorRatingLoading(false);
+    }
+  };
 
   // ── Demand Surcharge (vendor can set surge % for rain/peak hours) ─────────
   const [demandSurcharge, setDemandSurcharge] = useState(0);   // current %
@@ -1236,13 +1265,26 @@ export default function VendorOrdersScreen() {
                           }
                         }}
                       >
-                        <Text style={styles.ratePartnerBtnText}>Rate</Text>
+                        <Text style={styles.ratePartnerBtnText}>Rate Partner</Text>
                       </TouchableOpacity>
                     )}
                     {order.can_rate_partner && order.has_rated_partner && (
-                      <View style={styles.ratedBadge}>
-                        <Text style={styles.ratedBadgeText}>Rated ⭐</Text>
-                      </View>
+                      <TouchableOpacity
+                        style={[styles.ratePartnerBtn, { backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#CBD5E1" }]}
+                        onPress={() => handleOpenViewVendorRating(order)}
+                        activeOpacity={0.7}
+                      >
+                        {(() => {
+                          const ratingVal = order.vendor_rating || (order.reviews?.[0]?.vendor_review_rating);
+                          const num = ratingVal ? parseInt(ratingVal, 10) || 5 : 5;
+                          const starsText = "★".repeat(Math.max(1, Math.min(5, num)));
+                          return (
+                            <Text style={[styles.ratePartnerBtnText, { color: "#4B5563" }]}>
+                              You rated <Text style={{ color: "#F59E0B", fontWeight: "900" }}>{starsText}</Text>
+                            </Text>
+                          );
+                        })()}
+                      </TouchableOpacity>
                     )}
                   </View>
                 </View>
@@ -2690,6 +2732,20 @@ export default function VendorOrdersScreen() {
                   );
                   const data = await res.json();
                   if (data.success) {
+                    const submittedRating = vendorReviewRating;
+                    const submittedComment = vendorReviewComment;
+                    setHistory((prev) =>
+                      prev.map((o) =>
+                        o.id === vendorReviewOrder.id
+                          ? {
+                              ...o,
+                              has_rated_partner: true,
+                              vendor_rating: submittedRating,
+                              vendor_review_comment: submittedComment,
+                            }
+                          : o
+                      )
+                    );
                     setVendorReviewOrder(null);
                     setVendorReviewRating(0);
                     setVendorReviewComment("");
@@ -2719,6 +2775,139 @@ export default function VendorOrdersScreen() {
                 }}
               >
                 {vendorReviewLoading ? "Submitting..." : "Submit Review"}
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── VIEW SUBMITTED VENDOR RATING SLIDE-UP MODAL ── */}
+      <Modal
+        visible={!!viewVendorRatingOrder}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setViewVendorRatingOrder(null)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "flex-end",
+          }}
+          onPress={() => setViewVendorRatingOrder(null)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 24,
+              paddingBottom: 40,
+            }}
+            onPress={() => {}}
+          >
+            {/* Handle */}
+            <View
+              style={{
+                width: 40,
+                height: 4,
+                backgroundColor: "#E2E8F0",
+                borderRadius: 2,
+                alignSelf: "center",
+                marginBottom: 20,
+              }}
+            />
+
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <Text style={{ fontSize: 18, fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#0F172A" }}>
+                Your Submitted Rating
+              </Text>
+              <TouchableOpacity onPress={() => setViewVendorRatingOrder(null)} style={{ padding: 4 }}>
+                <Feather name="x" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 13, color: "#94A3B8", fontFamily: "PlusJakartaSans_500Medium", marginBottom: 20 }}>
+              {viewVendorRatingOrder?.delivery?.partner?.user?.name || "Delivery Partner"} · {formatOrderTime(viewVendorRatingOrder?.created_at)}
+            </Text>
+
+            {/* Rating Stars & Details Card */}
+            {viewVendorRatingLoading ? (
+              <View style={{ padding: 30, alignItems: "center", justifyContent: "center" }}>
+                <ActivityIndicator color="#16A34A" size="small" />
+                <Text style={{ fontSize: 13, color: "#94A3B8", marginTop: 10 }}>Fetching your review…</Text>
+              </View>
+            ) : (() => {
+              const ratingVal = fetchedVendorRating?.rating || viewVendorRatingOrder?.vendor_rating || 5;
+              const num = typeof ratingVal === "number" ? ratingVal : parseInt(ratingVal, 10) || 5;
+              const comment = fetchedVendorRating?.comment || viewVendorRatingOrder?.vendor_review_comment || "";
+
+              return (
+                <View
+                  style={{
+                    backgroundColor: "#F8FAFC",
+                    borderWidth: 1,
+                    borderColor: "#E2E8F0",
+                    borderRadius: 16,
+                    padding: 20,
+                    alignItems: "center",
+                    marginBottom: 20,
+                  }}
+                >
+                  <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Text
+                        key={star}
+                        style={{
+                          fontSize: 36,
+                          opacity: star <= num ? 1 : 0.25,
+                        }}
+                      >
+                        ⭐
+                      </Text>
+                    ))}
+                  </View>
+
+                  <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#0F172A", marginBottom: comment ? 12 : 0 }}>
+                    {num} out of 5 stars
+                  </Text>
+
+                  {comment ? (
+                    <View
+                      style={{
+                        backgroundColor: "#FFFFFF",
+                        borderRadius: 12,
+                        padding: 14,
+                        borderWidth: 1,
+                        borderColor: "#E2E8F0",
+                        width: "100%",
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, color: "#1F2937", lineHeight: 20 }}>
+                        {comment}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={{ fontSize: 13, color: "#94A3B8", fontStyle: "italic", marginTop: 4 }}>
+                      No written comment provided
+                    </Text>
+                  )}
+                </View>
+              );
+            })()}
+
+            <TouchableOpacity
+              onPress={() => setViewVendorRatingOrder(null)}
+              style={{
+                backgroundColor: "#16A34A",
+                borderRadius: 14,
+                padding: 16,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#FFFFFF" }}>
+                Close
               </Text>
             </TouchableOpacity>
           </Pressable>
