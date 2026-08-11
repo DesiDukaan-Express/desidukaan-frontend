@@ -71,10 +71,11 @@ export default function useInventory() {
       setProducts(data);
       setStats(st);
       setPage(1);
+      loadGlobalCategories();
     } finally {
       setLoading(false);
     }
-  }, [token, vendorId, statusFilter, search]);
+  }, [token, vendorId, statusFilter, search, loadGlobalCategories]);
 
   useEffect(() => {
     load();

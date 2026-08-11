@@ -35,19 +35,6 @@ const RED       = "#EF4444";
 const RED_L     = "#FEF2F2";
 const ORANGE    = "#F97316";
 
-const FALLBACK_CATEGORIES = [
-  "Dairy, Bread & Eggs",
-  "Fruits & Vegetables",
-  "Snacks & Munchies",
-  "Beverages",
-  "Bakery & Biscuits",
-  "Atta, Rice & Dal",
-  "Masala, Oil & More",
-  "Cleaning Essentials",
-  "Personal Care",
-  "Other",
-];
-
 const TYPE_OPTS = [
   { label: "Packed", value: "packed", icon: "archive" },
   { label: "Loose",  value: "loose",  icon: "sliders" },
@@ -467,6 +454,12 @@ function CategoryPicker({
         <View style={cp.dropdownList}>
           {catLoading ? (
             <ActivityIndicator size="small" color={PRIMARY} style={{ margin: 10 }} />
+          ) : topCategories.length === 0 ? (
+            <View style={cp.noSub}>
+              <Text style={cp.noSubText}>
+                No categories available. Please add categories in Admin app.
+              </Text>
+            </View>
           ) : (
             <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
               {topCategories.map((cat) => (
@@ -663,25 +656,15 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
       .then((data) => {
         if (cancelled) return;
         const dbCats = (data.data?.categories || []).filter((c) => c.parent_id === null);
-        
-        // Merge DB categories with missing fallback categories
-        let finalCats = [...dbCats];
-        FALLBACK_CATEGORIES.forEach((fallbackName, i) => {
-          if (!finalCats.some(c => c.name.toLowerCase() === fallbackName.toLowerCase())) {
-            finalCats.push({ id: -(i + 1), name: fallbackName, parent_id: null });
-          }
-        });
-        
-        setTopCategories(finalCats);
+        setTopCategories(dbCats);
 
         if (editing?.category) {
-          const match = finalCats.find((c) => c.name === editing.category);
+          const match = dbCats.find((c) => c.name === editing.category);
           if (match) setSelectedTopCat(match);
         }
       })
       .catch(() => {
-        if (!cancelled)
-          setTopCategories(FALLBACK_CATEGORIES.map((n, i) => ({ id: -(i + 1), name: n, parent_id: null })));
+        if (!cancelled) setTopCategories([]);
       })
       .finally(() => { if (!cancelled) setCatLoading(false); });
     return () => { cancelled = true; };
