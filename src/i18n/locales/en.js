@@ -90,6 +90,7 @@ export default {
     addAddress: "Add new address",
     fullAddress: "Full address",
     addressPlaceholder: "House no., street, area, city…",
+    suggestions: "Suggested addresses",
     labelPlaceholder: "Home",
     labelHint: "Label (e.g. Home, Office)",
     saveAddress: "Save address",

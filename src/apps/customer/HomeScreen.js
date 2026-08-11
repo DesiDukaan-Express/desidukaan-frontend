@@ -33,6 +33,7 @@ import { vendorsAPI, ordersAPI, categoriesAPI } from "../../services/api";
 import ChatWidget from "./ChatWidget";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
+import LocationMapPicker from "../../components/LocationMapPicker";
 
 // Use env var works on device, emulator, and web
 // In your .env: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api
@@ -129,6 +130,7 @@ function AddressPicker({
   onUpdate,
   onUseLocation,
   onDelete,
+  initialCoords,
 }) {
   const { t } = useTranslation();
   // mode: 'list' | 'add' | 'edit'
@@ -138,6 +140,14 @@ function AddressPicker({
   const [inputLabel, setInputLabel] = React.useState("");
   const [inputErr, setInputErr] = React.useState("");
   const [saving, setSaving] = React.useState(false);
+  // Picked location from the map (web)
+  const [pickLat, setPickLat] = React.useState(null);
+  const [pickLng, setPickLng] = React.useState(null);
+  // Autocomplete suggestions + point to fly the map to on selection
+  const [suggestions, setSuggestions] = React.useState([]);
+  const [focusPoint, setFocusPoint] = React.useState(null);
+  const suggestionSelectRef = React.useRef(false);
+  const focusSeqRef = React.useRef(0);
 
   React.useEffect(() => {
     if (!visible) {
@@ -147,6 +157,11 @@ function AddressPicker({
       setInputLabel("");
       setInputErr("");
       setSaving(false);
+      setPickLat(null);
+      setPickLng(null);
+      setSuggestions([]);
+      setFocusPoint(null);
+      suggestionSelectRef.current = false;
     }
   }, [visible]);
 
@@ -155,6 +170,11 @@ function AddressPicker({
     setInputText("");
     setInputLabel("");
     setInputErr("");
+    setPickLat(null);
+    setPickLng(null);
+    setSuggestions([]);
+    setFocusPoint(null);
+    suggestionSelectRef.current = false;
     setMode("add");
   };
 
@@ -163,15 +183,43 @@ function AddressPicker({
     setInputText(addr.address_line || addr.address || "");
     setInputLabel(addr.label || t("home.labelPlaceholder"));
     setInputErr("");
+    setPickLat(addr.lat || null);
+    setPickLng(addr.lng || null);
+    setSuggestions([]);
+    setFocusPoint(null);
+    suggestionSelectRef.current = false;
     setMode("edit");
   };
+
+  // Called by the map with the current centre + optional reverse-geocoded address.
+  // Keeps the shared lat/lng state and the text field in sync with the map.
+  const handleMapPick = React.useCallback((lat, lng, address) => {
+    setPickLat(lat);
+    setPickLng(lng);
+    if (address) {
+      setInputText(address);
+      setInputErr("");
+    }
+  }, []);
+
+  // User picked one of the autocomplete suggestions: adopt its label, move the
+  // map to it, and close the dropdown.
+  const selectSuggestion = React.useCallback((s) => {
+    suggestionSelectRef.current = true;
+    setInputText(s.display_name);
+    setInputErr("");
+    setPickLat(s.lat);
+    setPickLng(s.lng);
+    setFocusPoint({ key: ++focusSeqRef.current, lat: s.lat, lng: s.lng, displayName: s.display_name });
+    setSuggestions([]);
+  }, []);
 
   const handleSaveAdd = () => {
     if (inputText.trim().length < 5) {
       setInputErr(t("home.addressError"));
       return;
     }
-    onSaveNew(inputText.trim());
+    onSaveNew(inputText.trim(), { lat: pickLat, lng: pickLng });
     setMode("list");
     setInputText("");
     setInputErr("");
@@ -183,10 +231,15 @@ function AddressPicker({
       return;
     }
     setSaving(true);
-    await onUpdate?.(editingAddr.id, {
+    const patch = {
       address_line: inputText.trim(),
       label: inputLabel.trim() || editingAddr.label || t("home.labelPlaceholder"),
-    });
+    };
+    if (pickLat && pickLng) {
+      patch.latitude = pickLat;
+      patch.longitude = pickLng;
+    }
+    await onUpdate?.(editingAddr.id, patch);
     setSaving(false);
     setMode("list");
     setEditingAddr(null);
@@ -264,6 +317,23 @@ function AddressPicker({
                 </>
               )}
 
+              {/* Map location picker (web) — pin stays centred, map pans below */}
+              <LocationMapPicker
+                initialCoords={
+                  mode === "edit"
+                    ? editingAddr?.lat && editingAddr?.lng
+                      ? { lat: editingAddr.lat, lng: editingAddr.lng }
+                      : null
+                    : initialCoords
+                }
+                addressText={inputText}
+                focusPoint={focusPoint}
+                autoReverseOnReady={mode === "add"}
+                onPick={handleMapPick}
+                onSuggestions={setSuggestions}
+              />
+              <View style={{ height: 14 }} />
+
               <Text style={ap.formLabel}>{t("home.fullAddress")}</Text>
               <View style={[ap.inputBox, inputErr ? ap.inputBoxError : null]}>
                 <MaterialIcons
@@ -277,7 +347,20 @@ function AddressPicker({
                   placeholder={t("home.addressPlaceholder")}
                   placeholderTextColor={C.gray400}
                   value={inputText}
-                  onChangeText={(text) => { setInputText(text); setInputErr(""); }}
+                  onChangeText={(text) => {
+                    setInputText(text);
+                    setInputErr("");
+                    if (text.trim().length < 3) setSuggestions([]);
+                  }}
+                  onKeyPress={(e) => {
+                    if (e.nativeEvent?.key === "Escape") setSuggestions([]);
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      if (!suggestionSelectRef.current) setSuggestions([]);
+                      suggestionSelectRef.current = false;
+                    }, 120);
+                  }}
                   multiline
                   numberOfLines={3}
                   autoFocus
@@ -285,6 +368,39 @@ function AddressPicker({
                 />
               </View>
               {inputErr ? <Text style={ap.inputErr}>{inputErr}</Text> : null}
+
+              {/* Autocomplete suggestions dropdown (web) */}
+              {suggestions.length > 0 && (
+                <View style={ap.suggestWrap}>
+                  <View style={ap.suggestHeader}>
+                    <Text style={ap.suggestHeaderText}>{t("home.suggestions")}</Text>
+                  </View>
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    style={{ maxHeight: 176 }}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    {suggestions.map((s, i) => (
+                      <Pressable
+                        key={`${s.lat}-${s.lng}-${i}`}
+                        style={({ pressed, hovered }) => [
+                          ap.suggestRow,
+                          (pressed || hovered) && ap.suggestRowActive,
+                          i === suggestions.length - 1 && ap.suggestRowLast,
+                        ]}
+                        onPressIn={() => selectSuggestion(s)}
+                      >
+                        <View style={ap.suggestIconWrap}>
+                          <MaterialIcons name="location-on" size={16} color={C.green} />
+                        </View>
+                        <Text style={ap.suggestText} numberOfLines={2}>
+                          {s.display_name}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
               <TouchableOpacity
                 style={[
                   ap.saveBtn,
@@ -581,6 +697,50 @@ const ap = StyleSheet.create({
     ...Platform.select({ web: { outlineStyle: "none" } }),
   },
   inputErr: { fontSize: 12, color: C.red, marginTop: 6, fontWeight: "500" },
+  // Autocomplete suggestions dropdown
+  suggestWrap: {
+    marginTop: 8,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    backgroundColor: C.white,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 6,
+    overflow: "hidden",
+  },
+  suggestHeader: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    backgroundColor: C.gray100,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray200,
+  },
+  suggestHeaderText: { fontSize: 11, fontWeight: "700", color: C.gray500, letterSpacing: 0.3 },
+  suggestRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+  },
+  suggestRowActive: { backgroundColor: C.greenLight },
+  suggestRowLast: { borderBottomWidth: 0 },
+  suggestIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: C.greenLight,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    marginTop: 1,
+  },
+  suggestText: { flex: 1, fontSize: 13, color: C.gray800, fontWeight: "500", lineHeight: 18 },
   saveBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -3348,27 +3508,30 @@ export default function HomeScreen() {
         visible={addrPickerVisible}
         addresses={(addressStore?.addresses || []).filter(a => a.label !== "Current Location")}
         selectedId={selectedAddrId}
+        initialCoords={locationCoords}
         onClose={() => setAddrPickerVisible(false)}
         onSelect={handleSelectAddress}
         onDelete={(id) => addressStore.removeAddress(id, token)}
         onUpdate={async (id, patch) => {
           await addressStore.updateAddress(id, patch, token);
         }}
-        onSaveNew={async (text) => {
-          let lat = null,
-            lng = null;
-          try {
-            const encoded = encodeURIComponent(text);
-            const res = await fetch(
-              `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1`,
-              { headers: { "User-Agent": "KwikPik/1.0" } },
-            );
-            const results = await res.json();
-            if (results?.length > 0) {
-              lat = parseFloat(results[0].lat);
-              lng = parseFloat(results[0].lon);
-            }
-          } catch { }
+        onSaveNew={async (text, coords) => {
+          let lat = coords?.lat ?? null,
+            lng = coords?.lng ?? null;
+          if (!lat || !lng) {
+            try {
+              const encoded = encodeURIComponent(text);
+              const res = await fetch(
+                `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1`,
+                { headers: { "User-Agent": "KwikPik/1.0" } },
+              );
+              const results = await res.json();
+              if (results?.length > 0) {
+                lat = parseFloat(results[0].lat);
+                lng = parseFloat(results[0].lon);
+              }
+            } catch { }
+          }
 
           // addAddress now returns the real ID
           const newId = await addressStore?.addAddress?.({ address: text, lat, lng }, token);
