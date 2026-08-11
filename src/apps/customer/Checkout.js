@@ -596,7 +596,7 @@ function CounterOfferReview({ data, onAccept, onReject, placing, fs = 1, deliver
           <Text style={cor.totalVal}>
             {(() => {
               const activeSlot = slot || confirmedSlot;
-              if (!activeSlot) return t('payment.asap', 'As soon as possible');
+              if (!activeSlot || (!activeSlot.start && !activeSlot.end)) return t('payment.asap', 'As soon as possible');
               const startStr = new Date(activeSlot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
               const endStr = new Date(activeSlot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
               const dayStr = new Date(activeSlot.start).toDateString() === new Date().toDateString() ? t('payment.today', 'Today') : t('payment.tomorrow', 'Tomorrow');
@@ -962,12 +962,17 @@ export default function CheckoutScreen() {
     socket.on("order:countered", async (data) => {
       if (orderId && String(data.order_id) !== String(orderId)) return;
       if (data.counter_offer) {
+        const rawSlot = data.counter_offer.slot || data.counter_offer.delivery_slot;
+        const normalizedSlot = rawSlot ? {
+          start: rawSlot.vendor_slot_start || rawSlot.slot_start || rawSlot.start,
+          end: rawSlot.vendor_slot_end || rawSlot.slot_end || rawSlot.end,
+        } : null;
         setCounterData({
           items: data.counter_offer.items,
           delivery_fee: data.counter_offer.delivery_fee,
           total: data.counter_offer.total,
           note: data.counter_offer.note,
-          slot: data.counter_offer.slot || data.counter_offer.delivery_slot,
+          slot: normalizedSlot,
         });
         updatePendingOrder({ status: "countered", counter_offer: data.counter_offer });
         setOrderStatus("countered");
@@ -981,12 +986,17 @@ export default function CheckoutScreen() {
           const d = await res.json();
           if (d.success || d.data) {
             const order = d.data?.order || d.order;
+            const rawSlot = order.delivery_slot;
+            const normalizedSlot = rawSlot ? {
+              start: rawSlot.vendor_slot_start || rawSlot.slot_start || rawSlot.start,
+              end: rawSlot.vendor_slot_end || rawSlot.slot_end || rawSlot.end,
+            } : null;
             setCounterData({
               items: order.counter_offer_items,
               delivery_fee: order.delivery_fee,
               total: order.total,
               note: order.vendor_note,
-              slot: order.delivery_slot,
+              slot: normalizedSlot,
             });
             setOrderStatus("countered");
             setPlacing(false);
