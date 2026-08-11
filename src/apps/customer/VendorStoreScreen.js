@@ -426,7 +426,7 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
               <View style={pm.actionRow}>
                 <View>
                   <Text style={pm.totalLabel}>{t('cart.total') || 'TOTAL'}</Text>
-                  <Text style={pm.totalPrice}>₹{p.price}</Text>
+                  <Text style={pm.totalPrice}>₹{p.price * (qty || 1)}</Text>
                 </View>
                 {inStock ? (
                   loose ? (
@@ -439,7 +439,7 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
                       <Text style={pm.addBtnText}>{t('vendorStore.selectWeight')}</Text>
                     </TouchableOpacity>
                   ) : qty === 0 ? (
-                    <TouchableOpacity style={pm.addBtn} onPress={() => { onAdd(item); handleClose(); }} activeOpacity={0.85}>
+                    <TouchableOpacity style={pm.addBtn} onPress={() => onAdd(item)} activeOpacity={0.85}>
                       <MaterialIcons name="shopping-cart" size={16} color="#fff" />
                       <Text style={pm.addBtnText}>{t('vendorStore.add')}</Text>
                     </TouchableOpacity>
@@ -570,7 +570,7 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
         <Text style={pc.name} numberOfLines={2}>{p.name}</Text>
         <Text style={pc.unit} numberOfLines={1}>{p.unit || "1 pc"}</Text>
         <View style={pc.priceRow}>
-          <Text style={pc.price}>₹{p.price}</Text>
+          <Text style={pc.price}>₹{qty > 0 ? p.price * qty : p.price}</Text>
           {p.mrp && p.mrp > p.price && <Text style={pc.mrp}>₹{p.mrp}</Text>}
         </View>
 

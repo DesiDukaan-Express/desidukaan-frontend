@@ -423,9 +423,9 @@ export default function IncomingOrderSheet({ order, onAccept, onDecline, onIgnor
   if (!order) return null;
 
   return (
-    <Modal transparent animationType="none" visible={!!order} onRequestClose={handleDecline}>
+    <Modal transparent animationType="none" visible={!!order} onRequestClose={handleIgnore}>
       <View style={s.overlay}>
-        <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={handleDecline} />
+        <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={handleIgnore} />
 
         <Animated.View style={[s.sheet, { transform: [{ translateY: slideAnim }] }]}>
           {/* Handle bar */}

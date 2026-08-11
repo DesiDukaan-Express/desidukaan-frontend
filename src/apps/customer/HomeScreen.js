@@ -1467,7 +1467,7 @@ function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPre
         {/* Price + Add button row */}
         <View style={pic.priceRow}>
           <View>
-            <Text style={pic.price}>₹{item.price}</Text>
+            <Text style={pic.price}>₹{qty > 0 ? item.price * qty : item.price}</Text>
             {hasMrp && <Text style={pic.orig}>₹{item.orig}</Text>}
           </View>
 

@@ -34,9 +34,9 @@ const loadPersistedEnabledRoles = async (userRoles = []) => {
   try {
     const stored = await AsyncStorage.getItem(ENABLED_ROLES_KEY);
     const parsed = stored ? JSON.parse(stored) : [];
-    return Array.from(new Set([...ALL_ROLES, ...userRoles, ...parsed].filter(Boolean)));
+    return Array.from(new Set([...userRoles, ...parsed].filter(Boolean)));
   } catch {
-    return Array.from(new Set([...ALL_ROLES, ...userRoles].filter(Boolean)));
+    return Array.from(new Set([...userRoles].filter(Boolean)));
   }
 };
 
@@ -266,14 +266,13 @@ const useAuthStore = create((set, get) => ({
           body: JSON.stringify({ refreshToken }),
         }).catch(() => {});
       }
-    } finally {
-      await AsyncStorage.removeItem("user");
-      await AsyncStorage.removeItem(ACTIVE_ROLE_KEY);
-      await AsyncStorage.removeItem(ENABLED_ROLES_KEY);
-      await secureDelete(REFRESH_KEY);
-      useAddressStore.getState().clearAddresses();
-      set({ user: null, token: null, role: null, activeRole: null, enabledRoles: ["customer", "vendor", "delivery"], isAuthenticated: false, accountDeactivated: false });
-    }
+    } catch (_) {}
+    try { await AsyncStorage.removeItem("user"); } catch (_) {}
+    try { await AsyncStorage.removeItem(ACTIVE_ROLE_KEY); } catch (_) {}
+    try { await AsyncStorage.removeItem(ENABLED_ROLES_KEY); } catch (_) {}
+    try { await secureDelete(REFRESH_KEY); } catch (_) {}
+    try { useAddressStore.getState().clearAddresses(); } catch (_) {}
+    set({ user: null, token: null, role: null, activeRole: null, enabledRoles: ["customer", "vendor", "delivery"], isAuthenticated: false, accountDeactivated: false, vendorSuspended: false });
   },
 
   updateUser: (updates) =>

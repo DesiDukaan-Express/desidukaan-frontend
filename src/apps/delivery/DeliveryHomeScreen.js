@@ -350,20 +350,20 @@ export default function DeliveryHomeScreen({ navigation, route }) {
     } catch { setIncomingOrder(null); }
   };
 
-  const handleDeclineIncoming = () => {
-    if (incomingOrder) processedOrderIds.current.add(incomingOrder.orderId);
-    setIncomingOrder(null);
-  };
-
-  const handleIgnoreIncoming = async () => {
+  const handleDeclineIncoming = async () => {
     if (!incomingOrder) return;
     processedOrderIds.current.add(incomingOrder.orderId);
     try {
-      await fetch(`${API_BASE}/delivery/ignore/${incomingOrder.orderId}`, {
+      await fetch(`${API_BASE}/delivery/decline/${incomingOrder.orderId}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
     } catch (_) {}
+    setIncomingOrder(null);
+  };
+
+  const handleIgnoreIncoming = () => {
+    if (incomingOrder) processedOrderIds.current.add(incomingOrder.orderId);
     setIncomingOrder(null);
   };
 

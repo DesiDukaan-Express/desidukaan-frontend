@@ -981,12 +981,17 @@ export default function CheckoutScreen() {
           const d = await res.json();
           if (d.success || d.data) {
             const order = d.data?.order || d.order;
+            const rawSlot = order.delivery_slot;
+            const slot = rawSlot ? {
+              start: rawSlot.vendor_slot_start || rawSlot.slot_start || rawSlot.start,
+              end: rawSlot.vendor_slot_end || rawSlot.slot_end || rawSlot.end,
+            } : null;
             setCounterData({
               items: order.counter_offer_items,
               delivery_fee: order.delivery_fee,
               total: order.total,
               note: order.vendor_note,
-              slot: order.delivery_slot,
+              slot,
             });
             setOrderStatus("countered");
             setPlacing(false);
@@ -1061,8 +1066,8 @@ export default function CheckoutScreen() {
                 total: order.total,
                 note: order.vendor_note,
                 slot: order.delivery_slot ? {
-                  start: order.delivery_slot.vendor_slot_start || order.delivery_slot.slot_start,
-                  end: order.delivery_slot.vendor_slot_end || order.delivery_slot.slot_end,
+                start: order.delivery_slot.vendor_slot_start || order.delivery_slot.slot_start,
+                end: order.delivery_slot.vendor_slot_end || order.delivery_slot.slot_end,
                 } : null,
               });
             }
@@ -1377,9 +1382,10 @@ export default function CheckoutScreen() {
               delivery_fee: order.delivery_fee,
               total: order.total,
               note: order.vendor_note,
-              slot: order.delivery_slot && order.delivery_slot.start_time ? {
-                start: order.delivery_slot.start_time,
-                end: order.delivery_slot.end_time,
+              slot: order.delivery_slot ? {
+                start: order.delivery_slot.vendor_slot_start || order.delivery_slot.slot_start,
+                end: order.delivery_slot.vendor_slot_end || order.delivery_slot.slot_end,
+              
               } : null,
             });
           }
@@ -2747,8 +2753,11 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
 
   const isSlotDisabled = (slot) => {
     if (day === "tomorrow") return false;
-    // Disable if slot start is within 1 hour from now
-    return slot.start <= nowHour + 1;
+    // Slot already ended
+    if (nowHour >= slot.end) return true;
+    // Slot in progress but less than 30 min remaining → lock it
+    if (nowHour >= slot.start && (slot.end - nowHour) < 0.5) return true;
+    return false;
   };
 
   const isSlotOutsideHours = (slot) => {
@@ -2781,6 +2790,15 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
             </TouchableOpacity>
           </View>
           <Text style={sm.sub}>{t('checkout.pickTimeSlot', 'Pick a time slot for your delivery')}</Text>
+
+          {vendor?.opening_time && vendor?.closing_time && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.greenLight, borderRadius: 12, padding: 12, marginBottom: 16 }}>
+              <Feather name="clock" size={16} color={C.green} />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: C.greenDark }}>
+                {t('checkout.storeOpen', 'Store open')}: {vendor.opening_time} – {vendor.closing_time}
+              </Text>
+            </View>
+          )}
 
           <View style={{ marginBottom: 18 }}>
             <Text style={{ fontWeight: '700', marginBottom: 10, color: C.gray700 }}>{t('checkout.selectDay', 'Select Day')}</Text>

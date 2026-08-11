@@ -289,7 +289,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               title: `${s.pending_orders} order${s.pending_orders > 1 ? "s" : ""} waiting for your response`,
               body: "Tap to go to Orders and respond.",
               time: "Just now",
-              read: false,
+              read: true,
             });
           }
 
@@ -299,7 +299,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               title: `${s.low_stock_count} product${s.low_stock_count > 1 ? "s" : ""} running low on stock`,
               body: "Check your inventory before accepting more orders.",
               time: "Today",
-              read: false,
+              read: true,
             });
           }
 

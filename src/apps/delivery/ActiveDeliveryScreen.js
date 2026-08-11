@@ -957,6 +957,10 @@ export default function ActiveDeliveryScreen({ navigation }) {
     }
   };
 
+  const handleIgnoreIncoming = () => {
+    setIncomingOrder(null);
+  };
+
 
 
 const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
@@ -1114,6 +1118,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
         order={incomingOrder}
         onAccept={handleAcceptIncoming}
         onDecline={handleDeclineIncoming}
+        onIgnore={handleIgnoreIncoming}
       />
 
       <ScrollView

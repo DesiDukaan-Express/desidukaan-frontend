@@ -176,6 +176,12 @@ function RoleCard({ role, enabled, onPress, index }) {
         <Text style={rc.sublabel}>{role.sublabel}</Text>
 
         {/* Active indicator */}
+        {!enabled && (
+          <View style={rc.lockBadge}>
+            <Feather name="lock" size={10} color="#6B7280" />
+            <Text style={rc.lockText}>Locked</Text>
+          </View>
+        )}
         <View style={[rc.activeDot, { backgroundColor: role.gradientColors[0] }]} />
       </TouchableOpacity>
     </Animated.View>
@@ -297,6 +303,10 @@ export default function RolePickerScreen({ onRolePicked }) {
 
   // ── Handle card tap
   const handleRoleTap = async (role) => {
+    if (!enabledRoles.includes(role.key)) {
+      setUnlockTarget(role);
+      return;
+    }
     await setActiveRole(role.key);
     onRolePicked(role.key);
   };
@@ -370,7 +380,7 @@ export default function RolePickerScreen({ onRolePicked }) {
         {/* ── Hint */}
         <Animated.View style={[s.hintWrap, { opacity: taglineAnim }]}>
           <Feather name="info" size={12} color="rgba(255,255,255,0.3)" />
-          <Text style={s.hint}>Locked roles can be enabled with one tap</Text>
+          <Text style={s.hint}>Tap a locked role to enable it</Text>
         </Animated.View>
       </SafeAreaView>
 

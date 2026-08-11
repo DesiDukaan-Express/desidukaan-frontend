@@ -180,7 +180,7 @@ function QueueCard({ order, onAccept, onDecline, onIgnore, isAccepting }) {
         </View>
       </View>
 
-      {/* Timer — 15 minutes */}
+      {/*  Req will disappear after 15 minutes */}
       <TimerBar seconds={900} onComplete={() => onIgnore(order.orderId)} />
 
       {/* Buttons */}
@@ -454,21 +454,7 @@ export default function QueueScreen({ navigation }) {
     setSessionStats({ accepted: acceptedRef.current, declined: declinedRef.current });
   };
 
-  const handleIgnore = async (orderId) => {
-    console.log(`[QueueScreen] Ignoring order ${orderId}`);
-    try {
-      const res = await fetch(`${API_BASE}/delivery/ignore/${orderId}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      console.log(`[QueueScreen] Ignore response:`, JSON.stringify(data));
-    } catch (err) {
-      console.log('[QueueScreen] ignore error:', err);
-    }
-    setQueue(prev => prev.filter(o => o.orderId !== orderId));
-    declinedRef.current += 1;
-    setSessionStats({ accepted: acceptedRef.current, declined: declinedRef.current });
+  const handleIgnore = (orderId) => {
   };
 
   const acceptRate = sessionStats.accepted + sessionStats.declined === 0
