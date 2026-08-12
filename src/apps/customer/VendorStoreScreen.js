@@ -78,12 +78,6 @@ const CAT_ACCENT = {
   "Chips": { bg: "#FEF2F2", accent: "#EF4444", icon: "fastfood" },
   "Milk": { bg: "#F0F9FF", accent: "#0EA5E9", icon: "local-cafe" },
   "Rice": { bg: "#FEFCE8", accent: "#EAB308", icon: "grain" },
-  "Rice, Atta & Grains": { bg: "#FEFCE8", accent: "#A16207", icon: "grain" },
-  "Pulses & Dals": { bg: "#FFF7ED", accent: "#B45309", icon: "grain" },
-  "Spices & Masala": { bg: "#FFF7ED", accent: "#C2410C", icon: "local-fire-department" },
-  "Oils & Ghee": { bg: "#FEFCE8", accent: "#CA8A04", icon: "opacity" },
-  "Sugar & Salt": { bg: "#F8FAFC", accent: "#64748B", icon: "grain" },
-  "Beverages": { bg: "#F0FDF4", accent: "#16A34A", icon: "local-drink" },
   _default: { bg: "#F3F4F6", accent: "#6B7280", icon: "inventory" },
 };
 
@@ -121,30 +115,6 @@ const normalizeCatName = (name) => {
 };
 
 const normalizeCat = (cat) => normalizeCatName(cat) || "Other";
-
-// ─── Keyword-based category fallback ───────────────────────────────────────────
-// Used when a product has no (or a generic/"Other") category from the backend,
-// so the storefront can still show useful filter chips like Fruits & Vegetables,
-// Rice & Grains, Dairy, Spices, Oils, Pulses, etc.
-const KEYWORD_CATEGORIES = [
-  { name: "Fruits & Vegetables", keywords: ["tomato", "onion", "potato", "banana", "apple", "mango", "grape", "carrot", "cabbage", "cauliflower", "capsicum", "brinjal", "spinach", "chilli", "chili", "ginger", "garlic", "lemon", "cucumber", "peas", "beans", "orange", "papaya", "guava", "pomegranate", "vegetable", "fruit"] },
-  { name: "Rice, Atta & Grains", keywords: ["rice", "basmati", "atta", "flour", "wheat", "maida", "rava", "sooji", "poha", "millet", "grain"] },
-  { name: "Pulses & Dals", keywords: ["dal", "daal", "lentil", "moong", "chana", "toor", "urad", "rajma", "masoor", "pulse"] },
-  { name: "Spices & Masala", keywords: ["masala", "spice", "turmeric", "haldi", "chilli powder", "coriander powder", "jeera", "cumin", "mustard seed", "garam masala", "pepper"] },
-  { name: "Oils & Ghee", keywords: ["oil", "ghee", "sunflower oil", "mustard oil", "vanaspati"] },
-  { name: "Dairy, Bread & Eggs", keywords: ["milk", "curd", "yogurt", "paneer", "butter", "cheese", "bread", "egg", "ghee"] },
-  { name: "Snacks & Munchies", keywords: ["chips", "namkeen", "biscuit", "cookie", "snack", "chocolate", "candy", "wafer"] },
-  { name: "Beverages", keywords: ["juice", "soda", "cold drink", "tea", "coffee", "water bottle", "drink"] },
-  { name: "Sugar & Salt", keywords: ["sugar", "salt", "jaggery", "gud"] },
-];
-function classifyByName(name) {
-  if (!name) return null;
-  const n = name.toLowerCase();
-  for (const cat of KEYWORD_CATEGORIES) {
-    if (cat.keywords.some(k => n.includes(k))) return cat.name;
-  }
-  return null;
-}
 
 function buildHierarchyFromInventory(allInventoryItems, getCategoryName, parentOfMap) {
   const hierarchy = {};
@@ -775,44 +745,32 @@ const ct = StyleSheet.create({
   bubbleText: { fontSize: 10, fontWeight: "800" },
 });
 
-// ─── Category Icon Chip — pastel circular icon + label, matches reference design ─────
+// ─── Category Icon Chip — circular icon + label, matches reference design ─────
 function CatIconChip({ cat, isActive, onPress, isAll }) {
   const meta = getCatMeta(cat);
-  const isAllItems = cat === "All";
   return (
     <TouchableOpacity style={cic.wrap} onPress={onPress} activeOpacity={0.8}>
-      <View
-        style={[
-          isAllItems ? cic.tile : cic.circle,
-          { backgroundColor: meta.bg },
-          isActive && { borderColor: meta.accent, borderWidth: 2 },
-        ]}
-      >
-        {isAllItems
-          ? <Feather name="grid" size={20} color={meta.accent} />
-          : <MaterialIcons name={meta.emoji} size={22} color={meta.accent} />}
+      <View style={[cic.circle, isActive && cic.circleActive]}>
+        {isAll
+          ? <Feather name="grid" size={20} color={isActive ? C.green : C.gray600} />
+          : <MaterialIcons name={meta.emoji} size={20} color={isActive ? C.green : meta.accent} />}
       </View>
-      <Text style={[cic.label, isActive && { color: meta.accent, fontWeight: "800" }]} numberOfLines={1}>
-        {isAllItems ? "All Items" : cat}
-      </Text>
+      <Text style={[cic.label, isActive && cic.labelActive]} numberOfLines={1}>{cat === "All" ? "All Items" : cat}</Text>
     </TouchableOpacity>
   );
 }
 const cic = StyleSheet.create({
-  wrap: { alignItems: "center", width: 68, marginRight: 12 },
+  wrap: { alignItems: "center", width: 76, marginRight: 10 },
   circle: {
-    width: 56, height: 56, borderRadius: 999,
+    width: 60, height: 60, borderRadius: 16,
     alignItems: "center", justifyContent: "center",
-    borderWidth: 1, borderColor: "transparent",
+    backgroundColor: C.white,
+    borderWidth: 1.5, borderColor: C.gray200,
     marginBottom: 6,
   },
-  tile: {
-    width: 56, height: 56, borderRadius: 14,
-    alignItems: "center", justifyContent: "center",
-    borderWidth: 1, borderColor: "transparent",
-    marginBottom: 6,
-  },
+  circleActive: { backgroundColor: C.greenLight, borderColor: C.green },
   label: { fontSize: 11, fontWeight: "700", color: C.gray600, textAlign: "center" },
+  labelActive: { color: C.green, fontWeight: "800" },
 });
 
 // ═══════════════════════════════════════════════════════════════════════════ //
@@ -842,13 +800,7 @@ export default function VendorStoreScreen() {
   const [activeCat, setActiveCat] = useState("All");
   const [sortBy, setSortBy] = useState("default");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
-  const sortBtnRef = useRef(null);
-  const [sortBtnLayout, setSortBtnLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [wishlistCount, setWishlistCount] = useState(0);
-  const catScrollRef = useRef(null);
-  const [catContentW, setCatContentW] = useState(0);
-  const [catTrackW, setCatTrackW] = useState(0);
-  const [catScrollX, setCatScrollX] = useState(0);
   useEffect(() => {
   console.log("Sort Changed:", sortBy);
 }, [sortBy]);
@@ -910,12 +862,8 @@ export default function VendorStoreScreen() {
     let raw;
     if (cat && typeof cat === "object" && cat.name) raw = cat.name;
     else if (typeof cat === "string" && cat) raw = cat;
-
-    const normalized = raw ? normalizeCatName(raw) : null;
-    if (normalized && normalized.toLowerCase() !== "other" && normalized.toLowerCase() !== "others") {
-      return normalized;
-    }
-    return classifyByName(p?.name) || "Other";
+    else return "Other";
+    return normalizeCatName(raw) || "Other";
   }, []);
 
   const parentOfMap = useMemo(() => {
@@ -947,12 +895,9 @@ export default function VendorStoreScreen() {
     return ["All", ...Object.keys(categoryHierarchy).sort()];
   }, [categoryHierarchy]);
 
-  // Chips shown to the user — hide the generic "All" and "Other" buckets,
-  // but never leave the row empty if "Other" is all we have.
+  // Chips shown to the user — hide the generic "All" and "Other" buckets
   const visibleCategories = useMemo(() => {
-    const named = categories.filter(c => c !== "All" && c !== "Other" && c !== "Others");
-    if (named.length > 0) return named;
-    return categories.filter(c => c !== "All");
+    return categories.filter(c => c !== "All" && c !== "Other" && c !== "Others");
   }, [categories]);
 
   const inStockTotal = useMemo(() => inventory.filter(i => i.stock_qty > 0).length, [inventory]);
@@ -1296,40 +1241,27 @@ export default function VendorStoreScreen() {
 
         <View style={{ position: "relative" }}>
           <TouchableOpacity
-            ref={sortBtnRef}
             style={s.sortBtn}
             activeOpacity={0.85}
-            onPress={() => {
-              if (sortBtnRef.current?.measureInWindow) {
-                sortBtnRef.current.measureInWindow((x, y, width, height) => {
-                  setSortBtnLayout({ x, y, width, height });
-                  setSortMenuOpen(true);
-                });
-              } else {
-                setSortMenuOpen(true);
-              }
-            }}
+            onPress={() => setSortMenuOpen(true)}
           >
             <Feather name="bar-chart-2" size={14} color={C.gray700} style={{ transform: [{ rotate: "90deg" }] }} />
             <Text style={s.sortBtnText}>{t('vendorStore.sort')}</Text>
-            <Feather name={sortMenuOpen ? "chevron-up" : "chevron-down"} size={14} color={C.gray700} />
+            <Feather name="chevron-down" size={14} color={C.gray700} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* SORT DROPDOWN — small popover anchored right under the Sort button */}
+      {/* SORT MODAL — reliable on every platform (no absolute-position clipping issues) */}
       <Modal visible={sortMenuOpen} transparent animationType="fade" onRequestClose={() => setSortMenuOpen(false)}>
         <Pressable style={s.sortModalBackdrop} onPress={() => setSortMenuOpen(false)}>
-          <View
-            style={[
-              s.sortPopover,
-              {
-                top: sortBtnLayout.y + sortBtnLayout.height + 8,
-                left: Math.max(12, sortBtnLayout.x + sortBtnLayout.width - 220),
-              },
-            ]}
-            onStartShouldSetResponder={() => true}
-          >
+          <Pressable style={s.sortModalSheet} onPress={() => {}}>
+            <View style={s.sortModalHeader}>
+              <Text style={s.sortModalTitle}>Sort by</Text>
+              <TouchableOpacity onPress={() => setSortMenuOpen(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Feather name="x" size={18} color={C.gray600} />
+              </TouchableOpacity>
+            </View>
             {[
               { key: "default", label: t('vendorStore.default') },
               { key: "price_asc", label: t('vendorStore.priceLowHigh'), icon: "arrow-up" },
@@ -1354,29 +1286,55 @@ export default function VendorStoreScreen() {
                 </TouchableOpacity>
               );
             })}
-          </View>
+          </Pressable>
         </Pressable>
       </Modal>
 
-      {/* CATEGORY ICON ROW — circular icon chips, sticky just under search/sort so it's always reachable while banners scroll away */}
+      {/* PROMO BANNERS — 3 equal cards like reference */}
+      {!search && (
+        <View style={[s.promoRow, { paddingHorizontal: hPad }]}>
+          <View style={[s.promoCard, s.promoCardGreen]}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.promoCardLabel}>Fresh Vegetables</Text>
+              <Text style={s.promoCardValue}>Upto 20% OFF</Text>
+              <Text style={s.promoCardSub}>Farm fresh & handpicked</Text>
+              <TouchableOpacity style={s.promoShopBtn} onPress={() => setActiveCat("Fruits & Vegetables")} activeOpacity={0.85}>
+                <Text style={s.promoShopBtnText}>Shop Now</Text>
+              </TouchableOpacity>
+            </View>
+            <MaterialIcons name="eco" size={40} color={C.green} style={{ opacity: 0.28 }} />
+          </View>
+
+          <View style={[s.promoCard, s.promoCardOrange]}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.promoCardLabel}>Daily Essentials</Text>
+              <Text style={[s.promoCardValue, { color: C.orangeDark }]}>Upto 15% OFF</Text>
+              <Text style={s.promoCardSub}>On all essentials</Text>
+              <TouchableOpacity style={[s.promoShopBtn, s.promoShopBtnOrange]} onPress={() => setActiveCat("All")} activeOpacity={0.85}>
+                <Text style={s.promoShopBtnText}>Shop Now</Text>
+              </TouchableOpacity>
+            </View>
+            <MaterialIcons name="local-grocery-store" size={40} color={C.orangeDark} style={{ opacity: 0.28 }} />
+          </View>
+
+          <View style={[s.promoCard, s.promoCardGreen]}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.promoCardLabel}>Weekend Special</Text>
+              <Text style={s.promoCardValue}>Extra 5% OFF</Text>
+              <Text style={s.promoCardSub}>On orders above ₹499</Text>
+              <View style={s.promoCodeBtn}>
+                <Text style={s.promoCodeText}>Use Code: WEEKEND5</Text>
+              </View>
+            </View>
+            <MaterialIcons name="card-giftcard" size={40} color={C.green} style={{ opacity: 0.28 }} />
+          </View>
+        </View>
+      )}
+
+      {/* CATEGORY ICON ROW — circular icon chips, always visible like reference */}
       {!search && visibleCategories.length > 0 && (
         <View style={s.catTabsWrap}>
-          <ScrollView
-            ref={catScrollRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            onContentSizeChange={(w) => setCatContentW(w)}
-            onLayout={(e) => setCatTrackW(e.nativeEvent.layout.width)}
-            onScroll={(e) => setCatScrollX(e.nativeEvent.contentOffset.x)}
-            scrollEventThrottle={32}
-            contentContainerStyle={[s.catTabsRow, { paddingHorizontal: hPad }]}
-          >
-            <CatIconChip
-              cat="All"
-              isAll={true}
-              isActive={activeCat === "All"}
-              onPress={() => setActiveCat("All")}
-            />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.catTabsRow, { paddingHorizontal: hPad }]}>
             {visibleCategories.map(cat => (
               <CatIconChip
                 key={cat} cat={cat}
@@ -1386,19 +1344,6 @@ export default function VendorStoreScreen() {
               />
             ))}
           </ScrollView>
-          {catContentW > catTrackW + 4 && (
-            <TouchableOpacity
-              style={s.catScrollNextBtn}
-              activeOpacity={0.8}
-              onPress={() => {
-                const nextX = Math.min(catContentW - catTrackW, catScrollX + catTrackW * 0.8);
-                catScrollRef.current?.scrollTo({ x: nextX, animated: true });
-                setCatScrollX(nextX);
-              }}
-            >
-              <Feather name="chevron-right" size={16} color={C.gray700} />
-            </TouchableOpacity>
-          )}
         </View>
       )}
 
@@ -1411,47 +1356,6 @@ export default function VendorStoreScreen() {
           onLayout={(e) => setGridAreaW(e.nativeEvent.layout.width)}
           contentContainerStyle={[s.body, { paddingHorizontal: hPad }]}
         >
-          {/* PROMO BANNERS — 3 equal cards, now inside the scroll so they move with the page */}
-          {!search && (
-            <View style={s.promoRow}>
-              <View style={[s.promoCard, s.promoCardGreen]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.promoCardLabel}>Fresh Vegetables</Text>
-                  <Text style={s.promoCardValue}>Upto 20% OFF</Text>
-                  <Text style={s.promoCardSub}>Farm fresh & handpicked</Text>
-                  <TouchableOpacity style={s.promoShopBtn} onPress={() => setActiveCat("Fruits & Vegetables")} activeOpacity={0.85}>
-                    <Text style={s.promoShopBtnText}>Shop Now</Text>
-                  </TouchableOpacity>
-                </View>
-                <MaterialIcons name="eco" size={40} color={C.green} style={{ opacity: 0.28 }} />
-              </View>
-
-              <View style={[s.promoCard, s.promoCardOrange]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.promoCardLabel}>Daily Essentials</Text>
-                  <Text style={[s.promoCardValue, { color: C.orangeDark }]}>Upto 15% OFF</Text>
-                  <Text style={s.promoCardSub}>On all essentials</Text>
-                  <TouchableOpacity style={[s.promoShopBtn, s.promoShopBtnOrange]} onPress={() => setActiveCat("All")} activeOpacity={0.85}>
-                    <Text style={s.promoShopBtnText}>Shop Now</Text>
-                  </TouchableOpacity>
-                </View>
-                <MaterialIcons name="local-grocery-store" size={40} color={C.orangeDark} style={{ opacity: 0.28 }} />
-              </View>
-
-              <View style={[s.promoCard, s.promoCardGreen]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.promoCardLabel}>Weekend Special</Text>
-                  <Text style={s.promoCardValue}>Extra 5% OFF</Text>
-                  <Text style={s.promoCardSub}>On orders above ₹499</Text>
-                  <View style={s.promoCodeBtn}>
-                    <Text style={s.promoCodeText}>Use Code: WEEKEND5</Text>
-                  </View>
-                </View>
-                <MaterialIcons name="card-giftcard" size={40} color={C.green} style={{ opacity: 0.28 }} />
-              </View>
-            </View>
-          )}
-
           {inStock.length === 0 && outStock.length === 0 ? (
             <View style={s.emptyBox}>
               <View style={s.emptyIconWrap}>
@@ -1479,7 +1383,12 @@ export default function VendorStoreScreen() {
                       </Text>
                     </View>
                   )}
-                 
+                  {activeCat === "All" && !search && (
+                    <View style={s.allProductsHeader}>
+                      <Text style={s.allProductsTitle}>All Products</Text>
+                      <Text style={s.allProductsCount}>{inStockTotal}+ items</Text>
+                    </View>
+                  )}
                   {renderProductGrid(inStock)}
                 </>
               )}
@@ -1747,25 +1656,22 @@ const s = StyleSheet.create({
   },
   sortBtnText: { fontSize: 13, fontWeight: "800", color: C.gray900 },
 
-  // Transparent full-screen layer — only used to detect taps outside the popover
-  sortModalBackdrop: { flex: 1 },
-  // Small popover anchored just under the Sort button (position set inline via sortBtnLayout)
-  sortPopover: {
-    position: "absolute",
-    width: 220,
+  sortModalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  sortModalSheet: {
     backgroundColor: C.white,
-    borderRadius: 14,
-    borderWidth: 1, borderColor: C.gray200,
-    paddingVertical: 6, paddingHorizontal: 6,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 14,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 18, paddingTop: 16, paddingBottom: 34,
+    width: "100%", maxWidth: 420, alignSelf: "center",
   },
-  sortMenuItem: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 10, paddingVertical: 11, borderRadius: 10 },
-  sortMenuItemActive: { backgroundColor: C.greenLight },
-  sortMenuItemText: { fontSize: 13, fontWeight: "600", color: C.gray700 },
+  sortModalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  sortModalTitle: { fontSize: 16, fontWeight: "900", color: C.gray900 },
+  sortMenuItem: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 6, paddingVertical: 13 },
+  sortMenuItemActive: { backgroundColor: C.greenLight, borderRadius: 10 },
+  sortMenuItemText: { fontSize: 14, fontWeight: "600", color: C.gray700 },
   sortMenuItemTextActive: { color: C.green, fontWeight: "800" },
 
   // ── Promo banners (3-up) ──
-  promoRow: { flexDirection: "row", gap: 14, paddingBottom: 6, paddingTop: 12 },
+  promoRow: { flexDirection: "row", gap: 14, paddingBottom: 6, paddingTop: 2 },
   promoCard: {
     flex: 1, borderRadius: 18, padding: 16,
     flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between",
@@ -1783,15 +1689,8 @@ const s = StyleSheet.create({
   promoCodeText: { fontSize: 11, fontWeight: "800", color: C.white },
 
   // ── Category tabs ──
-  catTabsWrap: { backgroundColor: C.bg, position: "relative" },
-  catTabsRow: { paddingTop: 4, paddingBottom: 12, paddingRight: 44, flexDirection: "row" },
-  catScrollNextBtn: {
-    position: "absolute", right: 6, top: 17,
-    width: 30, height: 30, borderRadius: 999,
-    alignItems: "center", justifyContent: "center",
-    backgroundColor: C.white, borderWidth: 1, borderColor: C.gray200,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
-  },
+  catTabsWrap: { backgroundColor: C.bg },
+  catTabsRow: { paddingTop: 4, paddingBottom: 12, flexDirection: "row" },
 
   loadingHeader: { paddingHorizontal: 16, paddingTop: Platform.OS === "android" ? 14 : 52, paddingBottom: 14, flexDirection: "row", alignItems: "center", gap: 12 },
 
@@ -1920,4 +1819,4 @@ const s = StyleSheet.create({
   floatingTotal: { fontSize: 12, color: "rgba(255,255,255,0.82)", marginTop: 1 },
   floatingCTA: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14 },
   floatingCTAText: { fontSize: 14, fontWeight: "800", color: C.white },
-});
+})

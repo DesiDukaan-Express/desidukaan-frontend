@@ -228,4 +228,22 @@ export const searchAPI = {
     request("POST", "/search/track", { query, image_url, category }).catch(() => {});
   },
 };
+// ─── Wishlist ────────────────────────────────────────────────────────────────
+export const wishlistAPI = {
+  // Get all wishlist products 
+  getAll: (token) =>
+    request("GET", "/wishlist", null, token),
+
+  // Add product to wishlist
+  add: (productId, token) =>
+    request("POST", `/wishlist/${productId}`, null, token),
+
+  // Remove product from wishlist
+  remove: (productId, token) =>
+    request("DELETE", `/wishlist/${productId}`, null, token),
+
+  // Check whether a product is wishlisted
+  check: (productId, token) =>
+    request("GET", `/wishlist/check/${productId}`, null, token),
+};
 
