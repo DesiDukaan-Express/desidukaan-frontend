@@ -14,6 +14,8 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import useAuthStore from '../../store/authStore';
 import LanguageSwitcher from '../../components/common/LanguageSwitcher';
 
@@ -40,7 +42,7 @@ const C = {
   red:        '#EF4444',
   redLight:   '#FFEAEA',
   redText:    '#B91C1C',
-  redBorder: '#FECACA',
+  redBorder:  '#FECACA',
   redBackground: '#FEF2F2',
   amber:      '#F59E0B',
   amberLight: '#FFFBEB',
@@ -82,6 +84,7 @@ export default function DeliveryProfileScreen({ navigation }) {
   const { token, user, logout, setActiveRole } = useAuthStore();
   const { t } = useTranslation();
   const [showLanguage, setShowLanguage] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
 
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_500Medium,
@@ -118,14 +121,6 @@ export default function DeliveryProfileScreen({ navigation }) {
   const onRefresh = () => { setRefreshing(true); fetchData(); };
 
   const handleLogout = () => {
-    // Alert.alert(
-    //   t('profile.logoutConfirmTitle', 'Log out'),
-    //   t('profile.logoutConfirmMsg', 'Are you sure you want to log out?'),
-    //   [
-    //     { text: t('delivery.cancel', 'Cancel'), style: 'cancel' },
-    //     { text: t('profile.logout', 'Log out'), style: 'destructive', onPress: () => logout?.() },
-    //   ]
-    // );
     logout();
     setShowLogout(false);
   };
@@ -156,7 +151,7 @@ export default function DeliveryProfileScreen({ navigation }) {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.green} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.white} />}
       >
         {/* ── Hero ── */}
         <View style={p.hero}>

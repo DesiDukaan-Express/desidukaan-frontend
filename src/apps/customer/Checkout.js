@@ -1151,8 +1151,9 @@ export default function CheckoutScreen() {
   const placeOrder = async () => {
     console.log("placeOrder function INVOKED"); // START LOG
     if (!confirmedSlot) {
-      setErrorMsg("Please select a delivery slot before placing your order.");
-      Alert.alert("Delivery Slot Required", "Please select a delivery slot before placing your order.");
+      const slotReqMsg = t('checkout.selectDeliverySlotRequired', 'To send an order request, you must select a delivery slot.');
+      setErrorMsg(slotReqMsg);
+      Alert.alert(t('checkout.deliverySlotRequired', 'Delivery Slot Required'), slotReqMsg);
       return;
     }
     setErrorMsg(null);
@@ -1364,7 +1365,7 @@ export default function CheckoutScreen() {
 
   const minOrderValue = vendor?.min_order_value ?? 0;
   const isBelowMinOrder = liveSubtotal < minOrderValue;
-  const canPlace = !isBelowMinOrder && confirmedSlot !== null;
+  const canPlace = !isBelowMinOrder;
 
   // ── Status Polling Fallback ───────────────────────────────────────────────
   useEffect(() => {
@@ -2757,8 +2758,8 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
 
   const isSlotDisabled = (slot) => {
     if (day === "tomorrow") return false;
-    // Disable if slot start is within 1 hour from now
-    return slot.start <= nowHour + 1;
+    // Allow current slot if there are at least 30 minutes (0.5 hours) remaining before slot end
+    return slot.end <= nowHour + 0.5;
   };
 
   const isSlotOutsideHours = (slot) => {

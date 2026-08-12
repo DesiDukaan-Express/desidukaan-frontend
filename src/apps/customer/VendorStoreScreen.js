@@ -763,8 +763,8 @@ export default function VendorStoreScreen() {
   const [activeCat, setActiveCat] = useState("All");
   const [sortBy, setSortBy] = useState("default");
   useEffect(() => {
-  console.log("Sort Changed:", sortBy);
-}, [sortBy]);
+    console.log("Sort Changed:", sortBy);
+  }, [sortBy]);
   const [detailItem, setDetailItem] = useState(null);
   const [loosePickerItem, setLoosePickerItem] = useState(null); // weight picker
 
@@ -898,92 +898,92 @@ export default function VendorStoreScreen() {
   const inStock = useMemo(() => {
   let list = [...filtered.filter(i => i.is_active ?? true)];
 
-  switch (sortBy) {
-    case "price_asc":
-      list.sort((a, b) => (a.product?.price || 0) - (b.product?.price || 0));
-      break;
+    switch (sortBy) {
+      case "price_asc":
+        list.sort((a, b) => (a.product?.price || 0) - (b.product?.price || 0));
+        break;
 
-    case "price_desc":
-      list.sort((a, b) => (b.product?.price || 0) - (a.product?.price || 0));
-      break;
+      case "price_desc":
+        list.sort((a, b) => (b.product?.price || 0) - (a.product?.price || 0));
+        break;
 
-    case "discount":
-      list.sort((a, b) => {
-        const discountA =
-          ((a.product?.mrp || a.product?.price || 0) -
-            (a.product?.price || 0));
+      case "discount":
+        list.sort((a, b) => {
+          const discountA =
+            ((a.product?.mrp || a.product?.price || 0) -
+              (a.product?.price || 0));
 
-        const discountB =
-          ((b.product?.mrp || b.product?.price || 0) -
-            (b.product?.price || 0));
+          const discountB =
+            ((b.product?.mrp || b.product?.price || 0) -
+              (b.product?.price || 0));
 
-        return discountB - discountA;
-      });
-      break;
+          return discountB - discountA;
+        });
+        break;
 
-    case "name_asc":
-      list.sort((a, b) =>
-        (a.product?.name || "").localeCompare(b.product?.name || "")
-      );
-      break;
+      case "name_asc":
+        list.sort((a, b) =>
+          (a.product?.name || "").localeCompare(b.product?.name || "")
+        );
+        break;
 
-    case "name_desc":
-      list.sort((a, b) =>
-        (b.product?.name || "").localeCompare(a.product?.name || "")
-      );
-      break;
+      case "name_desc":
+        list.sort((a, b) =>
+          (b.product?.name || "").localeCompare(a.product?.name || "")
+        );
+        break;
 
-    default:
-      break;
-  }
+      default:
+        break;
+    }
 
-  return list;
-}, [filtered, sortBy]);
+    return list;
+  }, [filtered, sortBy]);
 
   const outStock = useMemo(() => {
   let list = [...filtered.filter(i => !(i.is_active ?? true))];
 
-  switch (sortBy) {
-    case "price_asc":
-      list.sort((a, b) => (a.product?.price || 0) - (b.product?.price || 0));
-      break;
+    switch (sortBy) {
+      case "price_asc":
+        list.sort((a, b) => (a.product?.price || 0) - (b.product?.price || 0));
+        break;
 
-    case "price_desc":
-      list.sort((a, b) => (b.product?.price || 0) - (a.product?.price || 0));
-      break;
+      case "price_desc":
+        list.sort((a, b) => (b.product?.price || 0) - (a.product?.price || 0));
+        break;
 
-    case "discount":
-      list.sort((a, b) => {
-        const discountA =
-          ((a.product?.mrp || a.product?.price || 0) -
-            (a.product?.price || 0));
+      case "discount":
+        list.sort((a, b) => {
+          const discountA =
+            ((a.product?.mrp || a.product?.price || 0) -
+              (a.product?.price || 0));
 
-        const discountB =
-          ((b.product?.mrp || b.product?.price || 0) -
-            (b.product?.price || 0));
+          const discountB =
+            ((b.product?.mrp || b.product?.price || 0) -
+              (b.product?.price || 0));
 
-        return discountB - discountA;
-      });
-      break;
+          return discountB - discountA;
+        });
+        break;
 
-    case "name_asc":
-      list.sort((a, b) =>
-        (a.product?.name || "").localeCompare(b.product?.name || "")
-      );
-      break;
+      case "name_asc":
+        list.sort((a, b) =>
+          (a.product?.name || "").localeCompare(b.product?.name || "")
+        );
+        break;
 
-    case "name_desc":
-      list.sort((a, b) =>
-        (b.product?.name || "").localeCompare(a.product?.name || "")
-      );
-      break;
+      case "name_desc":
+        list.sort((a, b) =>
+          (b.product?.name || "").localeCompare(a.product?.name || "")
+        );
+        break;
 
-    default:
-      break;
-  }
+      default:
+        break;
+    }
 
-  return list;
-}, [filtered, sortBy]);
+    return list;
+  }, [filtered, sortBy]);
 
 
   // ── Cart helpers ──────────────────────────────────────────────────────────
@@ -1134,29 +1134,29 @@ export default function VendorStoreScreen() {
           <Text style={s.sortTitle}>{t('vendorStore.sort')}</Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.sortRow}>
-         {[
-  { key: "default", label: t('vendorStore.default') },
-  { key: "price_asc", label: t('vendorStore.priceLowHigh'), icon: "arrow-up" },
-  { key: "price_desc", label: t('vendorStore.priceHighLow'), icon: "arrow-down" },
-  { key: "discount", label: t('vendorStore.bestDiscount'), icon: "percent" },
-  { key: "name_asc", label: t('vendorStore.nameAZ') },
-  { key: "name_desc", label: t('vendorStore.nameZA') },
-]
+          {[
+            { key: "default", label: t('vendorStore.default') },
+            { key: "price_asc", label: t('vendorStore.priceLowHigh'), icon: "arrow-up" },
+            { key: "price_desc", label: t('vendorStore.priceHighLow'), icon: "arrow-down" },
+            { key: "discount", label: t('vendorStore.bestDiscount'), icon: "percent" },
+            { key: "name_asc", label: t('vendorStore.nameAZ') },
+            { key: "name_desc", label: t('vendorStore.nameZA') },
+          ]
 
-.map((opt) => {
-            const active = sortBy === opt.key;
-            return (
-              <TouchableOpacity
-                key={opt.key}
-                onPress={() => setSortBy(opt.key)}
-                style={[s.sortPill, active && s.sortPillActive]}
-                activeOpacity={0.8}
-              >
-                {opt.icon && <Feather name={opt.icon} size={10} color={active ? C.white : C.gray600} style={{ marginRight: 4 }} />}
-                <Text style={[s.sortPillText, active && s.sortPillTextActive]}>{opt.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
+            .map((opt) => {
+              const active = sortBy === opt.key;
+              return (
+                <TouchableOpacity
+                  key={opt.key}
+                  onPress={() => setSortBy(opt.key)}
+                  style={[s.sortPill, active && s.sortPillActive]}
+                  activeOpacity={0.8}
+                >
+                  {opt.icon && <Feather name={opt.icon} size={10} color={active ? C.white : C.gray600} style={{ marginRight: 4 }} />}
+                  <Text style={[s.sortPillText, active && s.sortPillTextActive]}>{opt.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
         </ScrollView>
       </View>
 

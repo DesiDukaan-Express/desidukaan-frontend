@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -29,6 +29,7 @@ import { T } from "../../components/common/tokens";
 // ── Inventory Components ──────────────────────────────────────────────────────
 import BulkDeleteDialog from "../../components/inventory/BulkDeleteDialog";
 import ProductModal from "../../components/inventory/ProductModal";
+import CatalogueModal from "../../components/inventory/CatalogueModal";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -169,6 +170,7 @@ export default function InventoryScreen() {
   const [confirmSheet, setConfirmSheet] = useState(null); // { product, makingAvailable }
   const [actionSheetProduct, setActionSheetProduct] = useState(null);
   const [productToDelete, setProductToDelete] = useState(null);
+  const [showCatalogueModal, setShowCatalogueModal] = useState(false);
 
   // Clear selection on page change
   const productIdStr = inv.products.map((p) => p.id).join(",");
@@ -262,18 +264,56 @@ export default function InventoryScreen() {
     showToast(`${ids.length} product${ids.length !== 1 ? "s" : ""} deleted`);
   };
 
-  const parentCategoriesList = useMemo(() => {
-    return (inv.globalCategories || []).map((cat) => {
+  // Stack-based category path for recursive subcategory drill-down
+  const [catPath, setCatPath] = useState([]);
+  const activeCategoryNode = catPath.length > 0 ? catPath[catPath.length - 1] : null;
+
+  const handlePushCategory = (cat) => {
+    setCatPath(prev => [...prev, cat]);
+  };
+
+  const handlePopCategory = () => {
+    setCatPath(prev => prev.slice(0, -1));
+  };
+
+  const handleResetCategory = () => {
+    setCatPath([]);
+  };
+
+  // Helper function to recursively collect descendant category IDs
+  const getSubTreeCatIds = useCallback((catId) => {
+    if (!catId) return [];
+    let ids = [catId];
+    const children = (inv.globalCategories || []).filter(c => c.parent_id === catId);
+    children.forEach(c => {
+      ids = ids.concat(getSubTreeCatIds(c.id));
+    });
+    return ids;
+  }, [inv.globalCategories]);
+
+  // Direct child subcategories under activeCategoryNode
+  const currentChildCategories = useMemo(() => {
+    if (!activeCategoryNode) {
+      return (inv.globalCategories || []).filter(c => c.parent_id === null);
+    }
+    return (inv.globalCategories || []).filter(c => c.parent_id === activeCategoryNode.id);
+  }, [activeCategoryNode, inv.globalCategories]);
+
+  // Folder cards list for current active level with recursive item counts
+  const currentFolderList = useMemo(() => {
+    return currentChildCategories.map((cat) => {
+      const subTreeIds = getSubTreeCatIds(cat.id);
       const count = (inv.rawProducts || []).filter((p) => {
+        if (p.category_id && subTreeIds.includes(p.category_id)) return true;
         const pCat = typeof p.category === "object" ? p.category?.name : p.category;
         return String(pCat).toLowerCase() === String(cat.name).toLowerCase();
       }).length;
       return {
-        name: cat.name,
+        ...cat,
         count,
       };
     });
-  }, [inv.globalCategories, inv.rawProducts]);
+  }, [currentChildCategories, inv.rawProducts, getSubTreeCatIds]);
 
   const searchedProducts = useMemo(() => {
     if (!inv.search || inv.search.trim() === "") return [];
@@ -298,10 +338,14 @@ export default function InventoryScreen() {
   }, [inv.rawProducts, inv.search, inv.sortKey, inv.sortDir]);
 
   const categoryProducts = useMemo(() => {
-    if (!selectedCategory) return [];
+    if (!activeCategoryNode) return [];
+
+    const subTreeIds = getSubTreeCatIds(activeCategoryNode.id);
+
     let data = (inv.rawProducts || []).filter(p => {
+      if (p.category_id && subTreeIds.includes(p.category_id)) return true;
       const pCat = typeof p.category === "object" ? p.category?.name : p.category;
-      return String(pCat).toLowerCase() === selectedCategory.toLowerCase();
+      return String(pCat).toLowerCase() === String(activeCategoryNode.name).toLowerCase() || subTreeIds.includes(p.category_id);
     });
 
     // Filter by search
@@ -324,7 +368,7 @@ export default function InventoryScreen() {
       });
     }
     return data;
-  }, [inv.rawProducts, selectedCategory, inv.search, inv.sortKey, inv.sortDir]);
+  }, [inv.rawProducts, activeCategoryNode, getSubTreeCatIds, inv.search, inv.sortKey, inv.sortDir]);
 
   const handleProductPress = (product) => {
     setActionSheetProduct(product);
@@ -336,21 +380,20 @@ export default function InventoryScreen() {
 
       {/* ── Header ── */}
       <View style={s.header}>
-        {selectedCategory !== null ? (
+        {activeCategoryNode ? (
           <>
             <TouchableOpacity
-              onPress={() => {
-                setSelectedCategory(null);
-                inv.setSearch("");
-              }}
+              onPress={handlePopCategory}
               style={s.backBtn}
               activeOpacity={0.8}
             >
-              <Text style={s.backBtnText}>← {t('vendor.back')}</Text>
+              <Text style={s.backBtnText}>
+                ← {catPath.length > 1 ? catPath[catPath.length - 2].name : t('vendor.categories', 'Categories')}
+              </Text>
             </TouchableOpacity>
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={s.heading} numberOfLines={1}>
-                {selectedCategory === "Other" ? t('vendor.otherCategory', 'Other') : t(`category.${selectedCategory}`, selectedCategory)}
+                {activeCategoryNode.name}
               </Text>
               <Text style={s.subheading}>{t('vendor.productsInCategory')}</Text>
             </View>
@@ -361,13 +404,22 @@ export default function InventoryScreen() {
             <Text style={s.subheading}>{t('vendor.manageCategoriesProducts')}</Text>
           </View>
         )}
-        <TouchableOpacity
-          onPress={() => setModal("add")}
-          style={s.addBtn}
-          activeOpacity={0.85}
-        >
-          <Text style={s.addBtnText}>+ {t('vendor.addProduct')}</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={() => setShowCatalogueModal(true)}
+            style={[s.addBtn, { backgroundColor: '#F97316' }]}
+            activeOpacity={0.85}
+          >
+            <Text style={s.addBtnText}>📦 Add from Catalogue</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setModal("add")}
+            style={s.addBtn}
+            activeOpacity={0.85}
+          >
+            <Text style={s.addBtnText}>+ {t('vendor.addProduct')}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -383,8 +435,8 @@ export default function InventoryScreen() {
             value={inv.search}
             onChangeText={inv.setSearch}
             placeholder={
-              selectedCategory !== null
-                ? `${t('vendor.searchInCategoryPlaceholder')} ${selectedCategory === "Other" ? t('vendor.otherCategory', 'Other') : t(`category.${selectedCategory}`, selectedCategory)}…`
+              activeCategoryNode
+                ? `${t('vendor.searchInCategoryPlaceholder')} ${activeCategoryNode.name}…`
                 : t('vendor.searchPlaceholderInventory')
             }
             placeholderTextColor={TEXT_XLIGHT}
@@ -400,8 +452,8 @@ export default function InventoryScreen() {
           )}
         </View>
 
-        {/* ── Products Search (If selectedCategory === null but search is NOT empty) ── */}
-        {selectedCategory === null && inv.search.length > 0 && (
+        {/* ── Products Search (If catPath is empty but search is NOT empty) ── */}
+        {!activeCategoryNode && inv.search.length > 0 && (
           <>
             {/* Sort Options Bar */}
             <Text style={s.filterSectionTitle}>⇅ {t('vendor.sortProducts')}</Text>
@@ -466,47 +518,42 @@ export default function InventoryScreen() {
           </>
         )}
 
-        {/* ── Category Folders Grid (If selectedCategory === null and search is empty) ── */}
-        {selectedCategory === null && inv.search.length === 0 && (
+        {/* ── Category Folders Grid (If child categories exist and search is empty) ── */}
+        {!inv.search && currentFolderList.length > 0 && (
           <>
             <View style={s.listHeader}>
-              <Text style={s.listTitle}>{t('vendor.categories')}</Text>
-              <Text style={s.listCount}>{parentCategoriesList.length} {t('vendor.foldersCount')}</Text>
+              <Text style={s.listTitle}>
+                {activeCategoryNode ? `Subcategories of ${activeCategoryNode.name}` : t('vendor.categories')}
+              </Text>
+              <Text style={s.listCount}>{currentFolderList.length} {t('vendor.foldersCount')}</Text>
             </View>
 
-            {parentCategoriesList.length === 0 ? (
-              <View style={s.centered}>
-                <MaterialIcons name="folder-open" size={48} color="#9CA3AF" style={{ marginBottom: 10 }} />
-                <Text style={s.emptyText}>{t('vendor.noCategoriesFound')}</Text>
-              </View>
-            ) : (
-              <View style={s.gridContainer}>
-                {parentCategoriesList.map((cat) => (
-                  <TouchableOpacity
-                    key={cat.name}
-                    onPress={() => setSelectedCategory(cat.name)}
-                    onLongPress={() => handleDeleteCategory(cat.name)}
-                    style={s.folderCard}
-                    activeOpacity={0.8}
-                  >
-                    <View style={s.folderIconWrap}>
-                      <MaterialIcons name={getCategoryIcon(cat.name)} size={28} color={GREEN} />
-                    </View>
-                    <Text style={s.folderName} numberOfLines={1}>
-                      {cat.name === "Other" ? t('vendor.otherCategory', 'Other') : t(`category.${cat.name}`, cat.name)}
-                    </Text>
-                    <Text style={s.folderCount}>
-                      {cat.count} {cat.count === 1 ? t('vendor.product', 'product') : t('vendor.products', 'products')}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+            <View style={s.gridContainer}>
+              {currentFolderList.map((cat) => (
+                <TouchableOpacity
+                  key={cat.id || cat.name}
+                  onPress={() => handlePushCategory(cat)}
+                  onLongPress={() => handleDeleteCategory(cat.name)}
+                  style={s.folderCard}
+                  activeOpacity={0.8}
+                >
+                  <View style={s.folderIconWrap}>
+                    <MaterialIcons name={getCategoryIcon(cat.name)} size={28} color={GREEN} />
+                  </View>
+                  <Text style={s.folderName} numberOfLines={1}>
+                    {cat.name}
+                  </Text>
+                  <Text style={s.folderCount}>
+                    {cat.count} {cat.count === 1 ? t('vendor.product', 'product') : t('vendor.products', 'products')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </>
         )}
 
-        {/* ── Products Inside Selected Category (selectedCategory !== null) ── */}
-        {selectedCategory !== null && (
+        {/* ── Products Inside Active Category ── */}
+        {activeCategoryNode && (
           <>
             {/* Sort Options Bar */}
             <Text style={s.filterSectionTitle}>⇅ {t('vendor.sortProducts')}</Text>
@@ -540,7 +587,7 @@ export default function InventoryScreen() {
             </ScrollView>
 
             <View style={s.listHeader}>
-              <Text style={s.listTitle}>{t('vendor.products')}</Text>
+              <Text style={s.listTitle}>Products in {activeCategoryNode.name}</Text>
               <Text style={s.listCount}>{t('vendor.showingItems')} {categoryProducts.length} {t('vendor.items')}</Text>
             </View>
 
@@ -549,7 +596,7 @@ export default function InventoryScreen() {
                 <Spinner size={32} color={GREEN} />
                 <Text style={s.loadingText}>{t('vendor.loadingProducts')}</Text>
               </View>
-            ) : categoryProducts.length === 0 ? (
+            ) : categoryProducts.length === 0 && currentFolderList.length === 0 ? (
               <View style={s.centered}>
                 <Feather name="inbox" size={48} color="#9CA3AF" style={{ marginBottom: 12 }} />
                 <Text style={s.emptyText}>{t('vendor.noProductsInCategory')}</Text>
@@ -606,6 +653,17 @@ export default function InventoryScreen() {
           saving={inv.saving}
         />
       )}
+
+
+      <CatalogueModal
+        visible={showCatalogueModal}
+        onClose={() => setShowCatalogueModal(false)}
+        onSuccess={() => {
+          inv.reload();
+          showToast("Products imported from catalogue!");
+        }}
+      />
+
 
 
       {/* ── Action Sheet ── */}

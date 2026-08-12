@@ -44,8 +44,8 @@ export default function useInventory() {
       const res = await fetch(`${API_BASE}/products/categories`);
       const result = await res.json();
       if (res.ok) {
-        const cats = (result.data?.categories || []).filter((c) => c.parent_id === null);
-        setGlobalCategories(cats);
+        const flat = result.data?.flat || result.flat || result.data?.categories || [];
+        setGlobalCategories(flat);
       }
     } catch (err) {
       console.error("Load Global Categories Error:", err);
