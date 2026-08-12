@@ -12,10 +12,8 @@ import {
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { useTranslation } from 'react-i18next';
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import useAuthStore from '../../store/authStore';
 import LanguageSwitcher from '../../components/common/LanguageSwitcher';
 
@@ -97,7 +95,6 @@ export default function DeliveryProfileScreen({ navigation }) {
   const [stats,   setStats]   = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [showLogout, setShowLogout] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
