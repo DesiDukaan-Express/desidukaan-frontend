@@ -24,17 +24,18 @@ export default function CatalogueModal({ visible, onClose, onSuccess }) {
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [catalogueCategories, setCatalogueCategories] = useState([]);
-  const [selectedCatId, setSelectedCatId] = useState(null);
-  const [selectedSubcatId, setSelectedSubcatId] = useState(null);
+  const [catPath, setCatPath] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedItems, setSelectedItems] = useState({});
 
   useEffect(() => {
     if (visible) {
       fetchCatalogueTree();
+      setCatPath([]);
     } else {
       setSelectedItems({});
       setSearch("");
+      setCatPath([]);
     }
   }, [visible]);
 
@@ -47,9 +48,6 @@ export default function CatalogueModal({ visible, onClose, onSuccess }) {
       const data = await res.json();
       const cats = data.categories || [];
       setCatalogueCategories(cats);
-      if (cats.length > 0) {
-        setSelectedCatId(cats[0].id);
-      }
     } catch (err) {
       console.error("Failed to load catalogue tree:", err);
       Alert.alert("Error", "Failed to fetch master catalogue from server.");
@@ -58,50 +56,45 @@ export default function CatalogueModal({ visible, onClose, onSuccess }) {
     }
   };
 
-  // Active Category Object
-  const activeCategory = useMemo(() => {
-    return catalogueCategories.find((c) => c.id === selectedCatId) || null;
-  }, [catalogueCategories, selectedCatId]);
+  // Helper function to recursively collect products from a category node and all its descendants
+  const getAllProductsFromNode = (catNode) => {
+    let prods = [];
+    if (!catNode) return prods;
+    if (catNode.products) prods.push(...catNode.products);
+    const subList = catNode.subcategories || catNode.children || [];
+    subList.forEach((sub) => {
+      prods.push(...getAllProductsFromNode(sub));
+    });
+    return prods;
+  };
 
-  // Subcategories of Active Category
-  const subcategories = useMemo(() => {
-    return activeCategory?.subcategories || [];
-  }, [activeCategory]);
+  // Active Category node at end of path
+  const activeNode = catPath.length > 0 ? catPath[catPath.length - 1] : null;
 
-  // Active Subcategory Object
-  const activeSubcategory = useMemo(() => {
-    if (!selectedSubcatId) return null;
-    return subcategories.find((s) => s.id === selectedSubcatId) || null;
-  }, [subcategories, selectedSubcatId]);
+  // Direct child subcategories under activeNode
+  const currentChildSubCats = useMemo(() => {
+    if (!activeNode) return catalogueCategories;
+    return activeNode.subcategories || activeNode.children || [];
+  }, [activeNode, catalogueCategories]);
 
-  // Available Products based on selected Category / Subcategory & Search Query
+  // Available Products based on selected Category Node & Search Query
   const displayedProducts = useMemo(() => {
     let prods = [];
     if (search.trim()) {
-      // Search across ALL categories & subcategories
       catalogueCategories.forEach((cat) => {
-        if (cat.products) prods.push(...cat.products);
-        (cat.subcategories || []).forEach((sub) => {
-          if (sub.products) prods.push(...sub.products);
-        });
+        prods.push(...getAllProductsFromNode(cat));
       });
       const q = search.toLowerCase();
       prods = prods.filter((p) => p.name.toLowerCase().includes(q));
-    } else if (activeSubcategory) {
-      prods = activeSubcategory.products || [];
-    } else if (activeCategory) {
-      // Top level category products + subcategory products
-      if (activeCategory.products) prods.push(...activeCategory.products);
-      (activeCategory.subcategories || []).forEach((sub) => {
-        if (sub.products) prods.push(...sub.products);
-      });
+    } else if (activeNode) {
+      prods = getAllProductsFromNode(activeNode);
     }
 
     // Deduplicate by ID
     const map = new Map();
     prods.forEach((p) => map.set(p.id, p));
     return Array.from(map.values());
-  }, [catalogueCategories, activeCategory, activeSubcategory, search]);
+  }, [catalogueCategories, activeNode, search]);
 
   const toggleItemSelect = (product) => {
     setSelectedItems((prev) => {
@@ -160,12 +153,12 @@ export default function CatalogueModal({ visible, onClose, onSuccess }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to add products");
 
+      onClose();
+      onSuccess?.();
       Alert.alert(
         "Import Successful!",
         `${data.data?.total || itemsArray.length} items added/updated in your inventory.`
       );
-      onSuccess?.();
-      onClose();
     } catch (err) {
       Alert.alert("Import Failed", err.message || "Something went wrong.");
     } finally {
@@ -208,64 +201,67 @@ export default function CatalogueModal({ visible, onClose, onSuccess }) {
           )}
         </View>
 
-        {/* Category Tabs (if search is empty) */}
-        {!search && catalogueCategories.length > 0 && (
-          <View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={s.catTabRow}
-            >
-              {catalogueCategories.map((cat) => {
-                const active = cat.id === selectedCatId;
-                return (
-                  <TouchableOpacity
-                    key={cat.id}
-                    onPress={() => {
-                      setSelectedCatId(cat.id);
-                      setSelectedSubcatId(null);
-                    }}
-                    style={[s.catTab, active && s.catTabActive]}
-                  >
-                    <Text style={[s.catTabText, active && s.catTabTextActive]}>
-                      📁 {cat.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            {/* Subcategory Pills */}
-            {subcategories.length > 0 && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={s.subTabRow}
-              >
-                <TouchableOpacity
-                  onPress={() => setSelectedSubcatId(null)}
-                  style={[s.subTab, selectedSubcatId === null && s.subTabActive]}
-                >
-                  <Text
-                    style={[
-                      s.subTabText,
-                      selectedSubcatId === null && s.subTabTextActive,
-                    ]}
-                  >
-                    All in {activeCategory?.name}
+        {/* Shop By Category Breadcrumbs & Subcategory Navigation (if search is empty) */}
+        {!search && (
+          <View style={{ borderBottomWidth: 1, borderBottomColor: "#E4E4E7", backgroundColor: "#FAFAFA" }}>
+            {/* Breadcrumb Bar */}
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 10 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <TouchableOpacity onPress={() => setCatPath([])}>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: catPath.length === 0 ? GREEN : "#71717A" }}>
+                    All Categories
                   </Text>
                 </TouchableOpacity>
-                {subcategories.map((sub) => {
-                  const active = sub.id === selectedSubcatId;
+                {catPath.map((step, idx) => (
+                  <View key={step.id || idx} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={{ fontSize: 12, color: "#A1A1AA" }}>›</Text>
+                    <TouchableOpacity onPress={() => setCatPath(catPath.slice(0, idx + 1))}>
+                      <Text style={{ fontSize: 13, fontWeight: "700", color: idx === catPath.length - 1 ? GREEN : "#71717A" }}>
+                        {step.name}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+              {catPath.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setCatPath(catPath.slice(0, -1))}
+                  style={{ backgroundColor: "#E8F5EC", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, marginLeft: 8 }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: GREEN }}>← Back</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Subcategories Horizontal Scroll Row */}
+            {currentChildSubCats.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}>
+                {currentChildSubCats.map((sub) => {
+                  const childCount = (sub.subcategories || sub.children || []).length;
+                  const prodCount = getAllProductsFromNode(sub).length;
                   return (
                     <TouchableOpacity
                       key={sub.id}
-                      onPress={() => setSelectedSubcatId(sub.id)}
-                      style={[s.subTab, active && s.subTabActive]}
+                      onPress={() => setCatPath([...catPath, sub])}
+                      style={{
+                        backgroundColor: "#FFF",
+                        borderWidth: 1.5,
+                        borderColor: GREEN + "40",
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
                     >
-                      <Text style={[s.subTabText, active && s.subTabTextActive]}>
-                        ↳ {sub.name}
-                      </Text>
+                      <Text style={{ fontSize: 14 }}>📁</Text>
+                      <View>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#18181B" }}>{sub.name}</Text>
+                        <Text style={{ fontSize: 10, color: "#71717A" }}>
+                          {childCount > 0 ? `${childCount} subcats · ` : ""}{prodCount} items
+                        </Text>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
@@ -287,7 +283,9 @@ export default function CatalogueModal({ visible, onClose, onSuccess }) {
             <Text style={s.emptySubText}>
               {search
                 ? "Try searching for a different item name."
-                : "Select another category or add catalogue items from Admin panel."}
+                : catPath.length === 0
+                ? "Select a category above to browse products."
+                : `No products directly added to "${activeNode?.name}" yet.`}
             </Text>
           </View>
         ) : (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -441,109 +441,80 @@ const wo = StyleSheet.create({
 // ─── Category Picker ──────────────────────────────────────────────────────────
 
 function CategoryPicker({
-  topCategories, subcategories, selectedTopCat, selectedSubId, selectedSubName,
-  catLoading, subLoading,
-  onSelectTop, onSelectSub,
-  categoryName,
+  allCategories, selectedCategory, catLoading, onSelectCategory, categoryName,
 }) {
-  const [catOpen, setCatOpen] = useState(false);
-  const [subOpen, setSubOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const filteredCategories = useMemo(() => {
+    if (!search.trim()) return allCategories;
+    const q = search.toLowerCase();
+    return allCategories.filter(c => (c.path || c.name).toLowerCase().includes(q));
+  }, [allCategories, search]);
+
+  const selectedPathStr = selectedCategory?.path || selectedCategory?.name || categoryName || "Select Category / Subcategory...";
 
   return (
     <View style={cp.wrap}>
-      <Label>Category</Label>
+      <Label required>Category & Subcategory</Label>
       <TouchableOpacity
         style={cp.dropdownBox}
-        onPress={() => { setCatOpen(!catOpen); setSubOpen(false); }}
+        onPress={() => setOpen(!open)}
         activeOpacity={0.8}
       >
-        <Text style={cp.dropdownValue}>
-          {selectedTopCat ? selectedTopCat.name : "Select Category..."}
-        </Text>
-        <Feather name={catOpen ? "chevron-up" : "chevron-down"} size={16} color={TEXT_MED} />
+        <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Feather name="folder" size={15} color={PRIMARY} />
+          <Text style={[cp.dropdownValue, !selectedCategory && !categoryName && { color: TEXT_LITE }]} numberOfLines={1}>
+            {selectedPathStr}
+          </Text>
+        </View>
+        <Feather name={open ? "chevron-up" : "chevron-down"} size={16} color={TEXT_MED} />
       </TouchableOpacity>
 
-      {catOpen && (
+      {open && (
         <View style={cp.dropdownList}>
+          <View style={{ padding: 8, borderBottomWidth: 1, borderBottomColor: "#F4F4F5" }}>
+            <TextInput
+              style={{
+                backgroundColor: BG,
+                borderRadius: 8,
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                fontSize: 13,
+                color: TEXT,
+              }}
+              placeholder="Search category or subcategory..."
+              value={search}
+              onChangeText={setSearch}
+              placeholderTextColor={TEXT_LITE}
+            />
+          </View>
+
           {catLoading ? (
-            <ActivityIndicator size="small" color={PRIMARY} style={{ margin: 10 }} />
+            <ActivityIndicator size="small" color={PRIMARY} style={{ margin: 12 }} />
           ) : (
-            <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-              {topCategories.map((cat) => (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[cp.dropdownItem, selectedTopCat?.id === cat.id && cp.dropdownItemActive]}
-                  onPress={() => {
-                    onSelectTop(cat);
-                    setCatOpen(false);
-                  }}
-                >
-                  <Text style={[cp.dropdownItemText, selectedTopCat?.id === cat.id && cp.dropdownItemTextActive]}>
-                    {cat.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+              {filteredCategories.map((cat) => {
+                const isSelected = selectedCategory?.id === cat.id;
+                return (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[cp.dropdownItem, isSelected && cp.dropdownItemActive]}
+                    onPress={() => {
+                      onSelectCategory(cat);
+                      setOpen(false);
+                    }}
+                  >
+                    <Text style={[cp.dropdownItemText, isSelected && cp.dropdownItemTextActive]}>
+                      {cat.path ? cat.path : cat.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           )}
         </View>
       )}
-
-      {selectedTopCat && (
-        <View style={cp.subSection}>
-          <Text style={cp.subLabel}>Subcategory</Text>
-          <TouchableOpacity
-            style={cp.dropdownBox}
-            onPress={() => { setSubOpen(!subOpen); setCatOpen(false); }}
-            activeOpacity={0.8}
-          >
-            <Text style={cp.dropdownValue}>
-              {selectedSubName ? selectedSubName : "Select Subcategory (Optional)..."}
-            </Text>
-            <Feather name={subOpen ? "chevron-up" : "chevron-down"} size={16} color={TEXT_MED} />
-          </TouchableOpacity>
-
-          {subOpen && (
-            <View style={cp.dropdownList}>
-              {subLoading ? (
-                <ActivityIndicator size="small" color={PRIMARY} style={{ margin: 10 }} />
-              ) : subcategories.length === 0 ? (
-                <View style={cp.noSub}>
-                  <Text style={cp.noSubText}>
-                    No subcategories available under "{selectedTopCat.name}".
-                  </Text>
-                </View>
-              ) : (
-                <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                  {subcategories.map((sub) => (
-                    <TouchableOpacity
-                      key={sub.id}
-                      style={[cp.dropdownItem, selectedSubId === sub.id && cp.dropdownItemActive]}
-                      onPress={() => {
-                        onSelectSub(sub);
-                        setSubOpen(false);
-                      }}
-                    >
-                      <Text style={[cp.dropdownItemText, selectedSubId === sub.id && cp.dropdownItemTextActive]}>
-                        {sub.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              )}
-            </View>
-          )}
-        </View>
-      )}
-
-      {categoryName ? (
-        <View style={[cp.breadcrumb, { flexDirection: "row", alignItems: "center", gap: 5 }]}>
-          <Feather name="folder" size={13} color={PRIMARY_D} />
-          <Text style={cp.breadcrumbText}>
-            {categoryName}
-            {selectedSubName ? ` › ${selectedSubName}` : ""}
-          </Text>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -639,11 +610,9 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
   const [uploading, setUploading] = useState(false);
   const [urlInput, setUrlInput] = useState(false);
 
-  const [topCategories, setTopCategories]   = useState([]);
-  const [subcategories, setSubcategories]   = useState([]);
-  const [selectedTopCat, setSelectedTopCat] = useState(null);
+  const [allCategories, setAllCategories]   = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [catLoading, setCatLoading]         = useState(false);
-  const [subLoading, setSubLoading]         = useState(false);
   const [unitOpen, setUnitOpen]             = useState(false);
 
   // Slide-up animation
@@ -663,50 +632,36 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
-        const cats = (data.data?.categories || []).filter((c) => c.parent_id === null);
-        setTopCategories(
-          cats.length > 0
-            ? cats
-            : FALLBACK_CATEGORIES.map((n, i) => ({ id: -(i + 1), name: n, parent_id: null }))
+        const flatCats = data.data?.flat || data.flat || [];
+        setAllCategories(
+          flatCats.length > 0
+            ? flatCats
+            : FALLBACK_CATEGORIES.map((n, i) => ({ id: -(i + 1), name: n, path: n }))
         );
-        if (editing?.category) {
-          const match = cats.find((c) => c.name === editing.category);
-          if (match) setSelectedTopCat(match);
+        if (editing?.category_id) {
+          const match = flatCats.find((c) => c.id === editing.category_id);
+          if (match) setSelectedCategory(match);
+        } else if (editing?.category) {
+          const catNameStr = typeof editing.category === "object" ? editing.category?.name : editing.category;
+          const match = flatCats.find((c) => c.name === catNameStr);
+          if (match) setSelectedCategory(match);
         }
       })
       .catch(() => {
         if (!cancelled)
-          setTopCategories(FALLBACK_CATEGORIES.map((n, i) => ({ id: -(i + 1), name: n, parent_id: null })));
+          setAllCategories(FALLBACK_CATEGORIES.map((n, i) => ({ id: -(i + 1), name: n, path: n })));
       })
       .finally(() => { if (!cancelled) setCatLoading(false); });
     return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    if (!selectedTopCat || selectedTopCat.id < 0) { setSubcategories([]); return; }
-    let cancelled = false;
-    setSubLoading(true);
-    fetch(`${BASE_URL}/products/subcategories/${selectedTopCat.id}`)
-      .then((r) => r.json())
-      .then((data) => { if (!cancelled) setSubcategories(data.data?.subcategories || []); })
-      .catch(() => { if (!cancelled) setSubcategories([]); })
-      .finally(() => { if (!cancelled) setSubLoading(false); });
-    return () => { cancelled = true; };
-  }, [selectedTopCat]);
+  }, [editing]);
 
   const set = (k, v) => { setErr(""); setForm((f) => ({ ...f, [k]: v })); };
 
-  const handleSelectTop = (cat) => {
-    setSelectedTopCat(cat);
+  const handleSelectCategory = (cat) => {
+    setSelectedCategory(cat);
     set("categoryName", cat.name);
-    set("subcategoryId", null);
-    set("subcategoryName", "");
-    setSubcategories([]);
-  };
-
-  const handleSelectSub = (sub) => {
-    set("subcategoryId", sub.id);
-    set("subcategoryName", sub.name);
+    set("subcategoryId", cat.id);
+    set("subcategoryName", cat.name);
   };
 
   const pickImage = async () => {
@@ -739,8 +694,8 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
       setErr("Name, Stock and Price are required.");
       return;
     }
-    if (!selectedTopCat) {
-      setErr("Please select a Category.");
+    if (!selectedCategory && !form.categoryName) {
+      setErr("Please select a Category / Subcategory.");
       return;
     }
     if (form.type === "loose" && form.weight_options.length === 0) {
@@ -859,15 +814,10 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
             {/* Category */}
             <View style={s.section}>
               <CategoryPicker
-                topCategories={topCategories}
-                subcategories={subcategories}
-                selectedTopCat={selectedTopCat}
-                selectedSubId={form.subcategoryId}
-                selectedSubName={form.subcategoryName}
+                allCategories={allCategories}
+                selectedCategory={selectedCategory}
                 catLoading={catLoading}
-                subLoading={subLoading}
-                onSelectTop={handleSelectTop}
-                onSelectSub={handleSelectSub}
+                onSelectCategory={handleSelectCategory}
                 categoryName={form.categoryName}
               />
             </View>

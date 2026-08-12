@@ -999,49 +999,60 @@ const STORE_CATEGORY_META = {
 // We use the category NAME only (no parent_id from API categories since inventory
 // only gives us product.category). The apiCategoryTree provides parent lookup.
 function buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCategories) {
-  // Build a parent lookup from API categories: catName → parentName
-  const parentOf = {};  // catName → parentCatName | null
-  const catById = {};  // id → {name, parent_id}
+  const parentOf = {};
+  const catById = {};
   if (apiCategories && apiCategories.length > 0) {
     apiCategories.forEach(c => { catById[c.id] = c; });
     apiCategories.forEach(c => {
       if (c.parent_id && catById[c.parent_id]) {
         parentOf[c.name] = catById[c.parent_id].name;
       } else {
-        parentOf[c.name] = null; // top-level
+        parentOf[c.name] = null;
       }
     });
   }
 
-  const hierarchy = {};  // { topCat: { subCat: [inv, ...] } }
+  const getAncestors = (catName) => {
+    if (!catName) return [];
+    const chain = [catName];
+    let curr = catName;
+    const visited = new Set([curr]);
+    while (curr && parentOf.hasOwnProperty(curr) && parentOf[curr] !== null) {
+      curr = parentOf[curr];
+      if (visited.has(curr)) break;
+      visited.add(curr);
+      chain.unshift(curr);
+    }
+    return chain;
+  };
+
+  const hierarchy = {};
 
   allInventoryItems.forEach(inv => {
     const catName = getCategoryName(inv);
     if (!catName) return;
 
-    let topCat, subCat;
-    if (parentOf.hasOwnProperty(catName)) {
-      // We have API hierarchy data
-      if (parentOf[catName] === null) {
-        // This IS a top-level category — put product under "All" sub-cat
-        topCat = catName;
-        subCat = "All";
-      } else {
-        // It's a sub-category
-        topCat = parentOf[catName];
-        subCat = catName;
-      }
+    const chain = getAncestors(catName);
+    if (chain.length === 0) return;
+
+    const topCat = chain[0];
+    if (!hierarchy[topCat]) hierarchy[topCat] = {};
+
+    if (chain.length === 1) {
+      if (!hierarchy[topCat]["All"]) hierarchy[topCat]["All"] = [];
+      hierarchy[topCat]["All"].push(inv);
     } else {
-      // No API data — treat catName as top-level, sub-cat = product's unit as particulars group
-      topCat = catName;
-      const p = inv.product;
-      // Group by unit as a proxy for sub-category (e.g. "500 ml", "1 kg")
-      subCat = p?.unit || "General";
+      for (let i = 1; i < chain.length; i++) {
+        const subCatName = chain[i];
+        if (!hierarchy[topCat][subCatName]) hierarchy[topCat][subCatName] = [];
+        hierarchy[topCat][subCatName].push(inv);
+      }
     }
 
-    if (!hierarchy[topCat]) hierarchy[topCat] = {};
-    if (!hierarchy[topCat][subCat]) hierarchy[topCat][subCat] = [];
-    hierarchy[topCat][subCat].push(inv);
+    const directCat = chain[chain.length - 1];
+    if (!hierarchy[directCat]) hierarchy[directCat] = {};
+    if (!hierarchy[directCat]["All"]) hierarchy[directCat]["All"] = [];
+    hierarchy[directCat]["All"].push(inv);
   });
 
   return hierarchy;
@@ -1054,24 +1065,82 @@ function CategoryBrowseSheet({
   onStoreSelect, apiCategories, onItemDetail,
 }) {
   const { t } = useTranslation();
-  const [activeSubCat, setActiveSubCat] = React.useState(null);
-  const subCats = category && hierarchy[category]
-    ? Object.keys(hierarchy[category]).filter(sc => sc !== "All")
-    : [];
+  const [subCatPath, setSubCatPath] = React.useState([]);
 
   React.useEffect(() => {
     if (visible) {
-      setActiveSubCat(null);
+      setSubCatPath([]);
     }
   }, [visible, category]);
 
+  const catAccent = category ? (CAT_ACCENT[category] || CAT_ACCENT._default) : CAT_ACCENT._default;
+  const apiCat = category && apiCategories ? apiCategories.find(c => c.name === category) : null;
+
+  // Active subcategory at the end of current path
+  const activeSubCat = subCatPath.length > 0 ? subCatPath[subCatPath.length - 1] : null;
+
+  const findCategoryNode = (nodes, targetName) => {
+    if (!nodes || !targetName) return null;
+    for (const node of nodes) {
+      if (node.name === targetName) return node;
+      if (node.children && node.children.length > 0) {
+        const found = findCategoryNode(node.children, targetName);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  // Direct child subcategories at current level ONLY
+  const currentChildSubCats = React.useMemo(() => {
+    const targetCat = activeSubCat || category;
+    const node = findCategoryNode(apiCategories, targetCat);
+    if (node && node.children && node.children.length > 0) {
+      return node.children.map(c => c.name);
+    }
+    return [];
+  }, [activeSubCat, category, apiCategories]);
+
+  // Determine items for current active subcategory
+  const subCatItems = React.useMemo(() => {
+    if (!category || !hierarchy) return [];
+    const targetCat = activeSubCat || category;
+    
+    let items = [];
+    if (hierarchy[targetCat]) {
+      Object.keys(hierarchy[targetCat]).forEach(k => {
+        items.push(...(hierarchy[targetCat][k] || []));
+      });
+    }
+
+    if (hierarchy[category] && hierarchy[category][targetCat]) {
+      items.push(...(hierarchy[category][targetCat] || []));
+    }
+
+    const seen = new Set();
+    return items.filter(inv => {
+      if (!inv?.id) return false;
+      if (seen.has(inv.id)) return false;
+      seen.add(inv.id);
+      return true;
+    });
+  }, [category, activeSubCat, hierarchy]);
+
   if (!visible || !category) return null;
 
-  const subCatItems = activeSubCat
-    ? (hierarchy[category]?.[activeSubCat] || [])
-    : (subCats.length === 0 ? (hierarchy[category]?.["All"] || []) : []);
-  const catAccent = CAT_ACCENT[category] || CAT_ACCENT._default;
-  const apiCat = apiCategories?.find(c => c.name === category);
+  const showSubCatGrid = currentChildSubCats.length > 0;
+
+  const handlePopPath = () => {
+    setSubCatPath(prev => prev.slice(0, -1));
+  };
+
+  const handlePushPath = (sc) => {
+    setSubCatPath(prev => [...prev, sc]);
+  };
+
+  const prevTitle = subCatPath.length > 1
+    ? subCatPath[subCatPath.length - 2]
+    : category;
 
   return (
     <Modal
@@ -1095,29 +1164,50 @@ function CategoryBrowseSheet({
             </View>
             <View style={{ flex: 1 }}>
               <Text style={cbs.headerCat}>{t("home.categoryLabel")}</Text>
-              <Text style={cbs.headerTitle}>{category}</Text>
+              <Text style={cbs.headerTitle}>{activeSubCat || category}</Text>
             </View>
             <TouchableOpacity style={cbs.closeBtn} onPress={onClose}>
               <MaterialIcons name="close" size={16} color={C.gray500} />
             </TouchableOpacity>
           </View>
 
-          {activeSubCat === null && subCats.length > 0 ? (
+          {/* Back Navigation Bar when navigated into a subcategory */}
+          {subCatPath.length > 0 && (
+            <View style={cbs.backRow}>
+              <TouchableOpacity
+                style={[cbs.backToSubCatsBtn, { backgroundColor: catAccent.bg }]}
+                onPress={handlePopPath}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="arrow-back" size={16} color={catAccent.accent} />
+                <Text style={[cbs.backToSubCatsText, { color: catAccent.accent }]}>
+                  Back to {prevTitle}
+                </Text>
+              </TouchableOpacity>
+              <Text style={cbs.activeSubCatTitle}>{activeSubCat}</Text>
+            </View>
+          )}
+
+          {/* ── Subcategory Grid View ── */}
+          {showSubCatGrid ? (
             <ScrollView
               showsVerticalScrollIndicator={false}
               contentContainerStyle={cbs.subCatGridContainer}
             >
-              <Text style={cbs.subCatGridTitle}>{t("home.selectSubCategory")}</Text>
+              <Text style={cbs.subCatGridTitle}>
+                {subCatPath.length === 0 ? t("home.selectSubCategory") : `Subcategories of ${activeSubCat}`}
+              </Text>
               <View style={cbs.subCatGrid}>
-                {subCats.map(sc => {
-                  const count = hierarchy[category]?.[sc]?.length || 0;
-                  const firstItemImg = hierarchy[category]?.[sc]?.[0]?.product?.image_url;
+                {currentChildSubCats.map(sc => {
+                  const subItems = hierarchy[category]?.[sc] || hierarchy[sc]?.["All"] || (hierarchy[sc] ? Object.values(hierarchy[sc]).flat() : []);
+                  const count = subItems.length;
+                  const firstItemImg = subItems[0]?.product?.image_url;
 
                   return (
                     <TouchableOpacity
                       key={sc}
                       style={[cbs.subCatCard, { borderColor: catAccent.bg }]}
-                      onPress={() => setActiveSubCat(sc)}
+                      onPress={() => handlePushPath(sc)}
                       activeOpacity={0.85}
                     >
                       <View style={[cbs.subCatCardIconWrap, { backgroundColor: catAccent.bg }]}>
@@ -1129,7 +1219,9 @@ function CategoryBrowseSheet({
                       </View>
                       <View style={cbs.subCatCardInfo}>
                         <Text style={cbs.subCatCardName} numberOfLines={2}>{sc}</Text>
-                        <Text style={cbs.subCatCardCount}>{t("home.itemsCount", { count })}</Text>
+                        {count > 0 && (
+                          <Text style={cbs.subCatCardCount}>{t("home.itemsCount", { count })}</Text>
+                        )}
                       </View>
                       <MaterialIcons name="chevron-right" size={20} color={catAccent.accent} />
                     </TouchableOpacity>
@@ -1139,55 +1231,7 @@ function CategoryBrowseSheet({
             </ScrollView>
           ) : (
             <>
-              {activeSubCat !== null && (
-                <View style={cbs.backRow}>
-                  <TouchableOpacity
-                    style={[cbs.backToSubCatsBtn, { backgroundColor: catAccent.bg }]}
-                    onPress={() => setActiveSubCat(null)}
-                    activeOpacity={0.8}
-                  >
-                    <MaterialIcons name="arrow-back" size={16} color={catAccent.accent} />
-                    <Text style={[cbs.backToSubCatsText, { color: catAccent.accent }]}>
-                      {t("home.backToSubcategories")}
-                    </Text>
-                  </TouchableOpacity>
-                  <Text style={cbs.activeSubCatTitle}>{activeSubCat}</Text>
-                </View>
-              )}
-
-              {/* ── Sub-Category Pills ── */}
-              {activeSubCat !== null && subCats.length > 1 && (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={cbs.subCatRow}
-                >
-                  {subCats.map(sc => {
-                    const isActive = sc === activeSubCat;
-                    const count = hierarchy[category]?.[sc]?.length || 0;
-                    return (
-                      <TouchableOpacity
-                        key={sc}
-                        style={[
-                          cbs.subCatChip,
-                          isActive && { backgroundColor: catAccent.accent, borderColor: catAccent.accent },
-                        ]}
-                        onPress={() => setActiveSubCat(sc)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={[cbs.subCatChipText, isActive && { color: C.white }]}>
-                          {sc}
-                        </Text>
-                        <View style={[cbs.subCatCount, isActive && { backgroundColor: "rgba(255,255,255,0.25)" }]}>
-                          <Text style={[cbs.subCatCountText, isActive && { color: C.white }]}>
-                            {count}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              )}
+              {/* Note: Upper gray pills bar removed as requested to keep UI clean & strictly hierarchical */}
 
               {/* ── Column Headers ── */}
               <View style={cbs.tableHeader}>
