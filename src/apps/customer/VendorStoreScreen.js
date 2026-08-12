@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, Image, Modal,
   TouchableOpacity, ActivityIndicator, Animated,
   TextInput, Platform, StatusBar, Pressable, Dimensions,
+  Share, Alert,
 } from "react-native";
 import { Feather, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -77,6 +78,12 @@ const CAT_ACCENT = {
   "Chips": { bg: "#FEF2F2", accent: "#EF4444", icon: "fastfood" },
   "Milk": { bg: "#F0F9FF", accent: "#0EA5E9", icon: "local-cafe" },
   "Rice": { bg: "#FEFCE8", accent: "#EAB308", icon: "grain" },
+  "Rice, Atta & Grains": { bg: "#FEFCE8", accent: "#A16207", icon: "grain" },
+  "Pulses & Dals": { bg: "#FFF7ED", accent: "#B45309", icon: "grain" },
+  "Spices & Masala": { bg: "#FFF7ED", accent: "#C2410C", icon: "local-fire-department" },
+  "Oils & Ghee": { bg: "#FEFCE8", accent: "#CA8A04", icon: "opacity" },
+  "Sugar & Salt": { bg: "#F8FAFC", accent: "#64748B", icon: "grain" },
+  "Beverages": { bg: "#F0FDF4", accent: "#16A34A", icon: "local-drink" },
   _default: { bg: "#F3F4F6", accent: "#6B7280", icon: "inventory" },
 };
 
@@ -114,6 +121,30 @@ const normalizeCatName = (name) => {
 };
 
 const normalizeCat = (cat) => normalizeCatName(cat) || "Other";
+
+// ─── Keyword-based category fallback ───────────────────────────────────────────
+// Used when a product has no (or a generic/"Other") category from the backend,
+// so the storefront can still show useful filter chips like Fruits & Vegetables,
+// Rice & Grains, Dairy, Spices, Oils, Pulses, etc.
+const KEYWORD_CATEGORIES = [
+  { name: "Fruits & Vegetables", keywords: ["tomato", "onion", "potato", "banana", "apple", "mango", "grape", "carrot", "cabbage", "cauliflower", "capsicum", "brinjal", "spinach", "chilli", "chili", "ginger", "garlic", "lemon", "cucumber", "peas", "beans", "orange", "papaya", "guava", "pomegranate", "vegetable", "fruit"] },
+  { name: "Rice, Atta & Grains", keywords: ["rice", "basmati", "atta", "flour", "wheat", "maida", "rava", "sooji", "poha", "millet", "grain"] },
+  { name: "Pulses & Dals", keywords: ["dal", "daal", "lentil", "moong", "chana", "toor", "urad", "rajma", "masoor", "pulse"] },
+  { name: "Spices & Masala", keywords: ["masala", "spice", "turmeric", "haldi", "chilli powder", "coriander powder", "jeera", "cumin", "mustard seed", "garam masala", "pepper"] },
+  { name: "Oils & Ghee", keywords: ["oil", "ghee", "sunflower oil", "mustard oil", "vanaspati"] },
+  { name: "Dairy, Bread & Eggs", keywords: ["milk", "curd", "yogurt", "paneer", "butter", "cheese", "bread", "egg", "ghee"] },
+  { name: "Snacks & Munchies", keywords: ["chips", "namkeen", "biscuit", "cookie", "snack", "chocolate", "candy", "wafer"] },
+  { name: "Beverages", keywords: ["juice", "soda", "cold drink", "tea", "coffee", "water bottle", "drink"] },
+  { name: "Sugar & Salt", keywords: ["sugar", "salt", "jaggery", "gud"] },
+];
+function classifyByName(name) {
+  if (!name) return null;
+  const n = name.toLowerCase();
+  for (const cat of KEYWORD_CATEGORIES) {
+    if (cat.keywords.some(k => n.includes(k))) return cat.name;
+  }
+  return null;
+}
 
 function buildHierarchyFromInventory(allInventoryItems, getCategoryName, parentOfMap) {
   const hierarchy = {};
@@ -163,14 +194,15 @@ function useWindowWidth() {
 // Responsive card grid — 2 cols mobile, 3 tablet, 4-5 desktop
 function useCardLayout(winW) {
   return useMemo(() => {
-    const H_PAD = winW >= 1024 ? 24 : winW >= 640 ? 16 : 16;
-    const GAP = winW >= 640 ? 16 : 14;
+    const safeW = winW && winW > 0 ? winW : 360;
+    const H_PAD = safeW >= 1024 ? 24 : safeW >= 640 ? 16 : 16;
+    const GAP = safeW >= 640 ? 16 : 14;
     let cols;
-    if (winW >= 1200) cols = 5;
-    else if (winW >= 900) cols = 4;
-    else if (winW >= 600) cols = 3;
+    if (safeW >= 1200) cols = 5;
+    else if (safeW >= 900) cols = 4;
+    else if (safeW >= 600) cols = 3;
     else cols = 2;
-    const cardW = Math.floor((winW - H_PAD * 2 - GAP * (cols - 1)) / cols);
+    const cardW = Math.max(120, Math.floor((safeW - H_PAD * 2 - GAP * (cols - 1)) / cols));
     return { cols, cardW, gap: GAP, hPad: H_PAD };
   }, [winW]);
 }
@@ -530,6 +562,7 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
   const discount = p.mrp && p.mrp > p.price
     ? Math.round((1 - p.price / p.mrp) * 100) : null;
   const imgH = Math.max(120, Math.round(cardW));
+  const [wishlisted, setWishlisted] = useState(false);
 
   return (
     <TouchableOpacity
@@ -545,19 +578,17 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
         />
         <TouchableOpacity
           style={pc.eyeBtn}
-          onPress={(e) => { e.stopPropagation?.(); onPress?.(); }}
+          onPress={(e) => { e.stopPropagation?.(); setWishlisted(w => !w); }}
           activeOpacity={0.7}
         >
-          <Feather name="eye" size={14} color={C.white} />
+          <Feather name="heart" size={14} color={wishlisted ? "#EF4444" : C.white} fill={wishlisted ? "#EF4444" : "none"} />
         </TouchableOpacity>
-        {discount && inStock && (
-          <View style={pc.discBadge}><Text style={pc.discText}>{discount}% {t('vendorStore.off')}</Text></View>
-        )}
-        {/* Loose badge — top right */}
-        {loose && inStock && (
-          <View style={pc.looseBadge}>
-            <Feather name="droplet" size={8} color={C.cyan} />
-            <Text style={pc.looseBadgeText}>{t('vendorStore.loose')}</Text>
+        {/* Top-left status badge — matches reference chips: Loose / Fresh / X% OFF */}
+        {inStock && (
+          <View style={[pc.discBadge, loose ? pc.badgeLoose : discount ? pc.badgeOff : pc.badgeFresh]}>
+            <Text style={pc.discText}>
+              {loose ? t('vendorStore.loose') : discount ? `${discount}% ${t('vendorStore.off')}` : "Fresh"}
+            </Text>
           </View>
         )}
         {!inStock && (
@@ -635,6 +666,9 @@ const pc = StyleSheet.create({
   img: { width: "100%", height: "100%" },
   discBadge: { position: "absolute", top: 8, left: 8, backgroundColor: C.orange, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   discText: { fontSize: 9, color: C.white, fontWeight: "800", letterSpacing: 0 },
+  badgeOff: { backgroundColor: C.orange },
+  badgeFresh: { backgroundColor: C.green },
+  badgeLoose: { backgroundColor: C.green },
   looseBadge: { position: "absolute", top: 44, right: 8, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.88)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, borderWidth: 1, borderColor: C.green },
   looseBadgeText: { fontSize: 9, fontWeight: "800", color: C.cyan },
   oosOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.48)", alignItems: "center", justifyContent: "center" },
@@ -705,7 +739,7 @@ const csh = StyleSheet.create({
   badgeText: { fontSize: 12, fontWeight: "800", color: C.green },
 });
 
-// ─── Category Tab Pill ─────────────────────────────────────────────────────────
+// ─── Category Tab Pill (legacy, kept for narrow layouts) ──────────────────────
 function CatTabPill({ cat, count, isActive, onPress }) {
   const meta = getCatMeta(cat);
   return (
@@ -741,6 +775,46 @@ const ct = StyleSheet.create({
   bubbleText: { fontSize: 10, fontWeight: "800" },
 });
 
+// ─── Category Icon Chip — pastel circular icon + label, matches reference design ─────
+function CatIconChip({ cat, isActive, onPress, isAll }) {
+  const meta = getCatMeta(cat);
+  const isAllItems = cat === "All";
+  return (
+    <TouchableOpacity style={cic.wrap} onPress={onPress} activeOpacity={0.8}>
+      <View
+        style={[
+          isAllItems ? cic.tile : cic.circle,
+          { backgroundColor: meta.bg },
+          isActive && { borderColor: meta.accent, borderWidth: 2 },
+        ]}
+      >
+        {isAllItems
+          ? <Feather name="grid" size={20} color={meta.accent} />
+          : <MaterialIcons name={meta.emoji} size={22} color={meta.accent} />}
+      </View>
+      <Text style={[cic.label, isActive && { color: meta.accent, fontWeight: "800" }]} numberOfLines={1}>
+        {isAllItems ? "All Items" : cat}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+const cic = StyleSheet.create({
+  wrap: { alignItems: "center", width: 68, marginRight: 12 },
+  circle: {
+    width: 56, height: 56, borderRadius: 999,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: "transparent",
+    marginBottom: 6,
+  },
+  tile: {
+    width: 56, height: 56, borderRadius: 14,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: "transparent",
+    marginBottom: 6,
+  },
+  label: { fontSize: 11, fontWeight: "700", color: C.gray600, textAlign: "center" },
+});
+
 // ═══════════════════════════════════════════════════════════════════════════ //
 // ─── Main Screen ─────────────────────────────────────────────────────────── //
 // ═══════════════════════════════════════════════════════════════════════════ //
@@ -753,8 +827,10 @@ export default function VendorStoreScreen() {
   const cart = useCartStore();
 
   const winW = useWindowWidth();
-  const { cardW, gap, hPad } = useCardLayout(winW);
   const isWide = winW >= 768;
+  const [gridAreaW, setGridAreaW] = useState(0);
+  const effectiveW = gridAreaW > 0 ? gridAreaW : winW;
+  const { cardW, gap, hPad } = useCardLayout(effectiveW);
 
   const [vendor, setVendor] = useState(null);
   const [inventory, setInventory] = useState([]);
@@ -765,6 +841,14 @@ export default function VendorStoreScreen() {
   const searchInputRef = useRef(null);
   const [activeCat, setActiveCat] = useState("All");
   const [sortBy, setSortBy] = useState("default");
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const sortBtnRef = useRef(null);
+  const [sortBtnLayout, setSortBtnLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [wishlistCount, setWishlistCount] = useState(0);
+  const catScrollRef = useRef(null);
+  const [catContentW, setCatContentW] = useState(0);
+  const [catTrackW, setCatTrackW] = useState(0);
+  const [catScrollX, setCatScrollX] = useState(0);
   useEffect(() => {
   console.log("Sort Changed:", sortBy);
 }, [sortBy]);
@@ -826,8 +910,12 @@ export default function VendorStoreScreen() {
     let raw;
     if (cat && typeof cat === "object" && cat.name) raw = cat.name;
     else if (typeof cat === "string" && cat) raw = cat;
-    else return "Other";
-    return normalizeCatName(raw) || "Other";
+
+    const normalized = raw ? normalizeCatName(raw) : null;
+    if (normalized && normalized.toLowerCase() !== "other" && normalized.toLowerCase() !== "others") {
+      return normalized;
+    }
+    return classifyByName(p?.name) || "Other";
   }, []);
 
   const parentOfMap = useMemo(() => {
@@ -858,6 +946,14 @@ export default function VendorStoreScreen() {
   const categories = useMemo(() => {
     return ["All", ...Object.keys(categoryHierarchy).sort()];
   }, [categoryHierarchy]);
+
+  // Chips shown to the user — hide the generic "All" and "Other" buckets,
+  // but never leave the row empty if "Other" is all we have.
+  const visibleCategories = useMemo(() => {
+    const named = categories.filter(c => c !== "All" && c !== "Other" && c !== "Others");
+    if (named.length > 0) return named;
+    return categories.filter(c => c !== "All");
+  }, [categories]);
 
   const inStockTotal = useMemo(() => inventory.filter(i => i.stock_qty > 0).length, [inventory]);
 
@@ -1079,35 +1175,104 @@ export default function VendorStoreScreen() {
       {/* HEADER */}
       <View style={s.header}>
         <TouchableOpacity style={s.backBtn} onPress={goBack} activeOpacity={0.8}>
-          <Feather name="arrow-left" size={18} color={C.orangeDark} />
+          <Feather name="arrow-left" size={18} color={C.gray700} />
         </TouchableOpacity>
+
         <View style={s.headerMid}>
-          <Text style={s.appName}>KwikPik</Text>
-          <Text style={s.shopName} numberOfLines={1}>{vendor?.shop_name || vendorName}</Text>
+          <View style={s.shopNameRow}>
+            <Text style={s.shopName} numberOfLines={1}>{(vendor?.shop_name || vendorName || "Store").toUpperCase()}</Text>
+            <View style={s.verifiedBadge}>
+              <Feather name="check" size={10} color={C.white} />
+            </View>
+          </View>
           <View style={s.shopMetaRow}>
-            <View style={[s.statusDot, { backgroundColor: isStoreCurrentlyOpen(vendor) ? "#4ADE80" : "#F87171" }]} />
-            <Text style={s.metaText}>{isStoreCurrentlyOpen(vendor) ? t('vendorStore.open') : t('vendorStore.closed')}</Text>
+            <Text style={s.metaLink}>{vendor?.owner_name ? vendor.owner_name.split(" ")[0].toLowerCase() : "store"}</Text>
+            <Text style={s.metaSep}>·</Text>
+            <Text style={s.metaText}>{vendor?.shop_type || "Grocery Store"}</Text>
+          </View>
+          <View style={s.shopMetaRow}>
+            <View style={s.ratingChip}>
+              <Feather name="star" size={11} color={C.green} />
+              <Text style={s.ratingText}>{vendor?.rating ? Number(vendor.rating).toFixed(1) : "4.8"}</Text>
+            </View>
             <Text style={s.metaSep}>·</Text>
             <Text style={s.metaText}>{t('vendorStore.inStock', { count: inStockTotal })}</Text>
+            <Text style={s.metaSep}>·</Text>
+            <Feather name="clock" size={11} color={C.gray500} />
+            <Text style={s.metaText} numberOfLines={1}>
+              {isStoreCurrentlyOpen(vendor)
+                ? (vendor?.closing_time ? `Open till ${vendor.closing_time}` : t('vendorStore.open'))
+                : t('vendorStore.closed')}
+            </Text>
           </View>
         </View>
+
+        {isWide && (
+          <View style={s.headerActions}>
+            <TouchableOpacity
+              style={s.headerActionBtn}
+              activeOpacity={0.8}
+              onPress={() => { setWishlistCount(c => c + (wishlistCount ? 0 : 1)); }}
+            >
+              <Feather name="heart" size={16} color={C.gray700} />
+              <Text style={s.headerActionText}>Wishlist</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.headerActionBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                const shopName = vendor?.shop_name || vendorName || "this store";
+                if (Platform.OS === "web") { Alert.alert?.("Share", `Check out ${shopName} on KwikPik!`); }
+                else Share.share({ message: `Check out ${shopName} on KwikPik!` }).catch(() => {});
+              }}
+            >
+              <Feather name="share-2" size={16} color={C.gray700} />
+              <Text style={s.headerActionText}>Share</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.headerActionBtn}
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate("CustomerTabNavigator", { screen: "Cart" })}
+            >
+              <View>
+                <Feather name="shopping-cart" size={16} color={C.gray700} />
+                {cartCount > 0 && (
+                  <View style={s.headerCartDot}><Text style={s.headerCartDotText}>{cartCount}</Text></View>
+                )}
+              </View>
+              <Text style={s.headerActionText}>Cart</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.headerActionBtn}
+              activeOpacity={0.8}
+              onPress={() => Alert.alert?.("Help", "Need help? Chat with the store or contact support.")}
+            >
+              <Feather name="help-circle" size={16} color={C.gray700} />
+              <Text style={s.headerActionText}>Help</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View style={[s.statusChip, !isStoreCurrentlyOpen(vendor) && s.statusChipClosed]}>
-          <View style={[s.statusDot, { backgroundColor: isStoreCurrentlyOpen(vendor) ? C.greenFixed : "#F87171" }]} />
+          <View style={[s.statusDot, { backgroundColor: isStoreCurrentlyOpen(vendor) ? C.greenFixed : "#EF4444" }]} />
           <Text style={[s.statusText, !isStoreCurrentlyOpen(vendor) && s.statusTextClosed]}>
             {isStoreCurrentlyOpen(vendor) ? t('vendorStore.open') : t('vendorStore.closed')}
           </Text>
         </View>
-        <TouchableOpacity
-          style={s.headerSearchBtn}
-          onPress={() => searchInputRef.current?.focus?.()}
-          activeOpacity={0.8}
-        >
-          <Feather name="search" size={18} color={C.green} />
-        </TouchableOpacity>
+
+        {!isWide && (
+          <TouchableOpacity
+            style={s.headerSearchBtn}
+            onPress={() => searchInputRef.current?.focus?.()}
+            activeOpacity={0.8}
+          >
+            <Feather name="search" size={18} color={C.green} />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* SEARCH */}
-      <View style={s.searchWrap}>
+      {/* SEARCH + SORT */}
+      <View style={s.searchSortWrap}>
         <View style={[s.searchBox, searchFocus && s.searchBoxActive]}>
           <Feather name="search" size={15} color={searchFocus ? C.green : C.gray400} />
           <TextInput
@@ -1128,89 +1293,165 @@ export default function VendorStoreScreen() {
             </TouchableOpacity>
           )}
         </View>
-      </View>
 
-      {/* SORT OPTIONS */}
-      <View style={s.sortWrap}>
-        <View style={s.sortHeader}>
-          <Feather name="sliders" size={12} color={C.gray500} />
-          <Text style={s.sortTitle}>{t('vendorStore.sort')}</Text>
+        <View style={{ position: "relative" }}>
+          <TouchableOpacity
+            ref={sortBtnRef}
+            style={s.sortBtn}
+            activeOpacity={0.85}
+            onPress={() => {
+              if (sortBtnRef.current?.measureInWindow) {
+                sortBtnRef.current.measureInWindow((x, y, width, height) => {
+                  setSortBtnLayout({ x, y, width, height });
+                  setSortMenuOpen(true);
+                });
+              } else {
+                setSortMenuOpen(true);
+              }
+            }}
+          >
+            <Feather name="bar-chart-2" size={14} color={C.gray700} style={{ transform: [{ rotate: "90deg" }] }} />
+            <Text style={s.sortBtnText}>{t('vendorStore.sort')}</Text>
+            <Feather name={sortMenuOpen ? "chevron-up" : "chevron-down"} size={14} color={C.gray700} />
+          </TouchableOpacity>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.sortRow}>
-         {[
-  { key: "default", label: t('vendorStore.default') },
-  { key: "price_asc", label: t('vendorStore.priceLowHigh'), icon: "arrow-up" },
-  { key: "price_desc", label: t('vendorStore.priceHighLow'), icon: "arrow-down" },
-  { key: "discount", label: t('vendorStore.bestDiscount'), icon: "percent" },
-  { key: "name_asc", label: t('vendorStore.nameAZ') },
-  { key: "name_desc", label: t('vendorStore.nameZA') },
-]
-
-.map((opt) => {
-            const active = sortBy === opt.key;
-            return (
-              <TouchableOpacity
-                key={opt.key}
-                onPress={() => setSortBy(opt.key)}
-                style={[s.sortPill, active && s.sortPillActive]}
-                activeOpacity={0.8}
-              >
-                {opt.icon && <Feather name={opt.icon} size={10} color={active ? C.white : C.gray600} style={{ marginRight: 4 }} />}
-                <Text style={[s.sortPillText, active && s.sortPillTextActive]}>{opt.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
       </View>
 
-      {/* CATEGORY TABS — hidden on wide screens where sidebar shows */}
-      {!search && categories.length > 0 && !(isWide && categories.length > 2) && (
+      {/* SORT DROPDOWN — small popover anchored right under the Sort button */}
+      <Modal visible={sortMenuOpen} transparent animationType="fade" onRequestClose={() => setSortMenuOpen(false)}>
+        <Pressable style={s.sortModalBackdrop} onPress={() => setSortMenuOpen(false)}>
+          <View
+            style={[
+              s.sortPopover,
+              {
+                top: sortBtnLayout.y + sortBtnLayout.height + 8,
+                left: Math.max(12, sortBtnLayout.x + sortBtnLayout.width - 220),
+              },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
+            {[
+              { key: "default", label: t('vendorStore.default') },
+              { key: "price_asc", label: t('vendorStore.priceLowHigh'), icon: "arrow-up" },
+              { key: "price_desc", label: t('vendorStore.priceHighLow'), icon: "arrow-down" },
+              { key: "discount", label: t('vendorStore.bestDiscount'), icon: "percent" },
+              { key: "name_asc", label: t('vendorStore.nameAZ') },
+              { key: "name_desc", label: t('vendorStore.nameZA') },
+            ].map((opt) => {
+              const active = sortBy === opt.key;
+              return (
+                <TouchableOpacity
+                  key={opt.key}
+                  onPress={() => { setSortBy(opt.key); setSortMenuOpen(false); }}
+                  style={[s.sortMenuItem, active && s.sortMenuItemActive]}
+                  activeOpacity={0.8}
+                >
+                  {opt.icon
+                    ? <Feather name={opt.icon} size={13} color={active ? C.green : C.gray500} style={{ width: 18 }} />
+                    : <View style={{ width: 18 }} />}
+                  <Text style={[s.sortMenuItemText, active && s.sortMenuItemTextActive]}>{opt.label}</Text>
+                  {active && <Feather name="check" size={15} color={C.green} style={{ marginLeft: "auto" }} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* CATEGORY ICON ROW — circular icon chips, sticky just under search/sort so it's always reachable while banners scroll away */}
+      {!search && visibleCategories.length > 0 && (
         <View style={s.catTabsWrap}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.catTabsRow}>
-            {categories.map(cat => (
-              <CatTabPill
+          <ScrollView
+            ref={catScrollRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            onContentSizeChange={(w) => setCatContentW(w)}
+            onLayout={(e) => setCatTrackW(e.nativeEvent.layout.width)}
+            onScroll={(e) => setCatScrollX(e.nativeEvent.contentOffset.x)}
+            scrollEventThrottle={32}
+            contentContainerStyle={[s.catTabsRow, { paddingHorizontal: hPad }]}
+          >
+            <CatIconChip
+              cat="All"
+              isAll={true}
+              isActive={activeCat === "All"}
+              onPress={() => setActiveCat("All")}
+            />
+            {visibleCategories.map(cat => (
+              <CatIconChip
                 key={cat} cat={cat}
-                count={getTopCatCount(cat) || 0}
+                isAll={false}
                 isActive={activeCat === cat}
-                onPress={() => setActiveCat(cat)}
+                onPress={() => setActiveCat(activeCat === cat ? "All" : cat)}
               />
             ))}
           </ScrollView>
+          {catContentW > catTrackW + 4 && (
+            <TouchableOpacity
+              style={s.catScrollNextBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                const nextX = Math.min(catContentW - catTrackW, catScrollX + catTrackW * 0.8);
+                catScrollRef.current?.scrollTo({ x: nextX, animated: true });
+                setCatScrollX(nextX);
+              }}
+            >
+              <Feather name="chevron-right" size={16} color={C.gray700} />
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
       {/* PRODUCTS BODY */}
       <View style={s.bodyRow}>
-        {/* Desktop sidebar — category list (bigger screens only) */}
-        {isWide && categories.length > 0 && (
-          <View style={s.sidebar}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {categories.map(cat => {
-                const isActive = activeCat === cat;
-                const meta = getCatMeta(cat);
-                return (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[s.sidebarItem, isActive && s.sidebarItemActive]}
-                    onPress={() => setActiveCat(cat)}
-                    activeOpacity={0.8}
-                  >
-                    <MaterialIcons name={meta.emoji} size={16} color={isActive ? C.green : C.gray500} />
-                    <Text style={[s.sidebarLabel, isActive && s.sidebarLabelActive]} numberOfLines={1}>{cat}</Text>
-                    {isActive && <View style={s.sidebarDot} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
-
         {/* Main product list */}
         <ScrollView
           style={{ flex: 1 }}
           showsVerticalScrollIndicator={false}
+          onLayout={(e) => setGridAreaW(e.nativeEvent.layout.width)}
           contentContainerStyle={[s.body, { paddingHorizontal: hPad }]}
         >
+          {/* PROMO BANNERS — 3 equal cards, now inside the scroll so they move with the page */}
+          {!search && (
+            <View style={s.promoRow}>
+              <View style={[s.promoCard, s.promoCardGreen]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.promoCardLabel}>Fresh Vegetables</Text>
+                  <Text style={s.promoCardValue}>Upto 20% OFF</Text>
+                  <Text style={s.promoCardSub}>Farm fresh & handpicked</Text>
+                  <TouchableOpacity style={s.promoShopBtn} onPress={() => setActiveCat("Fruits & Vegetables")} activeOpacity={0.85}>
+                    <Text style={s.promoShopBtnText}>Shop Now</Text>
+                  </TouchableOpacity>
+                </View>
+                <MaterialIcons name="eco" size={40} color={C.green} style={{ opacity: 0.28 }} />
+              </View>
+
+              <View style={[s.promoCard, s.promoCardOrange]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.promoCardLabel}>Daily Essentials</Text>
+                  <Text style={[s.promoCardValue, { color: C.orangeDark }]}>Upto 15% OFF</Text>
+                  <Text style={s.promoCardSub}>On all essentials</Text>
+                  <TouchableOpacity style={[s.promoShopBtn, s.promoShopBtnOrange]} onPress={() => setActiveCat("All")} activeOpacity={0.85}>
+                    <Text style={s.promoShopBtnText}>Shop Now</Text>
+                  </TouchableOpacity>
+                </View>
+                <MaterialIcons name="local-grocery-store" size={40} color={C.orangeDark} style={{ opacity: 0.28 }} />
+              </View>
+
+              <View style={[s.promoCard, s.promoCardGreen]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.promoCardLabel}>Weekend Special</Text>
+                  <Text style={s.promoCardValue}>Extra 5% OFF</Text>
+                  <Text style={s.promoCardSub}>On orders above ₹499</Text>
+                  <View style={s.promoCodeBtn}>
+                    <Text style={s.promoCodeText}>Use Code: WEEKEND5</Text>
+                  </View>
+                </View>
+                <MaterialIcons name="card-giftcard" size={40} color={C.green} style={{ opacity: 0.28 }} />
+              </View>
+            </View>
+          )}
+
           {inStock.length === 0 && outStock.length === 0 ? (
             <View style={s.emptyBox}>
               <View style={s.emptyIconWrap}>
@@ -1238,6 +1479,7 @@ export default function VendorStoreScreen() {
                       </Text>
                     </View>
                   )}
+                 
                   {renderProductGrid(inStock)}
                 </>
               )}
@@ -1252,34 +1494,104 @@ export default function VendorStoreScreen() {
                   {renderProductGrid(outStock)}
                 </View>
               )}
-              {!search && activeCat === "All" && inStock.length > 0 && (
-                <View style={s.promoWrap}>
-                  <View style={s.promoLarge}>
-                    <Text style={s.promoTitle}>Neighborhood Special</Text>
-                    <Text style={s.promoSub}>
-                      Free delivery on orders above ₹500 today.
-                    </Text>
-                    <MaterialIcons name="local-shipping" size={36} color={C.orangeDark} style={s.promoIcon} />
-                  </View>
-                  <View style={s.promoStack}>
-                    <View style={s.promoMini}>
-                      <View>
-                        <Text style={s.promoOverline}>STORE</Text>
-                        <Text style={s.promoMiniValue}>{inStockTotal} items</Text>
-                      </View>
-                      <MaterialIcons name="inventory-2" size={24} color={C.green} />
-                    </View>
-                    <View style={[s.promoMini, s.promoMiniGreen]}>
-                      <View style={s.couponIcon}>
-                        <MaterialIcons name="redeem" size={18} color={C.green} />
-                      </View>
-                      <Text style={s.couponText}>Fresh deals available</Text>
-                    </View>
-                  </View>
-                </View>
-              )}
             </>
           )}
+
+          {/* STORE INFORMATION — shown at the bottom of the products, below everything */}
+          {!search && (
+            <View style={s.infoSection}>
+              <View style={s.infoSectionRow}>
+                {/* Store Information card */}
+                <View style={s.infoCard}>
+                  <View style={s.infoCardHeaderRow}>
+                    <View style={s.infoCardIconWrap}>
+                      <Feather name="home" size={16} color={C.green} />
+                    </View>
+                    <Text style={s.infoCardTitle}>Store Information</Text>
+                  </View>
+
+                  <View style={s.infoRow}>
+                    <Text style={s.infoLabel}>Store Name</Text>
+                    <Text style={s.infoValue} numberOfLines={1}>{vendor?.shop_name || vendorName || "—"}</Text>
+                  </View>
+                  <View style={s.infoRow}>
+                    <Text style={s.infoLabel}>Store Type</Text>
+                    <Text style={s.infoValue}>{vendor?.shop_type || "Grocery Store"}</Text>
+                  </View>
+                  <View style={s.infoRow}>
+                    <Text style={s.infoLabel}>Open Till</Text>
+                    <Text style={s.infoValue}>{vendor?.closing_time || "10:00 PM"}</Text>
+                  </View>
+                  <View style={s.infoRow}>
+                    <Text style={s.infoLabel}>Address</Text>
+                    <Text style={s.infoValue} numberOfLines={2}>{vendor?.address || "—"}</Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={s.chatStoreBtn}
+                    activeOpacity={0.85}
+                    onPress={() => Alert.alert?.("Chat with Store", "Store chat is coming soon.")}
+                  >
+                    <Feather name="message-circle" size={15} color={C.green} />
+                    <Text style={s.chatStoreBtnText}>Chat with Store</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Delivery / payment trust card */}
+                <View style={s.infoCard}>
+                  <View style={s.trustRow}>
+                    <View style={s.trustIconWrap}>
+                      <Feather name="truck" size={16} color={C.green} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.trustTitle}>Fast Delivery</Text>
+                      <Text style={s.trustSub}>Delivery in 30–45 mins</Text>
+                    </View>
+                    <View style={s.trustPill}><Text style={s.trustPillText}>On Time</Text></View>
+                  </View>
+                  <View style={s.trustDivider} />
+                  <View style={s.trustRow}>
+                    <View style={s.trustIconWrap}>
+                      <Feather name="package" size={16} color={C.green} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.trustTitle}>Free Delivery</Text>
+                      <Text style={s.trustSub}>On orders above ₹499</Text>
+                    </View>
+                    <View style={s.trustPill}><Text style={s.trustPillText}>₹49 saved</Text></View>
+                  </View>
+                  <View style={s.trustDivider} />
+                  <View style={s.trustRow}>
+                    <View style={s.trustIconWrap}>
+                      <Feather name="shield" size={16} color={C.green} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.trustTitle}>Secure Payment</Text>
+                      <Text style={s.trustSub}>100% secure checkout</Text>
+                    </View>
+                    <View style={s.trustPill}><Text style={s.trustPillText}>Safe</Text></View>
+                  </View>
+                </View>
+
+                {/* Exclusive offers card */}
+                <View style={[s.infoCard, s.offersCard]}>
+                  <View style={{ flex: 1 }}>
+                    <View style={s.infoCardHeaderRow}>
+                      <View style={[s.infoCardIconWrap, { backgroundColor: C.orangeMid }]}>
+                        <Feather name="gift" size={16} color={C.orangeDark} />
+                      </View>
+                      <Text style={s.infoCardTitle}>Exclusive Offers</Text>
+                    </View>
+                    <Text style={s.offersSub}>Grab best offers on your favourite products</Text>
+                    <TouchableOpacity style={s.viewOffersBtn} activeOpacity={0.85} onPress={() => setActiveCat("All")}>
+                      <Text style={s.viewOffersBtnText}>View All Offers</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+
           <View style={{ height: 130 }} />
         </ScrollView>
       </View>
@@ -1354,25 +1666,31 @@ const s = StyleSheet.create({
   },
   backBtn: {
     width: 40, height: 40, borderRadius: 999,
-    backgroundColor: C.orangeLight,
+    backgroundColor: C.surfaceLow,
     alignItems: "center", justifyContent: "center", flexShrink: 0,
   },
   headerMid: { flex: 1 },
+  shopNameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   appName: {
     fontSize: 10, fontWeight: "800", color: C.orangeDark,
     letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2,
   },
-  shopName: { fontSize: 22, fontWeight: "900", color: C.green, letterSpacing: 0 },
-  shopMetaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
+  shopName: { fontSize: 20, fontWeight: "900", color: C.gray900, letterSpacing: 0 },
+  verifiedBadge: {
+    width: 16, height: 16, borderRadius: 8,
+    backgroundColor: C.green, alignItems: "center", justifyContent: "center",
+  },
+  metaLink: { fontSize: 12, color: C.green, fontWeight: "700" },
+  shopMetaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3, flexWrap: "wrap" },
   statusDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
   metaText: { fontSize: 12, color: C.gray600, fontWeight: "600" },
   metaSep: { color: C.outlineVar, fontSize: 12 },
   ratingChip: {
-    flexDirection: "row", alignItems: "center", gap: 5,
+    flexDirection: "row", alignItems: "center", gap: 4,
     backgroundColor: C.greenMid,
-    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, flexShrink: 0,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, flexShrink: 0,
   },
-  ratingText: { fontSize: 12, fontWeight: "800", color: C.green },
+  ratingText: { fontSize: 11, fontWeight: "800", color: C.green },
   statusChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -1383,9 +1701,9 @@ const s = StyleSheet.create({
     borderRadius: 999,
     flexShrink: 0,
   },
-  statusChipClosed: { backgroundColor: C.gray200 },
+  statusChipClosed: { backgroundColor: "#FEE2E2" },
   statusText: { fontSize: 12, fontWeight: "800", color: C.greenFixed },
-  statusTextClosed: { color: C.gray600 },
+  statusTextClosed: { color: "#DC2626" },
   headerSearchBtn: {
     width: 40,
     height: 40,
@@ -1394,91 +1712,139 @@ const s = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: C.surfaceLow,
   },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 20, marginRight: 4 },
+  headerActionBtn: { alignItems: "center", gap: 4 },
+  headerActionText: { fontSize: 10, fontWeight: "700", color: C.gray600 },
+  headerCartDot: {
+    position: "absolute", top: -6, right: -8,
+    minWidth: 14, height: 14, borderRadius: 7,
+    backgroundColor: C.green, alignItems: "center", justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  headerCartDotText: { fontSize: 8, fontWeight: "900", color: C.white },
 
-  // ── Search ──
-  searchWrap: {
-    paddingHorizontal: 24, paddingTop: 16, paddingBottom: 4,
+  // ── Search + Sort (single row) ──
+  searchSortWrap: {
+    paddingHorizontal: 24, paddingTop: 16, paddingBottom: 10,
     backgroundColor: C.bg,
+    flexDirection: "row", alignItems: "center", gap: 10,
   },
   searchBox: {
+    flex: 1,
     flexDirection: "row", alignItems: "center",
-    backgroundColor: C.surfaceLow, borderRadius: 12,
-    borderWidth: 1, borderColor: "transparent",
+    backgroundColor: C.white, borderRadius: 12,
+    borderWidth: 1.5, borderColor: C.gray200,
     paddingHorizontal: 14, paddingVertical: 13, gap: 10,
   },
-  searchBoxActive: { borderColor: C.greenBorder, backgroundColor: C.greenMid },
+  searchBoxActive: { borderColor: C.green, backgroundColor: C.greenLight },
   searchInput: { flex: 1, fontSize: 14, color: C.gray900, ...Platform.select({ web: { outlineStyle: "none" } }) },
   searchClearBtn: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.gray300, alignItems: "center", justifyContent: "center" },
 
-  // ── Sort Options ──
-  sortWrap: {
-    paddingHorizontal: 24,
-    paddingBottom: 10,
-    backgroundColor: C.bg,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+  sortBtn: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: C.white, borderWidth: 1.5, borderColor: C.green,
+    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13,
   },
-  sortHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  sortTitle: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: C.gray500,
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  },
-  sortRow: {
-    flexDirection: "row",
-    gap: 6,
-    paddingLeft: 4,
-  },
-  sortPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: C.gray200,
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  sortBtnText: { fontSize: 13, fontWeight: "800", color: C.gray900 },
+
+  // Transparent full-screen layer — only used to detect taps outside the popover
+  sortModalBackdrop: { flex: 1 },
+  // Small popover anchored just under the Sort button (position set inline via sortBtnLayout)
+  sortPopover: {
+    position: "absolute",
+    width: 220,
     backgroundColor: C.white,
+    borderRadius: 14,
+    borderWidth: 1, borderColor: C.gray200,
+    paddingVertical: 6, paddingHorizontal: 6,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 14,
   },
-  sortPillActive: {
-    borderColor: C.green,
-    backgroundColor: C.green,
+  sortMenuItem: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 10, paddingVertical: 11, borderRadius: 10 },
+  sortMenuItemActive: { backgroundColor: C.greenLight },
+  sortMenuItemText: { fontSize: 13, fontWeight: "600", color: C.gray700 },
+  sortMenuItemTextActive: { color: C.green, fontWeight: "800" },
+
+  // ── Promo banners (3-up) ──
+  promoRow: { flexDirection: "row", gap: 14, paddingBottom: 6, paddingTop: 12 },
+  promoCard: {
+    flex: 1, borderRadius: 18, padding: 16,
+    flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between",
+    minHeight: 150,
   },
-  sortPillText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: C.gray600,
-  },
-  sortPillTextActive: {
-    color: C.white,
-    fontWeight: "700",
-  },
+  promoCardGreen: { backgroundColor: C.greenLight, borderWidth: 1, borderColor: C.greenBorder },
+  promoCardOrange: { backgroundColor: C.orangeMid, borderWidth: 1, borderColor: C.orangeLight },
+  promoCardLabel: { fontSize: 13, fontWeight: "800", color: C.gray900, marginBottom: 4 },
+  promoCardValue: { fontSize: 17, fontWeight: "900", color: C.green, marginBottom: 4 },
+  promoCardSub: { fontSize: 11, color: C.gray500, fontWeight: "600", marginBottom: 12 },
+  promoShopBtn: { backgroundColor: C.green, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8, alignSelf: "flex-start" },
+  promoShopBtnOrange: { backgroundColor: C.orange },
+  promoShopBtnText: { fontSize: 12, fontWeight: "800", color: C.white },
+  promoCodeBtn: { backgroundColor: C.greenDark, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, alignSelf: "flex-start" },
+  promoCodeText: { fontSize: 11, fontWeight: "800", color: C.white },
 
   // ── Category tabs ──
-  catTabsWrap: { backgroundColor: C.bg },
-  catTabsRow: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 10, flexDirection: "row" },
+  catTabsWrap: { backgroundColor: C.bg, position: "relative" },
+  catTabsRow: { paddingTop: 4, paddingBottom: 12, paddingRight: 44, flexDirection: "row" },
+  catScrollNextBtn: {
+    position: "absolute", right: 6, top: 17,
+    width: 30, height: 30, borderRadius: 999,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: C.white, borderWidth: 1, borderColor: C.gray200,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
+  },
 
   loadingHeader: { paddingHorizontal: 16, paddingTop: Platform.OS === "android" ? 14 : 52, paddingBottom: 14, flexDirection: "row", alignItems: "center", gap: 12 },
 
   // Desktop layout
   bodyRow: { flex: 1, flexDirection: "row" },
-  sidebar: { width: 144, backgroundColor: C.surfaceLowest, borderRightWidth: 1, borderRightColor: C.gray200, paddingTop: 8 },
-  sidebarItem: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 14, position: "relative" },
-  sidebarItemActive: { backgroundColor: C.greenMid },
-  sidebarEmoji: { fontSize: 17 },
-  sidebarLabel: { fontSize: 12, fontWeight: "600", color: C.gray600, flex: 1 },
-  sidebarLabelActive: { color: C.green, fontWeight: "800" },
-  sidebarDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: C.green, position: "absolute", right: 10 },
 
   body: { paddingTop: 8 },
   grid: { flexDirection: "row", flexWrap: "wrap" },
   sectionDivider: { height: 1, backgroundColor: C.gray100, marginTop: 16, marginHorizontal: 4 },
+
+  allProductsHeader: { flexDirection: "row", alignItems: "baseline", gap: 8, paddingTop: 18, paddingBottom: 12 },
+  allProductsTitle: { fontSize: 18, fontWeight: "900", color: C.gray900 },
+  allProductsCount: { fontSize: 12, fontWeight: "700", color: C.gray500 },
+
+  // ── Store info section — sits at the bottom of the products list ──
+  infoSection: { marginTop: 28, paddingTop: 20, borderTopWidth: 1, borderTopColor: C.gray200 },
+  infoSectionRow: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
+  infoCard: {
+    flexGrow: 1, flexBasis: 260, minWidth: 240,
+    backgroundColor: C.white, borderRadius: 18, borderWidth: 1, borderColor: C.gray200,
+    padding: 16,
+  },
+  infoCardHeaderRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
+  infoCardIconWrap: {
+    width: 32, height: 32, borderRadius: 10, backgroundColor: C.greenLight,
+    alignItems: "center", justifyContent: "center",
+  },
+  infoCardTitle: { fontSize: 14, fontWeight: "800", color: C.gray900 },
+  infoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 10 },
+  infoLabel: { fontSize: 12, color: C.gray500, fontWeight: "600" },
+  infoValue: { fontSize: 12, color: C.gray900, fontWeight: "700", flexShrink: 1, textAlign: "right" },
+  chatStoreBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    borderWidth: 1.5, borderColor: C.green, borderRadius: 999,
+    paddingVertical: 11, marginTop: 6,
+  },
+  chatStoreBtnText: { fontSize: 13, fontWeight: "800", color: C.green },
+
+  trustRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 },
+  trustIconWrap: {
+    width: 32, height: 32, borderRadius: 10, backgroundColor: C.greenLight,
+    alignItems: "center", justifyContent: "center",
+  },
+  trustTitle: { fontSize: 13, fontWeight: "800", color: C.gray900 },
+  trustSub: { fontSize: 11, color: C.gray500, fontWeight: "600", marginTop: 1 },
+  trustPill: { backgroundColor: C.greenMid, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 },
+  trustPillText: { fontSize: 10, fontWeight: "800", color: C.green },
+  trustDivider: { height: 1, backgroundColor: C.gray100, marginVertical: 8 },
+
+  offersCard: { backgroundColor: C.orangeMid, borderColor: C.orangeLight, flexDirection: "row" },
+  offersSub: { fontSize: 12, color: C.gray600, fontWeight: "600", marginBottom: 12, lineHeight: 17 },
+  viewOffersBtn: { backgroundColor: C.greenDark, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9, alignSelf: "flex-start" },
+  viewOffersBtnText: { fontSize: 12, fontWeight: "800", color: C.white },
 
   searchResultHeader: { paddingTop: 14, paddingBottom: 6 },
   searchResultText: { fontSize: 14, color: C.gray500, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold" },

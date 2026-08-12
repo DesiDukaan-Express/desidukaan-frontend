@@ -176,23 +176,59 @@ Loose Basmati Rice,85,80,kg,Grocery,100,loose
 Amul Milk 500ml,30,28,litre,Dairy,50,packed`;
 
 // ─── Auto-geocode helper ──────────────────────────────────────────────────────
-// Converts pincode + city → lat/lng using Nominatim (free, no API key needed)
+// Converts pincode + city → lat/lng using Nominatim (free, no API key needed).
+// NOTE: Browsers block scripts from setting a 'User-Agent' header (it's a
+// forbidden header name and gets silently dropped), and Nominatim's usage
+// policy rejects/rate-limits requests that don't identify the calling app.
+// We identify via the documented `email` query param instead, since that's
+// the one identification mechanism client-side JS can actually send.
+// Returns { latitude, longitude, error } — `error` lets the UI tell the
+// difference between "not found" and "request failed" instead of both
+// silently collapsing into the same null result.
 async function geocodeAddress(city, pincode) {
+  const controller = new AbortController();
+
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, 8000);
+
   try {
     const q = encodeURIComponent(`${pincode}, ${city}, India`);
+
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`,
-      { headers: { 'User-Agent': 'DesiDukaan/1.0' } }
+      `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=in&email=support@desidukaan.com`,
+      { signal: controller.signal }
     );
+
+    if (!res.ok) {
+      return { latitude: null, longitude: null, error: `Lookup failed (${res.status})` };
+    }
+
     const data = await res.json();
+
     if (data?.length > 0) {
       return {
         latitude: parseFloat(data[0].lat),
         longitude: parseFloat(data[0].lon),
+        error: null,
       };
     }
-  } catch { }
-  return { latitude: null, longitude: null };
+
+    return { latitude: null, longitude: null, error: 'Address not found' };
+
+  } catch (error) {
+    const message = error?.name === 'AbortError' ? 'Lookup timed out' : (error?.message || 'Lookup failed');
+    console.log('Geocoding failed:', message);
+
+    return {
+      latitude: null,
+      longitude: null,
+      error: message,
+    };
+
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -233,30 +269,39 @@ export default function VendorOnboardingScreen({ onComplete }) {
   // Geocoded coords — auto-set on submit
   const [resolvedLat, setResolvedLat] = useState(null);
   const [resolvedLng, setResolvedLng] = useState(null);
-  const [mapRegion, setMapRegion] = useState({
-    latitude: 28.6139,
-    longitude: 77.2090,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-  });
+  const [geoError, setGeoError] = useState(null);
+  // No fake default (e.g. New Delhi) — mapRegion stays null until we
+  // actually resolve real coordinates, so we never show a wrong pin.
+  const [mapRegion, setMapRegion] = useState(null);
+  // Guards against a slow, stale request overwriting a newer one's result.
+  const geoRequestId = useRef(0);
+
+  const runGeocode = async () => {
+    if (city.length < 3 || pincode.length !== 6) return;
+    const requestId = ++geoRequestId.current;
+    setGeocoding(true);
+    setGeoError(null);
+    const coords = await geocodeAddress(city, pincode);
+    if (requestId !== geoRequestId.current) return; // a newer request already resolved
+    if (coords.latitude && coords.longitude) {
+      setResolvedLat(coords.latitude);
+      setResolvedLng(coords.longitude);
+      setMapRegion({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      });
+    } else {
+      setResolvedLat(null);
+      setResolvedLng(null);
+      setGeoError(coords.error || 'Could not detect location');
+    }
+    setGeocoding(false);
+  };
 
   useEffect(() => {
-    const delayDebounceFn = setTimeout(async () => {
-      if (city.length >= 3 && pincode.length === 6) {
-        setGeocoding(true);
-        const coords = await geocodeAddress(city, pincode);
-        if (coords.latitude && coords.longitude) {
-          setResolvedLat(coords.latitude);
-          setResolvedLng(coords.longitude);
-          setMapRegion(prev => ({
-            ...prev,
-            latitude: coords.latitude,
-            longitude: coords.longitude,
-          }));
-        }
-        setGeocoding(false);
-      }
-    }, 1000);
+    const delayDebounceFn = setTimeout(runGeocode, 1000);
     return () => clearTimeout(delayDebounceFn);
   }, [city, pincode]);
 
@@ -504,24 +549,31 @@ export default function VendorOnboardingScreen({ onComplete }) {
       return;
     }
 
+    let latitude = resolvedLat;
+    let longitude = resolvedLng;
+
+    // Safety net: if the debounced geocode never resolved (e.g. user submitted
+    // fast, or the earlier attempt failed), try once more before submitting
+    // rather than silently sending null coordinates to the backend.
+    if (!latitude || !longitude) {
+      setGeocoding(true);
+      const coords = await geocodeAddress(city, pincode);
+      setGeocoding(false);
+      if (coords.latitude && coords.longitude) {
+        latitude = coords.latitude;
+        longitude = coords.longitude;
+        setResolvedLat(latitude);
+        setResolvedLng(longitude);
+      } else {
+        setGeoError(coords.error || 'Could not detect location');
+      }
+    }
+
     // ── Final submit ──────────────────────────────────────────────────────────
     setLoading(true);
     try {
       // 1. Auto-geocode pincode + city → lat/lng
       //    This runs just before submit so we always have fresh coords
-      setGeocoding(true);
-      const { latitude, longitude } = await geocodeAddress(city, pincode);
-      setGeocoding(false);
-
-      if (!latitude || !longitude) {
-        // Non-blocking warning — vendor still registers, just won't appear in nearby search
-        Alert.alert(
-          'Location not found',
-          `We couldn't pinpoint "${pincode}, ${city}". Your shop will still be created but may not show in nearby results. You can update your location from the dashboard.`,
-          [{ text: 'Continue anyway' }]
-        );
-      }
-
       // 2. Create vendor
       const body = {
         shop_name: shopName,
@@ -834,7 +886,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
               </View>
 
               {/* Map Preview */}
-              {(city.length > 0 || pincode.length > 0) && (
+              {mapRegion && resolvedLat && resolvedLng && (
                 <View style={styles.mapWrapper}>
                   <AddressMapView
                     region={mapRegion}
@@ -842,6 +894,23 @@ export default function VendorOnboardingScreen({ onComplete }) {
                     longitude={resolvedLng}
                     onRegionChangeComplete={setMapRegion}
                   />
+                </View>
+              )}
+
+              {geocoding && (
+                <View style={[styles.infoBox, { marginTop: 8 }]}>
+                  <Text style={styles.infoText}>Detecting location…</Text>
+                </View>
+              )}
+
+              {!geocoding && geoError && city.length >= 3 && pincode.length === 6 && (
+                <View style={[styles.infoBox, { marginTop: 8, backgroundColor: '#FEF2F2' }]}>
+                  <Text style={[styles.infoText, { color: '#B91C1C' }]}>
+                    {geoError}. We couldn't pin your shop on the map — double-check the city/pincode, or{' '}
+                    <Text style={{ fontWeight: '700', textDecorationLine: 'underline' }} onPress={runGeocode}>
+                      try again
+                    </Text>.
+                  </Text>
                 </View>
               )}
 

@@ -15,7 +15,7 @@ import {
   StatusBar,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import Svg, { Polyline } from "react-native-svg";
+import Svg, { Polyline, Circle, G } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTranslation } from "react-i18next";
 import useAuthStore from "../../store/authStore";
@@ -32,30 +32,50 @@ const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 // ─── Color Tokens ───────────────────────────────────────────────
 const C = {
-  bg: "#F0F4F8",
+  bg: "#F7F8FA",
   surface: "#FFFFFF",
-  primary: "#0EE627",
-  primaryDim: "#0EE62718",
-  primaryMid: "#0EE62740",
-  primaryDark: "#09a81c",
-  accent: "#0F172A",
-  accentMid: "#1E293B",
-  text: "#0F172A",
-  textSub: "#64748B",
-  textLight: "#94A3B8",
-  border: "#E2E8F0",
+
+  primary: "#16A34A",
+  primaryDim: "#16A34A14",
+  primaryMid: "#16A34A2A",
+  primaryDark: "#15803D",
+
+  accent: "#111827",
+  accentMid: "#1F2937",
+
+  text: "#111827",
+  textSub: "#6B7280",
+  textLight: "#9CA3AF",
+
+  border: "#E5E7EB",
+
   warn: "#FFFBEB",
   warnBorder: "#F59E0B",
   warnText: "#92400E",
+
   danger: "#FFF1F2",
   dangerBorder: "#F43F5E",
   dangerText: "#9F1239",
+
   purple: "#7C3AED",
-  purpleDim: "#7C3AED15",
-  blue: "#3B82F6",
-  blueDim: "#3B82F615",
-  orange: "#F97316",
-  orangeDim: "#F9731615",
+  purpleDim: "#7C3AED12",
+
+  blue: "#2563EB",
+  blueDim: "#2563EB12",
+
+  orange: "#EA580C",
+  orangeDim: "#EA580C12",
+
+  // Pastel icon-chip backgrounds (matches reference dashboard design)
+  purpleSoft: "#EDE9FE",
+  blueSoft: "#DBEAFE",
+  orangeSoft: "#FFEDD5",
+  greenSoft: "#DCFCE7",
+  redSoft: "#FEE2E2",
+  heroDark: "#0B3D24",
+
+  // Store performance donut palette
+  donutColors: ["#16A34A", "#7C3AED", "#2563EB", "#F59E0B"],
 };
 
 // ─── Greeting config ────────────────────────────────────────────
@@ -88,6 +108,44 @@ const getGreetingConfig = (t) => {
     badge: t('vendor.windDown'),
   };
 };
+
+// ─── Sparkline (mini trend line for weekly stat cards) ─────────
+function Sparkline({ data = [], color = "#2563EB", width = 90, height = 36 }) {
+  const vals = data.length >= 2 ? data : [0, 0];
+  const max = Math.max(...vals, 1);
+  const min = Math.min(...vals, 0);
+  const range = max - min || 1;
+  const stepX = width / (vals.length - 1 || 1);
+  const points = vals
+    .map((v, i) => {
+      const x = i * stepX;
+      const y = height - ((v - min) / range) * (height - 6) - 3;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const lastX = (vals.length - 1) * stepX;
+  const lastY =
+    height - ((vals[vals.length - 1] - min) / range) * (height - 6) - 3;
+
+  return (
+    <Svg width={width} height={height}>
+      <Polyline
+        points={points}
+        fill="none"
+        stroke={color}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Polyline
+        points={`${lastX},${lastY} ${lastX},${lastY}`}
+        stroke={color}
+        strokeWidth={7}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
 
 class ChartSafeBoundary extends React.Component {
   constructor(props) {
@@ -144,6 +202,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
   const [searchLoading, setSearchLoading] = useState(false);
   const [locModalVisible, setLocModalVisible] = useState(false);
   const [locInput, setLocInput] = useState("");
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [lowStockItems, setLowStockItems] = useState([]);
+  const [categoryBreakdown, setCategoryBreakdown] = useState([]);
 
   // Animations
   const greetFadeAnim = useRef(new Animated.Value(0)).current;
@@ -222,6 +283,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           s = data.data.stats;
           setStats({
             pendingOrders: s.pending_orders ?? 0,
+            completedOrders: s.completed_orders ?? Math.max((s.today_orders ?? 0) - (s.pending_orders ?? 0), 0),
+            cancelledOrders: s.cancelled_orders ?? 0,
+            lowStockCount: s.low_stock_count ?? 0,
             labels: s.weekly_chart_data?.map((d) =>
               new Date(d.date).toLocaleDateString("en-IN", {
                 weekday: "short",
@@ -232,18 +296,21 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               revenue: s.today_revenue ?? 0,
               avgPrepTime: s.delivery_efficiency?.avg_prep_time ?? 0,
               deliveryTime: s.delivery_efficiency?.avg_delivery_time ?? 0,
+              repeatCustomers: s.today_repeat_customers ?? s.repeat_customers ?? 0,
             },
             weekly: {
               totalOrders: s.weekly_orders ?? 0,
               revenue: s.weekly_revenue ?? 0,
               avgPrepTime: s.delivery_efficiency?.avg_prep_time ?? 0,
               deliveryTime: s.delivery_efficiency?.avg_delivery_time ?? 0,
+              repeatCustomers: s.weekly_repeat_customers ?? s.repeat_customers ?? 0,
             },
             monthly: {
               totalOrders: s.monthly_orders ?? 0,
               revenue: s.monthly_revenue ?? 0,
               avgPrepTime: s.delivery_efficiency?.avg_prep_time ?? 0,
               deliveryTime: s.delivery_efficiency?.avg_delivery_time ?? 0,
+              repeatCustomers: s.monthly_repeat_customers ?? s.repeat_customers ?? 0,
             },
             chartValues: s.weekly_chart_data?.map((d) => d.revenue || 0) || [
               0, 0, 0, 0, 0, 0, 0,
@@ -266,6 +333,71 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           const v = profileData.data.vendor;
           const addr = v.address_line || v.landmark;
           if (addr) setVendorLocation(addr);
+        }
+
+        // ── Recent Orders (best-effort; falls back to empty state if the
+        // endpoint isn't available on this backend yet) ──────────────────
+        try {
+          const ordersRes = await fetch(
+            `${API_BASE}/vendors/me/orders?limit=5&sort=recent`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          const ordersData = await ordersRes.json();
+          if (ordersData.success && Array.isArray(ordersData.data)) {
+            setRecentOrders(
+              ordersData.data.map((o) => ({
+                id: o.order_number || `#${o.id}`,
+                customer: o.customer_name || o.customer?.name || "Customer",
+                items: o.items_count ?? o.items?.length ?? 0,
+                amount: o.total ?? o.amount ?? 0,
+                status: o.status || "Pending",
+              })),
+            );
+          }
+        } catch (e) {
+          console.warn("Recent orders fetch failed:", e);
+        }
+
+        // ── Low Stock Alert list ──────────────────────────────────────────
+        try {
+          const lowStockRes = await fetch(
+            `${API_BASE}/vendors/me/inventory?lowStock=true&limit=4`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          const lowStockData = await lowStockRes.json();
+          if (lowStockData.success && Array.isArray(lowStockData.data)) {
+            setLowStockItems(
+              lowStockData.data.map((item) => ({
+                name: item.product?.name || item.name || "Item",
+                stockLeft: item.stock_qty ?? 0,
+              })),
+            );
+          }
+        } catch (e) {
+          console.warn("Low stock fetch failed:", e);
+        }
+
+        // ── Store Performance category breakdown (derived from top
+        // products' revenue share when categories are available) ─────────
+        if (s?.top_products?.length) {
+          const totals = {};
+          let grand = 0;
+          s.top_products.forEach((p) => {
+            const cat = p.category?.name || p.category || null;
+            const rev = Number(p.revenue || 0);
+            if (!cat) return;
+            totals[cat] = (totals[cat] || 0) + rev;
+            grand += rev;
+          });
+          if (grand > 0) {
+            const breakdown = Object.entries(totals)
+              .map(([label, value]) => ({
+                label,
+                pct: Math.round((value / grand) * 100),
+              }))
+              .sort((a, b) => b.pct - a.pct);
+            setCategoryBreakdown(breakdown);
+          }
         }
 
         // Build notifications from stats data instead of a missing endpoint
@@ -448,6 +580,16 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
 
   const STAT_TABS = [t('vendor.tabToday'), t('vendor.tabWeek'), t('vendor.tabMonth')];
 
+  // Safe navigation helper — some sidebar destinations may not be
+  // registered on every navigator, so this avoids a hard crash.
+  const goTo = (routeName, params) => {
+    try {
+      navigation.navigate(routeName, params);
+    } catch (e) {
+      console.warn(`Route "${routeName}" is not available on this navigator.`);
+    }
+  };
+
   const handleSearch = async (query) => {
     setSearchQuery(query);
     if (!query.trim()) {
@@ -618,6 +760,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
     <View style={[styles.root, { backgroundColor: C.bg }]}>
       <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
 
+      {/* ── MAIN COLUMN ──────────────────────────────────────── */}
+      <View style={{ flex: 1, minWidth: 0 }}>
+
       {/* ── NAVBAR ──────────────────────────────────────────── */}
       <View
         style={{
@@ -639,17 +784,30 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             }}
           >
             {/* Logo */}
-            <View style={styles.logoWrap}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <View
-                style={[
-                  styles.logoIconBox,
-                  { width: 38, height: 38, borderRadius: 10 },
-                ]}
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  backgroundColor: C.primary,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
               >
-                <MaterialIcons name="shopping-cart" size={20} color="#147538" />
+                <MaterialIcons name="storefront" size={19} color="#FFFFFF" />
               </View>
-              <Text style={[styles.logoText, { fontSize: 21, color: C.text }]}>
-                Kwik<Text style={{ color: C.primary }}>Pik</Text>
+              <Text
+                style={{
+                  fontSize: 17,
+                  fontWeight: "900",
+                  fontFamily: "PlusJakartaSans_800ExtraBold",
+                  color: C.text,
+                  letterSpacing: -0.4,
+                }}
+                numberOfLines={1}
+              >
+                Desi<Text style={{ color: C.primary }}>Dukaan</Text>
               </Text>
             </View>
 
@@ -665,27 +823,44 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 borderWidth: 1,
                 borderRadius: 999,
                 paddingHorizontal: 14,
-                paddingVertical: 9,
+                paddingVertical: 11,
               }}
               activeOpacity={0.7}
               onPress={() => setSearchVisible(true)}
             >
-              <MaterialIcons name="search" size={16} color={C.textLight} />
+              <MaterialIcons name="search" size={18} color={C.textLight} />
               <Text
-                style={{ fontSize: 13, color: C.textLight, flex: 1 }}
+                style={{ fontSize: 14, color: C.textLight, flex: 1 }}
                 numberOfLines={1}
               >
                 Search inventory, partners, earnings…
               </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 3,
+                  backgroundColor: C.surface,
+                  borderWidth: 1,
+                  borderColor: C.border,
+                  borderRadius: 6,
+                  paddingHorizontal: 7,
+                  paddingVertical: 3,
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: C.textLight }}>
+                  Ctrl + K
+                </Text>
+              </View>
             </TouchableOpacity>
 
             {/* Bell */}
             <TouchableOpacity
               style={{
-                width: 40,
-                height: 40,
-                borderRadius: 11,
-                backgroundColor: C.bg,
+                width: 42,
+                height: 42,
+                borderRadius: 21,
+                backgroundColor: C.surface,
                 borderWidth: 1,
                 borderColor: C.border,
                 alignItems: "center",
@@ -699,7 +874,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             >
               <MaterialIcons name="notifications-none" size={22} color={C.text} />
               {unreadCount > 0 && (
-                <View style={styles.notifBadge}>
+                <View style={[styles.notifBadge, { backgroundColor: C.primary, top: -2, right: -2 }]}>
                   <Text style={styles.notifBadgeText}>
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </Text>
@@ -710,45 +885,41 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             {/* Avatar pill */}
             <TouchableOpacity
               style={{
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.04,
-                shadowRadius: 3,
-                elevation: 1,
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 6,
-                backgroundColor: C.bg,
-                borderWidth: 1,
-                borderColor: C.border,
-                borderRadius: 999,
-                paddingHorizontal: 10,
-                paddingVertical: 6,
+                gap: 8,
+                paddingHorizontal: 4,
+                paddingVertical: 4,
               }}
               onPress={() => navigation.navigate("Profile")}
               activeOpacity={0.8}
             >
               <View
                 style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 12,
-                  backgroundColor: C.primary,
+                  width: 38,
+                  height: 38,
+                  borderRadius: 19,
+                  backgroundColor: C.accent,
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                <Text style={{ fontSize: 10, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#000" }}>
+                <Text style={{ fontSize: 13, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff" }}>
                   {vendorName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
                 </Text>
               </View>
-              <Text
-                style={{ fontSize: 13, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text, maxWidth: 70 }}
-                numberOfLines={1}
-              >
-                {vendorName.split(" ")[0]}
-              </Text>
-              <MaterialIcons name="keyboard-arrow-down" size={16} color={C.textSub} />
+              <View>
+                <Text
+                  style={{ fontSize: 14, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text, maxWidth: 90 }}
+                  numberOfLines={1}
+                >
+                  {vendorName.split(" ")[0]}
+                </Text>
+                <Text style={{ fontSize: 11, color: C.textSub, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" }}>
+                  Admin
+                </Text>
+              </View>
+              <MaterialIcons name="keyboard-arrow-down" size={18} color={C.textSub} />
             </TouchableOpacity>
           </View>
         ) : (
@@ -763,50 +934,32 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 marginBottom: 10,
               }}
             >
-              {/* Logo block */}
-              <View style={styles.logoWrap}>
+              {/* Logo */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                 <View
-                  style={[
-                    styles.logoIconBox,
-                    {
-                      width: rs(32, 36, 38),
-                      height: rs(32, 36, 38),
-                      borderRadius: rs(9, 10, 10),
-                    },
-                  ]}
+                  style={{
+                    width: rs(32, 36, 38),
+                    height: rs(32, 36, 38),
+                    borderRadius: rs(9, 10, 10),
+                    backgroundColor: C.primary,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
                 >
-                  <MaterialIcons
-                    name="shopping-cart"
-                    size={rs(17, 19, 20)}
-                    color="#147538"
-                  />
+                  <MaterialIcons name="storefront" size={rs(16, 18, 19)} color="#FFFFFF" />
                 </View>
-                <View>
-                  {/* <Text
-                    style={{
-                      fontSize: rs(8, 9, 10),
-                      color: C.textSub,
-                      fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"}}
-                  >
-                    Welcome back
-                  </Text> */}
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                    <Text
-                      style={[
-                        styles.logoText,
-                        { fontSize: rs(15, 17, 19), color: C.text },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      Kwik<Text style={{ color: C.primary }}>Pik</Text>
-                    </Text>
-                    {/* <MaterialIcons
-                      name="keyboard-arrow-down"
-                      size={rs(14, 15, 16)}
-                      color={C.textSub}
-                    /> */}
-                  </View>
-                </View>
+                <Text
+                  style={{
+                    fontSize: rs(15, 16, 17),
+                    fontWeight: "900",
+                    fontFamily: "PlusJakartaSans_800ExtraBold",
+                    color: C.text,
+                    letterSpacing: -0.4,
+                  }}
+                  numberOfLines={1}
+                >
+                  Desi<Text style={{ color: C.primary }}>Dukaan</Text>
+                </Text>
               </View>
 
               {/* Right: Bell + Avatar */}
@@ -837,7 +990,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                     color={C.text}
                   />
                   {unreadCount > 0 && (
-                    <View style={styles.notifBadge}>
+                    <View style={[styles.notifBadge, { backgroundColor: C.primary, top: -2, right: -2 }]}>
                       <Text style={styles.notifBadgeText}>
                         {unreadCount > 9 ? "9+" : unreadCount}
                       </Text>
@@ -848,38 +1001,27 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 {/* Avatar pill */}
                 <TouchableOpacity
                   style={{
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.04,
-                    shadowRadius: 3,
-                    elevation: 1,
                     flexDirection: "row",
                     alignItems: "center",
-                    gap: rs(5, 6, 6),
-                    backgroundColor: C.bg,
-                    borderWidth: 1,
-                    borderColor: C.border,
-                    borderRadius: 999,
-                    paddingHorizontal: rs(8, 10, 10),
-                    paddingVertical: rs(5, 6, 6),
+                    gap: rs(6, 7, 8),
                   }}
                   onPress={() => navigation.navigate("Profile")}
                   activeOpacity={0.8}
                 >
                   <View
                     style={{
-                      width: rs(22, 24, 26),
-                      height: rs(22, 24, 26),
-                      borderRadius: rs(11, 12, 13),
-                      backgroundColor: C.primary,
+                      width: rs(32, 34, 36),
+                      height: rs(32, 34, 36),
+                      borderRadius: rs(16, 17, 18),
+                      backgroundColor: C.accent,
                       alignItems: "center",
                       justifyContent: "center",
                     }}
                   >
                     <Text
                       style={{
-                        fontSize: rs(9, 10, 11),
-                        fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#000",
+                        fontSize: rs(11, 12, 12),
+                        fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff",
                       }}
                     >
                       {vendorName
@@ -890,16 +1032,21 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                         .toUpperCase()}
                     </Text>
                   </View>
-                  <Text
-                    style={{
-                      fontSize: rs(11, 12, 13),
-                      fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text,
-                      maxWidth: rs(48, 60, 70),
-                    }}
-                    numberOfLines={1}
-                  >
-                    {vendorName.split(" ")[0]}
-                  </Text>
+                  <View>
+                    <Text
+                      style={{
+                        fontSize: rs(12, 13, 13),
+                        fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text,
+                        maxWidth: rs(48, 60, 70),
+                      }}
+                      numberOfLines={1}
+                    >
+                      {vendorName.split(" ")[0]}
+                    </Text>
+                    <Text style={{ fontSize: rs(9, 10, 10), color: C.textSub, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" }}>
+                      Admin
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               </View>
             </View>
@@ -936,729 +1083,920 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               >
                 Search inventory, partners, earnings…
               </Text>
-              <MaterialIcons
-                name="mic"
-                size={rs(15, 16, 16)}
-                color={C.primary}
-              />
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: C.surface,
+                  borderWidth: 1,
+                  borderColor: C.border,
+                  borderRadius: 6,
+                  paddingHorizontal: 6,
+                  paddingVertical: 2,
+                }}
+              >
+                <Text style={{ fontSize: 10, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: C.textLight }}>
+                  Ctrl + K
+                </Text>
+              </View>
             </TouchableOpacity>
           </>
         )}
       </View>
 
-      {/* ── STATUS BANNERS ──────────────────────────────────── */}
-      {vendorStatus === "pending" && (
-        <StatusBanner
-          title={`⏳ ${t('vendor.verificationPending')}`}
-          message={t('vendor.verificationPendingMsg')}
-          bg={C.warn}
-          border={C.warnBorder}
-          textColor={C.warnText}
-          missingDocs={missingDocs}
-        />
-      )}
-      {vendorStatus === "rejected" && (
-        <StatusBanner
-          title={t('vendor.applicationRejected')}
-          message={t('vendor.applicationRejectedMsg')}
-          bg={C.danger}
-          border={C.dangerBorder}
-          textColor={C.dangerText}
-          missingDocs={missingDocs}
-        />
-      )}
-
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 130, paddingTop: 4 }}
       >
-        {/* ── GREETING ──────────────────────────────────────── */}
+        {/* ── GREETING TEXT + DATE ────────────────────────────── */}
         <Animated.View
-  style={{
-    opacity: greetFadeAnim,
-    transform: [{ translateY: greetSlideAnim }],
-    marginHorizontal: rs(20, 24, 28),
-    marginTop: rs(24, 28, 32),
-  }}
->
-  <LinearGradient
-    // colors={["#14B87A", "#0F9B5F", "#0A6B42", "#053D26"]}
-    // colors={["#14B87A", "#0F9B5F", "#0A6B42", "#053D26"]}
-    // colors={["#2ECC71", "#0F9B5F", "#1B5E3F", "#0A3D26"]}
-    colors={["#58b468", "#48BF59", "#2F9645", "#1E6B31"]}
-    start={{ x: 0, y: 0 }}
-    end={{ x: 1, y: 1 }}
-    style={[
-      styles.greetingCard,
-      {
-        paddingHorizontal: rs(22, 26, 30),
-        paddingVertical: rs(26, 30, 34),
-      },
-    ]}
-  >
-    {/* Background accent blobs — lighter on green */}
-    <View style={[styles.greetingBlobTop, { backgroundColor: "rgba(255,255,255,0.06)" }]} />
-    <View style={[styles.greetingBlobBot, { backgroundColor: "rgba(255,255,255,0.04)" }]} />
-
-    <View
-      style={{
-        position: "absolute",
-        top: -20,
-        left: -40,
-        width: "70%",
-        height: 200,
-        backgroundColor: "rgba(255,255,255,0.10)",
-        transform: [{ rotate: "-20deg" }],
-        borderRadius: 100,
-      }}
-    />
-    <View
-      style={{
-        position: "absolute",
-        top: 10,
-        left: -10,
-        width: "40%",
-        height: 140,
-        backgroundColor: "rgba(255,255,255,0.06)",
-        transform: [{ rotate: "-20deg" }],
-        borderRadius: 100,
-      }}
-    />
-
-    <View style={{ flexDirection: "row", alignItems: "center", gap: rs(12, 14, 16) }}>
-      {/* Emoji bubble — white glass on green */}
-      <View
-        style={{
-          width: rs(56, 60, 66),
-          height: rs(56, 60, 66),
-          borderRadius: rs(18, 19, 20),
-          backgroundColor: "rgba(255,255,255,0.2)",
-          alignItems: "center",
-          justifyContent: "center",
-          borderWidth: 1,
-          borderColor: "rgba(255,255,255,0.45)",
-        }}
-      >
-        <MaterialIcons name={greeting.icon} size={rs(24, 26, 30)} color="#fff" />
-      </View>
-
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3, flexWrap: "nowrap" }}>
-          <Text
-            style={{ fontSize: rs(11, 12, 13), color: "rgba(255,255,255,0.85)", fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold" }}
-          >
-            {greeting.text}
-          </Text>
-          <View style={{ backgroundColor: "rgba(255,255,255,0.25)", paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999 }}>
-            <Text style={{ color: "#fff", fontSize: rs(9, 10, 10), fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" }}>
-              {greeting.badge}
+          style={{
+            opacity: greetFadeAnim,
+            transform: [{ translateY: greetSlideAnim }],
+            marginHorizontal: rs(20, 24, 28),
+            marginTop: rs(20, 22, 24),
+            flexDirection: SCREEN_W >= 640 ? "row" : "column",
+            justifyContent: "space-between",
+            alignItems: SCREEN_W >= 640 ? "center" : "flex-start",
+            gap: 10,
+          }}
+        >
+          <View>
+            <Text
+              style={{
+                fontSize: rs(19, 21, 23),
+                fontWeight: "800",
+                fontFamily: "PlusJakartaSans_800ExtraBold",
+                color: C.text,
+                letterSpacing: -0.4,
+              }}
+            >
+              {greeting.text}, {vendorName.split(" ")[0]} 👋
+            </Text>
+            <Text
+              style={{
+                fontSize: rs(12, 13, 13),
+                color: C.textSub,
+                fontWeight: "500",
+                fontFamily: "PlusJakartaSans_500Medium",
+                marginTop: 3,
+              }}
+            >
+              Here's what's happening with your business today.
             </Text>
           </View>
-        </View>
-        <Text style={{ fontSize: rs(24, 27, 30), fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff" }}>
-          {vendorName.split(" ")[0]}
-        </Text>
-        <Text style={{ fontSize: rs(11, 12, 12), color: "rgba(255,255,255,0.9)", fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", marginTop: 2 }}>
-          {greeting.sub}
-        </Text>
-      </View>
-    </View>
 
-    {/* Mini stat strip — glass effect on green */}
-    <View
-      style={{
-        flexDirection: "row",
-        backgroundColor: "rgba(255,255,255,0.15)",
-        borderRadius: 18,
-        marginTop: 20,
-        padding: 16,
-      }}
-    >
-      <View style={styles.greetingStripItem}>
-        <Text style={{ fontSize: 17, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff" }}>
-          {stats.today.totalOrders}
-        </Text>
-        <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.8)", marginTop: 2, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" }}>
-          Today's Orders
-        </Text>
-      </View>
-      <View style={{ width: 1, backgroundColor: "rgba(255,255,255,0.45)", marginHorizontal: 8 }} />
-      <View style={styles.greetingStripItem}>
-        <Text style={{ fontSize: 17, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff" }}>
-          ₹{Number(stats.today.revenue).toLocaleString("en-IN")}
-        </Text>
-        <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.8)", marginTop: 2, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" }}>
-          Today's Revenue
-        </Text>
-      </View>
-      <View style={{ width: 1, backgroundColor: "rgba(255,255,255,0.45)", marginHorizontal: 8 }} />
-      <View style={styles.greetingStripItem}>
-        <Text style={{ fontSize: 17, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff" }}>
-          {stats.today.avgPrepTime}m
-        </Text>
-        <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.8)", marginTop: 2, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" }}>
-          Avg. Prep
-        </Text>
-      </View>
-    </View>
-  </LinearGradient>
-</Animated.View>
+          <TouchableOpacity
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              alignSelf: SCREEN_W >= 640 ? "auto" : "flex-start",
+              backgroundColor: C.surface,
+              borderWidth: 1,
+              borderColor: C.border,
+              borderRadius: 14,
+              paddingHorizontal: 14,
+              paddingVertical: 10,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.04,
+              shadowRadius: 8,
+              elevation: 1,
+            }}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="calendar-today" size={15} color={C.primary} />
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "700",
+                fontFamily: "PlusJakartaSans_700Bold",
+                color: C.text,
+              }}
+            >
+              {new Date().toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })}
+            </Text>
+            <MaterialIcons name="keyboard-arrow-down" size={16} color={C.textSub} />
+          </TouchableOpacity>
+        </Animated.View>
 
-        {/* ── HERO STAT ROW ─────────────────────────────────── */}
+        {/* ── HERO CARD (dark green) ──────────────────────────── */}
         <Animated.View
           style={{
             transform: [{ scale: heroScaleAnim }],
-            paddingHorizontal: rs(20, 24, 28),
-            marginTop: rs(20, 22, 24),
-            flexDirection: "row",
-            gap: rs(10, 12, 14),
+            marginHorizontal: rs(20, 24, 28),
+            marginTop: rs(14, 16, 18),
           }}
         >
-          {/* Big dark card */}
           <View
             style={[
-              styles.heroCard,
+              styles.greetingCard,
               {
-                flex: 1.5,
-                padding: rs(18, 20, 22),
-                borderRadius: rs(18, 20, 22),
+                paddingHorizontal: rs(22, 26, 30),
+                paddingTop: rs(22, 24, 26),
+                paddingBottom: rs(118, 124, 130),
               },
             ]}
           >
-            <View style={styles.heroGlowDot} />
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 6,
-                marginBottom: 8,
-              }}
-            >
-              <View style={styles.heroPulse} />
-              <Text style={[styles.heroTopLabel, { fontSize: rs(10, 11, 11) }]}>
-                {t('vendor.monthlyOrders')}
-              </Text>
-            </View>
-            <Text style={[styles.heroValue, { fontSize: rs(28, 32, 36) }]}>
-              {stats.monthly.totalOrders.toLocaleString()}
-            </Text>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 6,
-                marginTop: 4,
-              }}
-            >
-              <View style={styles.heroChangeBadge}>
-                <MaterialIcons name="trending-up" size={10} color={C.primary} />
-                <Text style={[styles.heroChangeTxt, { fontSize: rs(9, 10, 10) }]}>
-                  +24%
-                </Text>
-              </View>
-              <Text style={[styles.heroSubTxt, { fontSize: rs(10, 10, 11) }]}>
-                {t('vendor.vsLastMonth')}
-              </Text>
-            </View>
-            <View style={styles.heroDivider} />
-            <View style={{ flexDirection: "row", gap: rs(12, 14, 16) }}>
-              <View>
-                <Text style={[styles.heroSmallLabel, { fontSize: rs(9, 10, 10) }]}>
-                  {t('vendor.revenue')}
-                </Text>
-                <Text style={[styles.heroSmallVal, { fontSize: rs(13, 14, 15) }]}>
-                  ₹
-                  {Number(stats.monthly.revenue).toLocaleString("en-IN", {
-                    notation: "compact",
-                  })}
-                </Text>
-              </View>
-              <View>
-                <Text style={[styles.heroSmallLabel, { fontSize: rs(9, 10, 10) }]}>
-                  {t('vendor.prepAvg')}
-                </Text>
-                <Text style={[styles.heroSmallVal, { fontSize: rs(13, 14, 15) }]}>
-                  {stats.monthly.avgPrepTime}m
-                </Text>
-              </View>
-            </View>
-          </View>
+            {/* Decorative blobs */}
+            <View style={[styles.greetingBlobTop, { backgroundColor: "rgba(255,255,255,0.06)" }]} />
+            <View style={[styles.greetingBlobBot, { backgroundColor: "rgba(255,255,255,0.04)" }]} />
 
-          {/* Right mini cards */}
-          <View style={{ flex: 1, gap: rs(12, 14, 16) }}>
-            <MiniMetricCard
-              label={t('vendor.weeklyOrders')}
-              value={stats.weekly.totalOrders.toString()}
-              icon="receipt-long"
-              iconColor={C.blue}
-              iconBg={C.blueDim}
-              rs={rs}
+            {/* Decorative illustration icon, top-right */}
+            <MaterialIcons
+              name="inventory-2"
+              size={rs(78, 88, 98)}
+              color="rgba(255,255,255,0.10)"
+              style={{ position: "absolute", top: rs(14, 16, 18), right: rs(14, 18, 22) }}
             />
-            <MiniMetricCard
-              label={t('vendor.weeklyRevenue')}
-              value={`₹${Number(stats.weekly.revenue).toLocaleString("en-IN", { notation: "compact" })}`}
-              icon="payments"
-              iconColor={C.orange}
-              iconBg={C.orangeDim}
-              rs={rs}
+            <MaterialIcons
+              name="eco"
+              size={rs(20, 22, 24)}
+              color="rgba(255,255,255,0.18)"
+              style={{ position: "absolute", top: rs(70, 76, 84), right: rs(78, 92, 108) }}
             />
-            <MiniMetricCard
-              label={t('vendor.deliveryTime')}
-              value={`${stats.monthly.deliveryTime}m`}
-              icon="moped"
-              iconColor={C.purple}
-              iconBg={C.purpleDim}
-              rs={rs}
-            />
+
+            <View style={{ flexDirection: "row", alignItems: "center", gap: rs(12, 14, 16) }}>
+              <View
+                style={{
+                  width: rs(52, 56, 60),
+                  height: rs(52, 56, 60),
+                  borderRadius: rs(16, 17, 18),
+                  backgroundColor: "rgba(255,255,255,0.10)",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.16)",
+                }}
+              >
+                <MaterialIcons name={greeting.icon} size={rs(24, 26, 28)} color="#FFFFFF" />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: rs(16, 18, 19),
+                    fontWeight: "800",
+                    fontFamily: "PlusJakartaSans_800ExtraBold",
+                    color: "#FFFFFF",
+                  }}
+                >
+                  Keep growing, stay winning! 🚀
+                </Text>
+                <Text
+                  style={{
+                    fontSize: rs(12, 12.5, 13),
+                    color: "rgba(255,255,255,0.72)",
+                    fontWeight: "500",
+                    fontFamily: "PlusJakartaSans_500Medium",
+                    marginTop: 4,
+                    maxWidth: "88%",
+                  }}
+                >
+                  Track, manage and grow your business all in one place.
+                </Text>
+              </View>
+            </View>
+
+            {/* White stat strip, overlapping bottom of the hero card */}
+            <View
+              style={{
+                position: "absolute",
+                left: 22,
+                right: 22,
+                bottom: 18,
+                backgroundColor: "#FFFFFF",
+                borderRadius: 18,
+                padding: rs(14, 16, 18),
+                flexDirection: SCREEN_W >= 640 ? "row" : "column",
+                gap: rs(14, 0, 0),
+              }}
+            >
+              {[
+                {
+                  icon: "shopping-bag",
+                  iconColor: C.primary,
+                  iconBg: C.greenSoft,
+                  value: stats.today.totalOrders,
+                  label: "Today's Orders",
+                },
+                {
+                  icon: "account-balance-wallet",
+                  iconColor: C.purple,
+                  iconBg: C.purpleSoft,
+                  value: `₹${Number(stats.today.revenue).toLocaleString("en-IN")}`,
+                  label: "Today's Revenue",
+                },
+                {
+                  icon: "schedule",
+                  iconColor: C.blue,
+                  iconBg: C.blueSoft,
+                  value: `${stats.today.avgPrepTime}m`,
+                  label: "Avg. Prep Time",
+                },
+                {
+                  icon: "inventory-2",
+                  iconColor: C.orange,
+                  iconBg: C.orangeSoft,
+                  value: String(stats.lowStockCount),
+                  label: "Low Stock Items",
+                  isLink: true,
+                },
+              ].map((item, idx) => (
+                <React.Fragment key={item.label}>
+                  {idx > 0 && SCREEN_W >= 640 && (
+                    <View style={{ width: 1, backgroundColor: C.border }} />
+                  )}
+                  <TouchableOpacity
+                    activeOpacity={item.isLink ? 0.7 : 1}
+                    disabled={!item.isLink}
+                    onPress={() => goTo("Inventory")}
+                    style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 12 }}
+                  >
+                    <View
+                      style={{
+                        width: rs(38, 40, 42),
+                        height: rs(38, 40, 42),
+                        borderRadius: 12,
+                        backgroundColor: item.iconBg,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <MaterialIcons name={item.icon} size={rs(18, 19, 20)} color={item.iconColor} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: rs(17, 18, 19),
+                          fontWeight: "800",
+                          fontFamily: "PlusJakartaSans_800ExtraBold",
+                          color: C.text,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {item.value}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: rs(11, 11.5, 12),
+                          color: C.text,
+                          fontWeight: "600",
+                          fontFamily: "PlusJakartaSans_600SemiBold",
+                          marginTop: 1,
+                        }}
+                      >
+                        {item.label}
+                      </Text>
+                      {item.isLink ? (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 2, marginTop: 1 }}>
+                          <Text
+                            style={{
+                              fontSize: rs(10, 10.5, 11),
+                              color: C.primary,
+                              fontWeight: "700",
+                              fontFamily: "PlusJakartaSans_700Bold",
+                            }}
+                          >
+                            View Inventory
+                          </Text>
+                          <MaterialIcons name="arrow-forward" size={11} color={C.primary} />
+                        </View>
+                      ) : (
+                        <Text
+                          style={{
+                            fontSize: rs(10, 10.5, 11),
+                            color: C.textSub,
+                            fontWeight: "500",
+                            fontFamily: "PlusJakartaSans_500Medium",
+                            marginTop: 1,
+                          }}
+                        >
+                          — 0% vs yesterday
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                </React.Fragment>
+              ))}
+            </View>
           </View>
         </Animated.View>
 
-        {/* ── SALES CHART ───────────────────────────────────── */}
+        {/* ── OVERVIEW · ORDERS · TOP SELLING PRODUCTS ────────── */}
         <View
-          style={[
-            styles.card,
-            { marginHorizontal: rs(20, 24, 28), marginTop: rs(18, 20, 22) },
-          ]}
+          style={{
+            marginHorizontal: rs(20, 24, 28),
+            marginTop: rs(18, 20, 22),
+            flexDirection: SCREEN_W >= 900 ? "row" : "column",
+            alignItems: "flex-start",
+            gap: rs(14, 16, 16),
+          }}
         >
-          <View style={[styles.cardHeader, { flexWrap: "wrap", gap: 8 }]}>
-            <View>
-              <Text style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}>
-                {t('vendor.salesOverview')}
+          {/* ── Overview card ── */}
+          <View
+            style={[
+              styles.card,
+              { flex: SCREEN_W >= 900 ? 1.7 : undefined, width: SCREEN_W >= 900 ? undefined : "100%" },
+            ]}
+          >
+            <View style={[styles.cardHeader, { flexWrap: "wrap", gap: 8 }]}>
+              <Text style={[styles.cardTitle, { fontSize: rs(15, 16, 17) }]}>
+                Overview
               </Text>
-              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 16) }]}>
-                {t('vendor.revenueChart')}
-              </Text>
+              <TouchableOpacity
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 4,
+                  backgroundColor: C.surface,
+                  borderWidth: 1,
+                  borderColor: C.border,
+                  borderRadius: 999,
+                  paddingHorizontal: 12,
+                  paddingVertical: 7,
+                }}
+                onPress={() => setCurrIndex((currIndex + 1) % STAT_TABS.length)}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text }}>
+                  {currIndex === 0 ? "Today" : currIndex === 1 ? "This Week" : "This Month"}
+                </Text>
+                <MaterialIcons name="keyboard-arrow-down" size={16} color={C.textSub} />
+              </TouchableOpacity>
             </View>
-            <View style={[styles.tabRow, { flexShrink: 0 }]}>
-              {STAT_TABS.map((t, i) => (
-                <TouchableOpacity
-                  key={t}
-                  onPress={() => setCurrIndex(i)}
-                  style={[
-                    styles.tabPill,
-                    currIndex === i && styles.tabPillActive,
-                    {
-                      paddingHorizontal: rs(20, 24, 28),
-                      paddingVertical: rs(4, 5, 6),
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.tabText,
-                      { fontSize: rs(9, 10, 11) },
-                      currIndex === i && styles.tabTextActive,
-                    ]}
+
+            <Text
+              style={{
+                fontSize: 12,
+                color: C.textSub,
+                fontWeight: "600",
+                fontFamily: "PlusJakartaSans_600SemiBold",
+                marginTop: 10,
+              }}
+            >
+              Total Revenue
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 }}>
+              <Text
+                style={{
+                  fontSize: rs(30, 33, 36),
+                  fontWeight: "900",
+                  fontFamily: "PlusJakartaSans_800ExtraBold",
+                  color: C.text,
+                  letterSpacing: -1,
+                }}
+              >
+                ₹{Number(currStats.revenue).toLocaleString("en-IN")}
+              </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 3,
+                  backgroundColor: C.primaryDim,
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 999,
+                }}
+              >
+                <MaterialIcons name="trending-up" size={13} color={C.primary} />
+                <Text style={{ fontSize: 11, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.primary }}>
+                  vs last {currIndex === 0 ? "yesterday" : currIndex === 1 ? "week" : "month"}
+                </Text>
+              </View>
+            </View>
+
+            {hasChartData ? (
+              <LineChart
+                data={{
+                  labels: stats.labels,
+                  datasets: [
+                    { data: stats.chartValues.map((v) => (isFinite(Number(v)) ? Number(v) : 0)) },
+                  ],
+                }}
+                width={chartW}
+                height={rs(140, 160, 175)}
+                yAxisSuffix="₹"
+                chartConfig={{
+                  backgroundGradientFrom: C.surface,
+                  backgroundGradientTo: C.surface,
+                  fillShadowGradientFrom: C.primary,
+                  fillShadowGradientFromOpacity: 0.22,
+                  fillShadowGradientTo: C.surface,
+                  fillShadowGradientToOpacity: 0.02,
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => `rgba(22, 163, 74, ${opacity})`,
+                  labelColor: () => C.textLight,
+                  propsForDots: {
+                    r: "4",
+                    strokeWidth: "2",
+                    stroke: C.primary,
+                    fill: C.surface,
+                  },
+                  propsForBackgroundLines: {
+                    stroke: C.border,
+                    strokeDasharray: "4",
+                  },
+                }}
+                bezier
+                withInnerLines={false}
+                style={{ borderRadius: 12, marginTop: 12, marginLeft: -8 }}
+              />
+            ) : (
+              <View style={{ height: rs(140, 160, 175), justifyContent: "center", alignItems: "center", marginTop: 10 }}>
+                <MaterialIcons name="show-chart" size={22} color={C.textLight} />
+                <Text style={{ color: C.textLight, fontSize: rs(11, 12, 12), marginTop: 8 }}>
+                  {t('vendor.noChartData') || 'No sales data yet'}
+                </Text>
+              </View>
+            )}
+
+            {/* Total Orders / Avg Delivery Time / Repeat Customers mini boxes */}
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+              {[
+                {
+                  key: "orders",
+                  icon: "shopping-cart",
+                  iconColor: C.primary,
+                  iconBg: C.greenSoft,
+                  label: "Total Orders",
+                  value: String(currStats.totalOrders),
+                },
+                {
+                  key: "delivery",
+                  icon: "electric-moped",
+                  iconColor: C.purple,
+                  iconBg: C.purpleSoft,
+                  label: "Avg. Delivery Time",
+                  value: `${currStats.deliveryTime}m`,
+                },
+                {
+                  key: "repeat",
+                  icon: "person",
+                  iconColor: C.blue,
+                  iconBg: C.blueSoft,
+                  label: "Repeat Customers",
+                  value: String(currStats.repeatCustomers ?? 0),
+                },
+              ].map((box) => (
+                <View key={box.key} style={{ flex: 1, alignItems: "flex-start" }}>
+                  <View
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 9,
+                      backgroundColor: box.iconBg,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginBottom: 6,
+                    }}
                   >
-                    {t}
+                    <MaterialIcons name={box.icon} size={15} color={box.iconColor} />
+                  </View>
+                  <Text style={{ fontSize: rs(15, 16, 17), fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text }}>
+                    {box.value}
                   </Text>
-                </TouchableOpacity>
+                  <Text style={{ fontSize: 10.5, color: C.textSub, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", marginTop: 1 }} numberOfLines={1}>
+                    {box.label}
+                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 2, marginTop: 2 }}>
+                    <MaterialIcons name="arrow-upward" size={10} color={C.primary} />
+                    <Text style={{ fontSize: 9.5, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.primary }} numberOfLines={1}>
+                      vs last month
+                    </Text>
+                  </View>
+                </View>
               ))}
             </View>
           </View>
 
-          {/* Active period stats */}
-          <View style={styles.chartStatRow}>
-            <View style={styles.chartStatItem}>
-              <Text style={[styles.chartStatVal, { fontSize: rs(16, 18, 20), color: C.primary }]}>
-                {currStats.totalOrders}
-              </Text>
-              <Text style={[styles.chartStatLabel, { fontSize: rs(10, 11, 11) }]}>
-                {t('vendor.orders')}
-              </Text>
-            </View>
-            <View style={styles.chartStatItem}>
-              <Text style={[styles.chartStatVal, { fontSize: rs(16, 18, 20), color: C.blue }]}>
-                ₹{Number(currStats.revenue).toLocaleString("en-IN")}
-              </Text>
-              <Text style={[styles.chartStatLabel, { fontSize: rs(10, 11, 11) }]}>
-                {t('vendor.revenue')}
-              </Text>
-            </View>
-            <View style={styles.chartStatItem}>
-              <Text style={[styles.chartStatVal, { fontSize: rs(16, 18, 20), color: C.orange }]}>
-                {currStats.avgPrepTime}m
-              </Text>
-              <Text style={[styles.chartStatLabel, { fontSize: rs(10, 11, 11) }]}>
-                {t('vendor.avgPrep')}
-              </Text>
-            </View>
-          </View>
-
-          {hasChartData ? (
-            <LineChart
-              data={{
-                labels: stats.labels,
-                datasets: [
-                  { data: stats.chartValues.map(v => isFinite(Number(v)) ? Number(v) : 0) },
-                ],
-              }}
-              width={chartW}
-              height={rs(150, 170, 185)}
-              yAxisSuffix="₹"
-              chartConfig={{
-                backgroundGradientFrom: C.surface,
-                backgroundGradientTo: C.surface,
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(14, 230, 39, ${opacity})`,
-                labelColor: () => C.textLight,
-                propsForDots: {
-                  r: "5",
-                  strokeWidth: "2",
-                  stroke: C.primary,
-                  fill: C.surface,
-                },
-                propsForBackgroundLines: {
-                  stroke: C.border,
-                  strokeDasharray: "4",
-                },
-              }}
-              bezier
-              style={{ borderRadius: 12, marginTop: 10, marginLeft: -8 }}
-            />
-          ) : (
-            <View style={{ height: rs(150, 170, 185), justifyContent: 'center', alignItems: 'center', marginTop: 10 }}>
-              <MaterialIcons name="bar-chart" size={22} color={C.textLight} />
-              <Text style={{ color: C.textLight, fontSize: rs(11, 12, 12), marginTop: 8 }}>
-                {t('vendor.noChartData') || 'No sales data yet'}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* ── GOAL + EFFICIENCY ─────────────────────────────── */}
-        <View
-          style={[
-            styles.twoCol,
-            {
-              marginHorizontal: rs(20, 24, 28),
-              marginTop: rs(20, 22, 24),
-              gap: rs(10, 12, 14),
-            },
-          ]}
-        >
-          {/* Goal */}
+          {/* ── Orders breakdown card ── */}
           <View
             style={[
               styles.card,
-              { flex: 1, marginHorizontal: 0, marginTop: 0 },
-              SCREEN_W < 768 && { alignItems: "center" },
+              { flex: SCREEN_W >= 900 ? 1 : undefined, width: SCREEN_W >= 900 ? undefined : "100%", padding: 18 },
             ]}
           >
-            <Text style={[styles.cardTitle, { fontSize: rs(13, 14, 15), marginBottom: 12 }]}>
-              {t('vendor.goalOverview')}
-            </Text>
-            <View style={styles.goalRingWrap}>
-              <View
-                style={[
-                  styles.goalRing,
-                  {
-                    width: rs(76, 86, 96),
-                    height: rs(76, 86, 96),
-                    borderRadius: rs(38, 43, 48),
-                    borderWidth: rs(7, 8, 10),
-                  },
-                ]}
+            <View style={[styles.cardHeader, { marginBottom: 4 }]}>
+              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 15) }]}>Orders</Text>
+              <TouchableOpacity
+                style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
+                onPress={() => goTo("Orders")}
               >
-                <Text style={[styles.goalPct, { fontSize: rs(15, 17, 19) }]}>
-                  {goalPct}%
+                <Text style={{ fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.primary }}>
+                  View All
                 </Text>
-              </View>
+                <MaterialIcons name="arrow-forward" size={13} color={C.primary} />
+              </TouchableOpacity>
             </View>
-            <View style={{ gap: 8, marginTop: 12, alignItems: SCREEN_W >= 768 ? "stretch" : "center" }}>
-              <View style={[styles.goalRow, SCREEN_W < 768 && { justifyContent: "center" }]}>
+
+            {[
+              { icon: "shopping-cart", color: C.primary, bg: C.greenSoft, label: "Total Orders", value: stats.today.totalOrders },
+              { icon: "schedule", color: C.orange, bg: C.orangeSoft, label: "Pending", value: stats.pendingOrders },
+              { icon: "check-circle", color: C.primary, bg: C.greenSoft, label: "Completed", value: stats.completedOrders },
+              { icon: "cancel", color: "#EF4444", bg: C.redSoft, label: "Cancelled", value: stats.cancelledOrders },
+            ].map((row, i) => (
+              <View
+                key={row.label}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 10,
+                  paddingVertical: 11,
+                  borderTopWidth: i === 0 ? 0 : 1,
+                  borderTopColor: C.border,
+                }}
+              >
                 <View
-                  style={[styles.goalDot, { backgroundColor: C.primary }]}
-                />
-                <Text style={[styles.goalLabel, { fontSize: rs(10, 11, 11) }]}>
-                  Monthly Total
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 9,
+                    backgroundColor: row.bg,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <MaterialIcons name={row.icon} size={15} color={row.color} />
+                </View>
+                <Text
+                  style={{ flex: 1, fontSize: 13, color: C.textSub, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold" }}
+                  numberOfLines={1}
+                >
+                  {row.label}
                 </Text>
-                <Text style={[styles.goalNum, { fontSize: rs(11, 12, 12) }]}>
-                  {stats.monthly.totalOrders}
+                <Text style={{ fontSize: 14, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text }}>
+                  {row.value}
                 </Text>
               </View>
-              <View style={[styles.goalRow, SCREEN_W < 768 && { justifyContent: "center" }]}>
-                <View style={[styles.goalDot, { backgroundColor: C.blue }]} />
-                <Text style={[styles.goalLabel, { fontSize: rs(10, 11, 11) }]}>
-                  Today
-                </Text>
-                <Text style={[styles.goalNum, { fontSize: rs(11, 12, 12) }]}>
-                  {stats.today.totalOrders}
-                </Text>
-              </View>
-            </View>
+            ))}
           </View>
 
-          {/* Efficiency */}
+          {/* ── Top Selling Products card ── */}
           <View
             style={[
               styles.card,
-              { flex: 1, marginHorizontal: 0, marginTop: 0 },
-              SCREEN_W < 768 && { alignItems: "center" },
+              { flex: SCREEN_W >= 900 ? 1.15 : undefined, width: SCREEN_W >= 900 ? undefined : "100%", padding: 18 },
             ]}
           >
-            <Text
-              style={[
-                styles.cardTitle,
-                { fontSize: rs(13, 14, 15), marginBottom: 12 },
-              ]}
-            >
-              {t('vendor.efficiency')}
+            <View style={[styles.cardHeader, { marginBottom: 4 }]}>
+              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 15) }]}>Top Selling Products</Text>
+              <TouchableOpacity
+                style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
+                onPress={() => goTo("Reports")}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.primary }}>
+                  View All
+                </Text>
+                <MaterialIcons name="arrow-forward" size={13} color={C.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {stats.topProducts?.length ? (
+              stats.topProducts.slice(0, 4).map((p, i) => {
+                const chipColors = [C.redSoft, C.orangeSoft, C.greenSoft, C.blueSoft];
+                const chipIconColors = ["#EF4444", C.orange, C.primary, C.blue];
+                const sold = p.sold ?? p.units_sold ?? p.quantity_sold ?? 0;
+                return (
+                  <View
+                    key={p.id || p.name || i}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 10,
+                      paddingVertical: 10,
+                      borderTopWidth: i === 0 ? 0 : 1,
+                      borderTopColor: C.border,
+                    }}
+                  >
+                    {p.image ? (
+                      <Image source={{ uri: p.image }} style={{ width: 34, height: 34, borderRadius: 9 }} />
+                    ) : (
+                      <View
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 9,
+                          backgroundColor: chipColors[i % chipColors.length],
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <MaterialIcons name="shopping-bag" size={16} color={chipIconColors[i % chipIconColors.length]} />
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12.5, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text }} numberOfLines={1}>
+                        {p.name}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: C.textSub, marginTop: 2 }}>
+                        {sold} Orders
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })
+            ) : (
+              <View style={{ paddingVertical: 24, alignItems: "center" }}>
+                <MaterialIcons name="shopping-bag" size={26} color={C.border} />
+                <Text style={{ color: C.textLight, fontSize: 12, marginTop: 8 }}>No sales yet</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* ── RECENT ORDERS · LOW STOCK ALERT · STORE PERFORMANCE ── */}
+        <View
+          style={{
+            marginHorizontal: rs(20, 24, 28),
+            marginTop: rs(14, 16, 16),
+            flexDirection: SCREEN_W >= 900 ? "row" : "column",
+            alignItems: "flex-start",
+            gap: rs(14, 16, 16),
+          }}
+        >
+          {/* ── Recent Orders card ── */}
+          <View
+            style={[
+              styles.card,
+              { flex: SCREEN_W >= 900 ? 1.7 : undefined, width: SCREEN_W >= 900 ? undefined : "100%", padding: 18 },
+            ]}
+          >
+            <View style={[styles.cardHeader, { marginBottom: 6 }]}>
+              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 15) }]}>Recent Orders</Text>
+              <TouchableOpacity
+                style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
+                onPress={() => goTo("Orders")}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.primary }}>
+                  View All
+                </Text>
+                <MaterialIcons name="arrow-forward" size={13} color={C.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {recentOrders.length ? (
+              <>
+                {/* Table header — desktop only */}
+                {SCREEN_W >= 640 && (
+                  <View style={{ flexDirection: "row", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                    <Text style={[styles.tableHeadCell, { flex: 1.1 }]}>Order ID</Text>
+                    <Text style={[styles.tableHeadCell, { flex: 1.3 }]}>Customer</Text>
+                    <Text style={[styles.tableHeadCell, { flex: 0.7, textAlign: "center" }]}>Items</Text>
+                    <Text style={[styles.tableHeadCell, { flex: 0.9, textAlign: "right" }]}>Amount</Text>
+                    <Text style={[styles.tableHeadCell, { flex: 1, textAlign: "right" }]}>Status</Text>
+                  </View>
+                )}
+                {recentOrders.slice(0, 4).map((o, i) => {
+                  const st = String(o.status || "").toLowerCase();
+                  const statusColor = st === "completed" || st === "delivered"
+                    ? C.primaryDark
+                    : st === "pending" || st === "preparing"
+                      ? "#B45309"
+                      : "#B91C1C";
+                  const statusBg = st === "completed" || st === "delivered"
+                    ? C.primaryDim
+                    : st === "pending" || st === "preparing"
+                      ? "#FEF3C7"
+                      : C.redSoft;
+                  return (
+                    <View
+                      key={o.id || i}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        paddingVertical: 12,
+                        borderTopWidth: SCREEN_W >= 640 || i > 0 ? 1 : 0,
+                        borderTopColor: C.border,
+                        flexWrap: SCREEN_W >= 640 ? "nowrap" : "wrap",
+                      }}
+                    >
+                      <Text style={{ flex: 1.1, fontSize: 12.5, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text }} numberOfLines={1}>
+                        {o.id}
+                      </Text>
+                      <Text style={{ flex: 1.3, fontSize: 12.5, color: C.textSub }} numberOfLines={1}>
+                        {o.customer}
+                      </Text>
+                      <Text style={{ flex: 0.7, fontSize: 12.5, color: C.textSub, textAlign: "center" }}>
+                        {o.items}
+                      </Text>
+                      <Text style={{ flex: 0.9, fontSize: 12.5, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text, textAlign: "right" }}>
+                        ₹{Number(o.amount).toLocaleString("en-IN")}
+                      </Text>
+                      <View style={{ flex: 1, alignItems: "flex-end" }}>
+                        <View style={{ paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: statusBg }}>
+                          <Text style={{ fontSize: 10.5, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: statusColor }}>
+                            {o.status}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </>
+            ) : (
+              <View style={{ paddingVertical: 24, alignItems: "center" }}>
+                <MaterialIcons name="receipt-long" size={26} color={C.border} />
+                <Text style={{ color: C.textLight, fontSize: 12, marginTop: 8 }}>No recent orders yet</Text>
+              </View>
+            )}
+          </View>
+
+          {/* ── Low Stock Alert card ── */}
+          <View
+            style={[
+              styles.card,
+              { flex: SCREEN_W >= 900 ? 1 : undefined, width: SCREEN_W >= 900 ? undefined : "100%", padding: 18 },
+            ]}
+          >
+            <View style={[styles.cardHeader, { marginBottom: 4 }]}>
+              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 15) }]}>Low Stock Alert</Text>
+              <TouchableOpacity
+                style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
+                onPress={() => goTo("Inventory")}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.primary }}>
+                  View All
+                </Text>
+                <MaterialIcons name="arrow-forward" size={13} color={C.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {lowStockItems.length ? (
+              lowStockItems.slice(0, 4).map((item, i) => {
+                const chipColors = [C.redSoft, C.orangeSoft, C.greenSoft, C.blueSoft];
+                const chipIconColors = ["#EF4444", C.orange, C.primary, C.blue];
+                return (
+                  <View
+                    key={item.name + i}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 10,
+                      paddingVertical: 10,
+                      borderTopWidth: i === 0 ? 0 : 1,
+                      borderTopColor: C.border,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 9,
+                        backgroundColor: chipColors[i % chipColors.length],
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <MaterialIcons name="inventory-2" size={16} color={chipIconColors[i % chipIconColors.length]} />
+                    </View>
+                    <Text style={{ flex: 1, fontSize: 12.5, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text }} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text style={{ fontSize: 11.5, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.orange }}>
+                      {item.stockLeft} left
+                    </Text>
+                  </View>
+                );
+              })
+            ) : (
+              <View style={{ paddingVertical: 24, alignItems: "center" }}>
+                <MaterialIcons name="check-circle-outline" size={26} color={C.border} />
+                <Text style={{ color: C.textLight, fontSize: 12, marginTop: 8 }}>All stocked up</Text>
+              </View>
+            )}
+          </View>
+
+          {/* ── Store Performance donut card ── */}
+          <View
+            style={[
+              styles.card,
+              { flex: SCREEN_W >= 900 ? 1.1 : undefined, width: SCREEN_W >= 900 ? undefined : "100%", padding: 18 },
+            ]}
+          >
+            <View style={[styles.cardHeader, { marginBottom: 6, flexWrap: "wrap", gap: 6 }]}>
+              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 15) }]}>Store Performance</Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 3,
+                  backgroundColor: C.bg,
+                  borderWidth: 1,
+                  borderColor: C.border,
+                  borderRadius: 999,
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text }}>
+                  This Month
+                </Text>
+                <MaterialIcons name="keyboard-arrow-down" size={14} color={C.textSub} />
+              </View>
+            </View>
+
+            {categoryBreakdown.length ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 16, marginTop: 6 }}>
+                {/* Donut */}
+                <View style={{ width: 96, height: 96, alignItems: "center", justifyContent: "center" }}>
+                  <Svg width={96} height={96} viewBox="0 0 96 96">
+                    <G rotation={-90} origin="48, 48">
+                      {(() => {
+                        const r = 38;
+                        const circumference = 2 * Math.PI * r;
+                        let cumulative = 0;
+                        return categoryBreakdown.map((c, i) => {
+                          const dash = (c.pct / 100) * circumference;
+                          const seg = (
+                            <Circle
+                              key={c.label}
+                              cx={48}
+                              cy={48}
+                              r={r}
+                              stroke={C.donutColors[i % C.donutColors.length]}
+                              strokeWidth={13}
+                              fill="none"
+                              strokeDasharray={`${dash} ${circumference - dash}`}
+                              strokeDashoffset={-((cumulative / 100) * circumference)}
+                              strokeLinecap="butt"
+                            />
+                          );
+                          cumulative += c.pct;
+                          return seg;
+                        });
+                      })()}
+                    </G>
+                  </Svg>
+                  <View style={{ position: "absolute", alignItems: "center" }}>
+                    <Text style={{ fontSize: 13, fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text }}>
+                      ₹{Number(stats.today.revenue).toLocaleString("en-IN")}
+                    </Text>
+                    <Text style={{ fontSize: 9, color: C.textSub, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold" }}>
+                      Total Revenue
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Legend */}
+                <View style={{ flex: 1, gap: 8 }}>
+                  {categoryBreakdown.slice(0, 4).map((c, i) => (
+                    <View key={c.label} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: C.donutColors[i % C.donutColors.length] }} />
+                      <Text style={{ flex: 1, fontSize: 11.5, color: C.textSub, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" }} numberOfLines={1}>
+                        {c.label}
+                      </Text>
+                      <Text style={{ fontSize: 11.5, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text }}>
+                        {c.pct}%
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : (
+              <View style={{ paddingVertical: 24, alignItems: "center" }}>
+                <MaterialIcons name="pie-chart-outline" size={26} color={C.border} />
+                <Text style={{ color: C.textLight, fontSize: 12, marginTop: 8, textAlign: "center" }}>
+                  No category data yet
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* ── PRO TIP BANNER ───────────────────────────────────── */}
+        <View
+          style={[
+            styles.proTip,
+            { marginHorizontal: rs(20, 24, 28), marginTop: rs(16, 18, 18) },
+          ]}
+        >
+          <View style={styles.proTipIcon}>
+            <MaterialIcons name="star" size={20} color="#FFFFFF" />
+          </View>
+          <View style={{ flex: 1, minWidth: 160 }}>
+            <Text style={styles.proTipTitle}>Pro Tip</Text>
+            <Text style={styles.proTipText}>
+              Complete your store profile to build trust and get more orders.
             </Text>
-            <View style={styles.effBlock}>
-              <View
-                style={[
-                  styles.effIcon,
-                  {
-                    backgroundColor: C.primaryDim,
-                    width: rs(38, 42, 46),
-                    height: rs(38, 42, 46),
-                    borderRadius: rs(11, 12, 13),
-                  },
-                ]}
-              >
-                <MaterialIcons
-                  name="schedule"
-                  size={rs(18, 20, 22)}
-                  color={C.primaryDark}
-                />
-              </View>
-              <Text style={[styles.effLabel, { fontSize: rs(10, 10, 11) }]}>
-                {t('vendor.avgPrepTime')}
-              </Text>
-              <Text
-                style={[
-                  styles.effVal,
-                  { fontSize: rs(18, 20, 22), color: C.primaryDark },
-                ]}
-              >
-                {stats.monthly.avgPrepTime}
-                <Text style={{ fontSize: rs(11, 12, 13) }}> min</Text>
-              </Text>
-            </View>
-            <View style={styles.effDivider} />
-            <View style={styles.effBlock}>
-              <View
-                style={[
-                  styles.effIcon,
-                  {
-                    backgroundColor: C.purpleDim,
-                    width: rs(38, 42, 46),
-                    height: rs(38, 42, 46),
-                    borderRadius: rs(11, 12, 13),
-                  },
-                ]}
-              >
-                <MaterialIcons
-                  name="moped"
-                  size={rs(18, 20, 22)}
-                  color={C.purple}
-                />
-              </View>
-              <Text style={[styles.effLabel, { fontSize: rs(10, 10, 11) }]}>
-                {t('vendor.avgDelivery')}
-              </Text>
-              <Text
-                style={[
-                  styles.effVal,
-                  { fontSize: rs(18, 20, 22), color: C.purple },
-                ]}
-              >
-                {stats.monthly.deliveryTime}
-                <Text style={{ fontSize: rs(11, 12, 13) }}> min</Text>
-              </Text>
-            </View>
           </View>
+          <TouchableOpacity
+            style={styles.proTipButton}
+            onPress={() => navigation.navigate("VendorOnboarding")}
+          >
+            <Text style={styles.proTipButtonText}>Complete Profile</Text>
+            <MaterialIcons name="arrow-forward" size={16} color={C.primaryDark} />
+          </TouchableOpacity>
         </View>
 
-        {/* ── TOP PRODUCTS ──────────────────────────────────── */}
-        <View
-          style={[
-            styles.card,
-            { marginHorizontal: rs(20, 24, 28), marginTop: rs(20, 22, 24) },
-          ]}
-        >
-          <View style={styles.cardHeader}>
-            <View>
-              <Text style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}>
-                {t('vendor.performance')}
-              </Text>
-              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 16) }]}>
-                {t('vendor.topSellingProducts')}
-              </Text>
-            </View>
-            <View style={[styles.badgePill, { backgroundColor: C.primaryDim }]}>
-              <MaterialIcons
-                name="trending-up"
-                size={12}
-                color={C.primaryDark}
-              />
-              <Text
-                style={[
-                  styles.badgePillText,
-                  { color: C.primaryDark, fontSize: rs(9, 10, 10) },
-                ]}
-              >
-                {t('vendor.live')}
-              </Text>
-            </View>
-          </View>
-          {stats.topProducts && stats.topProducts.length > 0 ? (
-            stats.topProducts.map((p, i) => (
-              <ProductRow
-                key={i}
-                rank={i + 1}
-                name={p.name}
-                sold={p.sold}
-                revenue={p.revenue}
-                tag={i === 0 ? t('vendor.bestSeller') : i < 3 ? t('vendor.trending') : null}
-                image={
-                  p.image ||
-                  "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&q=80"
-                }
-                rs={rs}
-              />
-            ))
-          ) : (
-            <EmptyState icon="bar-chart" message={t('vendor.noSalesData')} />
-          )}
-        </View>
-
-        {/* ── LATEST REVIEWS ────────────────────────────────── */}
-        <View
-          style={[
-            styles.card,
-            { marginHorizontal: rs(20, 24, 28), marginTop: rs(20, 22, 24) },
-          ]}
-        >
-          <View style={styles.cardHeader}>
-            <View>
-              <Text style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}>
-                {t('vendor.feedback')}
-              </Text>
-              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 16) }]}>
-                {t('vendor.latestReviews')}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.viewMoreBtn]}
-              onPress={() => setReviewsModal(true)}
-            >
-              <Text style={[styles.viewMoreText, { fontSize: rs(11, 12, 12) }]}>
-                {t('vendor.viewAll')}
-              </Text>
-              <MaterialIcons
-                name="arrow-forward-ios"
-                size={10}
-                color={C.primary}
-              />
-            </TouchableOpacity>
-          </View>
-          {displayReviews.length > 0
-            ? displayReviews
-                .slice(0, 3)
-                .map((r, i) => <ReviewRow key={i} review={r} rs={rs} />)
-            : null}
-        </View>
-
-        {/* ── DELIVERY PARTNERS ─────────────────────────────── */}
-        <View
-          style={[
-            styles.card,
-            { marginHorizontal: rs(20, 24, 28), marginTop: rs(20, 22, 24) },
-          ]}
-        >
-          <View style={styles.cardHeader}>
-            <View>
-              <Text style={[styles.cardOverline, { fontSize: rs(9, 10, 10) }]}>
-                {t('vendor.network')}
-              </Text>
-              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 16) }]}>
-                {t('vendor.deliveryPartners')}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.viewMoreBtn}
-              onPress={() => setPartnersModal(true)}
-            >
-              <Text style={[styles.viewMoreText, { fontSize: rs(11, 12, 12) }]}>
-                {t('vendor.seeAll')}
-              </Text>
-              <MaterialIcons
-                name="arrow-forward-ios"
-                size={10}
-                color={C.primary}
-              />
-            </TouchableOpacity>
-          </View>
-          {displayPartners.length > 0
-            ? displayPartners
-                .slice(0, 3)
-                .map((d, i) => (
-                  <DeliveryRow key={i} index={i} partner={d} rs={rs} />
-                ))
-            : null}
-        </View>
       </ScrollView>
 
-      {/* ── NOTIFICATIONS MODAL ─────────────────────────────── */}
-      <Modal
-        visible={notifVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setNotifVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.overlay}
-          activeOpacity={1}
-          onPress={() => setNotifVisible(false)}
-        />
-        <View
-          style={[
-            styles.sheet,
-            { paddingBottom: Platform.OS === "ios" ? 34 : 20 },
-          ]}
-        >
-          <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}>
-            <View>
-              <Text style={styles.sheetTitle}>Notifications</Text>
-              {unreadCount > 0 && (
-                <Text style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>
-                  {unreadCount} unread
-                </Text>
-              )}
-            </View>
-            <TouchableOpacity
-              onPress={() => setNotifVisible(false)}
-              style={styles.closeIconBtn}
-            >
-              <MaterialIcons name="close" size={20} color={C.text} />
-            </TouchableOpacity>
-          </View>
-          {notifications.length > 0 ? (
-            <FlatList
-              data={notifications}
-              keyExtractor={(_, i) => i.toString()}
-              renderItem={({ item }) => (
-                <NotifItem
-                  item={item}
-                  onPress={(action) => {
-                    setNotifVisible(false);
-                    navigation.navigate("Orders", { initialTab: action });
-                  }}
-                />
-              )}
-              contentContainerStyle={{ paddingBottom: 40 }}
-            />
-          ) : (
-            <EmptyState
-              icon="notifications-none"
-              message="You're all caught up!"
-            />
-          )}
-        </View>
-      </Modal>
+
 
       {/* ── ALL REVIEWS MODAL ───────────────────────────────── */}
       <Modal
@@ -2183,6 +2521,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           <MaterialIcons name="close" size={16} color="#64748B" />
         </TouchableOpacity>
       </Animated.View>
+
+      </View>
+      {/* ── end MAIN COLUMN ─────────────────────────────────── */}
     </View>
   );
 }
@@ -2608,6 +2949,58 @@ function EmptyState({ icon, message }) {
 // ─── Styles ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1 },
+
+  // ── Pro Tip banner ──
+  proTip: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 14,
+    backgroundColor: "#ECFDF3",
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+    borderRadius: 18,
+    padding: 16,
+  },
+  proTipIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: C.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  proTipTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+    color: C.primaryDark,
+  },
+  proTipText: {
+    fontSize: 12.5,
+    color: "#166534",
+    fontWeight: "500",
+    fontFamily: "PlusJakartaSans_500Medium",
+    marginTop: 2,
+    lineHeight: 18,
+  },
+  proTipButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  proTipButtonText: {
+    fontSize: 13,
+    fontWeight: "800",
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+    color: C.primaryDark,
+  },
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
 
   loadingCard: {
@@ -2699,28 +3092,35 @@ const styles = StyleSheet.create({
   avatarInitials: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.primaryDark },
 
   // ── Banner ──
-  banner: {
-    marginHorizontal: 14,
-    marginTop: 10,
-    padding: 14,
-    borderRadius: 14,
-    borderLeftWidth: 4,
-  },
+ banner: {
+  marginHorizontal: 20,
+  marginTop: 16,
+  paddingHorizontal: 18,
+  paddingVertical: 16,
+  borderRadius: 16,
+  borderLeftWidth: 4,
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.04,
+  shadowRadius: 8,
+  elevation: 2,
+},
   bannerTitle: { fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", fontSize: 13, marginBottom: 4 },
   bannerMsg: { fontSize: 12, lineHeight: 18 },
   bannerDoc: { fontSize: 12, marginTop: 2 },
 
   // ── Greeting ──
-  greetingCard: {
-    backgroundColor: C.surface,
-    borderRadius: 24,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 4,
-  },
+ greetingCard: {
+  position: "relative",
+  backgroundColor: "#0F3D24",
+  borderRadius: 24,
+  borderWidth: 1,
+  borderColor: "#164E35",
+
+  paddingHorizontal: 24,
+  paddingTop: 24,
+  paddingBottom: 120,
+ },
   greetingBlobTop: {
     position: "absolute",
     top: -30,
@@ -2770,71 +3170,126 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
 
-  // ── Hero ──
-  heroCard: {
-    backgroundColor: C.accent,
-    borderRadius: 22,
-    shadowColor: C.accent,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
-    overflow: "hidden",
-  },
-  heroGlowDot: {
-    position: "absolute",
-    top: -40,
-    right: -40,
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    backgroundColor: "rgba(14,230,39,0.07)",
-  },
-  heroPulse: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: C.primary,
-  },
-  heroTopLabel: {
-    color: "rgba(255,255,255,0.5)",
-    fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", letterSpacing: 0.8,
-  },
-  heroValue: { fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff", letterSpacing: -1 },
-  heroChangeBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    backgroundColor: C.primaryDim,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  heroChangeTxt: { color: C.primary, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
-  heroSubTxt: { color: "rgba(255,255,255,0.4)", fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium"},
-  heroDivider: {
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    marginVertical: 10,
-  },
-  heroSmallLabel: {
-    color: "rgba(255,255,255,0.4)",
-    fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", marginBottom: 2,
-  },
-  heroSmallVal: { color: "#fff", fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"},
+ // ── Hero ──
+heroCard: {
+  backgroundColor: "#FFFFFF",
+  borderRadius: 20,
+  borderWidth: 1,
+  borderColor: "#E5E7EB",
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.05,
+  shadowRadius: 10,
+  elevation: 2,
+  overflow: "hidden",
+},
 
-  miniCard: {
-    backgroundColor: C.surface,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 1,
-  },
-  miniIcon: { alignItems: "center", justifyContent: "center" },
-  miniLabel: { color: C.textSub, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium", marginBottom: 1 },
-  miniValue: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold"},
+heroGlowDot: {
+  position: "absolute",
+  top: -40,
+  right: -40,
+  width: 130,
+  height: 130,
+  borderRadius: 65,
+  backgroundColor: "rgba(14,230,39,0.07)",
+},
 
+heroPulse: {
+  width: 6,
+  height: 6,
+  borderRadius: 3,
+  backgroundColor: C.primary,
+},
+
+heroTopLabel: {
+  color: "#6B7280",
+  fontWeight: "700",
+  fontFamily: "PlusJakartaSans_700Bold",
+  letterSpacing: 0.8,
+},
+
+heroValue: {
+  fontWeight: "900",
+  fontFamily: "PlusJakartaSans_800ExtraBold",
+  color: "#111827",
+  letterSpacing: -1,
+},
+
+heroChangeBadge: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 3,
+  backgroundColor: C.primaryDim,
+  paddingHorizontal: 7,
+  paddingVertical: 3,
+  borderRadius: 999,
+},
+
+heroChangeTxt: {
+  color: C.primary,
+  fontWeight: "700",
+  fontFamily: "PlusJakartaSans_700Bold",
+},
+
+heroSubTxt: {
+  color: "#6B7280",
+  fontWeight: "500",
+  fontFamily: "PlusJakartaSans_500Medium",
+},
+
+heroDivider: {
+  height: 1,
+  backgroundColor: "#E5E7EB",
+  marginVertical: 7,
+},
+
+heroSmallLabel: {
+  color: "#6B7280",
+  fontWeight: "600",
+  fontFamily: "PlusJakartaSans_600SemiBold",
+  marginBottom: 2,
+},
+
+heroSmallVal: {
+  color: "#111827",
+  fontWeight: "700",
+  fontFamily: "PlusJakartaSans_700Bold",
+},
+
+miniCard: {
+  backgroundColor: "#FFFFFF",
+  borderWidth: 1,
+  borderColor: "#EEF2F1",
+  borderRadius: 18,
+
+  minHeight: 100,
+
+  padding: 18,
+
+  shadowColor: "#000000",
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.04,
+  shadowRadius: 12,
+
+  elevation: 2,
+},
+
+miniIcon: {
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+miniLabel: {
+  color: C.textSub,
+  fontWeight: "500",
+  fontFamily: "PlusJakartaSans_500Medium",
+  marginBottom: 1,
+},
+
+miniValue: {
+  fontWeight: "800",
+  fontFamily: "PlusJakartaSans_800ExtraBold",
+},
   // ── Chart ──
   chartStatRow: {
     flexDirection: "row",
@@ -2885,6 +3340,15 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   cardTitle: { fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text, letterSpacing: -0.3 },
+
+  tableHeadCell: {
+    fontSize: 11,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+    color: C.textLight,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
 
   badgePill: {
     flexDirection: "row",
