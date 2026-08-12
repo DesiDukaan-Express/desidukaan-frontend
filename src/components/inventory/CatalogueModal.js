@@ -113,7 +113,6 @@ export default function CatalogueModal({ visible, onClose, onSuccess }) {
           weight_options: product.weight_options,
           image_url: product.image_url,
           description: product.description,
-          stock_qty: 10,
         };
       }
       return next;
@@ -334,16 +333,6 @@ export default function CatalogueModal({ visible, onClose, onSuccess }) {
                           keyboardType="numeric"
                           value={String(selectedItem.price)}
                           onChangeText={(v) => updateItemField(p.id, "price", v)}
-                        />
-                      </View>
-                      <View style={{ width: 12 }} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.inputLabel}>Initial Stock Qty</Text>
-                        <TextInput
-                          style={s.input}
-                          keyboardType="numeric"
-                          value={String(selectedItem.stock_qty)}
-                          onChangeText={(v) => updateItemField(p.id, "stock_qty", v)}
                         />
                       </View>
                     </View>

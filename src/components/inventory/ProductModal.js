@@ -690,8 +690,8 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
   };
 
   const handleSubmit = async () => {
-    if (!form.name.trim() || !form.stock.trim() || !form.price.trim()) {
-      setErr("Name, Stock and Price are required.");
+    if (!form.name.trim() || !form.price.trim()) {
+      setErr("Name and Price are required.");
       return;
     }
     if (!selectedCategory && !form.categoryName) {
@@ -885,28 +885,16 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
 
             <View style={s.divider} />
 
-            {/* Stock & Pricing */}
+            {/* Pricing */}
             <View style={s.section}>
-              <View style={s.row}>
-                <Field
-                  label="Stock"
-                  required
-                  style={{ flex: 1 }}
-                  value={form.stock}
-                  onChangeText={(v) => set("stock", v)}
-                  placeholder="e.g. 45"
-                  keyboardType="numeric"
-                />
-                <Field
-                  label="Selling Price (₹)"
-                  required
-                  style={{ flex: 1 }}
-                  value={form.price}
-                  onChangeText={(v) => set("price", v)}
-                  placeholder="e.g. 40"
-                  keyboardType="numeric"
-                />
-              </View>
+              <Field
+                label="Selling Price (₹)"
+                required
+                value={form.price}
+                onChangeText={(v) => set("price", v)}
+                placeholder="e.g. 40"
+                keyboardType="numeric"
+              />
               <Field
                 label="MRP (₹)"
                 style={{ marginTop: 12 }}
