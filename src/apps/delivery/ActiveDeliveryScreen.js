@@ -828,12 +828,6 @@ export default function ActiveDeliveryScreen({ navigation }) {
   const [step, setStep]                       = useState(0);
   const socketRef = useRef(null);
 
-  // Partner review customer
-  const [partnerReviewOrder, setPartnerReviewOrder] = useState(null);
-  const [partnerReviewRating, setPartnerReviewRating] = useState(0);
-  const [partnerReviewComment, setPartnerReviewComment] = useState("");
-  const [partnerReviewLoading, setPartnerReviewLoading] = useState(false);
-
 
   // -- AsyncStorage helpers: persist the local UI step per delivery --
   const STEP_KEY = (id) => `delivery_step_${id}`;
@@ -1091,11 +1085,10 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
           if (activeOrder?.id) await clearStep(activeOrder.id);
           setDeliveryCount(c => c + 1);
           setEarnings(e => e + (activeOrder?.deliveryFee || 65));
-          const reviewOrderData = activeOrder;
           setActiveOrder(null);
           setStep(0);
           fetchOrders();
-          navigation.navigate('Home', { reviewOrder: reviewOrderData });
+          navigation.navigate('Home');
           return;
         }
       } catch (e) { Alert.alert('Error', 'Network error'); return; }

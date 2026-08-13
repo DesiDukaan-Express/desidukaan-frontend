@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-  Platform, StatusBar, Animated, ScrollView, Modal, Pressable, Linking
+  Platform, StatusBar, Animated, ScrollView, Modal, Pressable, Linking,
+  TextInput,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -749,6 +750,156 @@ const s = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: C.gray600,
+  },
+
+  // ── Tip & Feedback Card ──
+  tipFeedbackCard: {
+    backgroundColor: C.white,
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    marginBottom: 16,
+  },
+  tfHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 14,
+  },
+  tfIconBg: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#FFF7ED",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tfTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: C.gray900,
+  },
+  tfSubtitle: {
+    fontSize: 12,
+    color: C.gray500,
+    marginTop: 1,
+  },
+  tipPresets: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
+  },
+  tipPresetBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: C.greenLight,
+    borderWidth: 2,
+    borderColor: C.greenBorder,
+  },
+  tipPresetBtnActive: {
+    backgroundColor: C.green,
+    borderColor: C.green,
+  },
+  tipPresetRupee: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.green,
+  },
+  tipPresetRupeeActive: {
+    color: "rgba(255,255,255,0.8)",
+  },
+  tipPresetAmount: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: C.greenDark,
+    marginTop: 2,
+  },
+  tipPresetAmountActive: {
+    color: C.white,
+  },
+  tipCustomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  tipCustomInputWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 48,
+  },
+  tipCurrency: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: C.gray500,
+    marginRight: 4,
+  },
+  tipCustomInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+    color: C.gray900,
+    paddingVertical: 0,
+  },
+  tipSendBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: C.green,
+    paddingHorizontal: 20,
+    height: 48,
+    borderRadius: 14,
+  },
+  tipSendBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: C.white,
+  },
+  tipSuccess: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 20,
+  },
+  tipSuccessText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: C.green,
+  },
+  tfDivider: {
+    height: 1,
+    backgroundColor: C.gray100,
+    marginVertical: 16,
+  },
+  feedbackRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  feedbackInput: {
+    flex: 1,
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    fontSize: 14,
+    color: C.gray900,
+  },
+  feedbackSendBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: C.green,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
 

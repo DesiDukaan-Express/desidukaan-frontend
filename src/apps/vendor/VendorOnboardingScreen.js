@@ -230,6 +230,13 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const [city, setCity] = useState('');
   const [pincode, setPincode] = useState('');
   const [deliveryType, setDeliveryType] = useState('self');
+
+  // Pre-fill owner name from user profile on mount
+  useEffect(() => {
+    if (user?.name && !ownerName) {
+      setOwnerName(user.name);
+    }
+  }, [user?.name]);
   // Geocoded coords — auto-set on submit
   const [resolvedLat, setResolvedLat] = useState(null);
   const [resolvedLng, setResolvedLng] = useState(null);

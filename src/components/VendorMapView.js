@@ -1,7 +1,54 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { View, Text, StyleSheet, Animated, Easing } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { FontAwesome5 } from "@expo/vector-icons";
+
+function BikeMarker() {
+  const pulse = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(0.6)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(pulse, { toValue: 1.35, duration: 900, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+          Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(opacity, { toValue: 0.15, duration: 900, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.6, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ]),
+      ])
+    ).start();
+  }, []);
+
+  return (
+    <View style={bikeStyles.wrapper}>
+      <Animated.View style={[bikeStyles.pulseRing, { transform: [{ scale: pulse }], opacity }]} />
+      <View style={bikeStyles.mainCircle}>
+        <Text style={bikeStyles.bikeEmoji}>🛵</Text>
+      </View>
+      <View style={bikeStyles.shadowDot} />
+    </View>
+  );
+}
+
+const bikeStyles = StyleSheet.create({
+  wrapper: { alignItems: "center", justifyContent: "center", width: 56, height: 56 },
+  pulseRing: { position: "absolute", width: 56, height: 56, borderRadius: 28, backgroundColor: "#22C55E" },
+  mainCircle: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: "#22C55E",
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 3, borderColor: "#FFFFFF",
+    shadowColor: "#22C55E", shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4, shadowRadius: 6, elevation: 8, zIndex: 2,
+  },
+  bikeEmoji: { fontSize: 22 },
+  shadowDot: {
+    position: "absolute", bottom: 2, width: 18, height: 6,
+    borderRadius: 3, backgroundColor: "rgba(0,0,0,0.12)", zIndex: 0,
+  },
+});
 
 const VendorMapView = ({ storeLocation, riders, silverMapStyle, destinationLocation }) => {
   return (
@@ -27,13 +74,8 @@ const VendorMapView = ({ storeLocation, riders, silverMapStyle, destinationLocat
       </Marker>
 
       {riders.map((rider) => (
-        <Marker key={rider.id} coordinate={rider.coordinate}>
-          <View style={styles.riderMarker}>
-            <View style={styles.riderMarkerDot} />
-            <View style={styles.riderMarkerIcon}>
-              <FontAwesome5 name="truck" size={12} color="#fff" />
-            </View>
-          </View>
+        <Marker key={rider.id} coordinate={rider.coordinate} tracksViewChanges={false}>
+          <BikeMarker />
         </Marker>
       ))}
 
@@ -88,28 +130,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 10,
     fontWeight: "700",
-  },
-  riderMarker: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  riderMarkerDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#22C55E",
-    marginBottom: -4,
-    zIndex: 1,
-  },
-  riderMarkerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: "#22C55E",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#fff",
   },
   destMarker: { alignItems: 'center' },
   destMarkerIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#E24B4A', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff' },

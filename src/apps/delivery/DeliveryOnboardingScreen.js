@@ -34,6 +34,7 @@ import {
 
 const INITIAL_FORM = {
     profile: {
+        name:          '',   // Partner's full name
         photoUrl:      '',   // CDN url (sent to backend)
         photoLocalUri: '',   // UI preview only
     },
@@ -77,6 +78,9 @@ const INITIAL_FORM = {
 function validate(form) {
     const e = {};
 
+    if (!form.profile.name.trim())
+        e['profile.name'] = 'Full name is required';
+
     if (!form.license.number.trim())
         e['license.number'] = 'License number is required';
 
@@ -108,6 +112,7 @@ function validate(form) {
 
 function buildPayload(form) {
     return {
+        name:                 form.profile.name.trim() || null,
         profile_photo_url:    form.profile.photoUrl    || null,
 
         license_number:       form.license.number.trim().toUpperCase() || null,
@@ -551,6 +556,17 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                             <Text style={s.fieldError}>{errors['profile.photoUrl']}</Text>
                         )}
                     </View>
+
+                    {/* Full Name Input */}
+                    <Field label="Full Name" required errorKey="profile.name" errors={errors}>
+                        <Input
+                            value={form.profile.name}
+                            onChangeText={(v) => setField('profile', 'name', v)}
+                            placeholder="Enter your full name"
+                            autoCapitalize="words"
+                        />
+                    </Field>
+
                     <TipBox text="Use a clear, well-lit photo. Face must be fully visible — no sunglasses or filters." />
                 </SectionCard>
 
