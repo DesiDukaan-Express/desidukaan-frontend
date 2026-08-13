@@ -262,6 +262,18 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
 
   const isLocating = !partnerPos;
 
+  // Distance & ETA from driver to customer
+  const distKm = partnerPos?.lat && destLat && destLng
+    ? haversineKm(partnerPos.lat, partnerPos.lng, destLat, destLng)
+    : null;
+  const distDisplay = distKm != null ? Number(distKm) : null;
+  const etaMins = distDisplay != null ? Math.max(2, Math.round(distDisplay * 4)) : null;
+  const etaLabel = etaMins != null
+    ? etaMins < 60
+      ? `~${etaMins} min`
+      : (() => { const h = Math.floor(etaMins / 60); const m = etaMins % 60; return m > 0 ? `~${h}h ${m}m` : `~${h}h`; })()
+    : null;
+
   const [showFullMap, setShowFullMap] = useState(false);
   const SCREEN_H = Dimensions.get("window").height;
 
@@ -300,6 +312,19 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
           destLng={destLng}
         />
 
+        {/* Arriving banner on map */}
+        {partnerPos && etaMins != null && (
+          <View style={dlm.mapArriveBanner}>
+            <Feather name="navigation" size={14} color={C.green} />
+            <Text style={dlm.mapArriveText}>
+              Arriving in{" "}
+              <Text style={dlm.mapArriveBold}>
+                ~{etaMins} {etaMins === 1 ? "min" : "mins"}
+              </Text>
+            </Text>
+          </View>
+        )}
+
         {/* Locating overlay — shown until first position arrives */}
         {isLocating && (
           <View style={dlm.locatingOverlay}>
@@ -336,82 +361,90 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
       </View>
     </View>
 
-    {/* ── Half-Screen Map Modal ── */}
+    {/* ── Full-Screen Map Modal ── */}
     <Modal
       visible={showFullMap}
-      transparent
       animationType="slide"
       onRequestClose={() => setShowFullMap(false)}
     >
-      <Pressable style={dlm.fullMapBackdrop} onPress={() => setShowFullMap(false)}>
-        <Pressable style={dlm.fullMapSheet} onPress={() => {}}>
-          {/* Handle */}
-          <View style={dlm.fullMapHandle} />
-
-          {/* Header row */}
-          <View style={dlm.fullMapHeader}>
-            <View style={dlm.fullMapHeaderLeft}>
-              <View style={dlm.mapIconBg}>
-                <Feather name="map" size={14} color={C.green} />
-              </View>
-              <Text style={dlm.fullMapTitle}>Live Tracking</Text>
+      <View style={dlm.fullScreenWrap}>
+        {/* Header row */}
+        <View style={dlm.fullMapHeader}>
+          <View style={dlm.fullMapHeaderLeft}>
+            <View style={dlm.mapIconBg}>
+              <Feather name="map" size={14} color={C.green} />
             </View>
-            <View style={dlm.fullMapHeaderRight}>
-              {partnerPos && (
-                <View style={dlm.fullMapLiveBadge}>
-                  <Animated.View style={[dlm.liveDot, { opacity: pulseAnim }]} />
-                  <Text style={dlm.liveText}>LIVE</Text>
-                </View>
-              )}
-              <TouchableOpacity
-                style={dlm.fullMapCloseBtn}
-                onPress={() => setShowFullMap(false)}
-                activeOpacity={0.7}
-              >
-                <Feather name="x" size={18} color={C.gray500} />
-              </TouchableOpacity>
-            </View>
+            <Text style={dlm.fullMapTitle}>Live Tracking</Text>
           </View>
+          <View style={dlm.fullMapHeaderRight}>
+            {partnerPos && (
+              <View style={dlm.fullMapLiveBadge}>
+                <Animated.View style={[dlm.liveDot, { opacity: pulseAnim }]} />
+                <Text style={dlm.liveText}>LIVE</Text>
+              </View>
+            )}
+            <TouchableOpacity
+              style={dlm.fullMapCloseBtn}
+              onPress={() => setShowFullMap(false)}
+              activeOpacity={0.7}
+            >
+              <Feather name="x" size={18} color={C.white} />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-          {/* Full map — fills remaining space */}
+        {/* Arriving banner on full map */}
+        {partnerPos && etaMins != null && (
+          <View style={dlm.fullMapArriveBanner}>
+            <Feather name="navigation" size={15} color={C.green} />
+            <Text style={dlm.fullMapArriveText}>
+              Arriving in{" "}
+              <Text style={dlm.fullMapArriveBold}>
+                ~{etaMins} {etaMins === 1 ? "min" : "mins"}
+              </Text>
+            </Text>
+          </View>
+        )}
+
+        {/* Full map — fills remaining space */}
           <View style={dlm.fullMapContainer}>
             <CustomerMapView
               partnerPos={partnerPos}
               destLat={destLat}
               destLng={destLng}
+              style={{ height: "100%", borderRadius: 0 }}
             />
 
-            {/* Locating overlay */}
-            {isLocating && (
-              <View style={dlm.locatingOverlayFull}>
-                <ActivityIndicator size="small" color={C.green} />
-                <Text style={dlm.locatingText}>
-                  {hasDriver ? "Locating driver…" : "Waiting for driver assignment…"}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Bottom info bar */}
-          <View style={dlm.fullMapInfoBar}>
-            <View style={dlm.fullMapInfoLeft}>
-              <View style={[dlm.connDot, { backgroundColor: connected ? C.green : C.gray300 }]} />
-              <Text style={dlm.fullMapInfoText}>
-                {connected ? "Connected — live updates" : "Reconnecting…"}
+          {/* Locating overlay */}
+          {isLocating && (
+            <View style={dlm.locatingOverlayFull}>
+              <ActivityIndicator size="small" color={C.green} />
+              <Text style={dlm.locatingText}>
+                {hasDriver ? "Locating driver…" : "Waiting for driver assignment…"}
               </Text>
             </View>
-            {lastUpdate && (
-              <Text style={dlm.fullMapInfoTime}>
-                {lastUpdate.toLocaleTimeString("en-IN", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                })}
-              </Text>
-            )}
+          )}
+        </View>
+
+        {/* Bottom info bar */}
+        <View style={dlm.fullMapInfoBar}>
+          <View style={dlm.fullMapInfoLeft}>
+            <View style={[dlm.connDot, { backgroundColor: connected ? C.green : C.gray300 }]} />
+            <Text style={dlm.fullMapInfoText}>
+              {connected ? "Connected — live updates" : "Reconnecting…"}
+            </Text>
           </View>
-        </Pressable>
-      </Pressable>
+          {lastUpdate && (
+            <Text style={dlm.fullMapInfoTime}>
+              {lastUpdate.toLocaleTimeString("en-IN", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
+            </Text>
+          )}
+        </View>
+      </View>
     </Modal>
     </>
   );
@@ -555,34 +588,18 @@ const dlm = StyleSheet.create({
     color: C.green,
   },
   // ── Half-Screen Map Modal ──
-  fullMapBackdrop: {
+  fullScreenWrap: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
-  fullMapSheet: {
-    backgroundColor: C.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: "hidden",
-  },
-  fullMapHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: C.gray300,
-    borderRadius: 2,
-    alignSelf: "center",
-    marginTop: 10,
-    marginBottom: 6,
+    backgroundColor: C.gray50,
   },
   fullMapHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: C.gray100,
+    paddingTop: 14,
+    paddingBottom: 10,
+    backgroundColor: C.green,
   },
   fullMapHeaderLeft: {
     flexDirection: "row",
@@ -597,7 +614,7 @@ const dlm = StyleSheet.create({
   fullMapTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: C.gray900,
+    color: C.white,
   },
   fullMapLiveBadge: {
     flexDirection: "row",
@@ -612,7 +629,7 @@ const dlm = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: C.gray100,
+    backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -626,8 +643,6 @@ const dlm = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: C.gray100,
     backgroundColor: C.white,
   },
   fullMapInfoLeft: {
@@ -644,6 +659,64 @@ const dlm = StyleSheet.create({
     fontSize: 11,
     color: C.gray400,
     fontWeight: "500",
+  },
+  mapArriveBanner: {
+    position: "absolute",
+    top: 10,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: C.white,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 6,
+    zIndex: 20,
+  },
+  mapArriveText: {
+    fontSize: 13,
+    color: C.gray600,
+    fontWeight: "500",
+  },
+  mapArriveBold: {
+    fontSize: 16,
+    color: C.green,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+  },
+  fullMapArriveBanner: {
+    position: "absolute",
+    top: 60,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: C.white,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 26,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 8,
+    zIndex: 20,
+  },
+  fullMapArriveText: {
+    fontSize: 14,
+    color: C.gray600,
+    fontWeight: "500",
+  },
+  fullMapArriveBold: {
+    fontSize: 18,
+    color: C.green,
+    fontWeight: "900",
+    letterSpacing: 0.3,
   },
 });
 
@@ -845,7 +918,14 @@ function OrderDetailModal({ order, onClose }) {
                   <Text style={od.statusTitle}>
                     {isActive
                       ? partnerPos?.lat
-                        ? `Arriving in ~${liveEtaMins} ${liveEtaMins === 1 ? "min" : "mins"}`
+                        ? (
+                          <>
+                            {"Arriving in "}
+                            <Text style={od.statusEtaBold}>
+                              ~{liveEtaMins} {liveEtaMins === 1 ? "min" : "mins"}
+                            </Text>
+                          </>
+                        )
                         : hasDriver
                           ? "Locating driver…"
                           : order?.status === "ready"
@@ -1357,6 +1437,15 @@ const od = StyleSheet.create({
     fontWeight: "900",
     color: C.white,
     lineHeight: 21,
+  },
+  statusEtaBold: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: C.white,
+    letterSpacing: 0.3,
+    textShadowColor: "rgba(0,0,0,0.25)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   statusLivePill: {
     flexDirection: "row",

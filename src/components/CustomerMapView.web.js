@@ -78,7 +78,7 @@ function svgToDataUrl(svg) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-export default function CustomerMapView({ partnerPos, destLat, destLng }) {
+export default function CustomerMapView({ partnerPos, destLat, destLng, style: styleOverride }) {
   const containerRef  = useRef(null);
   const mapRef        = useRef(null);   // Leaflet map instance
   const driverMarker  = useRef(null);   // Leaflet Marker for driver
@@ -138,10 +138,10 @@ export default function CustomerMapView({ partnerPos, destLat, destLng }) {
     const map = L.map(containerRef.current, {
       zoomControl: false,
       attributionControl: false,
-      dragging: false,
-      scrollWheelZoom: false,
-      doubleClickZoom: false,
-      touchZoom: false,
+      dragging: true,
+      scrollWheelZoom: true,
+      doubleClickZoom: true,
+      touchZoom: true,
     }).setView(center, 15);
 
     // Carto Voyager basemap — colorful, no API key needed
@@ -272,7 +272,7 @@ export default function CustomerMapView({ partnerPos, destLat, destLng }) {
   }, [partnerPos, ready]);
 
   return (
-    <View style={styles.outer}>
+    <View style={[styles.outer, styleOverride]}>
       {!ready && (
         <View style={styles.loaderWrap}>
           <ActivityIndicator size="small" color="#16A34A" />

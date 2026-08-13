@@ -97,7 +97,7 @@ const bikeStyles = StyleSheet.create({
   },
 });
 
-export default function CustomerMapView({ partnerPos, destLat, destLng }) {
+export default function CustomerMapView({ partnerPos, destLat, destLng, style: styleOverride }) {
   const mapRef = useRef(null);
 
   const center = partnerPos
@@ -122,13 +122,13 @@ export default function CustomerMapView({ partnerPos, destLat, destLng }) {
   }, [partnerPos?.lat, partnerPos?.lng, destLat, destLng]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, styleOverride]}>
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         region={{ ...center, ...DEFAULT_DELTA }}
-        scrollEnabled={false}
-        zoomEnabled={false}
+        scrollEnabled={true}
+        zoomEnabled={true}
         rotateEnabled={false}
       >
         {/* Route polyline between driver and destination */}
