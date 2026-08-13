@@ -132,22 +132,27 @@ function CustomerTabNavigator() {
           if (route.name === 'Cart') return <CartTabIcon focused={focused} label={label} />;
           return <TabIcon iconName={TAB_ICONS[route.name]} label={label} focused={focused} />;
         },
-        tabBarStyle: {
-          backgroundColor: C.surface,
-          borderTopWidth: 1,
-          borderTopColor: C.border,
-          height: Platform.OS === 'ios' ? 82 : 64,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 4,
-          paddingTop: 4,
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -3 },
-          shadowOpacity: 0.06,
-          shadowRadius: 10,
-          elevation: 16,
-          overflow: Platform.OS === 'android' ? 'hidden' : 'visible',
-        },
+        // ProfileScreen renders its own custom bottom nav, so hide this
+        // navigator's built-in tab bar just for that route to avoid a
+        // duplicate nav bar. All other tabs keep the normal styled bar.
+        tabBarStyle: route.name === 'Profile'
+          ? { display: 'none' }
+          : {
+            backgroundColor: C.surface,
+            borderTopWidth: 1,
+            borderTopColor: C.border,
+            height: Platform.OS === 'ios' ? 82 : 64,
+            paddingBottom: Platform.OS === 'ios' ? 20 : 4,
+            paddingTop: 4,
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -3 },
+            shadowOpacity: 0.06,
+            shadowRadius: 10,
+            elevation: 16,
+            overflow: Platform.OS === 'android' ? 'hidden' : 'visible',
+          },
         tabBarIconStyle: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
         tabBarItemStyle: { justifyContent: 'center', alignItems: 'center', height: '100%' },
         tabBarActiveTintColor: C.green,

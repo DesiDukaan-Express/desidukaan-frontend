@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Animated, Alert, Share, Platform,
   SafeAreaView, Modal, Pressable, ActivityIndicator,
-  Switch, Linking, useWindowDimensions,
+  Switch, useWindowDimensions, RefreshControl,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -16,7 +16,6 @@ import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
 import LanguageSwitcher from "../../components/common/LanguageSwitcher";
 
-
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 const C = {
@@ -26,6 +25,7 @@ const C = {
   greenMid: "#DCFCE7",
   blue: "#3B82F6", blueLight: "#EFF6FF",
   purple: "#8B5CF6", purpleLight: "#F5F3FF",
+  gold: "#F59E0B", goldLight: "#FFFBEB", goldBorder: "#FDE68A",
   white: "#FFFFFF", bg: "#F8FAFC",
   gray100: "#F3F4F6", gray200: "#E5E7EB",
   gray300: "#D1D5DB", gray400: "#9CA3AF",
@@ -35,20 +35,42 @@ const C = {
 };
 
 // ─── Avatar initials ──────────────────────────────────────────────────────
-function Avatar({ name, size = 64 }) {
-  const initials = (name || "?")
-    .trim().split(" ").slice(0, 2)
-    .map(w => w[0]?.toUpperCase() || "").join("");
-  return (
-    <LinearGradient
-      colors={[C.orange, C.green]}
-      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-      style={{ width: size, height: size, borderRadius: size * 0.3, alignItems: "center", justifyContent: "center" }}
+function Avatar({ name, size = 64, onPress, editable = false }) {
+  const initials = (name || "?").trim().slice(0, 1).toUpperCase();
+  const content = (
+    <View
+      style={{
+        width: size, height: size, borderRadius: size / 2,
+        backgroundColor: "rgba(255,255,255,0.25)",
+        alignItems: "center", justifyContent: "center",
+        borderWidth: 2, borderColor: "rgba(255,255,255,0.5)",
+      }}
     >
-      <Text style={{ color: C.white, fontWeight: "900", fontSize: size * 0.36, letterSpacing: 1 }}>
+      <Text style={{ color: C.white, fontWeight: "800", fontSize: size * 0.42 }}>
         {initials}
       </Text>
-    </LinearGradient>
+      {editable && (
+        <View style={{
+          position: "absolute", bottom: -2, left: -2,
+          width: size * 0.32, height: size * 0.32, borderRadius: size * 0.16,
+          backgroundColor: C.gray900, borderWidth: 2, borderColor: C.white,
+          alignItems: "center", justifyContent: "center",
+        }}>
+          <Feather name="camera" size={size * 0.15} color={C.white} />
+        </View>
+      )}
+    </View>
+  );
+  if (!editable) return content;
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel="Change profile photo"
+    >
+      {content}
+    </TouchableOpacity>
   );
 }
 
@@ -111,135 +133,206 @@ const em = StyleSheet.create({
   saveText: { fontSize: 15, fontWeight: "800", color: C.white },
 });
 
-// ─── Info row (tappable field) ────────────────────────────────────────────
-function InfoRow({ label, value, onEdit, editable = true, icon = "user" }) {
+// ─── Card header (icon + title + optional action link) ───────────────────
+function CardHeader({ icon, iconBg, iconColor, title, actionLabel, onAction }) {
   return (
-    <View style={ir.row}>
-      <View style={[ir.fieldIconWrap, !editable && ir.fieldIconWrapOff]}>
-        <Feather name={icon} size={15} color={editable ? C.green : C.gray400} />
+    <View style={ch.row}>
+      <View style={ch.left}>
+        <View style={[ch.iconWrap, { backgroundColor: iconBg }]}>
+          <Feather name={icon} size={16} color={iconColor} />
+        </View>
+        <Text style={ch.title}>{title}</Text>
+      </View>
+      {actionLabel ? (
+        <TouchableOpacity
+          style={ch.actionBtn} onPress={onAction} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button" accessibilityLabel={actionLabel}
+        >
+          <Text style={ch.actionText}>{actionLabel}</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+}
+const ch = StyleSheet.create({
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
+  left: { flexDirection: "row", alignItems: "center", gap: 10 },
+  iconWrap: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  title: { fontSize: 16, fontWeight: "800", color: C.gray900 },
+  actionBtn: { backgroundColor: C.greenMid, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
+  actionText: { fontSize: 12.5, fontWeight: "800", color: C.greenDark },
+});
+
+// ─── Info row (tappable field, chevron style) ─────────────────────────────
+function InfoRow({ label, value, onPress, icon = "user", last = false, locked = false, lockedHint }) {
+  return (
+    <TouchableOpacity
+      style={[ir.row, last && { borderBottomWidth: 0 }]}
+      onPress={onPress}
+      activeOpacity={locked ? 1 : 0.7}
+      accessibilityRole="button"
+      accessibilityLabel={locked ? `${label}, ${lockedHint || "cannot be changed"}` : `Edit ${label}`}
+    >
+      <View style={[ir.fieldIconWrap, locked && ir.fieldIconWrapLocked]}>
+        <Feather name={icon} size={15} color={locked ? C.gray400 : C.green} />
       </View>
       <View style={ir.left}>
-        <Text style={ir.label}>{label}</Text>
+        <View style={ir.labelRow}>
+          <Text style={ir.label}>{label}</Text>
+          {locked && (
+            <View style={ir.verifiedTag}>
+              <Feather name="check" size={9} color={C.greenDark} />
+              <Text style={ir.verifiedTagText}>Verified</Text>
+            </View>
+          )}
+        </View>
         <Text style={[ir.value, !value && ir.valuePlaceholder]}>
           {value || `Add ${label.toLowerCase()}`}
         </Text>
       </View>
-      {editable && (
-        <TouchableOpacity style={ir.editBtn} onPress={onEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="edit-2" size={13} color={C.green} />
-        </TouchableOpacity>
-      )}
-      {!editable && (
-        <View style={ir.lockWrap}>
-          <Feather name="lock" size={13} color={C.gray300} />
-        </View>
-      )}
-    </View>
-  );
-}
-const ir = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  fieldIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.greenMid, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  fieldIconWrapOff: { backgroundColor: C.gray100 },
-  left: { flex: 1 },
-  label: { fontSize: 11, fontWeight: "700", color: C.gray400, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 5 },
-  value: { fontSize: 16, fontWeight: "600", color: C.gray900 },
-  valuePlaceholder: { color: C.gray400, fontWeight: "400", fontStyle: "italic" },
-  editBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: C.greenMid, alignItems: "center", justifyContent: "center" },
-  lockWrap: { width: 34, height: 34, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
-});
-
-// ─── Address card ─────────────────────────────────────────────────────────
-function AddressCard({ addr, isSelected, onSelect, onRemove }) {
-  const text = typeof addr.address === "string" ? addr.address : addr.address_line || "Saved address";
-  return (
-    <TouchableOpacity
-      style={[adc.card, isSelected && adc.cardActive]}
-      onPress={() => onSelect(addr)} activeOpacity={0.8}
-    >
-      <View style={[adc.icon, isSelected && adc.iconActive]}>
-        <Feather name="map-pin" size={13} color={isSelected ? C.white : C.gray500} />
-      </View>
-      <Text style={[adc.text, isSelected && adc.textActive]} numberOfLines={2}>{text}</Text>
-      {isSelected
-        ? <View style={adc.tick}><Feather name="check" size={11} color={C.white} /></View>
-        : <TouchableOpacity onPress={() => onRemove(addr)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="x" size={15} color={C.gray300} />
-        </TouchableOpacity>
-      }
+      {locked
+        ? <Feather name="lock" size={14} color={C.gray300} />
+        : <Feather name="chevron-right" size={16} color={C.gray300} />}
     </TouchableOpacity>
   );
 }
-const adc = StyleSheet.create({
-  card: {
-    flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 16,
-    backgroundColor: C.white, marginBottom: 10, borderWidth: 1, borderColor: C.gray100,
-    shadowColor: "#0F172A", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
-  },
-  cardActive: { borderColor: C.greenBorder, backgroundColor: C.greenLight, shadowOpacity: 0.08 },
-  icon: { width: 32, height: 32, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  iconActive: { backgroundColor: C.green },
-  text: { flex: 1, fontSize: 13.5, color: C.gray700, fontWeight: "500", lineHeight: 19 },
-  textActive: { color: C.greenDark, fontWeight: "700" },
-  activeLabel: { fontSize: 11, color: C.green, fontWeight: "700", marginTop: 3 },
-  tick: { width: 22, height: 22, borderRadius: 7, backgroundColor: C.green, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+const ir = StyleSheet.create({
+  row: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  fieldIconWrap: { width: 36, height: 36, borderRadius: 11, backgroundColor: C.greenMid, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  fieldIconWrapLocked: { backgroundColor: C.gray100 },
+  left: { flex: 1 },
+  labelRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 },
+  label: { fontSize: 13.5, fontWeight: "700", color: C.gray900 },
+  verifiedTag: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: C.greenMid, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 8 },
+  verifiedTagText: { fontSize: 9.5, fontWeight: "800", color: C.greenDark },
+  value: { fontSize: 13, color: C.gray500, fontWeight: "500" },
+  valuePlaceholder: { color: C.gray400, fontStyle: "italic" },
 });
 
-// ─── Row menu item ────────────────────────────────────────────────────────
-const TINTS = {
-  orange: { bg: C.orangeLight, fg: C.orangeDark },
-  green: { bg: C.greenMid, fg: C.greenDark },
-  blue: { bg: C.blueLight, fg: C.blue },
-  purple: { bg: C.purpleLight, fg: C.purple },
-};
-function MenuItem({ icon, label, onPress, danger, right, sub, tint }) {
-  const t = tint ? TINTS[tint] : null;
+// ─── Row menu item (icon + label + sub + right control) ───────────────────
+function MenuItem({ icon, label, onPress, danger, right, sub, iconBg, iconColor, last = false }) {
   return (
     <TouchableOpacity
-      style={[mi.row, danger && mi.rowDanger]}
+      style={[mi.row, last && { borderBottomWidth: 0, marginBottom: 0, paddingBottom: 0 }]}
       onPress={onPress} activeOpacity={0.75}
+      accessibilityRole="button" accessibilityLabel={sub ? `${label}, ${sub}` : label}
     >
-      <View style={[mi.iconWrap, danger && mi.iconDanger, t && { backgroundColor: t.bg }]}>
-        <Feather name={icon} size={16} color={danger ? C.red : (t ? t.fg : C.gray600)} />
+      <View style={[mi.iconWrap, { backgroundColor: iconBg || C.gray100 }]}>
+        <Feather name={icon} size={16} color={iconColor || C.gray600} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[mi.label, danger && mi.labelDanger]}>{label}</Text>
-        {sub ? <Text style={mi.sub}>{sub}</Text> : null}
+        {sub ? <Text style={[mi.sub, danger && mi.subDanger]}>{sub}</Text> : null}
       </View>
-      {right !== undefined ? right : <Feather name="chevron-right" size={15} color={danger ? "#FECACA" : C.gray300} />}
+      {right !== undefined ? right : <Feather name="chevron-right" size={15} color={danger ? "#FCA5A5" : C.gray300} />}
     </TouchableOpacity>
   );
 }
 const mi = StyleSheet.create({
   row: {
-    flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 15, paddingHorizontal: 16,
-    backgroundColor: C.white, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: C.gray100,
-    shadowColor: "#0F172A", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
+    flexDirection: "row", alignItems: "center", gap: 13, paddingVertical: 13,
+    borderBottomWidth: 1, borderBottomColor: C.gray100, marginBottom: 2,
   },
-  rowDanger: { borderColor: "#FECACA", backgroundColor: C.redLight, shadowOpacity: 0 },
-  iconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
-  iconDanger: { backgroundColor: "#FEE2E2" },
-  label: { fontSize: 15, color: C.gray900, fontWeight: "600" },
+  iconWrap: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  label: { fontSize: 14.5, color: C.gray900, fontWeight: "700" },
   labelDanger: { color: C.red },
-  sub: { fontSize: 12, color: C.gray400, marginTop: 2 },
+  sub: { fontSize: 12, color: C.gray400, marginTop: 2, fontWeight: "500" },
+  subDanger: { color: "#F87171" },
+});
+
+// ─── Quick action button ───────────────────────────────────────────────────
+function QuickAction({ icon, label, bg, color, onPress }) {
+  return (
+    <TouchableOpacity
+      style={[qa.btn, { backgroundColor: bg }]} onPress={onPress} activeOpacity={0.8}
+      accessibilityRole="button" accessibilityLabel={label}
+    >
+      <Feather name={icon} size={20} color={color} />
+      <Text style={[qa.label, { color: C.gray700 }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+const qa = StyleSheet.create({
+  btn: { flexBasis: "48%", flexGrow: 1, borderRadius: 16, paddingVertical: 18, alignItems: "center", justifyContent: "center", gap: 8 },
+  label: { fontSize: 12.5, fontWeight: "700" },
+});
+
+// ─── Stat item (with action link) ──────────────────────────────────────────
+function StatItem({ icon, iconBg, iconColor, value, label, action, onAction }) {
+  return (
+    <View style={st.item}>
+      <View style={[st.iconWrap, { backgroundColor: iconBg }]}>
+        <Feather name={icon} size={16} color={iconColor} />
+      </View>
+      <View>
+        <Text style={st.value} numberOfLines={1}>{value}</Text>
+        <Text style={st.label}>{label}</Text>
+        {action ? (
+          <TouchableOpacity
+            onPress={onAction} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            accessibilityRole="button" accessibilityLabel={`${action} ${label}`}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 2, marginTop: 3 }}>
+              <Text style={st.action}>{action}</Text>
+              <Feather name="chevron-right" size={11} color={C.green} />
+            </View>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+const st = StyleSheet.create({
+  item: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  iconWrap: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  value: { fontSize: 16, fontWeight: "900", color: C.gray900 },
+  label: { fontSize: 11, color: C.gray400, fontWeight: "600", marginTop: 1 },
+  action: { fontSize: 11, color: C.green, fontWeight: "800" },
+});
+
+// ─── Address row (used inside Delivery Address card + Manage modal) ──────
+function AddressRow({ addr, isSelected, onPress }) {
+  const text = typeof addr.address === "string" ? addr.address : addr.address_line || "Saved address";
+  return (
+    <TouchableOpacity
+      style={[adc.card, isSelected && adc.cardActive]}
+      onPress={onPress} activeOpacity={0.8}
+    >
+      <View style={[adc.icon, isSelected && adc.iconActive]}>
+        <Feather name="map-pin" size={14} color={isSelected ? C.white : C.gray500} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[adc.text, isSelected && adc.textActive]} numberOfLines={2}>{text}</Text>
+        {isSelected && <Text style={adc.activeLabel}>Active delivery address</Text>}
+      </View>
+      <Feather name="chevron-right" size={15} color={isSelected ? C.green : C.gray300} />
+    </TouchableOpacity>
+  );
+}
+const adc = StyleSheet.create({
+  card: {
+    flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 14,
+    backgroundColor: C.white, marginBottom: 10, borderWidth: 1, borderColor: C.gray100,
+  },
+  cardActive: { borderColor: C.greenBorder, backgroundColor: C.greenLight },
+  icon: { width: 34, height: 34, borderRadius: 11, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  iconActive: { backgroundColor: C.green },
+  text: { fontSize: 13.5, color: C.gray700, fontWeight: "600", lineHeight: 19 },
+  textActive: { color: C.greenDark, fontWeight: "800" },
+  activeLabel: { fontSize: 11.5, color: C.green, fontWeight: "700", marginTop: 3 },
 });
 
 // ─── Address Detail Modal ─────────────────────────────────────────────────
 function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
   const [region, setRegion] = useState({
-    latitude: 28.6139,
-    longitude: 77.2090,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
+    latitude: 28.6139, longitude: 77.2090, latitudeDelta: 0.05, longitudeDelta: 0.05,
   });
 
   useEffect(() => {
     if (addr?.lat && addr?.lng) {
       setRegion({
-        latitude: parseFloat(addr.lat),
-        longitude: parseFloat(addr.lng),
-        latitudeDelta: 0.005,
-        longitudeDelta: 0.005,
+        latitude: parseFloat(addr.lat), longitude: parseFloat(addr.lng),
+        latitudeDelta: 0.005, longitudeDelta: 0.005,
       });
     }
   }, [addr]);
@@ -253,7 +346,6 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
           <View style={adm.handle} />
           <Text style={adm.title}>Address details</Text>
 
-          {/* Map Preview */}
           {addr.lat && addr.lng && (
             <View style={adm.mapWrapper}>
               <AddressMapView
@@ -265,7 +357,6 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
             </View>
           )}
 
-          {/* Address text */}
           <View style={adm.addrBox}>
             <View style={[adm.addrIcon, isSelected && adm.addrIconActive]}>
               <Feather name="map-pin" size={18} color={isSelected ? C.white : C.gray500} />
@@ -273,7 +364,6 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
             <Text style={adm.addrText}>{text}</Text>
           </View>
 
-          {/* Coordinates if available */}
           {addr.lat && addr.lng && (
             <View style={adm.coordRow}>
               <Feather name="navigation" size={13} color={C.gray400} />
@@ -283,7 +373,6 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
             </View>
           )}
 
-          {/* Active badge */}
           {isSelected && (
             <View style={adm.activeBadge}>
               <Feather name="check-circle" size={14} color={C.green} />
@@ -291,7 +380,6 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
             </View>
           )}
 
-          {/* Actions */}
           <View style={adm.actions}>
             {!isSelected && (
               <TouchableOpacity style={adm.selectBtn} onPress={() => onSelect(addr)} activeOpacity={0.85}>
@@ -325,7 +413,7 @@ const adm = StyleSheet.create({
   addrBox: { flexDirection: "row", alignItems: "flex-start", gap: 14, backgroundColor: C.gray100, borderRadius: 14, padding: 16, marginBottom: 12 },
   addrIcon: { width: 38, height: 38, borderRadius: 11, backgroundColor: C.gray200, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   addrIconActive: { backgroundColor: C.green },
-  addrText: { flex: 1, fontSize: 15, color: C.gray800 ?? C.gray900, fontWeight: "500", lineHeight: 22 },
+  addrText: { flex: 1, fontSize: 15, color: C.gray900, fontWeight: "500", lineHeight: 22 },
   coordRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, marginBottom: 12 },
   coordText: { fontSize: 12, color: C.gray400, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
   activeBadge: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.greenLight, borderRadius: 12, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: C.greenBorder },
@@ -337,19 +425,46 @@ const adm = StyleSheet.create({
   removeBtnText: { fontSize: 14, fontWeight: "700", color: C.red },
 });
 
-// ─── Section header ───────────────────────────────────────────────────────
-function SectionLabel({ title }) {
+// ─── Manage Addresses modal ────────────────────────────────────────────────
+function AddressesModal({ visible, addresses, selectedId, onSelect, onClose, onOpenDetail }) {
   return (
-    <View style={secStyles.wrap}>
-      <View style={secStyles.tick} />
-      <Text style={secStyles.text}>{title}</Text>
-    </View>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={am.backdrop} onPress={onClose}>
+        <Pressable style={am.sheet} onPress={() => { }}>
+          <View style={am.handle} />
+          <Text style={am.title}>Manage Addresses</Text>
+          <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+            {(!addresses || addresses.length === 0) ? (
+              <View style={{ alignItems: "center", paddingVertical: 24, gap: 8 }}>
+                <Feather name="map-pin" size={22} color={C.gray300} />
+                <Text style={{ color: C.gray400, fontSize: 13 }}>No saved addresses yet</Text>
+              </View>
+            ) : (
+              addresses.map(a => (
+                <AddressRow
+                  key={a.id}
+                  addr={a}
+                  isSelected={a.id === selectedId}
+                  onPress={() => onOpenDetail(a)}
+                />
+              ))
+            )}
+          </ScrollView>
+          <TouchableOpacity style={am.closeBtn} onPress={onClose}>
+            <Text style={am.closeBtnText}>Close</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
-const secStyles = StyleSheet.create({
-  wrap: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14, marginTop: 30 },
-  tick: { width: 3, height: 14, borderRadius: 2, backgroundColor: C.green },
-  text: { fontSize: 12, fontWeight: "800", color: C.gray500, letterSpacing: 0.8, textTransform: "uppercase" },
+const am = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
+  title: { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 16 },
+  closeBtn: { backgroundColor: C.gray100, paddingVertical: 14, borderRadius: 14, alignItems: "center", marginTop: 12 },
+  closeBtnText: { fontSize: 15, fontWeight: "700", color: C.gray600 },
 });
 
 // ─── Logout modal ─────────────────────────────────────────────────────────
@@ -422,34 +537,98 @@ const pm2 = StyleSheet.create({
   closeBtnText: { fontSize: 15, fontWeight: "700", color: C.gray600 },
 });
 
+// ─── Bottom nav bar ─────────────────────────────────────────────────────────
+function BottomNav({ active, onNavigate, cartCount }) {
+  const items = [
+    { key: "Home", label: "Home", icon: "home" },
+    { key: "Cart", label: "Cart", icon: "shopping-cart", badge: cartCount },
+    { key: "Orders", label: "Orders", icon: "clipboard" },
+    { key: "Profile", label: "Profile", icon: "user" },
+  ];
+  return (
+    <View style={bn.wrap}>
+      {items.map(it => {
+        const isActive = it.key === active;
+        return (
+          <TouchableOpacity
+            key={it.key}
+            style={[bn.item, isActive && bn.itemActive]}
+            onPress={() => onNavigate(it.key)}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={it.label}
+            accessibilityState={{ selected: isActive }}
+          >
+            <View>
+              <Feather name={it.icon} size={19} color={isActive ? C.green : C.gray400} />
+              {!!it.badge && (
+                <View style={bn.badge}>
+                  <Text style={bn.badgeText}>{it.badge}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={[bn.label, isActive && bn.labelActive]}>{it.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+const bn = StyleSheet.create({
+  wrap: {
+    flexDirection: "row", backgroundColor: C.white, borderTopWidth: 1, borderTopColor: C.gray100,
+    paddingTop: 10, paddingBottom: Platform.OS === "ios" ? 22 : 10, paddingHorizontal: 10,
+  },
+  item: { flex: 1, alignItems: "center", justifyContent: "center", gap: 4, paddingVertical: 6, borderRadius: 14 },
+  itemActive: { backgroundColor: C.greenMid },
+  badge: {
+    position: "absolute", top: -6, right: -10, minWidth: 16, height: 16, borderRadius: 8,
+    backgroundColor: C.green, alignItems: "center", justifyContent: "center", paddingHorizontal: 3,
+  },
+  badgeText: { color: C.white, fontSize: 9.5, fontWeight: "800" },
+  label: { fontSize: 11, color: C.gray400, fontWeight: "600" },
+  labelActive: { color: C.green, fontWeight: "800" },
+});
+
 // ═════════════════════════════════════════════════════════════════════════
 export default function ProfileScreen() {
   const navigation = useNavigation();
   const { t } = useTranslation();
   const { user, token, logout, updateUser, setActiveRole } = useAuthStore();
-  const { clearCart } = useCartStore();
+  const cartStore = useCartStore();
   const addressStore = useAddressStore();
-  const { width: winW } = useWindowDimensions();
-  const isWide = winW > 600;
   const [showLanguage, setShowLanguage] = useState(false);
-  const contentMaxW = Math.min(winW, 640);
-  const hPad = isWide ? Math.max(24, Math.floor((winW - contentMaxW) / 2)) : 20;
+  const hPad = 16;
 
   const [showLogout, setShowLogout] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
+  const [showAddresses, setShowAddresses] = useState(false);
   const [editField, setEditField] = useState(null);
   const [saving, setSaving] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [detailAddr, setDetailAddr] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Load notification preference from AsyncStorage
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        addressStore?.fetchAddresses?.(token),
+        cartStore?.fetchCart?.(token),
+      ]);
+    } catch {
+      // best-effort refresh; existing data stays on screen
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     AsyncStorage.getItem("notif_enabled")
       .then(v => { if (v !== null) setNotifEnabled(v === "true" || v === true); })
       .catch(() => { });
   }, []);
 
-  // Animations
   const fadeO = useRef(new Animated.Value(0)).current;
   const slideY = useRef(new Animated.Value(18)).current;
 
@@ -460,7 +639,6 @@ export default function ProfileScreen() {
     ]).start();
   }, []);
 
-  // ── Save field ─────────────────────────────────────────────────────────
   const handleSave = async (value) => {
     if (!value || !editField) return;
     setSaving(true);
@@ -484,13 +662,11 @@ export default function ProfileScreen() {
     }
   };
 
-  // ── Toggle notifications ───────────────────────────────────────────────
   const handleNotifToggle = async (val) => {
     setNotifEnabled(val);
     await AsyncStorage.setItem("notif_enabled", String(val));
   };
 
-  // ── Invite ─────────────────────────────────────────────────────────────
   const handleInvite = async () => {
     try {
       await Share.share({
@@ -499,26 +675,45 @@ export default function ProfileScreen() {
     } catch { }
   };
 
-  // ── Logout ─────────────────────────────────────────────────────────────
   const handleLogout = () => {
-    clearCart();
+    cartStore.clearCart?.();
     addressStore.clearAddresses?.();
     logout();
     setShowLogout(false);
+  };
+
+  const handleBottomNav = (key) => {
+    if (key === "Profile") return;
+    navigation.navigate(key);
   };
 
   const memberSince = user?.created_at
     ? new Date(user.created_at).toLocaleDateString("en-IN", { month: "long", year: "numeric" })
     : null;
 
+  const addresses = addressStore?.addresses ?? [];
+  const activeAddress = addresses.find(a => a.id === addressStore.selectedId) || addresses[0];
+  const cartCount = cartStore?.items?.length ?? 0;
+  const isPremium = user?.isPremium ?? true;
+  const loyaltyPoints = user?.loyaltyPoints ?? 3;
+
+  const gridCardStyle = [s.card];
+
   return (
     <SafeAreaView style={s.root}>
       <Animated.ScrollView
         style={{ opacity: fadeO }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 60 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={C.green}
+            colors={[C.green]}
+          />
+        }
       >
-
         {/* ── Hero header ─────────────────────────────────────────────── */}
         <Animated.View style={{ transform: [{ translateY: slideY }] }}>
           <LinearGradient
@@ -526,208 +721,250 @@ export default function ProfileScreen() {
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={[s.hero, { paddingHorizontal: hPad }]}
           >
-            {/* Decorative accents */}
             <View style={s.heroDecorCircle1} pointerEvents="none" />
             <View style={s.heroDecorCircle2} pointerEvents="none" />
 
-            {/* Top row */}
-            <View style={s.heroTop}>
-              <Text style={s.heroLabel}>{t('profile.myProfile')}</Text>
+            <View style={s.heroTopRow}>
+              <Text style={s.heroLabel}>{t('profile.myProfile', 'My Profile').toUpperCase()}</Text>
+              <TouchableOpacity
+                style={s.editProfileBtn}
+                activeOpacity={0.8}
+                onPress={() => setEditField({ field: "name", label: "Name", value: user?.name })}
+                accessibilityRole="button"
+                accessibilityLabel="Edit profile name"
+              >
+                <Feather name="edit-2" size={13} color={C.white} />
+                <Text style={s.editProfileText}>Edit Profile</Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Avatar + name */}
             <View style={s.heroMain}>
-              <View style={s.avatarRing}>
-                <View style={s.avatarOuter}>
-                  <Avatar name={user?.name} size={72} />
-                  <View style={s.verifiedDot}>
-                    <Feather name="check" size={9} color={C.white} />
-                  </View>
+              <View style={s.avatarOuter}>
+                <Avatar
+                  name={user?.name} size={72} editable
+                  onPress={() => Alert.alert("Change photo", "Photo upload is coming soon.")}
+                />
+                <View style={s.verifiedDot}>
+                  <Feather name="shield" size={10} color={C.white} />
                 </View>
               </View>
               <View style={s.heroInfo}>
-                <Text style={s.heroName} numberOfLines={1}>{user?.name || "Guest"}</Text>
+                <View style={s.heroNameRow}>
+                  <Text style={s.heroName} numberOfLines={1}>{user?.name || "Guest"}</Text>
+                  {isPremium && (
+                    <View style={s.premiumPill}>
+                      <Text style={s.premiumEmoji}>👑</Text>
+                      <Text style={s.premiumText}>Premium Member</Text>
+                    </View>
+                  )}
+                </View>
                 <View style={s.heroPill}>
                   <Feather name="phone" size={11} color={C.green} />
                   <Text style={s.heroPillText}>{user?.phone || "—"}</Text>
                 </View>
-                {memberSince && <Text style={s.heroSince}>{t('profile.memberSince', { date: memberSince })}</Text>}
+                {memberSince && (
+                  <View style={s.sinceRow}>
+                    <Feather name="calendar" size={12} color="rgba(255,255,255,0.75)" />
+                    <Text style={s.heroSince}>Member since {memberSince}</Text>
+                  </View>
+                )}
               </View>
             </View>
           </LinearGradient>
 
-          {/* Stats — sits OUTSIDE the hero's overflow:hidden box so the
-              overlap isn't clipped; it overlaps upward via negative marginTop
-              on statsWrap instead, and paints on top since it's a later sibling */}
+          {/* Stats — overlaps the hero bottom edge, 2x2 grid on phone */}
           <View style={[s.statsWrap, { paddingHorizontal: hPad }]}>
             <View style={s.stats}>
-              <View style={s.statItem}>
-                <View style={[s.statIconWrap, { backgroundColor: C.greenMid }]}>
-                  <Feather name="map-pin" size={13} color={C.greenDark} />
-                </View>
-                <Text style={s.statNum}>{addressStore?.addresses?.length ?? 0}</Text>
-                <Text style={s.statLabel}>{t('profile.savedAddresses')}</Text>
+              <View style={s.statCell}>
+                <StatItem
+                  icon="map-pin" iconBg={C.greenMid} iconColor={C.greenDark}
+                  value={String(addresses.length)} label="Addresses"
+                  action="Manage" onAction={() => setShowAddresses(true)}
+                />
               </View>
-              <View style={s.statSep} />
-              <View style={s.statItem}>
-                <View style={[s.statIconWrap, { backgroundColor: C.orangeLight }]}>
-                  <Feather name="credit-card" size={13} color={C.orangeDark} />
-                </View>
-                <Text style={s.statNum}>₹150</Text>
-                <Text style={s.statLabel}>{t('profile.credits')}</Text>
+              <View style={s.statCell}>
+                <StatItem
+                  icon="credit-card" iconBg={C.greenMid} iconColor={C.greenDark}
+                  value="₹150" label="Credits"
+                  action="View transactions" onAction={() => Alert.alert("Transactions", "Transaction history coming soon.")}
+                />
               </View>
-              <View style={s.statSep} />
-              <View style={s.statItem}>
-                <View style={[s.statIconWrap, { backgroundColor: C.blueLight }]}>
-                  <Feather name="user" size={13} color={C.blue} />
-                </View>
-                <Text style={[s.statNum, { fontSize: 12.5 }]} numberOfLines={1}>
-                  {(user?.role || "customer").toUpperCase()}
-                </Text>
-                <Text style={s.statLabel}>{t('profile.account')}</Text>
+              <View style={s.statCell}>
+                <StatItem
+                  icon="user" iconBg={C.blueLight} iconColor={C.blue}
+                  value={(user?.role || "Customer").replace(/^\w/, c => c.toUpperCase())} label="Account Type"
+                  action="Upgrade" onAction={() => Alert.alert("Upgrade", "Account upgrade options coming soon.")}
+                />
+              </View>
+              <View style={s.statCell}>
+                <StatItem
+                  icon="star" iconBg={C.purpleLight} iconColor={C.purple}
+                  value={String(loyaltyPoints)} label="Loyalty Points"
+                  action="Redeem" onAction={() => Alert.alert("Redeem", "Loyalty point redemption coming soon.")}
+                />
               </View>
             </View>
           </View>
         </Animated.View>
 
-        {/* ── Body ────────────────────────────────────────────────────── */}
-        <View style={{ paddingHorizontal: hPad }}>
+        {/* ── Body (stacked, full-width cards) ───────────────────────── */}
+        <View style={[s.gridWrap, { paddingHorizontal: hPad }]}>
 
-          {/* Personal info */}
-          <SectionLabel title={t('profile.personalInfo')} />
-          <View style={s.card}>
-            <InfoRow
-              label={t('profile.name')}
-              value={user?.name}
-              onEdit={() => setEditField({ field: "name", label: t('profile.name'), value: user?.name })}
-            />
-            <InfoRow
-              label={t('profile.email')}
-              value={user?.email}
-              onEdit={() => setEditField({ field: "email", label: t('profile.email'), value: user?.email, keyboardType: "email-address" })}
-            />
-            <View style={[ir.row, { borderBottomWidth: 0 }]}>
-              <View style={[ir.fieldIconWrap, ir.fieldIconWrapOff]}>
-                <Feather name="phone" size={15} color={C.gray400} />
-              </View>
-              <View style={ir.left}>
-                <Text style={ir.label}>{t('profile.phone')}</Text>
-                <Text style={ir.value}>{user?.phone || "—"}</Text>
-              </View>
-              <View style={ir.lockWrap}>
-                <Feather name="lock" size={13} color={C.gray300} />
+          {/* Row 1 */}
+          <View style={s.gridRow}>
+            {/* Personal Information */}
+            <View style={gridCardStyle}>
+              <CardHeader
+                icon="user" iconBg={C.greenMid} iconColor={C.greenDark}
+                title="Personal Information"
+                actionLabel="Edit All"
+                onAction={() => setEditField({ field: "name", label: "Full Name", value: user?.name })}
+              />
+              <InfoRow
+                label="Full Name" icon="user" value={user?.name}
+                onPress={() => setEditField({ field: "name", label: "Full Name", value: user?.name })}
+              />
+              <InfoRow
+                label="Email Address" icon="mail" value={user?.email}
+                onPress={() => setEditField({ field: "email", label: "Email Address", value: user?.email, keyboardType: "email-address" })}
+              />
+              <InfoRow
+                label="Phone Number" icon="phone" value={user?.phone} last
+                locked lockedHint="can't be changed here"
+                onPress={() => Alert.alert("Phone Number", "Your verified phone number can't be changed here. Contact support if you need to update it.")}
+              />
+            </View>
+
+            {/* Delivery Address */}
+            <View style={gridCardStyle}>
+              <CardHeader
+                icon="map-pin" iconBg={C.greenMid} iconColor={C.greenDark}
+                title="Delivery Address"
+                actionLabel="Manage Addresses"
+                onAction={() => setShowAddresses(true)}
+              />
+              {activeAddress ? (
+                <AddressRow
+                  addr={activeAddress}
+                  isSelected={activeAddress.id === addressStore.selectedId}
+                  onPress={() => setDetailAddr(activeAddress)}
+                />
+              ) : (
+                <View style={s.emptyBox}>
+                  <Feather name="map-pin" size={22} color={C.gray300} />
+                  <Text style={s.emptyTitle}>No saved addresses</Text>
+                  <Text style={s.emptySub}>Add a delivery address to get started</Text>
+                  <TouchableOpacity
+                    style={s.emptyCta}
+                    activeOpacity={0.85}
+                    onPress={() => setShowAddresses(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add delivery address"
+                  >
+                    <Feather name="plus" size={14} color={C.white} />
+                    <Text style={s.emptyCtaText}>Add Address</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {/* Quick Actions */}
+            <View style={gridCardStyle}>
+              <CardHeader icon="zap" iconBg={C.greenMid} iconColor={C.greenDark} title="Quick Actions" />
+              <View style={s.qaGrid}>
+                <QuickAction
+                  icon="truck" label="Track Order" bg={C.greenLight} color={C.green}
+                  onPress={() => navigation.navigate("Orders")}
+                />
+                <QuickAction
+                  icon="heart" label="Wishlist" bg={C.redLight} color={C.red}
+                  onPress={() => navigation.navigate("Wishlist")}
+                />
+                <QuickAction
+                  icon="gift" label="Refer & Earn" bg={C.blueLight} color={C.blue}
+                  onPress={handleInvite}
+                />
+                <QuickAction
+                  icon="help-circle" label="Help & Support" bg={C.orangeLight} color={C.orange}
+                  onPress={() => navigation.navigate("Support")}
+                />
               </View>
             </View>
           </View>
 
-          {/* Delivery addresses */}
-          <SectionLabel title={t('profile.deliveryAddresses')} />
-          {addressStore?.addresses?.length === 0 ? (
-            <View style={s.emptyBox}>
-              <Feather name="map-pin" size={24} color={C.gray300} />
-              <Text style={s.emptyTitle}>{t('profile.noAddresses')}</Text>
-              <Text style={s.emptySub}>{t('profile.noAddressesSub')}</Text>
-            </View>
-          ) : (
-            <>
-              {addressStore.addresses.map(addr => (
-                <TouchableOpacity
-                  key={addr.id}
-                  style={[adc.card, addr.id === addressStore.selectedId && adc.cardActive]}
-                  onPress={() => setDetailAddr(addr)}
-                  activeOpacity={0.8}
-                >
-                  <View style={[adc.icon, addr.id === addressStore.selectedId && adc.iconActive]}>
-                    <Feather name="map-pin" size={13} color={addr.id === addressStore.selectedId ? C.white : C.gray500} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[adc.text, addr.id === addressStore.selectedId && adc.textActive]} numberOfLines={2}>
-                      {typeof addr.address === "string" ? addr.address : addr.address_line || "Saved address"}
-                    </Text>
-                    {addr.id === addressStore.selectedId && (
-                      <Text style={adc.activeLabel}>Active delivery address</Text>
-                    )}
-                  </View>
-                  <Feather name="chevron-right" size={15} color={addr.id === addressStore.selectedId ? C.green : C.gray300} />
-                </TouchableOpacity>
-              ))}
-            </>
-          )}
-
-          {/* Activity */}
-          <SectionLabel title={t('profile.activity')} />
-          <MenuItem
-            icon="shopping-bag"
-            label={t('profile.orderHistory')}
-            sub={t('profile.orderHistorySub')}
-            onPress={() => navigation.navigate("Orders")}
-          />
-          <MenuItem
-            icon="gift"
-            label={t('profile.inviteFriends')}
-            sub={t('profile.inviteFriendsSub')}
-            onPress={handleInvite}
-          />
-
-          {/* App */}
-          <SectionLabel title={t('profile.app')} />
-          <MenuItem
-            icon="bell"
-            label={t('profile.pushNotifications')}
-            sub={notifEnabled ? t('profile.enabled') : t('profile.disabled')}
-            onPress={() => handleNotifToggle(!notifEnabled)}
-            right={
-              <Switch
-                value={notifEnabled === true}
-                onValueChange={handleNotifToggle}
-                trackColor={{ false: C.gray200, true: C.greenMid }}
-                thumbColor={notifEnabled === true ? C.green : C.gray400}
-                ios_backgroundColor={C.gray200}
+          {/* Row 2 */}
+          <View style={s.gridRow}>
+            {/* App Settings */}
+            <View style={gridCardStyle}>
+              <CardHeader icon="settings" iconBg={C.purpleLight} iconColor={C.purple} title="App Settings" />
+              <MenuItem
+                icon="bell" iconBg={C.purpleLight} iconColor={C.purple}
+                label="Push Notifications"
+                sub={notifEnabled ? "Enabled" : "Disabled"}
+                onPress={() => handleNotifToggle(!notifEnabled)}
+                right={
+                  <Switch
+                    value={notifEnabled === true}
+                    onValueChange={handleNotifToggle}
+                    trackColor={{ false: C.gray200, true: C.greenMid }}
+                    thumbColor={notifEnabled === true ? C.green : C.gray400}
+                    ios_backgroundColor={C.gray200}
+                  />
+                }
               />
-            }
-          />
-          <MenuItem
-            icon="globe"
-            label={t('profile.language')}
-            sub={t('profile.languageSub')}
-            onPress={() => setShowLanguage(true)}
-          />
-          <MenuItem
-            icon="credit-card"
-            label={t('profile.paymentMethods')}
-            sub={t('profile.paymentMethodsSub')}
-            onPress={() => setShowPayments(true)}
-          />
-          <MenuItem
-            icon="shield"
-            label={t('auth.privacyPolicy')}
-            onPress={() => navigation.navigate("Privacy")}
-          />
-          <MenuItem
-            icon="file-text"
-            label={t('profile.termsConditions')}
-            onPress={() => navigation.navigate("Terms")}
-          />
+              <MenuItem
+                icon="globe" iconBg={C.purpleLight} iconColor={C.purple}
+                label="Language" sub={t('profile.languageSub', 'English')}
+                onPress={() => setShowLanguage(true)}
+              />
+              <MenuItem
+                icon="sun" iconBg={C.purpleLight} iconColor={C.purple}
+                label="Theme" sub="Light Mode" last
+                onPress={() => Alert.alert("Theme", "Dark mode is coming soon.")}
+              />
+            </View>
 
-          {/* Account */}
-          <SectionLabel title={t('profile.accountSection')} />
-          <MenuItem
-            icon="shuffle"
-            label="Switch Profile"
-            sub="Switch between Customer, Vendor & Delivery"
-            tint="blue"
-            onPress={async () => { await setActiveRole(null); }}
-          />
-          <MenuItem
-            icon="log-out"
-            label={t('profile.logout')}
-            onPress={() => setShowLogout(true)}
-            danger
-            right={null}
-          />
+            {/* Security & Privacy */}
+            <View style={gridCardStyle}>
+              <CardHeader icon="shield" iconBg={C.greenMid} iconColor={C.greenDark} title="Security & Privacy" />
+              <MenuItem
+                icon="credit-card" iconBg={C.purpleLight} iconColor={C.purple}
+                label="Payment Methods" sub="Manage UPI, cards & wallets"
+                onPress={() => setShowPayments(true)}
+              />
+              <MenuItem
+                icon="shield" iconBg={C.purpleLight} iconColor={C.purple}
+                label="Privacy Policy" sub="Your data is safe with us"
+                onPress={() => navigation.navigate("Privacy")}
+              />
+              <MenuItem
+                icon="lock" iconBg={C.purpleLight} iconColor={C.purple}
+                label="Security" sub="Manage account security" last
+                onPress={() => Alert.alert("Security", "Password & 2-factor settings coming soon.")}
+              />
+            </View>
 
+            {/* Account */}
+            <View style={gridCardStyle}>
+              <CardHeader icon="user" iconBg={C.blueLight} iconColor={C.blue} title="Account" />
+              <MenuItem
+                icon="shuffle" iconBg={C.blueLight} iconColor={C.blue}
+                label="Switch Profile" sub="Switch between Customer, Vendor & Delivery"
+                onPress={async () => { await setActiveRole(null); }}
+              />
+              <MenuItem
+                icon="log-out"
+                label="Log Out" sub="Securely log out from your account"
+                danger last
+                onPress={() => setShowLogout(true)}
+              />
+            </View>
+          </View>
         </View>
       </Animated.ScrollView>
+
+      {/* Bottom nav */}
+      <BottomNav active="Profile" onNavigate={handleBottomNav} cartCount={cartCount} />
 
       {/* Modals */}
       <AddressDetailModal
@@ -736,6 +973,14 @@ export default function ProfileScreen() {
         onSelect={(a) => { addressStore.setSelectedId(a.id); setDetailAddr(null); }}
         onRemove={(a) => { addressStore.removeAddress(a.id, token); setDetailAddr(null); }}
         onClose={() => setDetailAddr(null)}
+      />
+      <AddressesModal
+        visible={showAddresses}
+        addresses={addresses}
+        selectedId={addressStore.selectedId}
+        onSelect={(a) => addressStore.setSelectedId(a.id)}
+        onOpenDetail={(a) => { setShowAddresses(false); setDetailAddr(a); }}
+        onClose={() => setShowAddresses(false)}
       />
       <EditModal
         visible={!!editField}
@@ -753,7 +998,6 @@ export default function ProfileScreen() {
         onConfirm={handleLogout}
         onCancel={() => setShowLogout(false)}
       />
-      {/* Language Picker Modal */}
       <Modal
         visible={showLanguage}
         transparent
@@ -787,7 +1031,7 @@ export default function ProfileScreen() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
 
-  // Hero — rounded bottom edge + decorative circles for depth
+  // Hero
   hero: {
     paddingTop: Platform.OS === "android" ? 32 : 24, paddingBottom: 44,
     borderBottomLeftRadius: 28, borderBottomRightRadius: 28,
@@ -796,11 +1040,16 @@ const s = StyleSheet.create({
   heroDecorCircle1: { position: "absolute", top: -50, right: -40, width: 150, height: 150, borderRadius: 75, backgroundColor: "rgba(255,255,255,0.08)" },
   heroDecorCircle2: { position: "absolute", top: 70, right: 50, width: 56, height: 56, borderRadius: 28, backgroundColor: "rgba(255,255,255,0.07)" },
 
-  heroTop: { marginBottom: 24 },
-  heroLabel: { fontSize: 13, fontWeight: "800", color: "rgba(255,255,255,0.7)", letterSpacing: 1, textTransform: "uppercase" },
-  heroMain: { flexDirection: "row", alignItems: "center", gap: 18, marginBottom: 28 },
+  heroTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 },
+  heroLabel: { fontSize: 12.5, fontWeight: "800", color: "rgba(255,255,255,0.75)", letterSpacing: 1.2 },
+  editProfileBtn: {
+    flexDirection: "row", alignItems: "center", gap: 7,
+    borderWidth: 1.3, borderColor: "rgba(255,255,255,0.55)", borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 9,
+  },
+  editProfileText: { fontSize: 13, fontWeight: "700", color: C.white },
 
-  avatarRing: { padding: 4, borderRadius: 26, backgroundColor: "rgba(255,255,255,0.22)" },
+  heroMain: { flexDirection: "row", alignItems: "flex-start", gap: 16, marginBottom: 28, flexWrap: "wrap" },
   avatarOuter: { position: "relative" },
   verifiedDot: {
     position: "absolute", bottom: -2, right: -2,
@@ -809,42 +1058,48 @@ const s = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
 
-  heroInfo: { flex: 1 },
-  heroName: { fontSize: 24, fontWeight: "900", color: C.white, letterSpacing: -0.3, flexWrap: "wrap" },
-  heroPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.white, alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, marginTop: 8 },
+  heroInfo: { flex: 1, minWidth: 180 },
+  heroNameRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 8 },
+  heroName: { fontSize: 24, fontWeight: "900", color: C.white, letterSpacing: -0.3 },
+  premiumPill: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: "rgba(0,0,0,0.18)", borderWidth: 1, borderColor: C.gold,
+    paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20,
+  },
+  premiumEmoji: { fontSize: 12 },
+  premiumText: { fontSize: 12, fontWeight: "800", color: C.gold },
+  heroPill: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.white, alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 8 },
   heroPillText: { fontSize: 13, fontWeight: "700", color: C.green },
-  heroSince: { fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 6 },
+  sinceRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  heroSince: { fontSize: 12, color: "rgba(255,255,255,0.75)" },
 
-  // Stats wrapper — a plain sibling AFTER the hero (not inside its
-  // overflow:hidden box), pulled up with a negative marginTop so it overlaps
-  // the green area. Because it paints after the hero, the overlap renders on
-  // top instead of being clipped.
-  statsWrap: { marginTop: -64 },
+  statsWrap: { marginTop: -46 },
   stats: {
-    flexDirection: "row", backgroundColor: C.white, borderRadius: 22, paddingVertical: 20,
+    flexDirection: "row", flexWrap: "wrap", backgroundColor: C.white, borderRadius: 20, padding: 18,
     shadowColor: "#0F172A", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.12, shadowRadius: 18, elevation: 6,
     borderWidth: 1, borderColor: C.gray100,
   },
-  statItem: { flex: 1, alignItems: "center", gap: 6 },
-  statIconWrap: { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center", marginBottom: 2 },
-  statNum: { fontSize: 19, fontWeight: "900", color: C.gray900 },
-  statLabel: { fontSize: 11.5, color: C.gray400, fontWeight: "600" },
-  statSep: { width: 1, backgroundColor: C.gray200 },
+  statCell: { width: "50%", paddingVertical: 10, paddingRight: 8 },
 
-  // Cards — soft shadow instead of a flat border
+  // Grid (single column, stacked full-width cards for phone)
+  gridWrap: { marginTop: 18 },
+  gridRow: { flexDirection: "column", gap: 14, marginBottom: 14 },
+
   card: {
-    backgroundColor: C.white, borderRadius: 18, paddingHorizontal: 18, marginTop: 8,
+    backgroundColor: C.white, borderRadius: 18, padding: 18, marginTop: 8,
     borderWidth: 1, borderColor: C.gray100,
     shadowColor: "#0F172A", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 2,
   },
 
-  // Empty address
-  emptyBox: { alignItems: "center", paddingVertical: 32, gap: 8, backgroundColor: C.white, borderRadius: 16, borderWidth: 1.5, borderColor: C.gray200, ...Platform.select({ web: { borderStyle: "dashed" }, default: { borderStyle: "solid" } }) },
-  emptyTitle: { fontSize: 15, fontWeight: "700", color: C.gray500 },
-  emptySub: { fontSize: 13, color: C.gray400, textAlign: "center", paddingHorizontal: 24, lineHeight: 19 },
+  qaGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+
+  emptyBox: { alignItems: "center", paddingVertical: 28, gap: 8, backgroundColor: C.gray100, borderRadius: 16 },
+  emptyTitle: { fontSize: 14, fontWeight: "700", color: C.gray500 },
+  emptySub: { fontSize: 12.5, color: C.gray400, textAlign: "center", paddingHorizontal: 20, lineHeight: 18 },
+  emptyCta: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: C.green, paddingHorizontal: 16, paddingVertical: 10,
+    borderRadius: 12, marginTop: 6,
+  },
+  emptyCtaText: { fontSize: 12.5, fontWeight: "800", color: C.white },
 });
-
-
-
-
-
