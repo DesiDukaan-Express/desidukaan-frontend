@@ -614,10 +614,36 @@ export default function VendorOrdersScreen() {
     socket.on("fee:confirmed", () => fetchOrdersRef.current?.());
 
     // Delivery Updates
-    socket.on("order_assigned_to_delivery", () => fetchOrdersRef.current?.());
-    socket.on("delivery_status_update", () => {
+    socket.on("order_assigned_to_delivery", (data) => {
+      fetchOrdersRef.current?.();
+      if (data?.order_id || data?.orderId) {
+        const oId = data.order_id || data.orderId;
+        setSelectedOrder((prev) => {
+          if (prev && prev.id === oId) {
+            return {
+              ...prev,
+              delivery: data.delivery || data,
+            };
+          }
+          return prev;
+        });
+      }
+    });
+    socket.on("delivery_status_update", (data) => {
       fetchOrdersRef.current?.();
       fetchHistoryRef.current?.(1);
+      if (data?.order_id || data?.orderId) {
+        const oId = data.order_id || data.orderId;
+        setSelectedOrder((prev) => {
+          if (prev && prev.id === oId) {
+            return {
+              ...prev,
+              delivery: data.delivery || { ...prev.delivery, status: data.status },
+            };
+          }
+          return prev;
+        });
+      }
     });
     socket.on("delivery_location_update", (data) => {
       if (data.deliveryId) {
