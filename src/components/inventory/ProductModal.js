@@ -462,86 +462,58 @@ function CategoryPicker({
         <View style={cp.dropdownList}>
           {catLoading ? (
             <ActivityIndicator size="small" color={PRIMARY} style={{ margin: 10 }} />
-          ) : topCategories.length === 0 ? (
-            <View style={cp.noSub}>
-              <Text style={cp.noSubText}>
-                No categories available. Please add categories in Admin app.
-              </Text>
-            </View>
           ) : (
-            <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-              {topCategories.map((cat) => (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[cp.dropdownItem, selectedTopCat?.id === cat.id && cp.dropdownItemActive]}
-                  onPress={() => {
-                    onSelectTop(cat);
-                    setCatOpen(false);
+            <>
+              <View style={{ padding: 8, borderBottomWidth: 1, borderBottomColor: "#F4F4F5" }}>
+                <TextInput
+                  style={{
+                    backgroundColor: "#F4F4F5",
+                    borderRadius: 8,
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    fontSize: 13,
+                    color: TEXT,
                   }}
-                >
-                  <Text style={[cp.dropdownItemText, selectedTopCat?.id === cat.id && cp.dropdownItemTextActive]}>
-                    {cat.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-        </View>
-      )}
-
-      {selectedTopCat && (
-        <View style={cp.subSection}>
-          <Text style={cp.subLabel}>Subcategory</Text>
-          <TouchableOpacity
-            style={cp.dropdownBox}
-            onPress={() => { setSubOpen(!subOpen); setCatOpen(false); }}
-            activeOpacity={0.8}
-          >
-            <Text style={cp.dropdownValue}>
-              {selectedSubName ? selectedSubName : "Select Subcategory (Optional)..."}
-            </Text>
-            <Feather name={subOpen ? "chevron-up" : "chevron-down"} size={16} color={TEXT_MED} />
-          </TouchableOpacity>
-
-          {subOpen && (
-            <View style={cp.dropdownList}>
-              {subLoading ? (
-                <ActivityIndicator size="small" color={PRIMARY} style={{ margin: 10 }} />
-              ) : subcategories.length === 0 ? (
+                  placeholder="Search category..."
+                  placeholderTextColor={TEXT_LITE}
+                  value={search}
+                  onChangeText={setSearch}
+                />
+              </View>
+              {filteredCategories.length === 0 ? (
                 <View style={cp.noSub}>
                   <Text style={cp.noSubText}>
-                    No subcategories available under "{selectedTopCat.name}".
+                    No categories available.
                   </Text>
                 </View>
               ) : (
                 <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                  {subcategories.map((sub) => (
+                  {filteredCategories.map((cat) => (
                     <TouchableOpacity
-                      key={sub.id}
-                      style={[cp.dropdownItem, selectedSubId === sub.id && cp.dropdownItemActive]}
+                      key={cat.id}
+                      style={[cp.dropdownItem, selectedCategory?.id === cat.id && cp.dropdownItemActive]}
                       onPress={() => {
-                        onSelectSub(sub);
-                        setSubOpen(false);
+                        onSelectCategory(cat);
+                        setOpen(false);
                       }}
                     >
-                      <Text style={[cp.dropdownItemText, selectedSubId === sub.id && cp.dropdownItemTextActive]}>
-                        {sub.name}
+                      <Text style={[cp.dropdownItemText, selectedCategory?.id === cat.id && cp.dropdownItemTextActive]}>
+                        {cat.path || cat.name}
                       </Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               )}
-            </View>
+            </>
           )}
         </View>
       )}
 
-      {categoryName ? (
+      {selectedCategory || categoryName ? (
         <View style={[cp.breadcrumb, { flexDirection: "row", alignItems: "center", gap: 5 }]}>
           <Feather name="folder" size={13} color={PRIMARY_D} />
           <Text style={cp.breadcrumbText}>
-            {categoryName}
-            {selectedSubName ? ` › ${selectedSubName}` : ""}
+            {selectedCategory?.path || selectedCategory?.name || categoryName}
           </Text>
         </View>
       ) : null}
@@ -661,16 +633,16 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
-        const dbCats = (data.data?.categories || []).filter((c) => c.parent_id === null);
-        setTopCategories(dbCats);
+        const dbCats = data.data?.flat || data.flat || data.data?.categories || [];
+        setAllCategories(dbCats);
 
-        if (editing?.category) {
-          const match = dbCats.find((c) => c.name === editing.category);
-          if (match) setSelectedTopCat(match);
+        if (editing?.category_id || editing?.category) {
+          const match = dbCats.find((c) => c.id === editing.category_id || c.name === editing.category || c.path === editing.category);
+          if (match) setSelectedCategory(match);
         }
       })
       .catch(() => {
-        if (!cancelled) setTopCategories([]);
+        if (!cancelled) setAllCategories([]);
       })
       .finally(() => { if (!cancelled) setCatLoading(false); });
     return () => { cancelled = true; };
@@ -734,7 +706,7 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
       ...form,
       weight_options:  cleanedOptions,
       subcategory_id:  form.subcategoryId || null,
-      category_id:     form.subcategoryId || selectedTopCat?.id || null,
+      category_id:     selectedCategory?.id || form.subcategoryId || null,
       category:        form.categoryName  || "Other",
       brand:           form.brand.trim()  || null,
       mrp:             form.mrp ? parseFloat(form.mrp) : null,

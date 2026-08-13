@@ -161,6 +161,8 @@ export default function useInventory() {
     sortDir,
     setSortDir,
     toggleSort,
+    reload: load,
+    loadVendor,
     page,
     setPage,
     totalPages,

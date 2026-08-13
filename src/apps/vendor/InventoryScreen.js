@@ -659,7 +659,8 @@ export default function InventoryScreen() {
         visible={showCatalogueModal}
         onClose={() => setShowCatalogueModal(false)}
         onSuccess={() => {
-          inv.reload();
+          inv.loadVendor?.();
+          inv.reload?.();
           showToast("Products imported from catalogue!");
         }}
       />
