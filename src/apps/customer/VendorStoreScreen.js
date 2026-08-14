@@ -598,12 +598,9 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
         />
         <TouchableOpacity
           style={pc.eyeBtn}
-<<<<<<< HEAD
           onPress={(e) => { e.stopPropagation?.(); setWishlisted(w => !w); }}
-=======
           disabled={!inStock}
           onPress={(e) => { e.stopPropagation?.(); onPress?.(); }}
->>>>>>> origin/main
           activeOpacity={0.7}
         >
           <Feather name="heart" size={14} color={wishlisted ? "#EF4444" : C.white} fill={wishlisted ? "#EF4444" : "none"} />
@@ -980,7 +977,6 @@ export default function VendorStoreScreen() {
     return ["All", ...Object.keys(categoryHierarchy).sort()];
   }, [categoryHierarchy]);
 
-<<<<<<< HEAD
   // Chips shown to the user — hide the generic "All" and "Other" buckets,
   // but never leave the row empty if "Other" is all we have.
   const visibleCategories = useMemo(() => {
@@ -990,9 +986,7 @@ export default function VendorStoreScreen() {
   }, [categories]);
 
   const inStockTotal = useMemo(() => inventory.filter(i => i.stock_qty > 0).length, [inventory]);
-=======
   const inStockTotal = useMemo(() => inventory.filter(i => i.is_active ?? true).length, [inventory]);
->>>>>>> origin/main
 
   const getTopCatCount = useCallback((catName) => {
     if (catName === "All") return inStockTotal;
@@ -1352,8 +1346,6 @@ export default function VendorStoreScreen() {
             <Feather name={sortMenuOpen ? "chevron-up" : "chevron-down"} size={14} color={C.gray700} />
           </TouchableOpacity>
         </View>
-<<<<<<< HEAD
-=======
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.sortRow}>
           {[
             { key: "default", label: t('vendorStore.default') },
@@ -1379,7 +1371,6 @@ export default function VendorStoreScreen() {
               );
             })}
         </ScrollView>
->>>>>>> origin/main
       </View>
 
       {/* SORT DROPDOWN — small popover anchored right under the Sort button */}

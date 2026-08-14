@@ -34,11 +34,8 @@
     "expo-status-bar": "~3.0.9",
     "i18next": "^26.3.4",
     "leaflet": "^1.9.4",
-<<<<<<< HEAD
     "lucide-react-native": "^1.31.0",
-=======
     "pdfjs-dist": "^4.10.38",
->>>>>>> origin/main
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-i18next": "^17.0.8",
