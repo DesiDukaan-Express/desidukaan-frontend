@@ -34,6 +34,7 @@ import ChatWidget from "./ChatWidget";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
 import LocationMapPicker from "../../components/LocationMapPicker";
+import UseCurrentLocationButton from "../../components/UseCurrentLocationButton";
 
 // Use env var works on device, emulator, and web
 // In your .env: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api
@@ -128,7 +129,6 @@ function AddressPicker({
   onSelect,
   onSaveNew,
   onUpdate,
-  onUseLocation,
   onDelete,
   initialCoords,
 }) {
@@ -148,6 +148,8 @@ function AddressPicker({
   const [focusPoint, setFocusPoint] = React.useState(null);
   const suggestionSelectRef = React.useRef(false);
   const focusSeqRef = React.useRef(0);
+  const [locating, setLocating] = React.useState(false);
+  const [locError, setLocError] = React.useState("");
 
   React.useEffect(() => {
     if (!visible) {
@@ -162,6 +164,8 @@ function AddressPicker({
       setSuggestions([]);
       setFocusPoint(null);
       suggestionSelectRef.current = false;
+      setLocating(false);
+      setLocError("");
     }
   }, [visible]);
 
@@ -175,6 +179,8 @@ function AddressPicker({
     setSuggestions([]);
     setFocusPoint(null);
     suggestionSelectRef.current = false;
+    setLocating(false);
+    setLocError("");
     setMode("add");
   };
 
@@ -213,6 +219,56 @@ function AddressPicker({
     setFocusPoint({ key: ++focusSeqRef.current, lat: s.lat, lng: s.lng, displayName: s.display_name });
     setSuggestions([]);
   }, []);
+
+  // "Use current location" in the Add-new-address form: geolocate, reverse-geocode,
+  // fill the field and fly the map. Address is only saved when the user taps Save.
+  const handleUseCurrentLocation = React.useCallback(async () => {
+    setLocating(true);
+    setLocError("");
+    if (!navigator?.geolocation) {
+      setLocError(t("home.locErrorUnavailable"));
+      setLocating(false);
+      return;
+    }
+    let pos;
+    try {
+      pos = await new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 12000,
+          maximumAge: 0,
+        })
+      );
+    } catch (e) {
+      setLocError(e?.code === 1 ? t("home.locErrorDenied") : t("home.locErrorUnavailable"));
+      setLocating(false);
+      return;
+    }
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    let displayName = "";
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+      );
+      const data = await res.json();
+      displayName = data?.display_name || "";
+    } catch (err) {
+      displayName = "";
+    }
+    if (!displayName) {
+      setLocError(t("home.locErrorUnavailable"));
+      setLocating(false);
+      return;
+    }
+    setPickLat(lat);
+    setPickLng(lng);
+    setInputText(displayName);
+    setInputErr("");
+    setSuggestions([]);
+    setFocusPoint({ key: ++focusSeqRef.current, lat, lng, displayName });
+    setLocating(false);
+  }, [t]);
 
   const handleSaveAdd = () => {
     if (inputText.trim().length < 5) {
@@ -318,6 +374,12 @@ function AddressPicker({
               )}
 
               {/* Map location picker (web) — pin stays centred, map pans below */}
+              <UseCurrentLocationButton
+                onPress={handleUseCurrentLocation}
+                loading={locating}
+                style={ap.locBtn}
+              />
+              {locError ? <Text style={ap.locErrorText}>{locError}</Text> : null}
               <LocationMapPicker
                 initialCoords={
                   mode === "edit"
@@ -425,20 +487,6 @@ function AddressPicker({
           ) : (
             /* ── Address List ── */
             <>
-              {/* Use Current Location row */}
-              <TouchableOpacity style={ap.locationRow} onPress={onUseLocation} activeOpacity={0.8}>
-                <View style={ap.locationIconWrap}>
-                  <MaterialIcons name="my-location" size={20} color={C.green} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={ap.locationRowTitle}>{t("home.useLocation")}</Text>
-                  <Text style={ap.locationRowSub}>{t("home.detectLocation")}</Text>
-                </View>
-                <MaterialIcons name="chevron-right" size={22} color={C.gray400} />
-              </TouchableOpacity>
-
-              <View style={ap.divider} />
-
               <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 340 }}>
                 {addresses.length === 0 ? (
                   <View style={ap.emptyWrap}>
@@ -556,29 +604,6 @@ const ap = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  // Location row
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: C.gray200,
-    backgroundColor: C.white,
-  },
-  locationIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: C.greenLight,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  locationRowTitle: { fontSize: 15, fontWeight: "700", color: C.gray900 },
-  locationRowSub: { fontSize: 12, color: C.gray500, marginTop: 2 },
-  divider: { height: 1, backgroundColor: C.gray100, marginVertical: 14 },
   emptyWrap: { alignItems: "center", paddingVertical: 36, gap: 10 },
   emptyText: { fontSize: 14, color: C.gray400 },
   // New card-style address row
@@ -675,6 +700,8 @@ const ap = StyleSheet.create({
   // Form
   formWrap: { paddingTop: 4 },
   formLabel: { fontSize: 12, fontWeight: "700", color: C.gray700, marginBottom: 8, letterSpacing: 0.2 },
+  locBtn: { marginBottom: 12 },
+  locErrorText: { fontSize: 12, color: C.red, marginTop: 6, marginBottom: 4, lineHeight: 16 },
   inputBox: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -2250,7 +2277,7 @@ export default function HomeScreen() {
   const addressStore = useAddressStore();
   const cart = useCartStore();
 
-  const { currentLocation, fetchLocation: triggerRefetch } = addressStore;
+  const { currentLocation } = addressStore;
 
   const [selectedAddrId, setSelectedAddrId] = useState(addressStore.selectedId || null);
 
@@ -2665,13 +2692,6 @@ export default function HomeScreen() {
     }
   };
 
-  const handleUseCurrentLocation = async () => {
-    setAddrPickerVisible(false);
-    setSelectedAddrId(null);
-    addressStore?.setSelectedId?.(null);
-    if (triggerRefetch) await triggerRefetch(true);
-  };
-
 
   // ── Cart helpers — reads from cartStore, no local qty state ───────────────
   // In handleAdd — check if THIS item is in cart, not just whether vendorId exists
@@ -3072,45 +3092,82 @@ export default function HomeScreen() {
                   <Text style={s.heroGhostText}>Change Address</Text>
                 </TouchableOpacity>
               </View> */}
-              <View style={s.heroStats}>
-                {homeStats.map((stat) => (
-                  <View key={stat.label} style={s.heroStat}>
-                    <MaterialIcons name={stat.icon} size={16} color={C.white} />
-                    <Text style={s.heroStatValue}>{stat.value}</Text>
-                    <Text style={s.heroStatLabel}>{stat.label}</Text>
-                  </View>
-                ))}
-              </View>
+              {wide && (
+                <View style={s.heroStats}>
+                  {homeStats.map((stat) => (
+                    <View key={stat.label} style={s.heroStat}>
+                      <MaterialIcons name={stat.icon} size={16} color={C.white} />
+                      <Text style={s.heroStatValue}>{stat.value}</Text>
+                      <Text style={s.heroStatLabel}>{stat.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
           </View>
         </View>
 
-        {/* 3. NEARBY STORES — hidden as per design (user request) */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingLeft: hPad,
-            paddingRight: hPad,
-            paddingBottom: 8,
-            gap: 10,
-          }}
-          style={s.quickActionRail}
-        >
-          {quickActions.map((action) => (
-            <TouchableOpacity
-              key={action.label}
-              style={s.quickAction}
-              onPress={action.onPress}
-              activeOpacity={0.85}
+        {/* 3. CATEGORY ROW — mobile only (replaces stat boxes + quick actions on phones) */}
+        {!wide && dynamicCategories.length > 0 && (
+          <View style={s.mobileCatRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingLeft: hPad,
+                paddingRight: hPad,
+                paddingBottom: 8,
+                gap: 10,
+              }}
             >
-              <View style={s.quickActionIcon}>
-                <MaterialIcons name={action.icon} size={17} color={C.green} />
-              </View>
-              <Text style={s.quickActionText}>{action.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+              {dynamicCategories.map((cat) => (
+                <TouchableOpacity
+                  key={cat.label}
+                  style={s.mobileCatChip}
+                  onPress={() => {
+                    const root = navigation.getParent?.() || navigation;
+                    root.navigate("Search", { category: cat.label });
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <View style={[s.mobileCatIcon, { backgroundColor: cat.bg }]}>
+                    <MaterialIcons name={cat.icon} size={17} color={cat.accent} />
+                  </View>
+                  <Text style={s.mobileCatChipText} numberOfLines={1}>{cat.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Quick actions rail — desktop/tablet only */}
+        {wide && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingLeft: hPad,
+              paddingRight: hPad,
+              paddingBottom: 8,
+              gap: 10,
+            }}
+            style={s.quickActionRail}
+          >
+            {quickActions.map((action) => (
+              <TouchableOpacity
+                key={action.label}
+                style={s.quickAction}
+                onPress={action.onPress}
+                activeOpacity={0.85}
+              >
+                <View style={s.quickActionIcon}>
+                  <MaterialIcons name={action.icon} size={17} color={C.green} />
+                </View>
+                <Text style={s.quickActionText}>{action.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
 
         <View style={[s.sectionHeader, { paddingHorizontal: hPad }]}>
           <View>
@@ -3543,7 +3600,6 @@ export default function HomeScreen() {
           }
           setAddrPickerVisible(false);
         }}
-        onUseLocation={handleUseCurrentLocation}
       />
 
       {/* ══ WEIGHPICKER MODAL ═════════════════════════════════════════════ */}
@@ -3995,6 +4051,37 @@ const s = StyleSheet.create({
     fontWeight: "600",
   },
   quickActionRail: { marginBottom: 16 },
+  mobileCatRow: { marginBottom: 8 },
+  mobileCatChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minWidth: 128,
+    backgroundColor: C.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  mobileCatIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mobileCatChipText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: C.gray800,
+    flexShrink: 1,
+  },
   quickAction: {
     minWidth: 132,
     flexDirection: "row",

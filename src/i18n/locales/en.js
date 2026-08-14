@@ -96,6 +96,8 @@ export default {
     saveAddress: "Save address",
     updateAddress: "Update address",
     addressError: "Please enter a valid address (at least 5 characters)",
+    locErrorDenied: "Location permission was denied. Please allow location access or enter the address manually.",
+    locErrorUnavailable: "Couldn't fetch your current location. Please try again or enter the address manually.",
     chooseStore: "Choose store",
     storeHasItem: "Stores with {{name}}",
     noStoresNearby: "No nearby stores carry this item right now.",
