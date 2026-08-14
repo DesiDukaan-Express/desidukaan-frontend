@@ -44,8 +44,8 @@ export default function useInventory() {
       const res = await fetch(`${API_BASE}/products/categories`);
       const result = await res.json();
       if (res.ok) {
-        const cats = (result.data?.categories || []).filter((c) => c.parent_id === null);
-        setGlobalCategories(cats);
+        const flat = result.data?.flat || result.flat || result.data?.categories || [];
+        setGlobalCategories(flat);
       }
     } catch (err) {
       console.error("Load Global Categories Error:", err);
@@ -194,36 +194,36 @@ export default function useInventory() {
     },
 
     toggleAvailability: async (productId, available) => {
-  // Optimistic update immediately
-  setProducts((prev) =>
-    prev.map((p) =>
-      p.id === String(productId)
-        ? {
-            ...p,
-            inventory: { ...(p.inventory || {}), stock_qty: available ? 1 : 0 },
-            rawStock: available ? 1 : 0,
-          }
-        : p
-    )
-  );
-  try {
-    await inventoryService.toggleAvailability(token, productId, available, vendorId);
-  } catch (err) {
-    console.error("Toggle failed, reverting:", err.message);
-    // Revert
-    setProducts((prev) =>
-      prev.map((p) =>
-        p.id === String(productId)
-          ? {
-              ...p,
-              inventory: { ...(p.inventory || {}), stock_qty: available ? 0 : 1 },
-              rawStock: available ? 0 : 1,
-            }
-          : p
-      )
-    );
-    throw err;
-  }
-},
+      // Optimistic update immediately
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === String(productId)
+            ? {
+                ...p,
+                is_active: available,
+                status: available ? "Available" : "Unavailable",
+              }
+            : p
+        )
+      );
+      try {
+        await inventoryService.toggleAvailability(token, productId, available);
+      } catch (err) {
+        console.error("Toggle failed, reverting:", err.message);
+        // Revert
+        setProducts((prev) =>
+          prev.map((p) =>
+            p.id === String(productId)
+              ? {
+                  ...p,
+                  is_active: !available,
+                  status: !available ? "Available" : "Unavailable",
+                }
+              : p
+          )
+        );
+        throw err;
+      }
+    },
   };
 }

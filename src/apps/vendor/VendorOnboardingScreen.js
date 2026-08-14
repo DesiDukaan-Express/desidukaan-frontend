@@ -175,9 +175,9 @@ const EMPTY_PRODUCT = {
   stock: '', type: 'loose', weight_options: [],
 };
 
-const SAMPLE_CSV = `name,mrp,sp,unit,category,stock_qty,type
-Loose Basmati Rice,85,80,kg,Grocery,100,loose
-Amul Milk 500ml,30,28,litre,Dairy,50,packed`;
+const SAMPLE_CSV = `name,mrp,sp,unit,category,type
+Loose Basmati Rice,85,80,kg,Grocery,loose
+Amul Milk 500ml,30,28,litre,Dairy,packed`;
 
 // Fallback top categories (used when the categories API is unreachable) —
 // mirrors the admin Add Product form's fallback list.

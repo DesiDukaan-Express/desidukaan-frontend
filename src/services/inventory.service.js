@@ -30,9 +30,7 @@ export const inventoryService = {
       });
       const result = await res.json();
       let data = (result.data?.products || []).map((p) => {
-        const qty = Array.isArray(p.inventory)
-          ? (p.inventory?.[0]?.stock_qty ?? 0)
-          : (p.inventory?.stock_qty ?? 0);
+        const isActive = p.is_active ?? true;
         // category is the top-level name, subcategory is the child name
         const categoryName =
           typeof p.category === "string"
@@ -47,34 +45,25 @@ export const inventoryService = {
           subcategory: subcategoryName,
           category_id: p.category_id || null,
           unit: p.unit || "kg",
-          stock: `${qty} ${p.unit || "kg"}`,
-          rawStock: qty,
           price: p.price,
           priceDisplay: `₹${p.price}`,
           updatedAt: new Date(p.updated_at ?? p.created_at).toLocaleDateString(
             "en-IN",
           ),
-          status: stockStatus(qty),
+          is_active: isActive,
+          status: isActive ? "Available" : "Unavailable",
           type: p.item_type || "packed",
           weight_options: p.weight_options || [],
           image_url: p.image_url || null,
           brand: p.brand || null,
-          inventory: {
-            stock_qty: qty,
-            low_stock_threshold: Array.isArray(p.inventory)
-              ? (p.inventory?.[0]?.low_stock_threshold ?? 5)
-              : (p.inventory?.low_stock_threshold ?? 5),
-          },
         };
       });
 
-      // Filter by stock status
-      if (status === "instock")
-        data = data.filter((p) => p.status === "In Stock");
-      if (status === "lowstock")
-        data = data.filter((p) => p.status === "Low Stock");
-      if (status === "outofstock")
-        data = data.filter((p) => p.status === "Out of Stock");
+      // Filter by active status
+      if (status === "available")
+        data = data.filter((p) => p.is_active === true);
+      if (status === "unavailable")
+        data = data.filter((p) => p.is_active === false);
 
       // Search filter
       if (q.trim()) {
@@ -105,9 +94,8 @@ export const inventoryService = {
       const s = result.data?.stats || {};
       return {
         totalProducts: s.total_products ?? 0,
-        availableStock: s.products_in_stock ?? 0,
-        lowStockItems: s.low_stock_items ?? 0,
-        outOfStockItems: s.out_of_stock_items ?? 0,
+        availableProducts: s.products_in_stock ?? 0,
+        unavailableProducts: s.out_of_stock_items ?? 0,
         todayOrders: s.today_orders ?? 0,
         todayRevenue: s.today_revenue ?? 0,
         totalRevenue: s.total_revenue ?? 0,
@@ -138,7 +126,8 @@ export const inventoryService = {
           category_id: payload.category_id || null,
           unit: payload.unit || "kg",
           price: parseFloat(String(payload.price).replace(/[^0-9.]/g, "")) || 0,
-          stock_qty: parseInt(payload.stock) || 0,
+          mrp: payload.mrp ? parseFloat(String(payload.mrp).replace(/[^0-9.]/g, "")) : null,
+          barcode: payload.barcode || null,
           type: payload.type || "packed",
           weight_options: payload.weight_options || null,
           image_url: payload.image_url || null,
@@ -172,13 +161,11 @@ export const inventoryService = {
           parseFloat(String(payload.price).replace(/[^0-9.]/g, "")) || 0;
       if (payload.mrp !== undefined) body.mrp = payload.mrp;
       if (payload.type !== undefined) body.item_type = payload.type;
+      if (payload.barcode !== undefined) body.barcode = payload.barcode;
       if (payload.weight_options !== undefined)
         body.weight_options = payload.weight_options;
       if (payload.image_url !== undefined) body.image_url = payload.image_url;
       if (payload.is_active !== undefined) body.is_active = payload.is_active;
-      // stock_qty goes to inventory table via separate field
-      if (payload.stock !== undefined)
-        body.stock_qty = parseInt(payload.stock) || 0;
 
       const res = await fetch(`${API_BASE}/products/${id}`, {
         method: "PUT",
@@ -194,41 +181,21 @@ export const inventoryService = {
     }
   },
 
-  async toggleAvailability(token, productId, available, vendorId) {
-  console.log("=== TOGGLE START ===");
-  console.log("productId:", productId, "available:", available, "vendorId:", vendorId);
-  try {
-    let vid = vendorId;
-    console.log("vid:", vid);
-
-    const invRes = await fetch(
-      `${API_BASE}/inventory/product/${productId}/vendor/${vid}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const invData = await invRes.json();
-    console.log("invData:", JSON.stringify(invData));
-    
-    const inventoryId = invData?.id;
-    console.log("inventoryId:", inventoryId);
-    
-    if (!inventoryId) throw new Error("Inventory record not found");
-
-    const res = await fetch(`${API_BASE}/inventory/${inventoryId}`, {
-      method: "PUT",
-      headers: authHeaders(token),
-      body: JSON.stringify({ stock_qty: available ? 1 : 0 }),
-    });
-    const data = await res.json();
-    console.log("PUT result:", JSON.stringify(data));
-    console.log("res.ok:", res.ok);
-    
-    if (!res.ok) throw new Error(data.message || "Failed");
-    return data;
-  } catch (err) {
-    console.log("=== TOGGLE ERROR ===", err.message);
-    throw err;
-  }
-},
+  async toggleAvailability(token, productId, available) {
+    try {
+      const res = await fetch(`${API_BASE}/products/${productId}`, {
+        method: "PUT",
+        headers: authHeaders(token),
+        body: JSON.stringify({ is_active: available }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to toggle availability");
+      return data;
+    } catch (err) {
+      console.error("toggleAvailability error:", err);
+      throw err;
+    }
+  },
 
   /**
    * Soft-delete a product (backend sets is_active = false).

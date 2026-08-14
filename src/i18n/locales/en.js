@@ -266,6 +266,7 @@ export default {
     totalPayable: "Total payable",
     cancellationReturnPolicy: "Cancellation & Return Policy",
     sendOrderRequest: "Send Order Request",
+    selectDeliverySlotRequired: "To send an order request, you must select a delivery slot.",
     waitingForStore: "Waiting for Store...",
     waitingForStoreSub: "Waiting for {{name}} to accept your order.",
     selectedDeliveryDetails: "SELECTED DELIVERY DETAILS",
