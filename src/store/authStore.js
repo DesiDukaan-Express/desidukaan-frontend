@@ -34,9 +34,10 @@ const loadPersistedEnabledRoles = async (userRoles = []) => {
   try {
     const stored = await AsyncStorage.getItem(ENABLED_ROLES_KEY);
     const parsed = stored ? JSON.parse(stored) : [];
-    return Array.from(new Set([...userRoles, ...parsed].filter(Boolean)));
-  } catch {
-    return Array.from(new Set([...userRoles].filter(Boolean)));
+    return Array.from(new Set([...ALL_ROLES, ...userRoles, ...parsed].filter(Boolean)));
+  } 
+  catch {
+    return Array.from(new Set([...ALL_ROLES, ...userRoles].filter(Boolean)));
   }
 };
 
