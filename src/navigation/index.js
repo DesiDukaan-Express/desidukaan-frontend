@@ -254,7 +254,7 @@ export default function Navigation() {
           // ── Routed app based on active role ──────────────────────────────
           <>
             {activeRole === "vendor" ? (
-              vendorOnboarded ? (
+              vendorOnboarded || vendorStatus ? (
                 <Stack.Screen name="VendorApp" component={VendorTabs} />
               ) : (
                 <>
