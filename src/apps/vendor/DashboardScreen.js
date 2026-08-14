@@ -471,17 +471,8 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             _type: "inventory",
             id: item.id,
             name: item.product?.name || item.name || "Unknown Item",
-            stock_qty: item.stock_qty ?? 0,
-            low_stock_threshold: item.low_stock_threshold ?? 5,
-            price: item.product?.price ?? item.price ?? 0,
-            unit: item.product?.unit || item.unit || "",
-            category: item.product?.category?.name || "",
-            stockStatus:
-              item.stock_qty <= 0
-                ? "out"
-                : item.stock_qty <= (item.low_stock_threshold ?? 5)
-                  ? "low"
-                  : "ok",
+            is_active: item.is_active ?? true,
+            stockStatus: (item.is_active ?? true) ? "ok" : "out",
           }));
           results = [...results, ...inventoryItems];
         }
@@ -505,7 +496,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               price: p.price ?? 0,
               unit: p.unit || "",
               category: p.category?.name || "",
-              stock_qty: p.inventory?.stock_qty ?? null,
+              is_active: p.is_active ?? true,
             }));
             results = [...results, ...productItems];
           }
@@ -1848,11 +1839,11 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                       badgeBg: C.primaryDim,
                       mainText: item.name,
                       subText: `${item.unit || ""}${item.category ? " · " + item.category : ""}`,
-                      rightTop: `${item.stock_qty ?? 0} units`,
-                      rightTopColor: stockColor,
-                      rightBottom: stockLabel,
-                      rightBottomBg: stockBg,
-                      rightBottomColor: stockColor,
+                      rightTop: (item.is_active ?? true) ? "Available" : "Unavailable",
+                      rightTopColor: (item.is_active ?? true) ? C.green : C.red,
+                      rightBottom: "",
+                      rightBottomBg: "transparent",
+                      rightBottomColor: "transparent",
                     },
                     product: {
                       icon: "shopping-bag",
@@ -1865,10 +1856,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                       subText: `${item.unit || ""}${item.category ? " · " + item.category : ""}`,
                       rightTop: `₹${item.price}`,
                       rightTopColor: C.blue,
-                      rightBottom:
-                        item.stock_qty != null
-                          ? `Stock: ${item.stock_qty}`
-                          : "",
+                      rightBottom: (item.is_active ?? true) ? "Available" : "Unavailable",
                       rightBottomBg: C.blueDim,
                       rightBottomColor: C.blue,
                     },

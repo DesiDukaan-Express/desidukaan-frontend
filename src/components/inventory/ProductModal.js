@@ -35,19 +35,6 @@ const RED       = "#EF4444";
 const RED_L     = "#FEF2F2";
 const ORANGE    = "#F97316";
 
-const FALLBACK_CATEGORIES = [
-  "Dairy, Bread & Eggs",
-  "Fruits & Vegetables",
-  "Snacks & Munchies",
-  "Beverages",
-  "Bakery & Biscuits",
-  "Atta, Rice & Dal",
-  "Masala, Oil & More",
-  "Cleaning Essentials",
-  "Personal Care",
-  "Other",
-];
-
 const TYPE_OPTS = [
   { label: "Packed", value: "packed", icon: "archive" },
   { label: "Loose",  value: "loose",  icon: "sliders" },
@@ -473,48 +460,63 @@ function CategoryPicker({
 
       {open && (
         <View style={cp.dropdownList}>
-          <View style={{ padding: 8, borderBottomWidth: 1, borderBottomColor: "#F4F4F5" }}>
-            <TextInput
-              style={{
-                backgroundColor: BG,
-                borderRadius: 8,
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-                fontSize: 13,
-                color: TEXT,
-              }}
-              placeholder="Search category or subcategory..."
-              value={search}
-              onChangeText={setSearch}
-              placeholderTextColor={TEXT_LITE}
-            />
-          </View>
-
           {catLoading ? (
-            <ActivityIndicator size="small" color={PRIMARY} style={{ margin: 12 }} />
+            <ActivityIndicator size="small" color={PRIMARY} style={{ margin: 10 }} />
           ) : (
-            <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-              {filteredCategories.map((cat) => {
-                const isSelected = selectedCategory?.id === cat.id;
-                return (
-                  <TouchableOpacity
-                    key={cat.id}
-                    style={[cp.dropdownItem, isSelected && cp.dropdownItemActive]}
-                    onPress={() => {
-                      onSelectCategory(cat);
-                      setOpen(false);
-                    }}
-                  >
-                    <Text style={[cp.dropdownItemText, isSelected && cp.dropdownItemTextActive]}>
-                      {cat.path ? cat.path : cat.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+            <>
+              <View style={{ padding: 8, borderBottomWidth: 1, borderBottomColor: "#F4F4F5" }}>
+                <TextInput
+                  style={{
+                    backgroundColor: "#F4F4F5",
+                    borderRadius: 8,
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    fontSize: 13,
+                    color: TEXT,
+                  }}
+                  placeholder="Search category..."
+                  placeholderTextColor={TEXT_LITE}
+                  value={search}
+                  onChangeText={setSearch}
+                />
+              </View>
+              {filteredCategories.length === 0 ? (
+                <View style={cp.noSub}>
+                  <Text style={cp.noSubText}>
+                    No categories available.
+                  </Text>
+                </View>
+              ) : (
+                <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                  {filteredCategories.map((cat) => (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={[cp.dropdownItem, selectedCategory?.id === cat.id && cp.dropdownItemActive]}
+                      onPress={() => {
+                        onSelectCategory(cat);
+                        setOpen(false);
+                      }}
+                    >
+                      <Text style={[cp.dropdownItemText, selectedCategory?.id === cat.id && cp.dropdownItemTextActive]}>
+                        {cat.path || cat.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </>
           )}
         </View>
       )}
+
+      {selectedCategory || categoryName ? (
+        <View style={[cp.breadcrumb, { flexDirection: "row", alignItems: "center", gap: 5 }]}>
+          <Feather name="folder" size={13} color={PRIMARY_D} />
+          <Text style={cp.breadcrumbText}>
+            {selectedCategory?.path || selectedCategory?.name || categoryName}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -588,7 +590,6 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
         subcategoryName: editing.subcategory || "",
         barcode:        editing.barcode      || "",
         brand:          editing.brand        || "",
-        stock:          String(editing.rawStock || 0),
         price:          String(editing.price    || 0),
         mrp:            String(editing.mrp     || ""),
         selling_price:  String(editing.selling_price || ""),
@@ -600,7 +601,7 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
     : {
         name: "", description: "", categoryName: "", subcategoryId: null,
         subcategoryName: "", barcode: "", brand: "", unit: "kg",
-        stock: "", price: "", mrp: "", selling_price: "",
+        price: "", mrp: "", selling_price: "",
         type: "packed", weight_options: [], image_url: "",
       };
 
@@ -632,24 +633,16 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
-        const flatCats = data.data?.flat || data.flat || [];
-        setAllCategories(
-          flatCats.length > 0
-            ? flatCats
-            : FALLBACK_CATEGORIES.map((n, i) => ({ id: -(i + 1), name: n, path: n }))
-        );
-        if (editing?.category_id) {
-          const match = flatCats.find((c) => c.id === editing.category_id);
-          if (match) setSelectedCategory(match);
-        } else if (editing?.category) {
-          const catNameStr = typeof editing.category === "object" ? editing.category?.name : editing.category;
-          const match = flatCats.find((c) => c.name === catNameStr);
+        const dbCats = data.data?.flat || data.flat || data.data?.categories || [];
+        setAllCategories(dbCats);
+
+        if (editing?.category_id || editing?.category) {
+          const match = dbCats.find((c) => c.id === editing.category_id || c.name === editing.category || c.path === editing.category);
           if (match) setSelectedCategory(match);
         }
       })
       .catch(() => {
-        if (!cancelled)
-          setAllCategories(FALLBACK_CATEGORIES.map((n, i) => ({ id: -(i + 1), name: n, path: n })));
+        if (!cancelled) setAllCategories([]);
       })
       .finally(() => { if (!cancelled) setCatLoading(false); });
     return () => { cancelled = true; };
@@ -713,7 +706,7 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
       ...form,
       weight_options:  cleanedOptions,
       subcategory_id:  form.subcategoryId || null,
-      category_id:     form.subcategoryId || selectedTopCat?.id || null,
+      category_id:     selectedCategory?.id || form.subcategoryId || null,
       category:        form.categoryName  || "Other",
       brand:           form.brand.trim()  || null,
       mrp:             form.mrp ? parseFloat(form.mrp) : null,
@@ -887,23 +880,26 @@ export default function ProductModal({ editing, onClose, onSave, saving }) {
 
             {/* Pricing */}
             <View style={s.section}>
-              <Field
-                label="Selling Price (₹)"
-                required
-                value={form.price}
-                onChangeText={(v) => set("price", v)}
-                placeholder="e.g. 40"
-                keyboardType="numeric"
-              />
-              <Field
-                label="MRP (₹)"
-                style={{ marginTop: 12 }}
-                value={form.mrp}
-                onChangeText={(v) => set("mrp", v)}
-                placeholder="e.g. 50"
-                keyboardType="numeric"
-              />
-            </View>
+              <View style={s.row}>
+                <Field
+                  label="Selling Price (₹)"
+                  required
+                  style={{ flex: 1 }}
+                  value={form.price}
+                  onChangeText={(v) => set("price", v)}
+                  placeholder="e.g. 40"
+                  keyboardType="numeric"
+                />
+                <Field
+                  label="MRP (₹)"
+                  style={{ marginTop: 12 }}
+                  value={form.mrp}
+                  onChangeText={(v) => set("mrp", v)}
+                  placeholder="e.g. 50"
+                  keyboardType="numeric"
+                />
+                </View>
+              </View>
 
             {/* Barcode */}
             <View style={[s.section, { marginTop: 0 }]}>

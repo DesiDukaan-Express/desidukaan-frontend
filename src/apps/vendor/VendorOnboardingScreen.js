@@ -972,7 +972,6 @@ export default function VendorOnboardingScreen({ onComplete }) {
             unit: product.unit || 'kg',
             category: product.category?.name || product.cat || currentCategory?.name || '',
             category_id: product.subcategory_id || product.category_id || currentCategory?.id,
-            subcategory_id: product.subcategory_id || null,
             stock_qty: parseInt(product.stock || product.stock_qty || 0),
             type: product.item_type || product.type || 'packed',
             image_url: product.image_url || product.image || null,
@@ -1837,9 +1836,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
                       <Text style={styles.inventoryMrp}>MRP ₹{product.mrp}</Text>
                       <Text style={styles.inventoryPrice}>SP ₹{product.sp || product.price}</Text>
                       <Text style={styles.inventoryStock}>
-                        {(product.stock || product.stock_qty) > 0
-                          ? `${product.stock || product.stock_qty} in stock`
-                          : 'Stock not set'}
+                        {product.is_active !== false ? "Available" : "Unavailable"}
                       </Text>
                     </View>
                   </View>

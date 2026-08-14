@@ -305,7 +305,7 @@ function ProductCard({ product, vendorId, vendorName, onSeeStores }) {
     product.mrp && product.mrp > product.price
       ? Math.round((1 - product.price / product.mrp) * 100)
       : null;
-  const outOfStock = product.stock_qty != null && product.stock_qty <= 0;
+  const outOfStock = !(product.is_active ?? true);
 
   return (
     <View style={[pc.card, outOfStock && pc.cardOos]}>
@@ -963,6 +963,13 @@ export default function SearchScreen() {
   // Trending items
   const [trendingItems, setTrendingItems] = useState([]);
 
+  // ── Focus field: when navigated from HomeScreen section buttons ────────
+  // Values: "stores" | "categories" | "items" | null
+  const [focusField, setFocusField] = useState(route.params?.focusField || null);
+  const [allNearbyVendors, setAllNearbyVendors] = useState([]);
+  const [focusedItems, setFocusedItems] = useState([]);
+  const [focusLoading, setFocusLoading] = useState(false);
+
   const handleStoreCatSelect = async (cat) => {
     const newCat = selectedStoreCategory === cat ? null : cat;
     setSelectedStoreCategory(newCat);
@@ -1062,8 +1069,43 @@ export default function SearchScreen() {
       setQuery(cat);
       doSearch(cat);
     }
-    setTimeout(() => inputRef.current?.focus(), 300);
+    // Only auto-focus search input when no focusField is set
+    if (!route.params?.focusField) {
+      setTimeout(() => inputRef.current?.focus(), 300);
+    }
   }, []);
+
+  // ── Load focused data when navigated from HomeScreen section buttons ────
+  useEffect(() => {
+    if (!focusField || !userCoords) return;
+    setFocusLoading(true);
+
+    const loadFocusedData = async () => {
+      try {
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        if (focusField === "stores") {
+          const res = await fetch(
+            `${BASE_URL}/vendors?latitude=${userCoords.lat}&longitude=${userCoords.lng}&radius_km=${FAR_RADIUS}`,
+            { headers },
+          );
+          const d = await res.json();
+          const list = Array.isArray(d) ? d : d.data || d.vendors || [];
+          setAllNearbyVendors(list);
+        } else if (focusField === "items") {
+          const res = await productsAPI.getTrending(userCoords.lat, userCoords.lng, 50);
+          setFocusedItems(res.data || []);
+        }
+        // "categories" uses dbCategories which are already loaded
+      } catch (e) {
+        console.error("Focus load error:", e.message);
+      } finally {
+        setFocusLoading(false);
+      }
+    };
+
+    loadFocusedData();
+  }, [focusField, userCoords?.lat, userCoords?.lng]);
 
   // ── Fetch all nearby vendors on mount ────────────────────────────────────
   useEffect(() => {
@@ -1250,7 +1292,7 @@ export default function SearchScreen() {
               const p = inv.product;
               if (!p) continue;
               const key = p.name?.toLowerCase() || p.id;
-              const inStock = inv.stock_qty > 0;
+              const inStock = inv.is_active ?? true;
               const existing = productMap.get(key);
               // Prefer in-stock over OOS; among same stock status, prefer cheapest
               if (
@@ -1262,7 +1304,7 @@ export default function SearchScreen() {
                   ...p,
                   vendor_id: vendor.id,
                   vendor: vendor,
-                  stock_qty: inv.stock_qty,
+                  is_active: inv.is_active,
                   _inStock: inStock,
                   _allVendorIds: existing?._allVendorIds || [],
                 });
@@ -1282,12 +1324,12 @@ export default function SearchScreen() {
             const p = inv.product;
             if (!p) continue;
             const key = p.name?.toLowerCase() || p.id;
-            if (!productMap.has(key) && inv.stock_qty <= 0) {
+            if (!productMap.has(key) && !(inv.is_active ?? true)) {
               productMap.set(key, {
                 ...p,
                 vendor_id: vendor.id,
                 vendor,
-                stock_qty: inv.stock_qty,
+                is_active: inv.is_active,
                 _inStock: false,
                 _allVendorIds: [vendor.id],
               });
@@ -1375,15 +1417,7 @@ export default function SearchScreen() {
 
   // ── Back ──────────────────────────────────────────────────────────────────
   const handleBack = () => {
-    if (committed || query.length > 0) {
-      setQuery("");
-      setCommitted(false);
-      setProducts([]);
-      setMatchedVendors([]);
-      setTimeout(() => inputRef.current?.focus(), 100);
-    } else {
-      navigation.goBack();
-    }
+    navigation.goBack();
   };
 
   // ── Compute distances ─────────────────────────────────────────────────────
@@ -1430,7 +1464,8 @@ export default function SearchScreen() {
 
   // ── Suggestions: API-first, fall back to local history ──────────────────
   const trimmed = query.trim();
-  const isIdle = !committed && trimmed.length === 0;
+  const isIdle = !committed && trimmed.length === 0 && !focusField;
+  const isFocused = !committed && trimmed.length === 0 && !!focusField;
   const isTyping = !committed && trimmed.length > 0;
 
   // Merge API suggestions with local history (API takes priority)
@@ -1511,6 +1546,7 @@ export default function SearchScreen() {
               onChangeText={(t) => {
                 setQuery(t);
                 setCommitted(false);
+                setFocusField(null);
               }}
               onSubmitEditing={() => doSearch()}
               returnKeyType="search"
@@ -1926,6 +1962,140 @@ export default function SearchScreen() {
                       />
                     ))}
                   </View>
+                )}
+              </View>
+            )}
+
+            {/* ── FOCUSED BROWSE VIEW (from HomeScreen section buttons) ── */}
+            {isFocused && (
+              <View style={{ paddingHorizontal: px, paddingTop: 16 }}>
+                {focusLoading && (
+                  <View style={s.loadingWrap}>
+                    <ActivityIndicator size="large" color={C.green} />
+                    <Text style={s.loadingText}>
+                      {focusField === "stores"
+                        ? "Finding stores…"
+                        : focusField === "categories"
+                          ? "Loading categories…"
+                          : "Loading items…"}
+                    </Text>
+                  </View>
+                )}
+
+                {/* ── Focused: ALL STORES ── */}
+                {!focusLoading && focusField === "stores" && (
+                  <>
+                    <SectionHeading title="All Nearby Stores" />
+                    {allNearbyVendors.length === 0 ? (
+                      <View style={s.emptyWrap}>
+                        <Feather name="map-pin" size={32} color={C.gray300} />
+                        <Text style={s.emptyTitle}>No stores found</Text>
+                        <Text style={s.emptySub}>
+                          No stores found near your location.
+                        </Text>
+                      </View>
+                    ) : (
+                      allNearbyVendors.map((v) => {
+                        const dist =
+                          userCoords && v.latitude && v.longitude
+                            ? distKm(
+                                userCoords.lat,
+                                userCoords.lng,
+                                v.latitude,
+                                v.longitude,
+                              )
+                            : null;
+                        const tooFar = dist != null && dist > NEARBY_RADIUS;
+                        return (
+                          <VendorCard
+                            key={v.id}
+                            vendor={v}
+                            distKm={dist}
+                            matchCount={0}
+                            onPress={() => goToStore(v)}
+                            tooFar={tooFar}
+                          />
+                        );
+                      })
+                    )}
+                  </>
+                )}
+
+                {/* ── Focused: ALL CATEGORIES ── */}
+                {!focusLoading && focusField === "categories" && (
+                  <>
+                    <SectionHeading title="All Categories" />
+                    {dbCategories.length === 0 ? (
+                      <View style={s.emptyWrap}>
+                        <Feather name="grid" size={32} color={C.gray300} />
+                        <Text style={s.emptyTitle}>No categories found</Text>
+                        <Text style={s.emptySub}>
+                          Categories are not available right now.
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={s.focusCatGrid}>
+                        {dbCategories.map((cat) => (
+                          <TouchableOpacity
+                            key={cat.label}
+                            style={s.focusCatItem}
+                            onPress={() => {
+                              setFocusField(null);
+                              setQuery(cat.label);
+                              doSearch(cat.label);
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <View
+                              style={[
+                                s.catImgWrap,
+                                { backgroundColor: cat.bg },
+                              ]}
+                            >
+                              <Image
+                                source={{ uri: cat.img }}
+                                style={s.catImg}
+                                resizeMode="cover"
+                              />
+                            </View>
+                            <Text style={s.catChipLabel}>{cat.label}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </>
+                )}
+
+                {/* ── Focused: ALL ITEMS ── */}
+                {!focusLoading && focusField === "items" && (
+                  <>
+                    <SectionHeading title="Popular Items" />
+                    {focusedItems.length === 0 ? (
+                      <View style={s.emptyWrap}>
+                        <Feather name="package" size={32} color={C.gray300} />
+                        <Text style={s.emptyTitle}>No items found</Text>
+                        <Text style={s.emptySub}>
+                          No popular items available right now.
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={s.itemsCard}>
+                        {focusedItems.map((item, i) => (
+                          <ProductCard
+                            key={`${item.id}_${i}`}
+                            product={item}
+                            vendorId={item.vendor_id}
+                            vendorName={item.vendor?.shop_name}
+                            onSeeStores={
+                              item.vendor_id
+                                ? () => handleSeeStores(item)
+                                : undefined
+                            }
+                          />
+                        ))}
+                      </View>
+                    )}
+                  </>
                 )}
               </View>
             )}
@@ -2496,6 +2666,81 @@ const s = StyleSheet.create({
     fontWeight: "700",
     textAlign: "center",
     fontFamily: "PlusJakartaSans_700Bold",
+  },
+
+  // ── Focused browse: category grid ─────────────────────────────────────────
+  focusCatGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+    paddingBottom: 16,
+  },
+  focusCatItem: {
+    alignItems: "center",
+    width: 100,
+  },
+
+  // ── Shared utility styles ─────────────────────────────────────────────────
+  emptyWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
+    gap: 10,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: C.gray700,
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+  },
+  emptySub: {
+    fontSize: 13,
+    color: C.gray400,
+    textAlign: "center",
+    lineHeight: 19,
+    paddingHorizontal: 24,
+    fontFamily: "PlusJakartaSans_500Medium",
+  },
+  loadingWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: C.gray500,
+    fontWeight: "600",
+    fontFamily: "PlusJakartaSans_600SemiBold",
+  },
+  resultNote: {
+    fontSize: 13,
+    color: C.gray500,
+    marginBottom: 14,
+    fontFamily: "PlusJakartaSans_500Medium",
+  },
+  itemsCard: {
+    backgroundColor: C.white,
+    borderRadius: 18,
+    overflow: "hidden",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  farHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  farHeaderText: {
+    fontSize: 13,
+    color: C.amber,
+    fontWeight: "600",
+    fontFamily: "PlusJakartaSans_600SemiBold",
   },
 });
 

@@ -12,8 +12,8 @@ import {
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { useTranslation } from 'react-i18next';
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
 import useAuthStore from '../../store/authStore';
 import LanguageSwitcher from '../../components/common/LanguageSwitcher';
 
@@ -338,6 +338,7 @@ function LogoutModal({ visible, onConfirm, onCancel }) {
             <Feather name="log-out" size={26} color={C.red} />
           </LinearGradient>
           <Text style={lm.title}>Log out?</Text>
+          {/* <Text style={lm.sub}>Your cart and session will be cleared.</Text> */}
           <View style={lm.btns}>
             <TouchableOpacity style={lm.cancel} onPress={onCancel}>
               <Text style={lm.cancelText}>Cancel</Text>

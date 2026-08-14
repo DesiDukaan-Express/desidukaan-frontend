@@ -47,37 +47,6 @@ const TEXT = "#18181B";
 const TEXT_LIGHT = "#71717A";
 const TEXT_XLIGHT = "#A1A1AA";
 
-function stockStatus(product) {
-  const qty = product.inventory?.stock_qty ?? product.stock_qty ?? 0;
-  const threshold =
-    product.inventory?.low_stock_threshold ?? product.low_stock_threshold ?? 5;
-  if (qty === 0) return "outofstock";
-  if (qty <= threshold) return "lowstock";
-  return "instock";
-}
-
-function stockColor(status) {
-  if (status === "outofstock") return RED;
-  if (status === "lowstock") return ORANGE;
-  return GREEN;
-}
-
-function stockLabel(status) {
-  if (status === "outofstock") return "Out of Stock";
-  if (status === "lowstock") return "Low Stock";
-  return "In Stock";
-}
-
-function stockQty(product) {
-  return product.inventory?.stock_qty ?? product.stock_qty ?? 0;
-}
-
-function stockMax(product) {
-  const threshold =
-    product.inventory?.low_stock_threshold ?? product.low_stock_threshold ?? 5;
-  // Use a generous max for progress bar — at least 20, or 4× threshold
-  return Math.max(20, threshold * 4, stockQty(product) * 1.2);
-}
 
 const getCategoryIcon = (catName) => {
   const name = String(catName || "").toLowerCase();
@@ -200,6 +169,7 @@ export default function InventoryScreen() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [confirmSheet, setConfirmSheet] = useState(null); // { product, makingAvailable }
   const [actionSheetProduct, setActionSheetProduct] = useState(null);
+  const [productToDelete, setProductToDelete] = useState(null);
   const [showCatalogueModal, setShowCatalogueModal] = useState(false);
 
   // Clear selection on page change
@@ -232,21 +202,7 @@ export default function InventoryScreen() {
   };
 
   const handleDelete = (id) => {
-    Alert.alert(
-      t('vendor.deleteProduct'),
-      t('vendor.deleteProductDesc'),
-      [
-        { text: t('vendor.cancel'), style: "cancel" },
-        {
-          text: t('vendor.delete'),
-          style: "destructive",
-          onPress: async () => {
-            await inv.deleteProduct(id);
-            showToast("Product deleted");
-          },
-        },
-      ],
-    );
+    setProductToDelete(id);
   };
 
   const handleDeleteCategory = (catName) => {
@@ -369,10 +325,7 @@ export default function InventoryScreen() {
       data = [...data].sort((a, b) => {
         let av = a[inv.sortKey];
         let bv = b[inv.sortKey];
-        if (inv.sortKey === "stock") {
-          av = a.rawStock ?? 0;
-          bv = b.rawStock ?? 0;
-        }
+
         if (typeof av === "number" && typeof bv === "number") {
           return inv.sortDir === "asc" ? av - bv : bv - av;
         }
@@ -405,10 +358,7 @@ export default function InventoryScreen() {
       data = [...data].sort((a, b) => {
         let av = a[inv.sortKey];
         let bv = b[inv.sortKey];
-        if (inv.sortKey === "stock") {
-          av = a.rawStock ?? 0;
-          bv = b.rawStock ?? 0;
-        }
+
         if (typeof av === "number" && typeof bv === "number") {
           return inv.sortDir === "asc" ? av - bv : bv - av;
         }
@@ -515,8 +465,7 @@ export default function InventoryScreen() {
               {[
                 { label: t('vendor.priceLowHigh'), key: "price", dir: "asc" },
                 { label: t('vendor.priceHighLow'), key: "price", dir: "desc" },
-                { label: t('vendor.stockLowHigh'), key: "stock", dir: "asc" },
-                { label: t('vendor.stockHighLow'), key: "stock", dir: "desc" },
+
               ].map((opt) => {
                 const active = inv.sortKey === opt.key && inv.sortDir === opt.dir;
                 return (
@@ -616,8 +565,7 @@ export default function InventoryScreen() {
               {[
                 { label: t('vendor.priceLowHigh'), key: "price", dir: "asc" },
                 { label: t('vendor.priceHighLow'), key: "price", dir: "desc" },
-                { label: t('vendor.stockLowHigh'), key: "stock", dir: "asc" },
-                { label: t('vendor.stockHighLow'), key: "stock", dir: "desc" },
+
               ].map((opt) => {
                 const active = inv.sortKey === opt.key && inv.sortDir === opt.dir;
                 return (
@@ -693,11 +641,26 @@ export default function InventoryScreen() {
         />
       )}
 
+      {productToDelete && (
+        <BulkDeleteDialog
+          count={1}
+          onConfirm={async () => {
+            await inv.deleteProduct(productToDelete);
+            showToast("Product deleted");
+            setProductToDelete(null);
+          }}
+          onCancel={() => setProductToDelete(null)}
+          saving={inv.saving}
+        />
+      )}
+
+
       <CatalogueModal
         visible={showCatalogueModal}
         onClose={() => setShowCatalogueModal(false)}
         onSuccess={() => {
-          inv.reload();
+          inv.loadVendor?.();
+          inv.reload?.();
           showToast("Products imported from catalogue!");
         }}
       />
