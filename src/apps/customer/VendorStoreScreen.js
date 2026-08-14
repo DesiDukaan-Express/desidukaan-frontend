@@ -198,6 +198,11 @@ function formatWeight(w) {
   }
   return String(w);
 }
+function formatRupee(v) {
+  const n = Number(v) || 0;
+  const rounded = Math.round(n * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2).replace(/\.?0+$/, "");
+}
 
 // ═══════════════════════════════════════════════════════════════════════════ //
 // ─── Weight Picker Modal ─────────────────────────────────────────────────── //
@@ -213,6 +218,9 @@ function WeightPickerModal({ item, onClose, onAdd }) {
       setSelected(weightOptions[0]);
     }
   }, [item]);
+
+  const selectedWeightStr = formatWeight(selected);
+  const selectedPrice = calculateProportionalPrice(p.price, selectedWeightStr, p.unit || "1kg");
 
   if (!item) return null;
 
@@ -280,7 +288,10 @@ function WeightPickerModal({ item, onClose, onAdd }) {
               style={wp.addBtnGrad}
             >
               <Feather name="shopping-cart" size={16} color={C.white} />
-              <Text style={wp.addBtnText}>{t('vendorStore.addWeightToCart', { weight: formatWeight(selected) })}</Text>
+              <Text style={wp.addBtnText}>
+                {t('vendorStore.addWeightToCart', { weight: selectedWeightStr })}
+                <Text style={wp.addBtnPrice}> · ₹{formatRupee(selectedPrice)}</Text>
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         </Pressable>
@@ -310,6 +321,7 @@ const wp = StyleSheet.create({
   addBtn: { borderRadius: 16, overflow: "hidden" },
   addBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16 },
   addBtnText: { fontSize: 16, fontWeight: "800", color: C.white },
+  addBtnPrice: { fontSize: 14, fontWeight: "700", color: "#a1ffad" },
 });
 
 // ═══════════════════════════════════════════════════════════════════════════ //
@@ -717,10 +729,11 @@ function CatTabPill({ cat, count, isActive, onPress }) {
 }
 const ct = StyleSheet.create({
   pill: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999,
+    flexDirection: "row", alignItems: "center", gap: 7,
+    paddingHorizontal: 13, paddingVertical: 9, borderRadius: 999,
     borderWidth: 1, borderColor: C.outlineVar,
     backgroundColor: C.surfaceLowest, marginRight: 8,
+    maxWidth: 150, flexShrink: 1,
   },
   pillActive: {
     backgroundColor: C.greenDark, borderColor: C.greenDark,
@@ -728,7 +741,7 @@ const ct = StyleSheet.create({
     shadowOpacity: 0.3, shadowRadius: 7, elevation: 4,
   },
   emoji: { fontSize: 14 },
-  label: { fontSize: 12, fontWeight: "700", color: C.gray600 },
+  label: { fontSize: 12, fontWeight: "700", color: C.gray600, flexShrink: 1 },
   labelActive: { color: C.white },
   bubble: {
     paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999,

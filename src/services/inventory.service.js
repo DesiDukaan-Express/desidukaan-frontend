@@ -114,6 +114,7 @@ export const inventoryService = {
         body: JSON.stringify({
           name: payload.name,
           description: payload.description || "",
+          brand: payload.brand || null,
           category: payload.category || "Other",
           // Send subcategory_id if available; backend will use it as category_id
           subcategory_id: payload.subcategory_id || null,
