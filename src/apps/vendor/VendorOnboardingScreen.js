@@ -2,13 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, Alert,
-  KeyboardAvoidingView, Platform, Image, Modal
+  KeyboardAvoidingView, Platform, Image, Modal, Pressable, Keyboard
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import useAuthStore from '../../store/authStore';
 import AddressMapView from "../../components/AddressMapView";
+import UseCurrentLocationButton from "../../components/UseCurrentLocationButton";
+import UnitDropdownMenu from '../../components/UnitDropdownMenu';
 import { uploadAPI } from '../../services/api';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -29,9 +31,10 @@ const STEPS = [
 ];
 
 
-const UNITS = [
-  'kg', 'g', 'litre', 'ml', 'pack', 'piece',
-  'dozen', 'bunch', 'box', 'bag', 'bottle', 'can', 'sachet', 'strip',
+// Unit options for the manual product form — same list as the admin Add Product
+// form (components/common/tokens.js UNITS) so both stay consistent.
+const MANUAL_UNIT_OPTIONS = [
+  'kg', 'g', 'litre', 'ml', 'piece', 'pack', 'dozen', 'box',
 ];
 
 
@@ -168,12 +171,142 @@ const GENERIC_PRODUCTS = [
 
 const EMPTY_PRODUCT = {
   name: '', mrp: '', sp: '', unit: 'kg', cat: '',
+  brand: '', description: '', subcat: '', category_id: null, subcategory_id: null,
   stock: '', type: 'loose', weight_options: [],
 };
 
-const SAMPLE_CSV = `name,mrp,sp,unit,category,stock_qty,type
-Loose Basmati Rice,85,80,kg,Grocery,100,loose
-Amul Milk 500ml,30,28,litre,Dairy,50,packed`;
+const SAMPLE_CSV = `name,mrp,sp,unit,category,type
+Loose Basmati Rice,85,80,kg,Grocery,loose
+Amul Milk 500ml,30,28,litre,Dairy,packed`;
+
+// Fallback top categories (used when the categories API is unreachable) —
+// mirrors the admin Add Product form's fallback list.
+const FALLBACK_CATEGORIES = [
+  'Dairy, Bread & Eggs',
+  'Fruits & Vegetables',
+  'Snacks & Munchies',
+  'Beverages',
+  'Bakery & Biscuits',
+  'Atta, Rice & Dal',
+  'Masala, Oil & More',
+  'Cleaning Essentials',
+  'Personal Care',
+  'Other',
+];
+
+// ─── Category dropdown (same data source as admin Add Product form) ──────────
+// Fetches top categories from GET /products/categories and subcategories from
+// GET /products/subcategories/:id — exactly like components/inventory/ProductModal.
+function ProductCategoryDropdown({ topCategories = [], loading, value, subvalue, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [subOpen, setSubOpen] = useState(false);
+  const [subs, setSubs] = useState([]);
+  const [subLoading, setSubLoading] = useState(false);
+
+  const loadSubs = async (top) => {
+    setSubLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/products/subcategories/${top.id}`);
+      const data = await res.json();
+      setSubs(data.data?.subcategories || []);
+    } catch {
+      setSubs([]);
+    } finally {
+      setSubLoading(false);
+    }
+  };
+
+  const pickTop = (cat) => {
+    setOpen(false);
+    setSubOpen(false);
+    setSubs([]);
+    onChange({ cat: cat.name, subcat: '', category_id: cat.id, subcategory_id: null });
+    if (cat.id > 0) loadSubs(cat);
+  };
+
+  const pickSub = (sub) => {
+    setSubOpen(false);
+    onChange({ cat: value, subcat: sub.name, category_id: sub.id, subcategory_id: sub.id });
+  };
+
+  return (
+    <View>
+      <TouchableOpacity
+        style={styles.dropdownBox}
+        activeOpacity={0.8}
+        onPress={() => { setOpen(!open); setSubOpen(false); }}
+      >
+        <Text style={[styles.dropdownValue, !value && styles.dropdownPlaceholder]}>
+          {value ? (subvalue ? `${value} › ${subvalue}` : value) : 'Select Category...'}
+        </Text>
+        <MaterialIcons name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#666" />
+      </TouchableOpacity>
+
+      {open && (
+        <View style={styles.dropdownList}>
+          {loading ? (
+            <ActivityIndicator size="small" color={PRIMARY} style={{ margin: 12 }} />
+          ) : (
+            <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+              {topCategories.map(cat => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[styles.dropdownItem, value === cat.name && styles.dropdownItemActive]}
+                  onPress={() => pickTop(cat)}
+                >
+                  <Text style={[styles.dropdownItemText, value === cat.name && styles.dropdownItemTextActive]}>
+                    {cat.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+      )}
+
+      {value && (
+        <View style={{ marginTop: 6 }}>
+          <TouchableOpacity
+            style={styles.dropdownBox}
+            activeOpacity={0.8}
+            onPress={() => { setSubOpen(!subOpen); setOpen(false); }}
+          >
+            <Text style={[styles.dropdownValue, !subvalue && styles.dropdownPlaceholder]}>
+              {subvalue ? subvalue : 'Select Subcategory (Optional)...'}
+            </Text>
+            <MaterialIcons name={subOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#666" />
+          </TouchableOpacity>
+
+          {subOpen && (
+            <View style={styles.dropdownList}>
+              {subLoading ? (
+                <ActivityIndicator size="small" color={PRIMARY} style={{ margin: 12 }} />
+              ) : subs.length === 0 ? (
+                <View style={styles.dropdownEmpty}>
+                  <Text style={styles.dropdownEmptyText}>No subcategories available.</Text>
+                </View>
+              ) : (
+                <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                  {subs.map(sub => (
+                    <TouchableOpacity
+                      key={sub.id}
+                      style={[styles.dropdownItem, subvalue === sub.name && styles.dropdownItemActive]}
+                      onPress={() => pickSub(sub)}
+                    >
+                      <Text style={[styles.dropdownItemText, subvalue === sub.name && styles.dropdownItemTextActive]}>
+                        {sub.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
 
 // ─── Auto-geocode helper ──────────────────────────────────────────────────────
 // Converts pincode + city → lat/lng using Nominatim (free, no API key needed).
@@ -231,6 +364,29 @@ async function geocodeAddress(city, pincode) {
   }
 }
 
+// Nominatim free-form autocomplete — India only, returns up to 5 suggestions
+// with addressdetails so we can extract city/postcode from each result.
+const NOMINATIM_UA = { 'User-Agent': 'DesiDukaan/1.0' };
+async function searchAddressSuggestions(query) {
+  const q = encodeURIComponent(query);
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/search?q=${q}&format=json&addressdetails=1&limit=5&countrycodes=in`,
+    { headers: NOMINATIM_UA }
+  );
+  if (!res.ok) throw new Error('Nominatim search failed');
+  return res.json();
+}
+
+// Nominatim reverse geocoding — used when the map marker is dragged.
+async function reverseGeocodeAddress(lat, lng) {
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
+    { headers: NOMINATIM_UA }
+  );
+  if (!res.ok) throw new Error('Nominatim reverse failed');
+  return res.json();
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function VendorOnboardingScreen({ onComplete }) {
@@ -261,10 +417,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const [phone, setPhone] = useState(user?.phone || '');
   const [altName, setAltName] = useState('');
   const [altPhone, setAltPhone] = useState('');
-  const [address, setAddress] = useState('');
   const [landmark, setLandmark] = useState('');
-  const [city, setCity] = useState('');
-  const [pincode, setPincode] = useState('');
   const [deliveryType, setDeliveryType] = useState('self');
   // Geocoded coords — auto-set on submit
   const [resolvedLat, setResolvedLat] = useState(null);
@@ -299,11 +452,235 @@ export default function VendorOnboardingScreen({ onComplete }) {
     }
     setGeocoding(false);
   };
+  // Shared location state — City, Pincode, Street Address and the map marker are
+  // all driven from this single object so they can never contradict each other.
+  const [shopLoc, setShopLoc] = useState({
+    formattedAddress: '',
+    city: '',
+    pincode: '',
+    lat: null,
+    lng: null,
+  });
+  const updateShopLoc = (patch) => setShopLoc(prev => ({ ...prev, ...patch }));
 
+  // ── Street Address autocomplete ───────────────────────────────────────────
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [addrLoading, setAddrLoading] = useState(false);
+  const [hoverIdx, setHoverIdx] = useState(null);
+  const searchTimer = useRef(null);
+  const searchSeq = useRef(0);          // guards against stale/out-of-order responses
+  const applyingRef = useRef(false);    // suppresses the city/pincode effect after a selection/drag
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  // Step 4 — per-row Unit dropdown + image-URL input visibility
+  const [unitOpenIdx, setUnitOpenIdx] = useState(null);
+  const [unitHover, setUnitHover] = useState(null);
+  const [urlInputIdx, setUrlInputIdx] = useState(null);
+  const unitTriggerRef = useRef(null);
+  const unitDropdownRef = useRef(null);
+
+  const closeSuggestions = () => {
+    setSuggestions([]);
+    setSuggestionsOpen(false);
+  };
+
+  // Debounced (~650ms) Nominatim autocomplete on Street Address keystrokes.
+  const searchAddress = (query) => {
+    clearTimeout(searchTimer.current);
+    const q = (query || '').trim();
+    if (q.length < 3) { closeSuggestions(); return; }
+    searchTimer.current = setTimeout(async () => {
+      const seq = ++searchSeq.current;
+      setAddrLoading(true);
+      try {
+        const data = await searchAddressSuggestions(q);
+        if (seq === searchSeq.current && Array.isArray(data)) {
+          setSuggestions(data);
+          setSuggestionsOpen(data.length > 0);
+        }
+      } catch {
+        if (seq === searchSeq.current) closeSuggestions();
+      } finally {
+        if (seq === searchSeq.current) setAddrLoading(false);
+      }
+    }, 650);
+  };
+
+  const handleAddressChange = (text) => {
+    applyingRef.current = false;
+    updateShopLoc({ formattedAddress: text });
+    searchAddress(text);
+  };
+
+  // Single selection updates the address field, city, pincode AND the map pin.
+  const selectSuggestion = async (item) => {
+    clearTimeout(searchTimer.current);
+    searchSeq.current++; // invalidate any in-flight request
+    applyingRef.current = true;
+    const a = item.address || {};
+    const cityName = a.city || a.town || a.suburb || a.village || '';
+    const lat = parseFloat(item.lat);
+    const lng = parseFloat(item.lon);
+    let pincode = a.postcode || '';
+
+    // Broad area-level matches (e.g. "Shahdara, Delhi") often omit postcode.
+    // Reverse-geocoding the exact point recovers it more reliably.
+    if (!pincode) {
+      try {
+        const rev = await reverseGeocodeAddress(lat, lng);
+        pincode = rev?.address?.postcode || '';
+      } catch {
+        // ignore — pincode stays empty and can be typed manually
+      }
+    }
+
+    updateShopLoc({
+      formattedAddress: item.display_name || '',
+      city: cityName,
+      pincode,
+      lat,
+      lng,
+    });
+    closeSuggestions();
+    Keyboard.dismiss();
+  };
+
+  // Marker dragged on the map → reverse-geocode back into the same state.
+  const handleMarkerDragEnd = async (lat, lng) => {
+    applyingRef.current = true;
+    updateShopLoc({ lat, lng });
+    try {
+      const data = await reverseGeocodeAddress(lat, lng);
+      const a = data?.address || {};
+      updateShopLoc({
+        formattedAddress: data?.display_name || shopLoc.formattedAddress,
+        city: a.city || a.town || a.suburb || a.village || shopLoc.city,
+        pincode: a.postcode || shopLoc.pincode,
+      });
+    } catch {
+      // keep the marker coords even if reverse geocoding fails
+    }
+  };
+
+  // "Use current location" — gets coordinates, reverse-geocodes them, and fills
+  // Street Address + City + Pincode while moving the map marker to that spot.
+  const [locating, setLocating] = useState(false);
+  const [locError, setLocError] = useState('');
+  const handleUseCurrentLocation = () => {
+    setLocError('');
+    if (Platform.OS === 'web') {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        setLocError("Geolocation isn't available in this browser.");
+        return;
+      }
+      setLocating(true);
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          await applyCurrentCoords(pos.coords.latitude, pos.coords.longitude);
+          setLocating(false);
+        },
+        () => {
+          setLocating(false);
+          setLocError('Location permission denied — type your address or pick a suggestion instead.');
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+      );
+    } else {
+      // Native — expo-location
+      setLocating(true);
+      (async () => {
+        try {
+          const Location = require('expo-location');
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') {
+            setLocError('Location permission denied — type your address or pick a suggestion instead.');
+            return;
+          }
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          await applyCurrentCoords(loc.coords.latitude, loc.coords.longitude);
+        } catch {
+          setLocError('Could not detect your location. Please type it manually.');
+        } finally {
+          setLocating(false);
+        }
+      })();
+    }
+  };
+
+  const applyCurrentCoords = async (lat, lng) => {
+    applyingRef.current = true;
+    updateShopLoc({ lat, lng });
+    try {
+      const data = await reverseGeocodeAddress(lat, lng);
+      const a = data?.address || {};
+      updateShopLoc({
+        formattedAddress: data?.display_name || shopLoc.formattedAddress,
+        city: a.city || a.town || a.suburb || a.village || '',
+        pincode: a.postcode || '',
+      });
+    } catch {
+      // keep the marker coords even if reverse geocoding fails
+    }
+  };
+
+  // Close the dropdown on Escape / outside click (web only).
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const onKey = (e) => { if (e.key === 'Escape') closeSuggestions(); };
+    const onClick = (e) => {
+      const inInput = inputRef.current && inputRef.current.contains && inputRef.current.contains(e.target);
+      const inDrop = dropdownRef.current && dropdownRef.current.contains && dropdownRef.current.contains(e.target);
+      if (!inInput && !inDrop) closeSuggestions();
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onClick);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onClick);
+    };
+  }, []);
+
+  // Close the Unit dropdown on Escape / outside click (web only).
+  // Note: uses 'click' (not 'mousedown') so option selection — which happens on
+  // mousedown AND click — always runs before this outside-close check.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const onKey = (e) => { if (e.key === 'Escape') setUnitOpenIdx(null); };
+    const onClick = (e) => {
+      if (unitOpenIdx === null) return;
+      const trigger = unitTriggerRef.current;
+      const menu = unitDropdownRef.current;
+      const inTrigger = trigger && trigger.contains && trigger.contains(e.target);
+      const inMenu = menu && menu.contains && menu.contains(e.target);
+      if (!inTrigger && !inMenu) setUnitOpenIdx(null);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('click', onClick);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('click', onClick);
+    };
+  }, [unitOpenIdx]);
+
+  // Manual edits to City/Pincode still move the map pin (forward geocode),
+  // but never fight a suggestion selection or marker drag.
   useEffect(() => {
     const delayDebounceFn = setTimeout(runGeocode, 1000);
+    const delayDebounceFn = setTimeout(async () => {
+      if (applyingRef.current) { applyingRef.current = false; return; }
+      if (shopLoc.city.length >= 3 && shopLoc.pincode.length === 6) {
+        setGeocoding(true);
+        const coords = await geocodeAddress(shopLoc.city, shopLoc.pincode);
+        if (coords.latitude && coords.longitude) {
+          updateShopLoc({ lat: coords.latitude, lng: coords.longitude });
+        }
+        setGeocoding(false);
+      }
+    }, 1000);
     return () => clearTimeout(delayDebounceFn);
-  }, [city, pincode]);
+  }, [shopLoc.city, shopLoc.pincode]);
 
   // Step 2 — Compliance
   const [fssai, setFssai] = useState('');
@@ -334,6 +711,9 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const [categoryStack, setCategoryStack] = useState([]);
   const [currentCategory, setCurrentCategory] = useState(null);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
+  // Top-level categories for the manual-entry Category dropdown (admin data source)
+  const [catTopOptions, setCatTopOptions] = useState([]);
+  const [catTopLoading, setCatTopLoading] = useState(false);
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -341,7 +721,29 @@ export default function VendorOnboardingScreen({ onComplete }) {
     if (currentStep === 4 && masterCategories.length === 0) {
       fetchCategories();
     }
+    if (currentStep === 4 && catTopOptions.length === 0) {
+      fetchAdminCategories();
+    }
   }, [currentStep]);
+
+  // Fetch top categories from the same endpoint the admin Add Product form uses
+  const fetchAdminCategories = async () => {
+    setCatTopLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/products/categories`);
+      const data = await res.json();
+      const cats = (data.data?.categories || []).filter(c => c.parent_id === null);
+      setCatTopOptions(
+        cats.length > 0
+          ? cats
+          : FALLBACK_CATEGORIES.map((n, i) => ({ id: -(i + 1), name: n, parent_id: null }))
+      );
+    } catch {
+      setCatTopOptions(FALLBACK_CATEGORIES.map((n, i) => ({ id: -(i + 1), name: n, parent_id: null })));
+    } finally {
+      setCatTopLoading(false);
+    }
+  };
 
   const fetchCategories = async (parentId = null) => {
     setLoadingCatalog(true);
@@ -442,6 +844,8 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const removeManualRow = (i) => setManualProds(prev => prev.filter((_, idx) => idx !== i));
   const updateManualProd = (i, field, value) =>
     setManualProds(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: value } : p));
+  const updateManualCategory = (i, payload) =>
+    setManualProds(prev => prev.map((p, idx) => idx === i ? { ...p, ...payload } : p));
 
   // ── Document upload (Step 2) ──────────────────────────────────────────────────
   const pickAndUploadDoc = async (docKey) => {
@@ -518,9 +922,9 @@ export default function VendorOnboardingScreen({ onComplete }) {
       if (!shopName.trim()) { Alert.alert('Required', 'Enter your shop name'); return false; }
       if (!ownerName.trim()) { Alert.alert('Required', 'Enter owner name'); return false; }
       if (!email.trim()) { Alert.alert('Required', 'Enter email address'); return false; }
-      if (!address.trim()) { Alert.alert('Required', 'Enter shop address'); return false; }
-      if (!city.trim()) { Alert.alert('Required', 'Enter your city'); return false; }
-      if (pincode.length !== 6) { Alert.alert('Required', 'Enter a valid 6-digit pincode'); return false; }
+      if (!shopLoc.formattedAddress.trim()) { Alert.alert('Required', 'Enter shop address'); return false; }
+      if (!shopLoc.city.trim()) { Alert.alert('Required', 'Enter your city'); return false; }
+      if (shopLoc.pincode.length !== 6) { Alert.alert('Required', 'Enter a valid 6-digit pincode'); return false; }
     }
     if (currentStep === 2) {
       if (!fssai.trim()) { Alert.alert('Required', 'Enter your FSSAI license number'); return false; }
@@ -534,6 +938,9 @@ export default function VendorOnboardingScreen({ onComplete }) {
     if (currentStep === 4) {
       if (getAllProducts().length === 0) {
         Alert.alert('Required', 'Add at least one product'); return false;
+      }
+      if (manualProds.some(p => p.name && p.sp && !p.cat)) {
+        Alert.alert('Required', 'Select a Category for every product you add manually'); return false;
       }
     }
     return true;
@@ -574,6 +981,27 @@ export default function VendorOnboardingScreen({ onComplete }) {
     try {
       // 1. Auto-geocode pincode + city → lat/lng
       //    This runs just before submit so we always have fresh coords
+      // 1. Auto-geocode pincode + city → lat/lng (only if the map pin wasn't set
+      //    already by a suggestion selection or marker drag)
+      let latitude = shopLoc.lat;
+      let longitude = shopLoc.lng;
+      if (!latitude || !longitude) {
+        setGeocoding(true);
+        const coords = await geocodeAddress(shopLoc.city, shopLoc.pincode);
+        latitude = coords.latitude;
+        longitude = coords.longitude;
+        setGeocoding(false);
+      }
+
+      if (!latitude || !longitude) {
+        // Non-blocking warning — vendor still registers, just won't appear in nearby search
+        Alert.alert(
+          'Location not found',
+          `We couldn't pinpoint "${shopLoc.pincode}, ${shopLoc.city}". Your shop will still be created but may not show in nearby results. You can update your location from the dashboard.`,
+          [{ text: 'Continue anyway' }]
+        );
+      }
+
       // 2. Create vendor
       const body = {
         shop_name: shopName,
@@ -590,10 +1018,10 @@ export default function VendorOnboardingScreen({ onComplete }) {
         trade_license_number: tradeLicense || null,
         fssai_license_url: docUrls.fssai || null,
         gst_certificate_url: docUrls.gst || null,
-        address_line: address,
+        address_line: shopLoc.formattedAddress,
         landmark: landmark || null,
-        city,
-        pincode,
+        city: shopLoc.city,
+        pincode: shopLoc.pincode,
         latitude: latitude || null,
         longitude: longitude || null,
         upi_id: upiId || null,
@@ -629,11 +1057,13 @@ export default function VendorOnboardingScreen({ onComplete }) {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
             name: product.name,
+            description: product.description || null,
+            brand: product.brand || null,
             mrp: parseFloat(product.mrp || 0),
             price: parseFloat(product.price || product.base_price || product.sp || 0),
             unit: product.unit || 'kg',
             category: product.category?.name || product.cat || currentCategory?.name || '',
-            category_id: product.category_id || currentCategory?.id,
+            category_id: product.subcategory_id || product.category_id || currentCategory?.id,
             stock_qty: parseInt(product.stock || product.stock_qty || 0),
             type: product.item_type || product.type || 'packed',
             image_url: product.image_url || product.image || null,
@@ -817,7 +1247,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
           {/* ── STEP 1: Shop Info ── */}
           {currentStep === 1 && (
             <View style={styles.form}>
-              <Text style={styles.label}>Shop Name <Text style={styles.req}>*</Text></Text>
+              <Text style={styles.label}>Shop Name *</Text>
               <TextInput style={styles.input} placeholder="e.g. Sharma Kirana Store" value={shopName} onChangeText={setShopName} />
 
               <Text style={styles.label}>Shop Owner Name <Text style={styles.req}>*</Text></Text>
@@ -868,31 +1298,94 @@ export default function VendorOnboardingScreen({ onComplete }) {
                 <MaterialIcons name="location-on" size={18} color={PRIMARY} />
                 <Text style={[styles.sectionSep, { marginTop: 0, marginBottom: 0 }]}>Shop Address</Text>
               </View>
-              <Text style={styles.label}>Street Address <Text style={styles.req}>*</Text></Text>
-              <TextInput style={[styles.input, styles.textArea]} placeholder="Shop no., Street, Area" value={address} onChangeText={setAddress} multiline numberOfLines={2} />
+              <UseCurrentLocationButton
+                loading={locating}
+                onPress={handleUseCurrentLocation}
+                style={{ marginBottom: 10 }}
+              />
+              {locError !== '' && (
+                <View style={styles.locErrorBox}>
+                  <MaterialIcons name="info-outline" size={14} color="#B45309" style={{ marginRight: 6 }} />
+                  <Text style={styles.locErrorText}>{locError}</Text>
+                </View>
+              )}
+              <View style={styles.addressWrap}>
+                <Text style={styles.label}>Street Address <Text style={styles.req}>*</Text></Text>
+                <TextInput
+                  ref={inputRef}
+                  style={[styles.input, styles.textArea, { marginBottom: 0 }]}
+                  placeholder="Shop no., Street, Area — start typing for suggestions"
+                  value={shopLoc.formattedAddress}
+                  onChangeText={handleAddressChange}
+                  multiline numberOfLines={2}
+                  onFocus={() => { if (suggestions.length > 0) setSuggestionsOpen(true); }}
+                />
+
+                {suggestionsOpen && suggestions.length > 0 && (
+                  <View ref={dropdownRef} style={styles.suggestionPanel}>
+                    <ScrollView
+                      style={{ maxHeight: 220 }}
+                      keyboardShouldPersistTaps="handled"
+                      nestedScrollEnabled
+                    >
+                      {addrLoading && suggestions.length === 0 && (
+                        <View style={styles.suggestionLoading}>
+                          <ActivityIndicator size="small" color={PRIMARY} />
+                          <Text style={styles.suggestionLoadingText}>Searching…</Text>
+                        </View>
+                      )}
+                      {suggestions.map((item, i) => (
+                        <Pressable
+                          key={`${item.place_id}_${i}`}
+                          onPressIn={() => selectSuggestion(item)}
+                          onHoverIn={() => setHoverIdx(i)}
+                          onHoverOut={() => setHoverIdx(null)}
+                          style={({ pressed }) => [
+                            styles.suggestionItem,
+                            hoverIdx === i && styles.suggestionItemHover,
+                            pressed && styles.suggestionItemHover,
+                          ]}
+                        >
+                          <MaterialIcons name="location-on" size={16} color={PRIMARY} style={styles.suggestionIcon} />
+                          <Text style={styles.suggestionText} numberOfLines={2}>{item.display_name}</Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
 
               <Text style={styles.label}>Landmark</Text>
               <TextInput style={styles.input} placeholder="e.g. Near Hanuman Temple" value={landmark} onChangeText={setLandmark} />
               <View style={styles.row}>
                 <View style={{ flex: 2 }}>
                   <Text style={styles.label}>City <Text style={styles.req}>*</Text></Text>
-                  <TextInput style={styles.input} placeholder="e.g. Noida" value={city} onChangeText={setCity} />
+                  <TextInput
+                    style={styles.input} placeholder="e.g. Noida"
+                    value={shopLoc.city}
+                    onChangeText={text => { applyingRef.current = false; updateShopLoc({ city: text }); }}
+                  />
                 </View>
                 <View style={{ width: 12 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>Pincode <Text style={styles.req}>*</Text></Text>
-                  <TextInput style={styles.input} placeholder="6-digit" keyboardType="numeric" maxLength={6} value={pincode} onChangeText={setPincode} />
+                  <TextInput
+                    style={styles.input} placeholder="6-digit" keyboardType="numeric" maxLength={6}
+                    value={shopLoc.pincode}
+                    onChangeText={text => { applyingRef.current = false; updateShopLoc({ pincode: text }); }}
+                  />
                 </View>
               </View>
 
-              {/* Map Preview */}
-              {mapRegion && resolvedLat && resolvedLng && (
+             
+              {/* Map Preview — marker is draggable; dragging reverse-geocodes the fields */}
+              
+              {(shopLoc.formattedAddress || shopLoc.city || shopLoc.pincode) && (
                 <View style={styles.mapWrapper}>
                   <AddressMapView
-                    region={mapRegion}
-                    latitude={resolvedLat}
-                    longitude={resolvedLng}
-                    onRegionChangeComplete={setMapRegion}
+                    latitude={shopLoc.lat}
+                    longitude={shopLoc.lng}
+                    onMarkerDragEnd={handleMarkerDragEnd}
                   />
                 </View>
               )}
@@ -902,7 +1395,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
                   <Text style={styles.infoText}>Detecting location…</Text>
                 </View>
               )}
-
+            
               {!geocoding && geoError && city.length >= 3 && pincode.length === 6 && (
                 <View style={[styles.infoBox, { marginTop: 8, backgroundColor: '#FEF2F2' }]}>
                   <Text style={[styles.infoText, { color: '#B91C1C' }]}>
@@ -1180,12 +1673,12 @@ export default function VendorOnboardingScreen({ onComplete }) {
                       </View>
 
                       <View style={styles.photoRow}>
-                        {product.image_url ? (
+                        {product.image_url && urlInputIdx !== index ? (
                           <View style={styles.photoPreviewWrap}>
                             <Image source={{ uri: product.image_url }} style={styles.photoPreview} />
                             <TouchableOpacity
                               style={styles.photoRemoveBtn}
-                              onPress={() => updateManualProd(index, 'image_url', null)}
+                              onPress={() => { updateManualProd(index, 'image_url', null); if (urlInputIdx === index) setUrlInputIdx(null); }}
                             >
                               <MaterialIcons name="close" size={14} color="#fff" />
                             </TouchableOpacity>
@@ -1203,17 +1696,70 @@ export default function VendorOnboardingScreen({ onComplete }) {
                             )}
                           </TouchableOpacity>
                         )}
-                        <Text style={styles.photoHint}>
-                          {product.image_url
-                            ? 'Photo uploaded! Tap close icon to remove.'
-                            : `Add a photo for better visibility.\nCustomers trust shops with product photos.`}
-                        </Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.photoHint}>
+                            {product.image_url && urlInputIdx !== index
+                              ? 'Photo uploaded! Tap close icon to remove.'
+                              : `Add a photo for better visibility.\nCustomers trust shops with product photos.`}
+                          </Text>
+                          {product.image_url && urlInputIdx !== index ? null : urlInputIdx === index ? (
+                            <View style={styles.urlInputRow}>
+                              <TextInput
+                                style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                                placeholder="Paste image URL…"
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                keyboardType="url"
+                                value={product.image_url || ''}
+                                onChangeText={v => updateManualProd(index, 'image_url', v)}
+                              />
+                              <TouchableOpacity
+                                style={styles.urlApplyBtn}
+                                activeOpacity={0.8}
+                                onPress={() => setUrlInputIdx(null)}
+                              >
+                                <Text style={styles.urlApplyText}>{product.image_url ? 'Use' : 'Cancel'}</Text>
+                              </TouchableOpacity>
+                            </View>
+                          ) : (
+                            <TouchableOpacity
+                              style={styles.urlLinkRow}
+                              activeOpacity={0.8}
+                              onPress={() => setUrlInputIdx(index)}
+                            >
+                              <MaterialIcons name="link" size={14} color={PRIMARY} />
+                              <Text style={styles.urlLinkText}>Use image URL</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
                       </View>
 
                       <Text style={styles.label}>Product Name <Text style={styles.req}>*</Text></Text>
                       <TextInput
                         style={styles.input} placeholder="e.g. Loose Basmati Rice"
                         value={product.name} onChangeText={v => updateManualProd(index, 'name', v)}
+                      />
+
+                      <Text style={styles.label}>Brand</Text>
+                      <TextInput
+                        style={styles.input} placeholder="e.g. Amul, Nestle, Tata..."
+                        value={product.brand} onChangeText={v => updateManualProd(index, 'brand', v)}
+                      />
+
+                      <Text style={styles.label}>Description</Text>
+                      <TextInput
+                        style={[styles.input, styles.textArea]} placeholder="Optional product details..."
+                        value={product.description} onChangeText={v => updateManualProd(index, 'description', v)}
+                        multiline
+                      />
+
+                      <Text style={styles.label}>Category <Text style={styles.req}>*</Text></Text>
+                      <ProductCategoryDropdown
+                        topCategories={catTopOptions}
+                        loading={catTopLoading}
+                        value={product.cat}
+                        subvalue={product.subcat}
+                        onChange={payload => updateManualCategory(index, payload)}
                       />
 
                       <View style={styles.row}>
@@ -1236,10 +1782,35 @@ export default function VendorOnboardingScreen({ onComplete }) {
                         <View style={{ width: 12 }} />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.label}>Unit <Text style={styles.req}>*</Text></Text>
-                          <TextInput
-                            style={styles.input} placeholder="kg / litre / piece..."
-                            value={product.unit} onChangeText={v => updateManualProd(index, 'unit', v)}
-                          />
+                          <View
+                            style={styles.dropdownWrap}
+                            ref={unitOpenIdx === index ? unitTriggerRef : null}
+                          >
+                            <TouchableOpacity
+                              style={styles.dropdownBox}
+                              activeOpacity={0.8}
+                              onPress={() => setUnitOpenIdx(unitOpenIdx === index ? null : index)}
+                            >
+                              <Text style={[styles.dropdownValue, !product.unit && styles.dropdownPlaceholder]}>
+                                {product.unit || 'Select Unit...'}
+                              </Text>
+                              <MaterialIcons name={unitOpenIdx === index ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#666" />
+                            </TouchableOpacity>
+                            {unitOpenIdx === index && (
+                              <UnitDropdownMenu
+                                anchorRef={unitTriggerRef}
+                                listRef={unitDropdownRef}
+                                options={MANUAL_UNIT_OPTIONS}
+                                value={product.unit}
+                                hover={unitHover}
+                                onHover={setUnitHover}
+                                onSelect={(u) => {
+                                  updateManualProd(index, 'unit', u);
+                                  setUnitOpenIdx(null);
+                                }}
+                              />
+                            )}
+                          </View>
                         </View>
                       </View>
 
@@ -1376,9 +1947,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
                       <Text style={styles.inventoryMrp}>MRP ₹{product.mrp}</Text>
                       <Text style={styles.inventoryPrice}>SP ₹{product.sp || product.price}</Text>
                       <Text style={styles.inventoryStock}>
-                        {(product.stock || product.stock_qty) > 0
-                          ? `${product.stock || product.stock_qty} in stock`
-                          : 'Stock not set'}
+                        {product.is_active !== false ? "Available" : "Unavailable"}
                       </Text>
                     </View>
                   </View>
@@ -1399,7 +1968,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
                 {[
                   { icon: 'store', label: 'Shop Name', value: shopName || '—' },
                   { icon: 'person', label: 'Owner', value: ownerName || '—' },
-                  { icon: 'location-on', label: 'Location', value: city && pincode ? `${city} – ${pincode}` : '—' },
+                  { icon: 'location-on', label: 'Location', value: shopLoc.city && shopLoc.pincode ? `${shopLoc.city} – ${shopLoc.pincode}` : '—' },
                   { icon: 'assignment', label: 'FSSAI / GST', value: `${fssai || '—'} / ${gst || '—'}` },
                   ...(aadhar ? [{ icon: 'badge', label: 'Aadhaar', value: aadhar }] : []),
                   ...(pan ? [{ icon: 'description', label: 'PAN', value: pan }] : []),
@@ -1518,6 +2087,31 @@ const styles = StyleSheet.create({
   textArea: { height: 80, textAlignVertical: 'top' },
   row: { flexDirection: 'row' },
 
+  // Street Address autocomplete
+  addressWrap: { position: 'relative', zIndex: 30 },
+  locErrorBox: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#FFF8E1', borderRadius: 10, padding: 10, marginBottom: 4,
+  },
+  locErrorText: { fontSize: 12, color: '#7B5800', flex: 1, lineHeight: 17 },
+  suggestionPanel: {
+    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 40,
+    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e0e0e0',
+    borderRadius: 10, marginTop: 4, overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 },
+    elevation: 6,
+  },
+  suggestionItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 13, paddingVertical: 11,
+    borderBottomWidth: 1, borderBottomColor: '#f4f4f5',
+  },
+  suggestionItemHover: { backgroundColor: PRIMARY_LIGHT },
+  suggestionIcon: { marginRight: 2 },
+  suggestionText: { flex: 1, fontSize: 13, color: '#333', lineHeight: 18, fontFamily: "PlusJakartaSans_500Medium" },
+  suggestionLoading: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 13 },
+  suggestionLoadingText: { fontSize: 12, color: '#999' },
+
   // Geocoding note
   geoNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#FFF8E1', borderRadius: 10, padding: 12, marginTop: 6, marginBottom: 4 },
   geoNoteIcon: { fontSize: 14, marginTop: 1 },
@@ -1528,6 +2122,30 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: PRIMARY_LIGHT, borderColor: PRIMARY },
   chipText: { fontSize: 12, color: '#555', fontWeight: '500', fontFamily: "PlusJakartaSans_500Medium" },
   chipTextActive: { color: PRIMARY, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" },
+
+  // Category dropdown (manual product entry)
+  dropdownBox: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e0e0e0',
+    borderRadius: 10, padding: 13, marginBottom: 6,
+  },
+  dropdownValue: { fontSize: 14, color: '#333', fontWeight: '500', fontFamily: "PlusJakartaSans_500Medium" },
+  dropdownPlaceholder: { color: '#999' },
+  dropdownWrap: { position: 'relative', zIndex: 999 },
+  // In-flow list for the Category dropdown (expands inline under its trigger).
+  dropdownList: {
+    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e0e0e0',
+    borderRadius: 10, overflow: 'hidden', marginBottom: 6,
+  },
+  dropdownItem: {
+    paddingHorizontal: 14, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: '#f4f4f5',
+  },
+  dropdownItemActive: { backgroundColor: PRIMARY_LIGHT },
+  dropdownItemText: { fontSize: 13, color: '#555', fontFamily: "PlusJakartaSans_500Medium" },
+  dropdownItemTextActive: { color: PRIMARY, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" },
+  dropdownEmpty: { padding: 14, backgroundColor: '#fafafa' },
+  dropdownEmptyText: { fontSize: 12, color: '#999' },
 
   // Vendor type — 2x2 grid
   segmentGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
@@ -1615,6 +2233,12 @@ const styles = StyleSheet.create({
   photoPreview: { width: 56, height: 56, borderRadius: 10, backgroundColor: '#eee' },
   photoRemoveBtn: { position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: '#e53935', alignItems: 'center', justifyContent: 'center' },
   photoRemoveText: { color: '#fff', fontSize: 10, fontWeight: '900', fontFamily: "PlusJakartaSans_800ExtraBold" },
+  // Image URL option (manual product card)
+  urlLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, alignSelf: 'flex-start' },
+  urlLinkText: { fontSize: 12, fontWeight: '700', color: PRIMARY, fontFamily: "PlusJakartaSans_700Bold" },
+  urlInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  urlApplyBtn: { backgroundColor: PRIMARY, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 13 },
+  urlApplyText: { color: '#fff', fontSize: 13, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" },
 
   segmentRow: { flexDirection: 'row', backgroundColor: '#f0f0f0', borderRadius: 8, padding: 3 },
   segBtn: { flex: 1, paddingVertical: 7, borderRadius: 6, alignItems: 'center' },

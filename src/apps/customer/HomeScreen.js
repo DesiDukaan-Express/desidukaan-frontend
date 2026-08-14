@@ -34,6 +34,7 @@ import ChatWidget from "./ChatWidget";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
 import LocationMapPicker from "../../components/LocationMapPicker";
+import UseCurrentLocationButton from "../../components/UseCurrentLocationButton";
 
 // Use env var works on device, emulator, and web
 // In your .env: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api
@@ -128,7 +129,6 @@ function AddressPicker({
   onSelect,
   onSaveNew,
   onUpdate,
-  onUseLocation,
   onDelete,
   initialCoords,
 }) {
@@ -148,6 +148,8 @@ function AddressPicker({
   const [focusPoint, setFocusPoint] = React.useState(null);
   const suggestionSelectRef = React.useRef(false);
   const focusSeqRef = React.useRef(0);
+  const [locating, setLocating] = React.useState(false);
+  const [locError, setLocError] = React.useState("");
 
   React.useEffect(() => {
     if (!visible) {
@@ -162,6 +164,8 @@ function AddressPicker({
       setSuggestions([]);
       setFocusPoint(null);
       suggestionSelectRef.current = false;
+      setLocating(false);
+      setLocError("");
     }
   }, [visible]);
 
@@ -175,6 +179,8 @@ function AddressPicker({
     setSuggestions([]);
     setFocusPoint(null);
     suggestionSelectRef.current = false;
+    setLocating(false);
+    setLocError("");
     setMode("add");
   };
 
@@ -213,6 +219,56 @@ function AddressPicker({
     setFocusPoint({ key: ++focusSeqRef.current, lat: s.lat, lng: s.lng, displayName: s.display_name });
     setSuggestions([]);
   }, []);
+
+  // "Use current location" in the Add-new-address form: geolocate, reverse-geocode,
+  // fill the field and fly the map. Address is only saved when the user taps Save.
+  const handleUseCurrentLocation = React.useCallback(async () => {
+    setLocating(true);
+    setLocError("");
+    if (!navigator?.geolocation) {
+      setLocError(t("home.locErrorUnavailable"));
+      setLocating(false);
+      return;
+    }
+    let pos;
+    try {
+      pos = await new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 12000,
+          maximumAge: 0,
+        })
+      );
+    } catch (e) {
+      setLocError(e?.code === 1 ? t("home.locErrorDenied") : t("home.locErrorUnavailable"));
+      setLocating(false);
+      return;
+    }
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    let displayName = "";
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+      );
+      const data = await res.json();
+      displayName = data?.display_name || "";
+    } catch (err) {
+      displayName = "";
+    }
+    if (!displayName) {
+      setLocError(t("home.locErrorUnavailable"));
+      setLocating(false);
+      return;
+    }
+    setPickLat(lat);
+    setPickLng(lng);
+    setInputText(displayName);
+    setInputErr("");
+    setSuggestions([]);
+    setFocusPoint({ key: ++focusSeqRef.current, lat, lng, displayName });
+    setLocating(false);
+  }, [t]);
 
   const handleSaveAdd = () => {
     if (inputText.trim().length < 5) {
@@ -318,6 +374,12 @@ function AddressPicker({
               )}
 
               {/* Map location picker (web) — pin stays centred, map pans below */}
+              <UseCurrentLocationButton
+                onPress={handleUseCurrentLocation}
+                loading={locating}
+                style={ap.locBtn}
+              />
+              {locError ? <Text style={ap.locErrorText}>{locError}</Text> : null}
               <LocationMapPicker
                 initialCoords={
                   mode === "edit"
@@ -425,20 +487,6 @@ function AddressPicker({
           ) : (
             /* ── Address List ── */
             <>
-              {/* Use Current Location row */}
-              <TouchableOpacity style={ap.locationRow} onPress={onUseLocation} activeOpacity={0.8}>
-                <View style={ap.locationIconWrap}>
-                  <MaterialIcons name="my-location" size={20} color={C.green} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={ap.locationRowTitle}>{t("home.useLocation")}</Text>
-                  <Text style={ap.locationRowSub}>{t("home.detectLocation")}</Text>
-                </View>
-                <MaterialIcons name="chevron-right" size={22} color={C.gray400} />
-              </TouchableOpacity>
-
-              <View style={ap.divider} />
-
               <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 340 }}>
                 {addresses.length === 0 ? (
                   <View style={ap.emptyWrap}>
@@ -556,29 +604,6 @@ const ap = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  // Location row
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: C.gray200,
-    backgroundColor: C.white,
-  },
-  locationIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: C.greenLight,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  locationRowTitle: { fontSize: 15, fontWeight: "700", color: C.gray900 },
-  locationRowSub: { fontSize: 12, color: C.gray500, marginTop: 2 },
-  divider: { height: 1, backgroundColor: C.gray100, marginVertical: 14 },
   emptyWrap: { alignItems: "center", paddingVertical: 36, gap: 10 },
   emptyText: { fontSize: 14, color: C.gray400 },
   // New card-style address row
@@ -675,6 +700,8 @@ const ap = StyleSheet.create({
   // Form
   formWrap: { paddingTop: 4 },
   formLabel: { fontSize: 12, fontWeight: "700", color: C.gray700, marginBottom: 8, letterSpacing: 0.2 },
+  locBtn: { marginBottom: 12 },
+  locErrorText: { fontSize: 12, color: C.red, marginTop: 6, marginBottom: 4, lineHeight: 16 },
   inputBox: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -771,7 +798,7 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
 
   const vendorsWithItem = vendors.filter((v) =>
     v._inventory?.some(
-      (inv) => inv.product?.id === item.id && inv.stock_qty > 0,
+      (inv) => inv.product?.id === item.id && (inv.is_active ?? true),
     ),
   );
 
@@ -999,49 +1026,60 @@ const STORE_CATEGORY_META = {
 // We use the category NAME only (no parent_id from API categories since inventory
 // only gives us product.category). The apiCategoryTree provides parent lookup.
 function buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCategories) {
-  // Build a parent lookup from API categories: catName → parentName
-  const parentOf = {};  // catName → parentCatName | null
-  const catById = {};  // id → {name, parent_id}
+  const parentOf = {};
+  const catById = {};
   if (apiCategories && apiCategories.length > 0) {
     apiCategories.forEach(c => { catById[c.id] = c; });
     apiCategories.forEach(c => {
       if (c.parent_id && catById[c.parent_id]) {
         parentOf[c.name] = catById[c.parent_id].name;
       } else {
-        parentOf[c.name] = null; // top-level
+        parentOf[c.name] = null;
       }
     });
   }
 
-  const hierarchy = {};  // { topCat: { subCat: [inv, ...] } }
+  const getAncestors = (catName) => {
+    if (!catName) return [];
+    const chain = [catName];
+    let curr = catName;
+    const visited = new Set([curr]);
+    while (curr && parentOf.hasOwnProperty(curr) && parentOf[curr] !== null) {
+      curr = parentOf[curr];
+      if (visited.has(curr)) break;
+      visited.add(curr);
+      chain.unshift(curr);
+    }
+    return chain;
+  };
+
+  const hierarchy = {};
 
   allInventoryItems.forEach(inv => {
     const catName = getCategoryName(inv);
     if (!catName) return;
 
-    let topCat, subCat;
-    if (parentOf.hasOwnProperty(catName)) {
-      // We have API hierarchy data
-      if (parentOf[catName] === null) {
-        // This IS a top-level category — put product under "All" sub-cat
-        topCat = catName;
-        subCat = "All";
-      } else {
-        // It's a sub-category
-        topCat = parentOf[catName];
-        subCat = catName;
-      }
+    const chain = getAncestors(catName);
+    if (chain.length === 0) return;
+
+    const topCat = chain[0];
+    if (!hierarchy[topCat]) hierarchy[topCat] = {};
+
+    if (chain.length === 1) {
+      if (!hierarchy[topCat]["All"]) hierarchy[topCat]["All"] = [];
+      hierarchy[topCat]["All"].push(inv);
     } else {
-      // No API data — treat catName as top-level, sub-cat = product's unit as particulars group
-      topCat = catName;
-      const p = inv.product;
-      // Group by unit as a proxy for sub-category (e.g. "500 ml", "1 kg")
-      subCat = p?.unit || "General";
+      for (let i = 1; i < chain.length; i++) {
+        const subCatName = chain[i];
+        if (!hierarchy[topCat][subCatName]) hierarchy[topCat][subCatName] = [];
+        hierarchy[topCat][subCatName].push(inv);
+      }
     }
 
-    if (!hierarchy[topCat]) hierarchy[topCat] = {};
-    if (!hierarchy[topCat][subCat]) hierarchy[topCat][subCat] = [];
-    hierarchy[topCat][subCat].push(inv);
+    const directCat = chain[chain.length - 1];
+    if (!hierarchy[directCat]) hierarchy[directCat] = {};
+    if (!hierarchy[directCat]["All"]) hierarchy[directCat]["All"] = [];
+    hierarchy[directCat]["All"].push(inv);
   });
 
   return hierarchy;
@@ -1054,24 +1092,82 @@ function CategoryBrowseSheet({
   onStoreSelect, apiCategories, onItemDetail,
 }) {
   const { t } = useTranslation();
-  const [activeSubCat, setActiveSubCat] = React.useState(null);
-  const subCats = category && hierarchy[category]
-    ? Object.keys(hierarchy[category]).filter(sc => sc !== "All")
-    : [];
+  const [subCatPath, setSubCatPath] = React.useState([]);
 
   React.useEffect(() => {
     if (visible) {
-      setActiveSubCat(null);
+      setSubCatPath([]);
     }
   }, [visible, category]);
 
+  const catAccent = category ? (CAT_ACCENT[category] || CAT_ACCENT._default) : CAT_ACCENT._default;
+  const apiCat = category && apiCategories ? apiCategories.find(c => c.name === category) : null;
+
+  // Active subcategory at the end of current path
+  const activeSubCat = subCatPath.length > 0 ? subCatPath[subCatPath.length - 1] : null;
+
+  const findCategoryNode = (nodes, targetName) => {
+    if (!nodes || !targetName) return null;
+    for (const node of nodes) {
+      if (node.name === targetName) return node;
+      if (node.children && node.children.length > 0) {
+        const found = findCategoryNode(node.children, targetName);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  // Direct child subcategories at current level ONLY
+  const currentChildSubCats = React.useMemo(() => {
+    const targetCat = activeSubCat || category;
+    const node = findCategoryNode(apiCategories, targetCat);
+    if (node && node.children && node.children.length > 0) {
+      return node.children.map(c => c.name);
+    }
+    return [];
+  }, [activeSubCat, category, apiCategories]);
+
+  // Determine items for current active subcategory
+  const subCatItems = React.useMemo(() => {
+    if (!category || !hierarchy) return [];
+    const targetCat = activeSubCat || category;
+    
+    let items = [];
+    if (hierarchy[targetCat]) {
+      Object.keys(hierarchy[targetCat]).forEach(k => {
+        items.push(...(hierarchy[targetCat][k] || []));
+      });
+    }
+
+    if (hierarchy[category] && hierarchy[category][targetCat]) {
+      items.push(...(hierarchy[category][targetCat] || []));
+    }
+
+    const seen = new Set();
+    return items.filter(inv => {
+      if (!inv?.id) return false;
+      if (seen.has(inv.id)) return false;
+      seen.add(inv.id);
+      return true;
+    });
+  }, [category, activeSubCat, hierarchy]);
+
   if (!visible || !category) return null;
 
-  const subCatItems = activeSubCat
-    ? (hierarchy[category]?.[activeSubCat] || [])
-    : (subCats.length === 0 ? (hierarchy[category]?.["All"] || []) : []);
-  const catAccent = CAT_ACCENT[category] || CAT_ACCENT._default;
-  const apiCat = apiCategories?.find(c => c.name === category);
+  const showSubCatGrid = currentChildSubCats.length > 0;
+
+  const handlePopPath = () => {
+    setSubCatPath(prev => prev.slice(0, -1));
+  };
+
+  const handlePushPath = (sc) => {
+    setSubCatPath(prev => [...prev, sc]);
+  };
+
+  const prevTitle = subCatPath.length > 1
+    ? subCatPath[subCatPath.length - 2]
+    : category;
 
   return (
     <Modal
@@ -1095,29 +1191,50 @@ function CategoryBrowseSheet({
             </View>
             <View style={{ flex: 1 }}>
               <Text style={cbs.headerCat}>{t("home.categoryLabel")}</Text>
-              <Text style={cbs.headerTitle}>{category}</Text>
+              <Text style={cbs.headerTitle}>{activeSubCat || category}</Text>
             </View>
             <TouchableOpacity style={cbs.closeBtn} onPress={onClose}>
               <MaterialIcons name="close" size={16} color={C.gray500} />
             </TouchableOpacity>
           </View>
 
-          {activeSubCat === null && subCats.length > 0 ? (
+          {/* Back Navigation Bar when navigated into a subcategory */}
+          {subCatPath.length > 0 && (
+            <View style={cbs.backRow}>
+              <TouchableOpacity
+                style={[cbs.backToSubCatsBtn, { backgroundColor: catAccent.bg }]}
+                onPress={handlePopPath}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="arrow-back" size={16} color={catAccent.accent} />
+                <Text style={[cbs.backToSubCatsText, { color: catAccent.accent }]}>
+                  Back to {prevTitle}
+                </Text>
+              </TouchableOpacity>
+              <Text style={cbs.activeSubCatTitle}>{activeSubCat}</Text>
+            </View>
+          )}
+
+          {/* ── Subcategory Grid View ── */}
+          {showSubCatGrid ? (
             <ScrollView
               showsVerticalScrollIndicator={false}
               contentContainerStyle={cbs.subCatGridContainer}
             >
-              <Text style={cbs.subCatGridTitle}>{t("home.selectSubCategory")}</Text>
+              <Text style={cbs.subCatGridTitle}>
+                {subCatPath.length === 0 ? t("home.selectSubCategory") : `Subcategories of ${activeSubCat}`}
+              </Text>
               <View style={cbs.subCatGrid}>
-                {subCats.map(sc => {
-                  const count = hierarchy[category]?.[sc]?.length || 0;
-                  const firstItemImg = hierarchy[category]?.[sc]?.[0]?.product?.image_url;
+                {currentChildSubCats.map(sc => {
+                  const subItems = hierarchy[category]?.[sc] || hierarchy[sc]?.["All"] || (hierarchy[sc] ? Object.values(hierarchy[sc]).flat() : []);
+                  const count = subItems.length;
+                  const firstItemImg = subItems[0]?.product?.image_url;
 
                   return (
                     <TouchableOpacity
                       key={sc}
                       style={[cbs.subCatCard, { borderColor: catAccent.bg }]}
-                      onPress={() => setActiveSubCat(sc)}
+                      onPress={() => handlePushPath(sc)}
                       activeOpacity={0.85}
                     >
                       <View style={[cbs.subCatCardIconWrap, { backgroundColor: catAccent.bg }]}>
@@ -1129,7 +1246,9 @@ function CategoryBrowseSheet({
                       </View>
                       <View style={cbs.subCatCardInfo}>
                         <Text style={cbs.subCatCardName} numberOfLines={2}>{sc}</Text>
-                        <Text style={cbs.subCatCardCount}>{t("home.itemsCount", { count })}</Text>
+                        {count > 0 && (
+                          <Text style={cbs.subCatCardCount}>{t("home.itemsCount", { count })}</Text>
+                        )}
                       </View>
                       <MaterialIcons name="chevron-right" size={20} color={catAccent.accent} />
                     </TouchableOpacity>
@@ -1139,55 +1258,7 @@ function CategoryBrowseSheet({
             </ScrollView>
           ) : (
             <>
-              {activeSubCat !== null && (
-                <View style={cbs.backRow}>
-                  <TouchableOpacity
-                    style={[cbs.backToSubCatsBtn, { backgroundColor: catAccent.bg }]}
-                    onPress={() => setActiveSubCat(null)}
-                    activeOpacity={0.8}
-                  >
-                    <MaterialIcons name="arrow-back" size={16} color={catAccent.accent} />
-                    <Text style={[cbs.backToSubCatsText, { color: catAccent.accent }]}>
-                      {t("home.backToSubcategories")}
-                    </Text>
-                  </TouchableOpacity>
-                  <Text style={cbs.activeSubCatTitle}>{activeSubCat}</Text>
-                </View>
-              )}
-
-              {/* ── Sub-Category Pills ── */}
-              {activeSubCat !== null && subCats.length > 1 && (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={cbs.subCatRow}
-                >
-                  {subCats.map(sc => {
-                    const isActive = sc === activeSubCat;
-                    const count = hierarchy[category]?.[sc]?.length || 0;
-                    return (
-                      <TouchableOpacity
-                        key={sc}
-                        style={[
-                          cbs.subCatChip,
-                          isActive && { backgroundColor: catAccent.accent, borderColor: catAccent.accent },
-                        ]}
-                        onPress={() => setActiveSubCat(sc)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={[cbs.subCatChipText, isActive && { color: C.white }]}>
-                          {sc}
-                        </Text>
-                        <View style={[cbs.subCatCount, isActive && { backgroundColor: "rgba(255,255,255,0.25)" }]}>
-                          <Text style={[cbs.subCatCountText, isActive && { color: C.white }]}>
-                            {count}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              )}
+              {/* Note: Upper gray pills bar removed as requested to keep UI clean & strictly hierarchical */}
 
               {/* ── Column Headers ── */}
               <View style={cbs.tableHeader}>
@@ -2243,14 +2314,16 @@ export default function HomeScreen() {
   const { t } = useTranslation();
   const { token, user } = useAuthStore();
   const navigation = useNavigation();
-  const goToSearch = () => {
+  const goToSearch = (focusField) => {
+    const validFields = ["stores", "categories", "items"];
+    const field = validFields.includes(focusField) ? focusField : null;
     const root = navigation.getParent?.() || navigation;
-    root.navigate('Search');
+    root.navigate('Search', field ? { focusField: field } : undefined);
   };
   const addressStore = useAddressStore();
   const cart = useCartStore();
 
-  const { currentLocation, fetchLocation: triggerRefetch } = addressStore;
+  const { currentLocation } = addressStore;
 
   const [selectedAddrId, setSelectedAddrId] = useState(addressStore.selectedId || null);
 
@@ -2542,7 +2615,7 @@ export default function HomeScreen() {
     const items = [];
     vendors.forEach((v) => {
       (v._inventory || []).forEach((inv) => {
-        if (inv.stock_qty > 0 && inv.product) {
+        if ((inv.is_active ?? true) && inv.product) {
           items.push({ ...inv, _vendorId: v.id, _vendorName: v.shop_name });
         }
       });
@@ -2663,13 +2736,6 @@ export default function HomeScreen() {
       fetchNearbyVendors(addr.lat, addr.lng);
       fetchPopularProducts(addr.lat, addr.lng);
     }
-  };
-
-  const handleUseCurrentLocation = async () => {
-    setAddrPickerVisible(false);
-    setSelectedAddrId(null);
-    addressStore?.setSelectedId?.(null);
-    if (triggerRefetch) await triggerRefetch(true);
   };
 
 
@@ -3072,52 +3138,89 @@ export default function HomeScreen() {
                   <Text style={s.heroGhostText}>Change Address</Text>
                 </TouchableOpacity>
               </View> */}
-              <View style={s.heroStats}>
-                {homeStats.map((stat) => (
-                  <View key={stat.label} style={s.heroStat}>
-                    <MaterialIcons name={stat.icon} size={16} color={C.white} />
-                    <Text style={s.heroStatValue}>{stat.value}</Text>
-                    <Text style={s.heroStatLabel}>{stat.label}</Text>
-                  </View>
-                ))}
-              </View>
+              {wide && (
+                <View style={s.heroStats}>
+                  {homeStats.map((stat) => (
+                    <View key={stat.label} style={s.heroStat}>
+                      <MaterialIcons name={stat.icon} size={16} color={C.white} />
+                      <Text style={s.heroStatValue}>{stat.value}</Text>
+                      <Text style={s.heroStatLabel}>{stat.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
           </View>
         </View>
 
-        {/* 3. NEARBY STORES — hidden as per design (user request) */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingLeft: hPad,
-            paddingRight: hPad,
-            paddingBottom: 8,
-            gap: 10,
-          }}
-          style={s.quickActionRail}
-        >
-          {quickActions.map((action) => (
-            <TouchableOpacity
-              key={action.label}
-              style={s.quickAction}
-              onPress={action.onPress}
-              activeOpacity={0.85}
+        {/* 3. CATEGORY ROW — mobile only (replaces stat boxes + quick actions on phones) */}
+        {!wide && dynamicCategories.length > 0 && (
+          <View style={s.mobileCatRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingLeft: hPad,
+                paddingRight: hPad,
+                paddingBottom: 8,
+                gap: 10,
+              }}
             >
-              <View style={s.quickActionIcon}>
-                <MaterialIcons name={action.icon} size={17} color={C.green} />
-              </View>
-              <Text style={s.quickActionText}>{action.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+              {dynamicCategories.map((cat) => (
+                <TouchableOpacity
+                  key={cat.label}
+                  style={s.mobileCatChip}
+                  onPress={() => {
+                    const root = navigation.getParent?.() || navigation;
+                    root.navigate("Search", { category: cat.label });
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <View style={[s.mobileCatIcon, { backgroundColor: cat.bg }]}>
+                    <MaterialIcons name={cat.icon} size={17} color={cat.accent} />
+                  </View>
+                  <Text style={s.mobileCatChipText} numberOfLines={1}>{cat.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Quick actions rail — desktop/tablet only */}
+        {wide && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingLeft: hPad,
+              paddingRight: hPad,
+              paddingBottom: 8,
+              gap: 10,
+            }}
+            style={s.quickActionRail}
+          >
+            {quickActions.map((action) => (
+              <TouchableOpacity
+                key={action.label}
+                style={s.quickAction}
+                onPress={action.onPress}
+                activeOpacity={0.85}
+              >
+                <View style={s.quickActionIcon}>
+                  <MaterialIcons name={action.icon} size={17} color={C.green} />
+                </View>
+                <Text style={s.quickActionText}>{action.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
 
         <View style={[s.sectionHeader, { paddingHorizontal: hPad }]}>
           <View>
             <Text style={s.sectionTitle}>{t("home.nearbyStoresTitle")}</Text>
             <Text style={s.sectionSub}>{t("home.deliveringToYourLocation")}</Text>
           </View>
-          <TouchableOpacity onPress={goToSearch}>
+          <TouchableOpacity onPress={() => goToSearch("stores")}>
             <Text style={s.viewAll}>{t("home.explore")}</Text>
           </TouchableOpacity>
         </View>
@@ -3330,7 +3433,7 @@ export default function HomeScreen() {
               ]}
             >
               <Text style={s.sectionTitle}>{t("home.shopByCategory")}</Text>
-              <TouchableOpacity onPress={goToSearch}>
+              <TouchableOpacity onPress={() => goToSearch("categories")}>
                 <Text style={s.viewAll}>{t("home.viewAll")}</Text>
               </TouchableOpacity>
             </View>
@@ -3404,7 +3507,7 @@ export default function HomeScreen() {
               ]}
             >
               <Text style={s.sectionTitle}>{t("home.popularItemsTitle")}</Text>
-              <TouchableOpacity onPress={goToSearch}>
+              <TouchableOpacity onPress={() => goToSearch("items")}>
                 <Text style={s.viewAll}>{t("home.seeAll")}</Text>
               </TouchableOpacity>
             </View>
@@ -3543,7 +3646,6 @@ export default function HomeScreen() {
           }
           setAddrPickerVisible(false);
         }}
-        onUseLocation={handleUseCurrentLocation}
       />
 
       {/* ══ WEIGHPICKER MODAL ═════════════════════════════════════════════ */}
@@ -3995,6 +4097,37 @@ const s = StyleSheet.create({
     fontWeight: "600",
   },
   quickActionRail: { marginBottom: 16 },
+  mobileCatRow: { marginBottom: 8 },
+  mobileCatChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minWidth: 128,
+    backgroundColor: C.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  mobileCatIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mobileCatChipText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: C.gray800,
+    flexShrink: 1,
+  },
   quickAction: {
     minWidth: 132,
     flexDirection: "row",

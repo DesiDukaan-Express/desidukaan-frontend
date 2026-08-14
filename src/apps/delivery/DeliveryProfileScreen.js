@@ -12,6 +12,8 @@ import {
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { useTranslation } from 'react-i18next';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
 import useAuthStore from '../../store/authStore';
 import LanguageSwitcher from '../../components/common/LanguageSwitcher';
 
@@ -35,9 +37,11 @@ const C = {
   gray700:    '#374151',
   gray800:    '#1F2937',
   gray900:    '#111827',
-  red:        '#FF3B30',
+  red:        '#EF4444',
   redLight:   '#FFEAEA',
   redText:    '#B91C1C',
+  redBorder:  '#FECACA',
+  redBackground: '#FEF2F2',
   amber:      '#F59E0B',
   amberLight: '#FFFBEB',
   amberText:  '#92400E',
@@ -78,6 +82,7 @@ export default function DeliveryProfileScreen({ navigation }) {
   const { token, user, logout, setActiveRole } = useAuthStore();
   const { t } = useTranslation();
   const [showLanguage, setShowLanguage] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
 
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_500Medium,
@@ -113,14 +118,8 @@ export default function DeliveryProfileScreen({ navigation }) {
   const onRefresh = () => { setRefreshing(true); fetchData(); };
 
   const handleLogout = () => {
-    Alert.alert(
-      t('profile.logoutConfirmTitle', 'Log out'),
-      t('profile.logoutConfirmMsg', 'Are you sure you want to log out?'),
-      [
-        { text: t('delivery.cancel', 'Cancel'), style: 'cancel' },
-        { text: t('profile.logout', 'Log out'), style: 'destructive', onPress: () => logout?.() },
-      ]
-    );
+    logout();
+    setShowLogout(false);
   };
 
   if (loading || !fontsLoaded) {
@@ -149,7 +148,7 @@ export default function DeliveryProfileScreen({ navigation }) {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.green} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.white} />}
       >
         {/* ── Hero ── */}
         <View style={p.hero}>
@@ -283,7 +282,7 @@ export default function DeliveryProfileScreen({ navigation }) {
           </TouchableOpacity>
 
           {/* ── Log out ── */}
-          <TouchableOpacity style={p.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+          <TouchableOpacity style={p.logoutBtn} onPress={() => setShowLogout(true)} activeOpacity={0.8}>
             <Text style={p.logoutText}>{t('profile.logout', 'Log out')}</Text>
           </TouchableOpacity>
 
@@ -291,6 +290,12 @@ export default function DeliveryProfileScreen({ navigation }) {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      <LogoutModal
+        visible={showLogout}
+        onConfirm={handleLogout}
+        onCancel={() => setShowLogout(false)}
+      />
 
       {/* Language Picker Modal */}
       <Modal
@@ -322,6 +327,44 @@ export default function DeliveryProfileScreen({ navigation }) {
     </View>
   );
 }
+
+// ─── Logout modal ─────────────────────────────────────────────────────────
+function LogoutModal({ visible, onConfirm, onCancel }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <Pressable style={lm.backdrop} onPress={onCancel}>
+        <Pressable style={lm.card} onPress={() => { }}>
+          <LinearGradient colors={["#FEF2F2", "#FFF"]} style={lm.iconWrap}>
+            <Feather name="log-out" size={26} color={C.red} />
+          </LinearGradient>
+          <Text style={lm.title}>Log out?</Text>
+          {/* <Text style={lm.sub}>Your cart and session will be cleared.</Text> */}
+          <View style={lm.btns}>
+            <TouchableOpacity style={lm.cancel} onPress={onCancel}>
+              <Text style={lm.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={lm.confirm} onPress={onConfirm}>
+              <Text style={lm.confirmText}>Log out</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const lm = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },
+  card: { backgroundColor: C.white, borderRadius: 24, padding: 28, width: "82%", alignItems: "center", gap: 8 },
+  iconWrap: { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  title: { fontSize: 20, fontWeight: "900", color: C.gray900 },
+  sub: { fontSize: 13, color: C.gray400, textAlign: "center", lineHeight: 20 },
+  btns: { flexDirection: "row", gap: 10, marginTop: 12, width: "100%" },
+  cancel: { flex: 1, paddingVertical: 14, borderRadius: 13, backgroundColor: C.gray100, alignItems: "center" },
+  cancelText: { fontSize: 15, fontWeight: "700", color: C.gray700 },
+  confirm: { flex: 1, paddingVertical: 14, borderRadius: 13, backgroundColor: C.red, alignItems: "center" },
+  confirmText: { fontSize: 15, fontWeight: "700", color: C.white },
+});
 
 const p = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
@@ -379,7 +422,7 @@ const p = StyleSheet.create({
 
   logoutBtn: {
     borderRadius: 16, paddingVertical: 14, alignItems: 'center',
-    borderWidth: 1.5, borderColor: C.gray200, backgroundColor: C.white,
+    borderWidth: 1, borderColor: C.redBorder, backgroundColor: C.redBackground,
     marginTop: 4,
   },
   logoutText: { fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: C.red },

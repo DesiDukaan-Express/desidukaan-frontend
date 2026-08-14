@@ -22,7 +22,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { MapContainer, Marker, TileLayer, useMap } from "react-leaflet";
 import { Icon } from "leaflet";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -99,7 +99,6 @@ export default function LocationMapPicker({
   autoReverseOnReady = true,
 }) {
   const [ready, setReady] = useState(false);
-  const [locLoading, setLocLoading] = useState(false);
   const [initialLocating, setInitialLocating] = useState(false); // seed geocode overlay
   const [notice, setNotice] = useState(null); // { type: 'err', msg } | { type: 'hint', msg }
   const hadInitial =
@@ -315,32 +314,6 @@ export default function LocationMapPicker({
     }
   }, [ready, addressText, autoReverseOnReady, handleMoveEnd, seedLocate]);
 
-  const handleUseMyLocation = () => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setNotice({ type: "err", msg: "Geolocation isn't available in this browser." });
-      return;
-    }
-    setLocLoading(true);
-    setNotice(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setLocLoading(false);
-        const map = mapApi.current;
-        if (map) {
-          map.flyTo([latitude, longitude], Math.max(map.getZoom(), 15), { animate: true, duration: 0.8 });
-        } else {
-          onPick(latitude, longitude, null);
-        }
-      },
-      () => {
-        setLocLoading(false);
-        setNotice({ type: "err", msg: "Location permission denied — drag the map or type your address instead." });
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
-  };
-
   return (
     <View style={styles.wrap}>
       <MapContainer
@@ -368,20 +341,6 @@ export default function LocationMapPicker({
           </Text>
         </View>
       )}
-
-      {/* Use current location */}
-      <TouchableOpacity
-        style={styles.locBtn}
-        onPress={handleUseMyLocation}
-        activeOpacity={0.85}
-      >
-        {locLoading ? (
-          <ActivityIndicator size="small" color="#16A34A" />
-        ) : (
-          <MaterialIcons name="my-location" size={18} color="#16A34A" />
-        )}
-        <Text style={styles.locBtnText}>Use current location</Text>
-      </TouchableOpacity>
 
       {/* Status pill: hint or error */}
       {notice ? (
@@ -423,25 +382,6 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   loaderText: { fontSize: 12, color: "#6B7280", fontWeight: "500" },
-  locBtn: {
-    position: "absolute",
-    left: 12,
-    bottom: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 24,
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-    zIndex: 15,
-  },
-  locBtnText: { fontSize: 13, fontWeight: "700", color: "#15803D" },
   hintPill: {
     position: "absolute",
     top: 12,
