@@ -71,10 +71,11 @@ export default function useInventory() {
       setProducts(data);
       setStats(st);
       setPage(1);
+      loadGlobalCategories();
     } finally {
       setLoading(false);
     }
-  }, [token, vendorId, statusFilter, search]);
+  }, [token, vendorId, statusFilter, search, loadGlobalCategories]);
 
   useEffect(() => {
     load();
@@ -160,6 +161,8 @@ export default function useInventory() {
     sortDir,
     setSortDir,
     toggleSort,
+    reload: load,
+    loadVendor,
     page,
     setPage,
     totalPages,
@@ -194,36 +197,36 @@ export default function useInventory() {
     },
 
     toggleAvailability: async (productId, available) => {
-      // Optimistic update immediately
-      setProducts((prev) =>
-        prev.map((p) =>
-          p.id === String(productId)
-            ? {
-                ...p,
-                is_active: available,
-                status: available ? "Available" : "Unavailable",
-              }
-            : p
-        )
-      );
-      try {
-        await inventoryService.toggleAvailability(token, productId, available);
-      } catch (err) {
-        console.error("Toggle failed, reverting:", err.message);
-        // Revert
-        setProducts((prev) =>
-          prev.map((p) =>
-            p.id === String(productId)
-              ? {
-                  ...p,
-                  is_active: !available,
-                  status: !available ? "Available" : "Unavailable",
-                }
-              : p
-          )
-        );
-        throw err;
-      }
-    },
+  // Optimistic update immediately
+  setProducts((prev) =>
+    prev.map((p) =>
+      p.id === String(productId)
+        ? {
+            ...p,
+            is_active: available,
+            status: available ? "Available" : "Unavailable",
+          }
+        : p
+    )
+  );
+  try {
+    await inventoryService.toggleAvailability(token, productId, available);
+  } catch (err) {
+    console.error("Toggle failed, reverting:", err.message);
+    // Revert
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === String(productId)
+          ? {
+              ...p,
+              is_active: !available,
+              status: !available ? "Available" : "Unavailable",
+            }
+          : p
+      )
+    );
+    throw err;
+  }
+},
   };
 }

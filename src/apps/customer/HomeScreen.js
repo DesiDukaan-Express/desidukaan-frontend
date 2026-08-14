@@ -771,7 +771,7 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
 
   const vendorsWithItem = vendors.filter((v) =>
     v._inventory?.some(
-      (inv) => inv.product?.id === item.id && inv.stock_qty > 0,
+      (inv) => inv.product?.id === item.id && (inv.is_active ?? true),
     ),
   );
 
@@ -2287,9 +2287,11 @@ export default function HomeScreen() {
   const { t } = useTranslation();
   const { token, user } = useAuthStore();
   const navigation = useNavigation();
-  const goToSearch = () => {
+  const goToSearch = (focusField) => {
+    const validFields = ["stores", "categories", "items"];
+    const field = validFields.includes(focusField) ? focusField : null;
     const root = navigation.getParent?.() || navigation;
-    root.navigate('Search');
+    root.navigate('Search', field ? { focusField: field } : undefined);
   };
   const addressStore = useAddressStore();
   const cart = useCartStore();
@@ -2586,7 +2588,7 @@ export default function HomeScreen() {
     const items = [];
     vendors.forEach((v) => {
       (v._inventory || []).forEach((inv) => {
-        if (inv.stock_qty > 0 && inv.product) {
+        if ((inv.is_active ?? true) && inv.product) {
           items.push({ ...inv, _vendorId: v.id, _vendorName: v.shop_name });
         }
       });
@@ -3161,7 +3163,7 @@ export default function HomeScreen() {
             <Text style={s.sectionTitle}>{t("home.nearbyStoresTitle")}</Text>
             <Text style={s.sectionSub}>{t("home.deliveringToYourLocation")}</Text>
           </View>
-          <TouchableOpacity onPress={goToSearch}>
+          <TouchableOpacity onPress={() => goToSearch("stores")}>
             <Text style={s.viewAll}>{t("home.explore")}</Text>
           </TouchableOpacity>
         </View>
@@ -3374,7 +3376,7 @@ export default function HomeScreen() {
               ]}
             >
               <Text style={s.sectionTitle}>{t("home.shopByCategory")}</Text>
-              <TouchableOpacity onPress={goToSearch}>
+              <TouchableOpacity onPress={() => goToSearch("categories")}>
                 <Text style={s.viewAll}>{t("home.viewAll")}</Text>
               </TouchableOpacity>
             </View>
@@ -3448,7 +3450,7 @@ export default function HomeScreen() {
               ]}
             >
               <Text style={s.sectionTitle}>{t("home.popularItemsTitle")}</Text>
-              <TouchableOpacity onPress={goToSearch}>
+              <TouchableOpacity onPress={() => goToSearch("items")}>
                 <Text style={s.viewAll}>{t("home.seeAll")}</Text>
               </TouchableOpacity>
             </View>

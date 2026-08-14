@@ -11,12 +11,7 @@ const authHeaders = (token) => ({
   Authorization: `Bearer ${token}`,
 });
 
-// Derive stock status from qty
-const stockStatus = (qty) => {
-  if (qty <= 0) return "Out of Stock";
-  if (qty <= 10) return "Low Stock";
-  return "In Stock";
-};
+// Deriving status from is_active flag instead of stock
 
 export const inventoryService = {
   /**
@@ -166,6 +161,7 @@ export const inventoryService = {
       if (payload.image_url !== undefined) body.image_url = payload.image_url;
       if (payload.is_active !== undefined) body.is_active = payload.is_active;
 
+
       const res = await fetch(`${API_BASE}/products/${id}`, {
         method: "PUT",
         headers: authHeaders(token),
@@ -229,18 +225,7 @@ export const inventoryService = {
     }
   },
 
-  async getLowStock(token, threshold = null) {
-    try {
-      const qs = threshold !== null ? `?threshold=${threshold}` : "";
-      const res = await fetch(`${API_BASE}/inventory/my/low-stock${qs}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return await res.json();
-    } catch (err) {
-      console.error("getLowStock error:", err);
-      return { success: false, data: { items: [] } };
-    }
-  },
+
 
   async bulkImport(token, items) {
     try {

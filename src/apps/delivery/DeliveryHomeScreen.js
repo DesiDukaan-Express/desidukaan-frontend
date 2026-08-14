@@ -318,6 +318,27 @@ export default function DeliveryHomeScreen({ navigation, route }) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ is_available: next }),
       });
+      if (next) {
+        // Send default/current location if online so nearby query picks rider up
+        const lat = 28.6139; // Delhi / NCR default fallback or navigator geolocation
+        const lng = 77.2090;
+        navigator.geolocation?.getCurrentPosition(
+          (pos) => {
+            fetch(`${API_BASE}/delivery/location`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+            }).catch(() => {});
+          },
+          () => {
+            fetch(`${API_BASE}/delivery/location`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ latitude: lat, longitude: lng }),
+            }).catch(() => {});
+          }
+        );
+      }
     } catch {
       setStats(s => ({ ...s, isAvailable: !next }));
     } finally {

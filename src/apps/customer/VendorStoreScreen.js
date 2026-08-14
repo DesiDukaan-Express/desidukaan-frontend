@@ -350,7 +350,7 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
   const p = item.product || {};
   const catName = p.category?.name || p.category;
   const meta = getCatMeta(catName);
-  const inStock = item.stock_qty > 0;
+  const inStock = item.is_active ?? true;
   const loose = isLooseItem(p);
   const discount = p.mrp && p.mrp > p.price
     ? Math.round((1 - p.price / p.mrp) * 100) : null;
@@ -395,12 +395,7 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
               </View> */}
             </View>
             <View style={pm.body}>
-              {item.stock_qty > 0 && item.stock_qty <= 10 && (
-                <View style={pm.lowBanner}>
-                  <Feather name="alert-circle" size={13} color="#D97706" />
-                  <Text style={pm.lowBannerText}>{t('vendorStore.onlyLeft', { count: item.stock_qty })}</Text>
-                </View>
-              )}
+
               <Text style={pm.name}>{p.name}</Text>
               <Text style={pm.unit}>{p.unit}</Text>
               {loose && (
@@ -525,7 +520,7 @@ const pm = StyleSheet.create({
 function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
   const { t } = useTranslation();
   const p = item.product || {};
-  const inStock = item.stock_qty > 0;
+  const inStock = item.product?.is_active;
   const loose = isLooseItem(p);
   const discount = p.mrp && p.mrp > p.price
     ? Math.round((1 - p.price / p.mrp) * 100) : null;
@@ -536,6 +531,7 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
       style={[pc.card, { width: cardW }, !inStock && { opacity: 0.5 }]}
       onPress={onPress}
       activeOpacity={0.88}
+      disabled={!inStock}
     >
       {/* Image */}
       <View style={[pc.imgWrap, { height: imgH }]}>
@@ -545,6 +541,7 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
         />
         <TouchableOpacity
           style={pc.eyeBtn}
+          disabled={!inStock}
           onPress={(e) => { e.stopPropagation?.(); onPress?.(); }}
           activeOpacity={0.7}
         >
@@ -859,14 +856,14 @@ export default function VendorStoreScreen() {
     return ["All", ...Object.keys(categoryHierarchy).sort()];
   }, [categoryHierarchy]);
 
-  const inStockTotal = useMemo(() => inventory.filter(i => i.stock_qty > 0).length, [inventory]);
+  const inStockTotal = useMemo(() => inventory.filter(i => i.is_active ?? true).length, [inventory]);
 
   const getTopCatCount = useCallback((catName) => {
     if (catName === "All") return inStockTotal;
     const subCats = categoryHierarchy[catName] || {};
     let total = 0;
     Object.values(subCats).forEach(items => {
-      total += items.filter(i => i.stock_qty > 0).length;
+      total += items.filter(i => i.is_active ?? true).length;
     });
     return total;
   }, [categoryHierarchy, inStockTotal]);
@@ -899,7 +896,7 @@ export default function VendorStoreScreen() {
   }), [inventory, search, activeCat, getCatName, parentOfMap]);
 
   const inStock = useMemo(() => {
-    let list = [...filtered.filter(i => i.stock_qty > 0)];
+  let list = [...filtered.filter(i => i.is_active ?? true)];
 
     switch (sortBy) {
       case "price_asc":
@@ -944,7 +941,7 @@ export default function VendorStoreScreen() {
   }, [filtered, sortBy]);
 
   const outStock = useMemo(() => {
-    let list = [...filtered.filter(i => i.stock_qty <= 0)];
+  let list = [...filtered.filter(i => !(i.is_active ?? true))];
 
     switch (sortBy) {
       case "price_asc":
