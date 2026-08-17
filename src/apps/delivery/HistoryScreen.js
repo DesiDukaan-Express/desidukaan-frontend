@@ -2,7 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, RefreshControl, StatusBar, Platform,
+  Modal, Pressable, TextInput, Alert
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import {
   useFonts,
   PlusJakartaSans_500Medium,
@@ -36,12 +38,13 @@ const C = {
   red:        '#FF3B30',
   redLight:   '#FFEAEA',
   redText:    '#B91C1C',
+  starColor:  '#F59E0B',
   blue:       '#3B82F6',
 };
 
 const TABS = ['Today', 'This Week', 'This Month'];
 
-function HistoryCard({ delivery }) {
+function HistoryCard({ delivery, onRate, onViewRating }) {
   const { t } = useTranslation();
   const isDelivered = delivery.status === 'delivered';
   const isFailed = delivery.status === 'failed';
@@ -95,10 +98,36 @@ function HistoryCard({ delivery }) {
         </View>
         <View style={s.cardMeta}>
           <Text style={s.metaTime}>{dateStr}  {timeStr}</Text>
-          <View style={[s.statusPill, { backgroundColor: cardColor }]}>
-            <Text style={[s.statusPillText, { color: iconColor }]}>
-              {statusLabel}
-            </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <View style={[s.statusPill, { backgroundColor: isDelivered ? C.greenLight : C.redLight }]}>
+              <Text style={[s.statusPillText, { color: isDelivered ? C.greenText : C.redText }]}>
+                {isDelivered ? t('delivery.delivered', 'Delivered') : t('delivery.failed', 'Failed')}
+              </Text>
+            </View>
+
+            {isDelivered && (
+              <TouchableOpacity
+                style={[
+                  s.rateBtn,
+                  delivery.has_rated_customer && { backgroundColor: C.gray100, borderWidth: 1, borderColor: C.gray200 }
+                ]}
+                onPress={() => delivery.has_rated_customer ? onViewRating(delivery) : onRate(delivery)}
+                activeOpacity={0.7}
+              >
+                {delivery.has_rated_customer ? (() => {
+                  const ratingVal = delivery.partner_rating || (delivery.order?.reviews?.[0]?.partner_review_rating);
+                  const num = ratingVal ? parseInt(ratingVal, 10) || 5 : 5;
+                  const starsText = "★".repeat(Math.max(1, Math.min(5, num)));
+                  return (
+                    <Text style={[s.rateBtnText, { color: C.gray600 }]}>
+                      You rated <Text style={{ color: C.starColor, fontWeight: "900" }}>{starsText}</Text>
+                    </Text>
+                  );
+                })() : (
+                  <Text style={s.rateBtnText}>{t('delivery.rateCustomer', 'Rate')}</Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -122,6 +151,92 @@ export default function HistoryScreen() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Partner review customer state
+  const [partnerReviewOrder, setPartnerReviewOrder] = useState(null);
+  const [partnerReviewRating, setPartnerReviewRating] = useState(0);
+  const [partnerReviewComment, setPartnerReviewComment] = useState("");
+  const [partnerReviewLoading, setPartnerReviewLoading] = useState(false);
+
+  // Partner view rating state & handler
+  const [viewPartnerRatingOrder, setViewPartnerRatingOrder] = useState(null);
+  const [viewPartnerRatingLoading, setViewPartnerRatingLoading] = useState(false);
+  const [fetchedPartnerRating, setFetchedPartnerRating] = useState(null);
+
+  const handleOpenViewPartnerRating = async (delivery) => {
+    setViewPartnerRatingOrder(delivery);
+    setViewPartnerRatingLoading(true);
+    const initialRating = delivery.partner_rating || (delivery.order?.reviews?.[0]?.partner_review_rating) || 5;
+    const initialComment = delivery.partner_review_comment || (delivery.order?.reviews?.[0]?.partner_review_comment) || (delivery.order?.reviews?.[0]?.comment) || "";
+    setFetchedPartnerRating({ rating: initialRating, comment: initialComment });
+
+    const orderId = delivery.order?.id || delivery.order_id || delivery.id;
+    try {
+      const res = await fetch(`${API_BASE}/orders/${orderId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      const o = data.data?.order || data.order;
+      if (o) {
+        setFetchedPartnerRating({
+          rating: o.partner_rating ?? o.reviews?.[0]?.partner_review_rating ?? initialRating,
+          comment: o.partner_review_comment ?? o.reviews?.[0]?.partner_review_comment ?? o.reviews?.[0]?.comment ?? initialComment,
+        });
+      }
+    } catch (e) {
+      console.error("Fetch partner rating error:", e);
+    } finally {
+      setViewPartnerRatingLoading(false);
+    }
+  };
+
+  const submitPartnerReview = async () => {
+    if (partnerReviewRating === 0) {
+      Alert.alert("Please select a rating");
+      return;
+    }
+    setPartnerReviewLoading(true);
+    const orderId = partnerReviewOrder.order?.id || partnerReviewOrder.order_id || partnerReviewOrder.id;
+    try {
+      const res = await fetch(`${API_BASE}/orders/${orderId}/partner-review`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          partner_review_rating: partnerReviewRating,
+          partner_review_comment: partnerReviewComment,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const submittedRating = partnerReviewRating;
+        const submittedComment = partnerReviewComment;
+        setAllDeliveries((prev) =>
+          prev.map((d) =>
+            (d.id === partnerReviewOrder.id || d.order?.id === orderId)
+              ? {
+                  ...d,
+                  has_rated_customer: true,
+                  partner_rating: submittedRating,
+                  partner_review_comment: submittedComment,
+                }
+              : d
+          )
+        );
+        setPartnerReviewOrder(null);
+        setPartnerReviewRating(0);
+        setPartnerReviewComment("");
+        fetchData();
+        Alert.alert("Thank you!", "Your rating has been submitted.");
+      }
+    } catch (e) {
+      Alert.alert("Error", "Failed to submit review.");
+    } finally {
+      setPartnerReviewLoading(false);
+    }
+  };
 
   const TABS = [
     { key: 'today', label: t('delivery.today', 'Today') },
@@ -280,7 +395,15 @@ export default function HistoryScreen() {
           <View style={s.listCard}>
             {filtered.map((delivery, idx) => (
               <React.Fragment key={delivery.id}>
-                <HistoryCard delivery={delivery} />
+                <HistoryCard
+                  delivery={delivery}
+                  onRate={(d) => {
+                    setPartnerReviewOrder(d);
+                    setPartnerReviewRating(0);
+                    setPartnerReviewComment("");
+                  }}
+                  onViewRating={(d) => handleOpenViewPartnerRating(d)}
+                />
                 {idx < filtered.length - 1 && <View style={s.divider} />}
               </React.Fragment>
             ))}
@@ -289,6 +412,262 @@ export default function HistoryScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* ── PARTNER REVIEW CUSTOMER MODAL ── */}
+      <Modal
+        visible={!!partnerReviewOrder}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPartnerReviewOrder(null)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "flex-end",
+          }}
+          onPress={() => setPartnerReviewOrder(null)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: C.white,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 24,
+              paddingBottom: 40,
+            }}
+            onPress={() => {}}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 4,
+                backgroundColor: C.gray200,
+                borderRadius: 2,
+                alignSelf: "center",
+                marginBottom: 20,
+              }}
+            />
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "900",
+                fontFamily: "PlusJakartaSans_800ExtraBold",
+                color: C.gray900,
+                marginBottom: 4,
+              }}
+            >
+              Rate Customer
+            </Text>
+            <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, marginBottom: 20 }}>
+              {partnerReviewOrder?.order?.customer?.name || partnerReviewOrder?.order?.order_number || "Customer"}
+            </Text>
+
+            {/* Star picker */}
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 10,
+                marginBottom: 20,
+                justifyContent: "center",
+              }}
+            >
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity
+                  key={star}
+                  onPress={() => setPartnerReviewRating(star)}
+                >
+                  <Text
+                    style={{
+                      fontSize: 36,
+                      opacity: star <= partnerReviewRating ? 1 : 0.25,
+                    }}
+                  >
+                    ⭐
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Comment input */}
+            <TextInput
+              style={{
+                backgroundColor: C.gray100,
+                borderRadius: 12,
+                padding: 14,
+                fontSize: 14,
+                fontFamily: "PlusJakartaSans_500Medium",
+                color: C.gray900,
+                minHeight: 80,
+                textAlignVertical: "top",
+                marginBottom: 20,
+                borderWidth: 1,
+                borderColor: C.gray200,
+              }}
+              placeholder="Tell us about the delivery experience (optional)"
+              placeholderTextColor={C.gray400}
+              multiline
+              value={partnerReviewComment}
+              onChangeText={setPartnerReviewComment}
+            />
+
+            <TouchableOpacity
+              onPress={submitPartnerReview}
+              disabled={partnerReviewLoading}
+              style={{
+                backgroundColor: partnerReviewLoading ? C.gray200 : C.greenDark,
+                borderRadius: 14,
+                padding: 16,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {partnerReviewLoading ? (
+                <ActivityIndicator color={C.white} />
+              ) : (
+                <Text
+                  style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.white }}
+                >
+                  Submit Review
+                </Text>
+              )}
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── VIEW SUBMITTED PARTNER RATING SLIDE-UP MODAL ── */}
+      <Modal
+        visible={!!viewPartnerRatingOrder}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setViewPartnerRatingOrder(null)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "flex-end",
+          }}
+          onPress={() => setViewPartnerRatingOrder(null)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: C.white,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 24,
+              paddingBottom: 40,
+            }}
+            onPress={() => {}}
+          >
+            {/* Handle */}
+            <View
+              style={{
+                width: 40,
+                height: 4,
+                backgroundColor: C.gray200,
+                borderRadius: 2,
+                alignSelf: "center",
+                marginBottom: 20,
+              }}
+            />
+
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <Text style={{ fontSize: 18, fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray900 }}>
+                Your Submitted Rating
+              </Text>
+              <TouchableOpacity onPress={() => setViewPartnerRatingOrder(null)} style={{ padding: 4 }}>
+                <Feather name="x" size={20} color={C.gray500} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, marginBottom: 20 }}>
+              {viewPartnerRatingOrder?.order?.customer?.name || viewPartnerRatingOrder?.order?.order_number || "Customer"} · {viewPartnerRatingOrder?.delivered_at ? new Date(viewPartnerRatingOrder.delivered_at).toLocaleDateString() : ""}
+            </Text>
+
+            {/* Rating Stars & Details Card */}
+            {viewPartnerRatingLoading ? (
+              <View style={{ padding: 30, alignItems: "center", justifyContent: "center" }}>
+                <ActivityIndicator color={C.greenDark} size="small" />
+                <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, marginTop: 10 }}>Fetching your review…</Text>
+              </View>
+            ) : (() => {
+              const ratingVal = fetchedPartnerRating?.rating || viewPartnerRatingOrder?.partner_rating || 5;
+              const num = typeof ratingVal === "number" ? ratingVal : parseInt(ratingVal, 10) || 5;
+              const comment = fetchedPartnerRating?.comment || viewPartnerRatingOrder?.partner_review_comment || "";
+
+              return (
+                <View
+                  style={{
+                    backgroundColor: C.gray100,
+                    borderWidth: 1,
+                    borderColor: C.gray200,
+                    borderRadius: 16,
+                    padding: 20,
+                    alignItems: "center",
+                    marginBottom: 20,
+                  }}
+                >
+                  <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Text
+                        key={star}
+                        style={{
+                          fontSize: 36,
+                          opacity: star <= num ? 1 : 0.25,
+                        }}
+                      >
+                        ⭐
+                      </Text>
+                    ))}
+                  </View>
+
+                  <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray900, marginBottom: comment ? 12 : 0 }}>
+                    {num} out of 5 stars
+                  </Text>
+
+                  {comment ? (
+                    <View
+                      style={{
+                        backgroundColor: C.white,
+                        borderRadius: 12,
+                        padding: 14,
+                        borderWidth: 1,
+                        borderColor: C.gray200,
+                        width: "100%",
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, fontFamily: "PlusJakartaSans_500Medium", color: C.gray800, lineHeight: 20 }}>
+                        {comment}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, fontStyle: "italic", marginTop: 4 }}>
+                      No written comment provided
+                    </Text>
+                  )}
+                </View>
+              );
+            })()}
+
+            <TouchableOpacity
+              onPress={() => setViewPartnerRatingOrder(null)}
+              style={{
+                backgroundColor: C.greenDark,
+                borderRadius: 14,
+                padding: 16,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.white }}>
+                Close
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -389,6 +768,19 @@ const s = StyleSheet.create({
   metaTime: { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: C.gray400 },
   statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   statusPillText: { fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold' },
+  rateBtn: {
+    backgroundColor: C.greenLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+  },
+  rateBtnText: {
+    fontSize: 11,
+    fontFamily: "PlusJakartaSans_700Bold",
+    color: C.greenText,
+  },
 
   emptyWrap:  { alignItems: 'center', paddingVertical: 56 },
   emptyEmoji: { fontSize: 44, marginBottom: 12 },

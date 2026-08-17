@@ -2,6 +2,28 @@ import { Platform } from 'react-native';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
+// ─── Magic-byte validation (web) ──────────────────────────────────────────────
+// Browsers report MIME from the file extension, so a renamed HTML file (e.g. a
+// saved SPA index.html named ".pdf") is silently accepted by the file picker.
+// Check the real first bytes so such files are rejected up front with a clear
+// message instead of being stored as a broken "PDF" on the server.
+class ContentMismatchError extends Error {}
+
+function matchesMagicBytes(bytes, mimeType) {
+  const b = bytes || [];
+  if (mimeType === "application/pdf") {
+    return b.length >= 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46; // %PDF
+  }
+  if (mimeType === "image/png") {
+    return b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47; // \x89PNG
+  }
+  if (mimeType === "image/webp") {
+    return b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50; // RIFF....WEBP
+  }
+  // default: treat as JPEG
+  return b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff; // \xFF\xD8\xFF
+}
+
 // ─── Core request helper with automatic token refresh ─────────────────────────
 /**
  * All API calls go through here.
@@ -88,9 +110,12 @@ export const uploadAPI = {
    * @param {string} localUri  - local file URI from image/document picker
    * @param {string} mimeType  - e.g. 'image/jpeg' | 'application/pdf'
    * @param {string} token     - JWT access token
-   * @returns {Promise<{url: string, mime: string}>}
+   * @param {(percent:number)=>void} onProgress - upload progress 0–100
+   * @param {object} [options] - { authenticated?: boolean } — mark sensitive
+   *        documents as authenticated Cloudinary assets (signed, expiring URL).
+   * @returns {Promise<{url: string, public_id: string, mime: string}>}
    */
-  upload: async (localUri, mimeType, token) => {
+  upload: async (localUri, mimeType, token, onProgress = null, options = {}) => {
     const ext =
       mimeType === "application/pdf" ? ".pdf"
       : mimeType === "image/png"    ? ".png"
@@ -99,13 +124,23 @@ export const uploadAPI = {
 
     const fileName = `upload_${Date.now()}${ext}`;
     const formData = new FormData();
+    if (options.authenticated) formData.append("authenticated", "1");
 
     if (Platform.OS === 'web') {
       try {
         const response = await fetch(localUri);
         const blob = await response.blob();
+        const bytes = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
+        if (!matchesMagicBytes(bytes, mimeType)) {
+          throw new ContentMismatchError(
+            mimeType === "application/pdf"
+              ? "This file doesn't look like a valid PDF. Please upload the actual PDF file (not a renamed HTML/text page)."
+              : "This file doesn't match the selected type. Please upload a valid JPG, PNG, WebP or PDF file."
+          );
+        }
         formData.append("file", blob, fileName);
       } catch (err) {
+        if (err instanceof ContentMismatchError) throw err;
         console.error("Web upload blob conversion failed:", err);
         throw new Error("Could not process file for upload");
       }
@@ -119,19 +154,60 @@ export const uploadAPI = {
 
     console.log("📤 Uploading file to:", `${BASE_URL}/upload`, "Platform:", Platform.OS);
 
-    const response = await fetch(`${BASE_URL}/upload`, {
-      method:  "POST",
-      headers: { "Authorization": `Bearer ${token}` },
-      body:    formData,
-    });
+    // XMLHttpRequest is used so we can report upload progress (fetch cannot).
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${BASE_URL}/upload`);
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.timeout = 60000; // 60s hard timeout
 
-    const data = await response.json();
-    if (!response.ok) {
-      console.error("❌ Upload response error:", data);
-      throw new Error(data.message || "Upload failed");
-    }
-    return data; // { success, url, mime }
+      xhr.upload.onprogress = (e) => {
+        if (onProgress && e.lengthComputable && e.total > 0) {
+          onProgress(Math.min(100, Math.round((e.loaded / e.total) * 100)));
+        }
+      };
+      xhr.onerror = () => reject(new Error("Network error during upload"));
+      xhr.ontimeout = () => reject(new Error("Upload timed out. Please try again."));
+
+      xhr.onload = () => {
+        let data = {};
+        try {
+          data = JSON.parse(xhr.responseText || "{}");
+        } catch (err) {
+          console.error("Upload: could not parse response", err);
+        }
+        if (xhr.status >= 200 && xhr.status < 300 && data.url) {
+          if (onProgress) onProgress(100);
+          resolve(data); // { success, url, public_id, mime }
+        } else {
+          reject(new Error(data.message || data.msg || "Upload failed"));
+        }
+      };
+
+      xhr.send(formData);
+    });
   },
+
+  /**
+   * Delete an uploaded asset from Cloudinary (signed, through the backend).
+   * @param {string} publicId - Cloudinary public_id (or local filename fallback)
+   * @param {string} token    - JWT access token
+   * @returns {Promise<{success:boolean}>}
+   */
+  remove: (publicId, token) =>
+    request("POST", "/upload/delete", { public_id: publicId }, token),
+
+  /**
+   * Get a freshly signed (expiring) URL for an authenticated asset.
+   * Signed URLs expire, so call this right before opening a document so the
+   * link is always valid (PDF viewer, "Open in New Tab").
+   * @param {string} publicId  - Cloudinary public_id
+   * @param {string} resourceType - 'image' | 'raw' | 'auto'
+   * @param {string} token     - JWT access token
+   * @returns {Promise<{url: string}>}
+   */
+  getSignedUrl: (publicId, resourceType = "auto", token) =>
+    request("POST", "/upload/signed", { public_id: publicId, resource_type: resourceType }, token),
 };
 
 // ─── Products ─────────────────────────────────────────────────────────────────

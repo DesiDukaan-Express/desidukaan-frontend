@@ -16,7 +16,7 @@ import {
   Linking,
   Dimensions,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Feather, FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import { io } from "socket.io-client";
@@ -39,6 +39,7 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const TIP_PRESETS = [10, 20, 50, 100];
 
 const C = {
+  yellow: "#F59E0B",
   orange: "#F97316",
   orangeDark: "#EA580C",
   green: "#16A34A",
@@ -1958,7 +1959,7 @@ const formatCardDate = (iso) => {
 };
 
 
-function OrderCard({ order, onPress, onRate, alreadyRated, onReorder, onDownloadInvoice, isFirstDelivered }) {
+function OrderCard({ order, onPress, onRate, onViewRating, alreadyRated, onReorder, onDownloadInvoice, isFirstDelivered }) {
   const { t } = useTranslation();
   const st = getStatus(order.status);
   const stepIdx = stepIndex(order.status);
@@ -2125,15 +2126,28 @@ function OrderCard({ order, onPress, onRate, alreadyRated, onReorder, onDownload
             
             <View style={oc.actionDivider} />
 
-            <TouchableOpacity 
-              style={oc.actionBtn} 
-              onPress={alreadyRated ? null : onRate} 
-              activeOpacity={alreadyRated ? 1 : 0.7}
-            >
-              <Text style={[oc.actionBtnText, alreadyRated && { color: C.gray400 }]}>
-                {alreadyRated ? t('orders.rated', 'Rated ⭐') : t('orders.rateOrder', 'Rate order')}
-              </Text>
-            </TouchableOpacity>
+            {(() => {
+              const ratingVal = order.user_rating || order.rating || (order.reviews?.[0]?.vendor_rating);
+              const num = ratingVal ? parseInt(ratingVal, 10) || 5 : 5;
+              const starsText = "★".repeat(Math.max(1, Math.min(5, num)));
+              return (
+                <TouchableOpacity 
+                  style={oc.actionBtn} 
+                  onPress={alreadyRated ? () => onViewRating(order) : onRate} 
+                  activeOpacity={0.7}
+                >
+                  {alreadyRated ? (
+                    <Text style={[oc.actionBtnText, { color: C.gray600 }]}>
+                      You rated <Text style={{ color: C.yellow, fontWeight: "900" }}>{starsText}</Text>
+                    </Text>
+                  ) : (
+                    <Text style={oc.actionBtnText}>
+                      {t('orders.rateOrder', 'Rate order')}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })()}
           </>
         ) : (
           <>
@@ -2306,9 +2320,38 @@ export default function MyOrdersScreen() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [reviewOrder, setReviewOrder] = useState(null);
+  const [viewRatingOrder, setViewRatingOrder] = useState(null);
+  const [viewRatingLoading, setViewRatingLoading] = useState(false);
+  const [fetchedRating, setFetchedRating] = useState(null);
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
+
+  const handleOpenViewRating = async (order) => {
+    setViewRatingOrder(order);
+    setViewRatingLoading(true);
+    const initialRating = order.user_rating || order.rating || (order.reviews?.[0]?.vendor_rating) || 5;
+    const initialComment = order.review_comment || (order.reviews?.[0]?.comment) || "";
+    setFetchedRating({ rating: initialRating, comment: initialComment });
+
+    try {
+      const res = await fetch(`${BASE_URL}/orders/${order.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      const o = data.data?.order || data.order;
+      if (o) {
+        setFetchedRating({
+          rating: o.user_rating ?? o.reviews?.[0]?.vendor_rating ?? initialRating,
+          comment: o.review_comment ?? o.reviews?.[0]?.comment ?? initialComment,
+        });
+      }
+    } catch (e) {
+      console.error("Fetch rating error:", e);
+    } finally {
+      setViewRatingLoading(false);
+    }
+  };
 
   const submitReview = async () => {
     if (reviewRating === 0) {
@@ -2330,6 +2373,15 @@ export default function MyOrdersScreen() {
       });
       const data = await res.json();
       if (data.success) {
+        const submittedRating = reviewRating;
+        const currentOrderId = reviewOrder.id;
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === currentOrderId
+              ? { ...o, has_reviewed: true, user_rating: submittedRating }
+              : o
+          )
+        );
         setReviewOrder(null);
         setReviewRating(0);
         setReviewComment("");
@@ -2671,6 +2723,7 @@ export default function MyOrdersScreen() {
                 setReviewRating(0);
                 setReviewComment("");
               }}
+              onViewRating={(o) => handleOpenViewRating(o)}
               alreadyRated={!!order.has_reviewed}
               onReorder={() => handleReorder(order)}
               onDownloadInvoice={() => handleDownloadInvoice(order)}
@@ -2803,6 +2856,139 @@ export default function MyOrdersScreen() {
                   Submit Review
                 </Text>
               )}
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── VIEW SUBMITTED RATING SLIDE-UP MODAL ── */}
+      <Modal
+        visible={!!viewRatingOrder}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setViewRatingOrder(null)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "flex-end",
+          }}
+          onPress={() => setViewRatingOrder(null)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: C.white,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 24,
+              paddingBottom: 40,
+            }}
+            onPress={() => {}}
+          >
+            {/* Handle */}
+            <View
+              style={{
+                width: 40,
+                height: 4,
+                backgroundColor: C.gray200,
+                borderRadius: 2,
+                alignSelf: "center",
+                marginBottom: 20,
+              }}
+            />
+
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <Text style={{ fontSize: 18, fontWeight: "900", color: C.gray900 }}>
+                Your Submitted Rating
+              </Text>
+              <TouchableOpacity onPress={() => setViewRatingOrder(null)} style={{ padding: 4 }}>
+                <Feather name="x" size={20} color={C.gray500} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 13, color: C.gray400, marginBottom: 20 }}>
+              {viewRatingOrder?.vendor?.shop_name || "Your order"} · {formatCardDate(viewRatingOrder?.created_at)}
+            </Text>
+
+            {/* Rating Stars & Details Card */}
+            {viewRatingLoading ? (
+              <View style={{ padding: 30, alignItems: "center", justifyContent: "center" }}>
+                <ActivityIndicator color={C.green} size="small" />
+                <Text style={{ fontSize: 13, color: C.gray400, marginTop: 10 }}>Fetching your review…</Text>
+              </View>
+            ) : (() => {
+              const ratingVal = fetchedRating?.rating || viewRatingOrder?.user_rating || 5;
+              const num = typeof ratingVal === "number" ? ratingVal : parseInt(ratingVal, 10) || 5;
+              const comment = fetchedRating?.comment || viewRatingOrder?.review_comment || "";
+
+              return (
+                <View
+                  style={{
+                    backgroundColor: C.gray100,
+                    borderWidth: 1,
+                    borderColor: C.gray200,
+                    borderRadius: 16,
+                    padding: 20,
+                    alignItems: "center",
+                    marginBottom: 20,
+                  }}
+                >
+                  <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Text
+                        key={star}
+                        style={{
+                          fontSize: 36,
+                          opacity: star <= num ? 1 : 0.25,
+                        }}
+                      >
+                        ⭐
+                      </Text>
+                    ))}
+                  </View>
+
+                  <Text style={{ fontSize: 15, fontWeight: "800", color: C.gray900, marginBottom: comment ? 12 : 0 }}>
+                    {num} out of 5 stars
+                  </Text>
+
+                  {comment ? (
+                    <View
+                      style={{
+                        backgroundColor: C.white,
+                        borderRadius: 12,
+                        padding: 14,
+                        borderWidth: 1,
+                        borderColor: C.gray200,
+                        width: "100%",
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, color: C.gray800, lineHeight: 20 }}>
+                        {comment}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={{ fontSize: 13, color: C.gray400, fontStyle: "italic", marginTop: 4 }}>
+                      No written comment provided
+                    </Text>
+                  )}
+                </View>
+              );
+            })()}
+
+            <TouchableOpacity
+              onPress={() => setViewRatingOrder(null)}
+              style={{
+                backgroundColor: C.green,
+                borderRadius: 14,
+                padding: 16,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: "800", color: C.white }}>
+                Close
+              </Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>

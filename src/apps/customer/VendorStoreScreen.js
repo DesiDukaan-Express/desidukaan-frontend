@@ -198,6 +198,11 @@ function formatWeight(w) {
   }
   return String(w);
 }
+function formatRupee(v) {
+  const n = Number(v) || 0;
+  const rounded = Math.round(n * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2).replace(/\.?0+$/, "");
+}
 
 // ═══════════════════════════════════════════════════════════════════════════ //
 // ─── Weight Picker Modal ─────────────────────────────────────────────────── //
@@ -213,6 +218,9 @@ function WeightPickerModal({ item, onClose, onAdd }) {
       setSelected(weightOptions[0]);
     }
   }, [item]);
+
+  const selectedWeightStr = formatWeight(selected);
+  const selectedPrice = calculateProportionalPrice(p.price, selectedWeightStr, p.unit || "1kg");
 
   if (!item) return null;
 
@@ -280,7 +288,10 @@ function WeightPickerModal({ item, onClose, onAdd }) {
               style={wp.addBtnGrad}
             >
               <Feather name="shopping-cart" size={16} color={C.white} />
-              <Text style={wp.addBtnText}>{t('vendorStore.addWeightToCart', { weight: formatWeight(selected) })}</Text>
+              <Text style={wp.addBtnText}>
+                {t('vendorStore.addWeightToCart', { weight: selectedWeightStr })}
+                <Text style={wp.addBtnPrice}> · ₹{formatRupee(selectedPrice)}</Text>
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         </Pressable>
@@ -310,6 +321,7 @@ const wp = StyleSheet.create({
   addBtn: { borderRadius: 16, overflow: "hidden" },
   addBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16 },
   addBtnText: { fontSize: 16, fontWeight: "800", color: C.white },
+  addBtnPrice: { fontSize: 14, fontWeight: "700", color: "#a1ffad" },
 });
 
 // ═══════════════════════════════════════════════════════════════════════════ //
@@ -350,7 +362,7 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
   const p = item.product || {};
   const catName = p.category?.name || p.category;
   const meta = getCatMeta(catName);
-  const inStock = item.stock_qty > 0;
+  const inStock = item.is_active ?? true;
   const loose = isLooseItem(p);
   const discount = p.mrp && p.mrp > p.price
     ? Math.round((1 - p.price / p.mrp) * 100) : null;
@@ -395,12 +407,7 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
               </View> */}
             </View>
             <View style={pm.body}>
-              {item.stock_qty > 0 && item.stock_qty <= 10 && (
-                <View style={pm.lowBanner}>
-                  <Feather name="alert-circle" size={13} color="#D97706" />
-                  <Text style={pm.lowBannerText}>{t('vendorStore.onlyLeft', { count: item.stock_qty })}</Text>
-                </View>
-              )}
+
               <Text style={pm.name}>{p.name}</Text>
               <Text style={pm.unit}>{p.unit}</Text>
               {loose && (
@@ -525,7 +532,7 @@ const pm = StyleSheet.create({
 function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
   const { t } = useTranslation();
   const p = item.product || {};
-  const inStock = item.stock_qty > 0;
+  const inStock = item.product?.is_active;
   const loose = isLooseItem(p);
   const discount = p.mrp && p.mrp > p.price
     ? Math.round((1 - p.price / p.mrp) * 100) : null;
@@ -536,6 +543,7 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
       style={[pc.card, { width: cardW }, !inStock && { opacity: 0.5 }]}
       onPress={onPress}
       activeOpacity={0.88}
+      disabled={!inStock}
     >
       {/* Image */}
       <View style={[pc.imgWrap, { height: imgH }]}>
@@ -545,6 +553,7 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
         />
         <TouchableOpacity
           style={pc.eyeBtn}
+          disabled={!inStock}
           onPress={(e) => { e.stopPropagation?.(); onPress?.(); }}
           activeOpacity={0.7}
         >
@@ -720,10 +729,11 @@ function CatTabPill({ cat, count, isActive, onPress }) {
 }
 const ct = StyleSheet.create({
   pill: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999,
+    flexDirection: "row", alignItems: "center", gap: 7,
+    paddingHorizontal: 13, paddingVertical: 9, borderRadius: 999,
     borderWidth: 1, borderColor: C.outlineVar,
     backgroundColor: C.surfaceLowest, marginRight: 8,
+    maxWidth: 150, flexShrink: 1,
   },
   pillActive: {
     backgroundColor: C.greenDark, borderColor: C.greenDark,
@@ -731,7 +741,7 @@ const ct = StyleSheet.create({
     shadowOpacity: 0.3, shadowRadius: 7, elevation: 4,
   },
   emoji: { fontSize: 14 },
-  label: { fontSize: 12, fontWeight: "700", color: C.gray600 },
+  label: { fontSize: 12, fontWeight: "700", color: C.gray600, flexShrink: 1 },
   labelActive: { color: C.white },
   bubble: {
     paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999,
@@ -766,8 +776,8 @@ export default function VendorStoreScreen() {
   const [activeCat, setActiveCat] = useState("All");
   const [sortBy, setSortBy] = useState("default");
   useEffect(() => {
-  console.log("Sort Changed:", sortBy);
-}, [sortBy]);
+    console.log("Sort Changed:", sortBy);
+  }, [sortBy]);
   const [detailItem, setDetailItem] = useState(null);
   const [loosePickerItem, setLoosePickerItem] = useState(null); // weight picker
 
@@ -859,14 +869,14 @@ export default function VendorStoreScreen() {
     return ["All", ...Object.keys(categoryHierarchy).sort()];
   }, [categoryHierarchy]);
 
-  const inStockTotal = useMemo(() => inventory.filter(i => i.stock_qty > 0).length, [inventory]);
+  const inStockTotal = useMemo(() => inventory.filter(i => i.is_active ?? true).length, [inventory]);
 
   const getTopCatCount = useCallback((catName) => {
     if (catName === "All") return inStockTotal;
     const subCats = categoryHierarchy[catName] || {};
     let total = 0;
     Object.values(subCats).forEach(items => {
-      total += items.filter(i => i.stock_qty > 0).length;
+      total += items.filter(i => i.is_active ?? true).length;
     });
     return total;
   }, [categoryHierarchy, inStockTotal]);
@@ -899,94 +909,94 @@ export default function VendorStoreScreen() {
   }), [inventory, search, activeCat, getCatName, parentOfMap]);
 
   const inStock = useMemo(() => {
-  let list = [...filtered.filter(i => i.stock_qty > 0)];
+  let list = [...filtered.filter(i => i.is_active ?? true)];
 
-  switch (sortBy) {
-    case "price_asc":
-      list.sort((a, b) => (a.product?.price || 0) - (b.product?.price || 0));
-      break;
+    switch (sortBy) {
+      case "price_asc":
+        list.sort((a, b) => (a.product?.price || 0) - (b.product?.price || 0));
+        break;
 
-    case "price_desc":
-      list.sort((a, b) => (b.product?.price || 0) - (a.product?.price || 0));
-      break;
+      case "price_desc":
+        list.sort((a, b) => (b.product?.price || 0) - (a.product?.price || 0));
+        break;
 
-    case "discount":
-      list.sort((a, b) => {
-        const discountA =
-          ((a.product?.mrp || a.product?.price || 0) -
-            (a.product?.price || 0));
+      case "discount":
+        list.sort((a, b) => {
+          const discountA =
+            ((a.product?.mrp || a.product?.price || 0) -
+              (a.product?.price || 0));
 
-        const discountB =
-          ((b.product?.mrp || b.product?.price || 0) -
-            (b.product?.price || 0));
+          const discountB =
+            ((b.product?.mrp || b.product?.price || 0) -
+              (b.product?.price || 0));
 
-        return discountB - discountA;
-      });
-      break;
+          return discountB - discountA;
+        });
+        break;
 
-    case "name_asc":
-      list.sort((a, b) =>
-        (a.product?.name || "").localeCompare(b.product?.name || "")
-      );
-      break;
+      case "name_asc":
+        list.sort((a, b) =>
+          (a.product?.name || "").localeCompare(b.product?.name || "")
+        );
+        break;
 
-    case "name_desc":
-      list.sort((a, b) =>
-        (b.product?.name || "").localeCompare(a.product?.name || "")
-      );
-      break;
+      case "name_desc":
+        list.sort((a, b) =>
+          (b.product?.name || "").localeCompare(a.product?.name || "")
+        );
+        break;
 
-    default:
-      break;
-  }
+      default:
+        break;
+    }
 
-  return list;
-}, [filtered, sortBy]);
+    return list;
+  }, [filtered, sortBy]);
 
   const outStock = useMemo(() => {
-  let list = [...filtered.filter(i => i.stock_qty <= 0)];
+  let list = [...filtered.filter(i => !(i.is_active ?? true))];
 
-  switch (sortBy) {
-    case "price_asc":
-      list.sort((a, b) => (a.product?.price || 0) - (b.product?.price || 0));
-      break;
+    switch (sortBy) {
+      case "price_asc":
+        list.sort((a, b) => (a.product?.price || 0) - (b.product?.price || 0));
+        break;
 
-    case "price_desc":
-      list.sort((a, b) => (b.product?.price || 0) - (a.product?.price || 0));
-      break;
+      case "price_desc":
+        list.sort((a, b) => (b.product?.price || 0) - (a.product?.price || 0));
+        break;
 
-    case "discount":
-      list.sort((a, b) => {
-        const discountA =
-          ((a.product?.mrp || a.product?.price || 0) -
-            (a.product?.price || 0));
+      case "discount":
+        list.sort((a, b) => {
+          const discountA =
+            ((a.product?.mrp || a.product?.price || 0) -
+              (a.product?.price || 0));
 
-        const discountB =
-          ((b.product?.mrp || b.product?.price || 0) -
-            (b.product?.price || 0));
+          const discountB =
+            ((b.product?.mrp || b.product?.price || 0) -
+              (b.product?.price || 0));
 
-        return discountB - discountA;
-      });
-      break;
+          return discountB - discountA;
+        });
+        break;
 
-    case "name_asc":
-      list.sort((a, b) =>
-        (a.product?.name || "").localeCompare(b.product?.name || "")
-      );
-      break;
+      case "name_asc":
+        list.sort((a, b) =>
+          (a.product?.name || "").localeCompare(b.product?.name || "")
+        );
+        break;
 
-    case "name_desc":
-      list.sort((a, b) =>
-        (b.product?.name || "").localeCompare(a.product?.name || "")
-      );
-      break;
+      case "name_desc":
+        list.sort((a, b) =>
+          (b.product?.name || "").localeCompare(a.product?.name || "")
+        );
+        break;
 
-    default:
-      break;
-  }
+      default:
+        break;
+    }
 
-  return list;
-}, [filtered, sortBy]);
+    return list;
+  }, [filtered, sortBy]);
 
 
   // ── Cart helpers ──────────────────────────────────────────────────────────
@@ -1137,29 +1147,29 @@ export default function VendorStoreScreen() {
           <Text style={s.sortTitle}>{t('vendorStore.sort')}</Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.sortRow}>
-         {[
-  { key: "default", label: t('vendorStore.default') },
-  { key: "price_asc", label: t('vendorStore.priceLowHigh'), icon: "arrow-up" },
-  { key: "price_desc", label: t('vendorStore.priceHighLow'), icon: "arrow-down" },
-  { key: "discount", label: t('vendorStore.bestDiscount'), icon: "percent" },
-  { key: "name_asc", label: t('vendorStore.nameAZ') },
-  { key: "name_desc", label: t('vendorStore.nameZA') },
-]
+          {[
+            { key: "default", label: t('vendorStore.default') },
+            { key: "price_asc", label: t('vendorStore.priceLowHigh'), icon: "arrow-up" },
+            { key: "price_desc", label: t('vendorStore.priceHighLow'), icon: "arrow-down" },
+            { key: "discount", label: t('vendorStore.bestDiscount'), icon: "percent" },
+            { key: "name_asc", label: t('vendorStore.nameAZ') },
+            { key: "name_desc", label: t('vendorStore.nameZA') },
+          ]
 
-.map((opt) => {
-            const active = sortBy === opt.key;
-            return (
-              <TouchableOpacity
-                key={opt.key}
-                onPress={() => setSortBy(opt.key)}
-                style={[s.sortPill, active && s.sortPillActive]}
-                activeOpacity={0.8}
-              >
-                {opt.icon && <Feather name={opt.icon} size={10} color={active ? C.white : C.gray600} style={{ marginRight: 4 }} />}
-                <Text style={[s.sortPillText, active && s.sortPillTextActive]}>{opt.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
+            .map((opt) => {
+              const active = sortBy === opt.key;
+              return (
+                <TouchableOpacity
+                  key={opt.key}
+                  onPress={() => setSortBy(opt.key)}
+                  style={[s.sortPill, active && s.sortPillActive]}
+                  activeOpacity={0.8}
+                >
+                  {opt.icon && <Feather name={opt.icon} size={10} color={active ? C.white : C.gray600} style={{ marginRight: 4 }} />}
+                  <Text style={[s.sortPillText, active && s.sortPillTextActive]}>{opt.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
         </ScrollView>
       </View>
 

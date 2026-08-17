@@ -1,11 +1,27 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 
-export default function AddressMapView({ region, latitude, longitude }) {
+// Web map — Leaflet + OpenStreetMap tiles. The marker is draggable; dragging it
+// reports new coords via onMarkerDragEnd so the parent can reverse-geocode and
+// keep City / Pincode / Street Address in sync with the pin.
+export default function AddressMapView({
+  region,
+  latitude,
+  longitude,
+  onMarkerDragEnd,
+  onRegionChangeComplete,
+}) {
   const mapRef = useRef(null);
   const leafletMap = useRef(null);
   const markerRef = useRef(null);
   const [isLoaded, setIsLoaded] = useState(false);
+
+  const lat = latitude != null ? parseFloat(latitude) : region?.latitude;
+  const lng = longitude != null ? parseFloat(longitude) : region?.longitude;
+
+  // Fall back to a default India centre so the map never renders blank.
+  const centerLat = lat != null ? lat : 28.6139;
+  const centerLng = lng != null ? lng : 77.2090;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -34,47 +50,71 @@ export default function AddressMapView({ region, latitude, longitude }) {
       if (leafletMap.current) {
         leafletMap.current.remove();
         leafletMap.current = null;
+        markerRef.current = null;
       }
     };
   }, []);
 
+  // Create the map once, then fly to the shared lat/lng whenever it changes.
   useEffect(() => {
     if (!isLoaded || !mapRef.current || !window.L) return;
 
     const L = window.L;
-    const center = [region.latitude, region.longitude];
-
     if (!leafletMap.current) {
       leafletMap.current = L.map(mapRef.current, {
         zoomControl: true,
-        attributionControl: false
-      }).setView(center, 14);
+      }).setView([centerLat, centerLng], 15);
 
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(leafletMap.current);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      }).addTo(leafletMap.current);
+
+      leafletMap.current.on("moveend", () => {
+        if (onRegionChangeComplete && leafletMap.current) {
+          const c = leafletMap.current.getCenter();
+          onRegionChangeComplete({
+            latitude: c.lat,
+            longitude: c.lng,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          });
+        }
+      });
     } else {
-      leafletMap.current.setView(center, 14);
+      leafletMap.current.flyTo([centerLat, centerLng], 15, { duration: 0.8 });
     }
+  }, [isLoaded, centerLat, centerLng]);
 
-    // Update marker
+  // Place / update the draggable marker from the shared lat/lng state.
+  useEffect(() => {
+    if (!isLoaded || !leafletMap.current || !window.L) return;
+    if (lat == null || lng == null) return;
+
+    const L = window.L;
     if (markerRef.current) {
       markerRef.current.remove();
     }
 
-    if (latitude && longitude) {
-      markerRef.current = L.marker([latitude, longitude])
-        .addTo(leafletMap.current)
-        .bindPopup("Your Address")
-        .openPopup();
-    }
+    markerRef.current = L.marker([lat, lng], { draggable: true })
+      .addTo(leafletMap.current)
+      .bindPopup("Your Address")
+      .openPopup();
 
-  }, [isLoaded, region, latitude, longitude]);
+    markerRef.current.on("dragend", () => {
+      if (!markerRef.current || !onMarkerDragEnd) return;
+      const p = markerRef.current.getLatLng();
+      onMarkerDragEnd(p.lat, p.lng);
+    });
+  }, [isLoaded, lat, lng]);
 
   return (
     <View style={styles.container}>
       {!isLoaded && <ActivityIndicator size="small" style={styles.loader} />}
-      <div 
-        ref={mapRef} 
-        style={{ width: '100%', height: '100%', position: 'absolute' }} 
+      <div
+        ref={mapRef}
+        style={{ width: "100%", height: "100%", position: "absolute" }}
       />
     </View>
   );
@@ -87,6 +127,6 @@ const styles = StyleSheet.create({
   },
   loader: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 10
-  }
+    zIndex: 10,
+  },
 });
