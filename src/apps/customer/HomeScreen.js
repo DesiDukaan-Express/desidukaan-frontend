@@ -3177,7 +3177,7 @@ export default function HomeScreen() {
                   activeOpacity={0.85}
                 >
                   <View style={[s.mobileCatIcon, { backgroundColor: cat.bg }]}>
-                    <MaterialIcons name={cat.icon} size={17} color={cat.accent} />
+                    <Text style={{ fontSize: 16 }}>{cat.icon}</Text>
                   </View>
                   <Text style={s.mobileCatChipText} numberOfLines={1}>{cat.label}</Text>
                 </TouchableOpacity>

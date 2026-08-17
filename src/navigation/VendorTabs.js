@@ -13,7 +13,7 @@ import VendorOrdersScreen from "../apps/vendor/VendorOrdersScreen";
 import EarningsScreen from "../apps/vendor/EarningsScreen";
 import VendorProfileScreen from "../apps/vendor/VendorProfileScreen";
 
-const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3007";
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 const Tab = createBottomTabNavigator();
 
 export default function VendorTabs() {
