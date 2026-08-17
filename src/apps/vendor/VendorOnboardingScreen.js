@@ -667,7 +667,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
   // Manual edits to City/Pincode still move the map pin (forward geocode),
   // but never fight a suggestion selection or marker drag.
   useEffect(() => {
-    const delayDebounceFn = setTimeout(runGeocode, 1000);
+  
     const delayDebounceFn = setTimeout(async () => {
       if (applyingRef.current) { applyingRef.current = false; return; }
       if (shopLoc.city.length >= 3 && shopLoc.pincode.length === 6) {

@@ -986,8 +986,7 @@ export default function VendorStoreScreen() {
   }, [categories]);
 
   const inStockTotal = useMemo(() => inventory.filter(i => i.stock_qty > 0).length, [inventory]);
-  const inStockTotal = useMemo(() => inventory.filter(i => i.is_active ?? true).length, [inventory]);
-
+  
   const getTopCatCount = useCallback((catName) => {
     if (catName === "All") return inStockTotal;
     const subCats = categoryHierarchy[catName] || {};
