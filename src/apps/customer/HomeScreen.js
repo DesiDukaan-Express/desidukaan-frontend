@@ -1698,7 +1698,7 @@ function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPre
         {/* Price + Add button row */}
         <View style={pic.priceRow}>
           <View>
-            <Text style={pic.price}>₹{item.price}</Text>
+            <Text style={pic.price}>₹{qty > 0 ? item.price * qty : item.price}</Text>
             {hasMrp && <Text style={pic.orig}>₹{item.orig}</Text>}
           </View>
 
@@ -3177,7 +3177,7 @@ export default function HomeScreen() {
                   activeOpacity={0.85}
                 >
                   <View style={[s.mobileCatIcon, { backgroundColor: cat.bg }]}>
-                    <MaterialIcons name={cat.icon} size={17} color={cat.accent} />
+                    <Text style={{ fontSize: 16 }}>{cat.icon}</Text>
                   </View>
                   <Text style={s.mobileCatChipText} numberOfLines={1}>{cat.label}</Text>
                 </TouchableOpacity>

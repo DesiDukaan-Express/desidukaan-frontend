@@ -657,6 +657,8 @@ export default {
     orderItems: "Order Items",
     specialInstructions: "Special Instructions",
     manageOrder: "Manage Order",
+    manageOrderDeclinedSingle: "Manage Order — {{name}} delivery partner declined",
+    manageOrderDeclinedMultiple: "Manage Order — {{count}} delivery partners declined",
     manageDelivery: "Manage Delivery",
     markPreparing: "Mark Preparing",
     markReady: "Mark Ready",

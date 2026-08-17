@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, RefreshControl, Switch, Animated,
-  StatusBar, Platform, Modal, Pressable, TextInput, Alert,
+  StatusBar, Platform, Alert,
 } from 'react-native';
 import Svg, { G, Path, Rect, Circle, Ellipse, Polygon } from 'react-native-svg';
 import { io } from 'socket.io-client';
@@ -198,19 +198,6 @@ export default function DeliveryHomeScreen({ navigation, route }) {
   const { token, user } = useAuthStore();
   const { t } = useTranslation();
 
-  const [partnerReviewOrder, setPartnerReviewOrder] = useState(null);
-  const [partnerReviewRating, setPartnerReviewRating] = useState(0);
-  const [partnerReviewComment, setPartnerReviewComment] = useState("");
-  const [partnerReviewLoading, setPartnerReviewLoading] = useState(false);
-
-  useEffect(() => {
-    if (route?.params?.reviewOrder) {
-      setPartnerReviewOrder(route.params.reviewOrder);
-      setPartnerReviewRating(0);
-      setPartnerReviewComment("");
-      navigation.setParams({ reviewOrder: null });
-    }
-  }, [route?.params?.reviewOrder]);
 
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_500Medium,
@@ -225,6 +212,7 @@ export default function DeliveryHomeScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [toggling,     setToggling]     = useState(false);
   const [incomingOrder, setIncomingOrder] = useState(null);
+  const processedOrderIds = useRef(new Set());
   const socketRef = useRef(null);
 
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -294,7 +282,10 @@ export default function DeliveryHomeScreen({ navigation, route }) {
     const socket = io(SOCKET_URL, { auth: { token }, transports: ['websocket'] });
     socket.on('delivery_status_update', () => { fetchStats(); fetchHistory(); });
     socket.on('new_delivery_request', fetchStats);
-    socket.on('order:incoming', (data) => setIncomingOrder(data));
+    socket.on('order:incoming', (data) => {
+      if (processedOrderIds.current.has(data.orderId)) return;
+      setIncomingOrder(data);
+    });
     socket.on('order:removed', (data) => {
       setIncomingOrder(prev => prev?.orderId === data.orderId ? null : prev);
     });
@@ -350,6 +341,7 @@ export default function DeliveryHomeScreen({ navigation, route }) {
 
   const handleAcceptIncoming = async () => {
     if (!incomingOrder) return;
+    processedOrderIds.current.add(incomingOrder.orderId);
     try {
       const res = await fetch(`${API_BASE}/delivery/accept/${incomingOrder.orderId}`, {
         method: 'POST',
@@ -366,7 +358,22 @@ export default function DeliveryHomeScreen({ navigation, route }) {
     } catch { setIncomingOrder(null); }
   };
 
-  const handleDeclineIncoming = () => setIncomingOrder(null);
+  const handleDeclineIncoming = async () => {
+    if (!incomingOrder) return;
+    processedOrderIds.current.add(incomingOrder.orderId);
+    try {
+      await fetch(`${API_BASE}/delivery/decline/${incomingOrder.orderId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (_) {}
+    setIncomingOrder(null);
+  };
+
+  const handleIgnoreIncoming = () => {
+    if (incomingOrder) processedOrderIds.current.add(incomingOrder.orderId);
+    setIncomingOrder(null);
+  };
 
   if (loading || !fontsLoaded) {
     return (
@@ -419,6 +426,7 @@ export default function DeliveryHomeScreen({ navigation, route }) {
         order={incomingOrder}
         onAccept={handleAcceptIncoming}
         onDecline={handleDeclineIncoming}
+        onIgnore={handleIgnoreIncoming}
       />
 
       <ScrollView
@@ -572,173 +580,6 @@ export default function DeliveryHomeScreen({ navigation, route }) {
         </Animated.View>
         <View style={{ height: 110 }} />
       </ScrollView>
-
-      {/* ── PARTNER REVIEW CUSTOMER MODAL ── */}
-      <Modal
-        visible={!!partnerReviewOrder}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setPartnerReviewOrder(null)}
-      >
-        <Pressable
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            justifyContent: "flex-end",
-          }}
-          onPress={() => setPartnerReviewOrder(null)}
-        >
-          <Pressable
-            style={{
-              backgroundColor: "#FFFFFF",
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              padding: 24,
-              paddingBottom: 40,
-            }}
-            onPress={() => {}}
-          >
-            <View
-              style={{
-                width: 40,
-                height: 4,
-                backgroundColor: "#E2E8F0",
-                borderRadius: 2,
-                alignSelf: "center",
-                marginBottom: 20,
-              }}
-            />
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "900",
-                color: "#111827",
-                marginBottom: 4,
-              }}
-            >
-              Rate Customer
-            </Text>
-            <Text style={{ fontSize: 13, color: "#6B7280", marginBottom: 20 }}>
-              {partnerReviewOrder?.customerName || "Customer"}
-            </Text>
-
-            {/* Star picker */}
-            <View
-              style={{
-                flexDirection: "row",
-                gap: 10,
-                marginBottom: 20,
-                justifyContent: "center",
-              }}
-            >
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity
-                  key={star}
-                  onPress={() => setPartnerReviewRating(star)}
-                >
-                  <Text
-                    style={{
-                      fontSize: 36,
-                      opacity: star <= partnerReviewRating ? 1 : 0.25,
-                    }}
-                  >
-                    ⭐
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Comment input */}
-            <TextInput
-              style={{
-                backgroundColor: "#F3F4F6",
-                borderRadius: 12,
-                padding: 14,
-                fontSize: 14,
-                color: "#111827",
-                minHeight: 80,
-                textAlignVertical: "top",
-                marginBottom: 20,
-                borderWidth: 1,
-                borderColor: "#E5E7EB",
-              }}
-              placeholder="Tell us about the customer experience (optional)"
-              placeholderTextColor="#9CA3AF"
-              multiline
-              value={partnerReviewComment}
-              onChangeText={setPartnerReviewComment}
-            />
-
-            <TouchableOpacity
-              onPress={async () => {
-                if (partnerReviewRating === 0) {
-                  Alert.alert("Please select a rating");
-                  return;
-                }
-                setPartnerReviewLoading(true);
-                try {
-                  const res = await fetch(
-                    `${API_BASE}/orders/${partnerReviewOrder.orderIdRaw || partnerReviewOrder.id}/partner-review`,
-                    {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: JSON.stringify({
-                        partner_review_rating: partnerReviewRating,
-                        partner_review_comment: partnerReviewComment,
-                      }),
-                    }
-                  );
-                  const data = await res.json();
-                  if (data.success) {
-                    setPartnerReviewOrder(null);
-                    setPartnerReviewRating(0);
-                    setPartnerReviewComment("");
-                  }
-                } catch (e) {
-                  console.log("Partner review error", e);
-                } finally {
-                  setPartnerReviewLoading(false);
-                }
-              }}
-              disabled={partnerReviewLoading}
-              style={{
-                backgroundColor: partnerReviewLoading ? "#E5E7EB" : "#2E7D32",
-                borderRadius: 14,
-                padding: 16,
-                alignItems: "center",
-              }}
-            >
-              <Text
-                style={{
-                  color: "#fff",
-                  fontSize: 16,
-                  fontWeight: "800",
-                }}
-              >
-                {partnerReviewLoading ? "Submitting..." : "Submit Review"}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {
-                setPartnerReviewOrder(null);
-              }}
-              style={{
-                alignItems: "center",
-                paddingVertical: 12,
-                marginTop: 8,
-              }}
-            >
-              <Text style={{ color: "#6B7280", fontSize: 14, fontWeight: "600" }}>
-                Skip
-              </Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 }

@@ -113,7 +113,7 @@ const sp = StyleSheet.create({
 });
 
 // ── Queue card ────────────────────────────────────────────────────────────────
-function QueueCard({ order, onAccept, onDecline, isAccepting }) {
+function QueueCard({ order, onAccept, onDecline, onIgnore, isAccepting }) {
   const { t } = useTranslation();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
@@ -180,8 +180,8 @@ function QueueCard({ order, onAccept, onDecline, isAccepting }) {
         </View>
       </View>
 
-      {/* Timer */}
-      <TimerBar seconds={60} onComplete={() => onDecline(order.orderId)} />
+      {/*  Req will disappear after 15 minutes */}
+      <TimerBar seconds={900} onComplete={() => onIgnore(order.orderId)} />
 
       {/* Buttons */}
       <View style={qc.btnRow}>
@@ -348,15 +348,67 @@ export default function QueueScreen({ navigation }) {
       });
     });
 
-    socket.on('order:removed', (data) => {
-      setQueue(prev => prev.filter(o => o.orderId !== data.orderId));
+    socket.on('order:assigned', (data) => {
+      Vibration.vibrate([0, 200, 100, 200]);
+      playOrderSound();
+      fetchQueuedOrders();
+    });
+
+    socket.on('order:assigned_flash', (data) => {
+      if (data.isQueued) {
+        Vibration.vibrate([0, 200, 100, 200]);
+        playOrderSound();
+        fetchQueuedOrders();
+      }
     });
 
     socket.on('order_assigned_to_delivery', (data) => {
       setQueue(prev => prev.filter(o => o.orderId !== data.order?.id));
     });
 
+    socket.on('order:removed', (data) => {
+      setQueue(prev => prev.filter(o => o.orderId !== data.orderId));
+    });
+
     return () => { socket.disconnect(); socketRef.current = null; };
+  }, [token]);
+
+  const fetchQueuedOrders = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/delivery/queued`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && data.data?.orders) {
+        const mapped = data.data.orders.map((d) => ({
+          orderId: d.order.id,
+          orderNumber: `#${d.order.id}`,
+          total: d.order.total,
+          deliveryFee: d.delivery_fee,
+          pickup: {
+            name: d.order.vendor?.shop_name || d.order.vendor?.user?.name || '',
+            lat: d.order.vendor?.latitude,
+            lng: d.order.vendor?.longitude,
+          },
+          dropoff: {
+            address: d.order.customer?.address || '',
+            city: d.order.customer?.city || '',
+          },
+          status: d.status,
+        }));
+        setQueue((prev) => {
+          const existingIds = new Set(prev.map((o) => o.orderId));
+          const newOrders = mapped.filter((o) => !existingIds.has(o.orderId));
+          return [...newOrders, ...prev];
+        });
+      }
+    } catch (err) {
+      console.log('[QueueScreen] fetchQueuedOrders error:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (token) fetchQueuedOrders();
   }, [token]);
 
   const handleAccept = async (orderId) => {
@@ -382,10 +434,27 @@ export default function QueueScreen({ navigation }) {
     }
   };
 
-  const handleDecline = (orderId) => {
+  const handleDecline = async (orderId) => {
+    console.log(`[QueueScreen] Declining order ${orderId}`);
+    try {
+      const res = await fetch(`${API_BASE}/delivery/decline/${orderId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      console.log(`[QueueScreen] Decline response:`, JSON.stringify(data));
+      if (!data.success) {
+        console.log(`[QueueScreen] Decline FAILED:`, data.message);
+      }
+    } catch (err) {
+      console.log('[QueueScreen] decline error:', err);
+    }
     setQueue(prev => prev.filter(o => o.orderId !== orderId));
     declinedRef.current += 1;
     setSessionStats({ accepted: acceptedRef.current, declined: declinedRef.current });
+  };
+
+  const handleIgnore = (orderId) => {
   };
 
   const acceptRate = sessionStats.accepted + sessionStats.declined === 0
@@ -465,6 +534,7 @@ export default function QueueScreen({ navigation }) {
               order={order}
               onAccept={handleAccept}
               onDecline={handleDecline}
+              onIgnore={handleIgnore}
               isAccepting={acceptingId === order.orderId}
             />
           ))
