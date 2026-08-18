@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, RefreshControl, Switch, Animated,
-  StatusBar, Platform, Alert,
+  StatusBar, Platform, Alert, Modal, Pressable, TextInput
 } from 'react-native';
 import Svg, { G, Path, Rect, Circle, Ellipse, Polygon } from 'react-native-svg';
 import { io } from 'socket.io-client';
