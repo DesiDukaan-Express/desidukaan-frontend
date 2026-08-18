@@ -325,7 +325,7 @@ export default function CartScreen() {
                   <View style={s.itemMid}>
                     <Text style={[s.itemName, { fontSize: Math.round(14 * fs) }]} numberOfLines={1}>{item.name}</Text>
                     {item.unit ? <Text style={[s.itemUnit, { fontSize: Math.round(12 * fs) }]}>{formatWeight(item.unit)}</Text> : null}
-                    <Text style={[s.itemPrice, { fontSize: Math.round(15 * fs) }]}>₹{item.price}</Text>
+                    <Text style={[s.itemPrice, { fontSize: Math.round(15 * fs) }]}>₹{item.price * (item.qty ?? item.quantity ?? 1)}</Text>
                   </View>
                   <View style={[s.qtyRow, { borderRadius: isDesktop ? 12 : 9 }]}>
                     <TouchableOpacity

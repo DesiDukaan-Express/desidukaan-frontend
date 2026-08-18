@@ -117,9 +117,15 @@ export default function DeliveryProfileScreen({ navigation }) {
   useEffect(() => { fetchData(); }, [fetchData]);
   const onRefresh = () => { setRefreshing(true); fetchData(); };
 
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
   const handleLogout = () => {
+    setShowLogoutModal(true);
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutModal(false);
     logout();
-    setShowLogout(false);
   };
 
   if (loading || !fontsLoaded) {
@@ -321,6 +327,57 @@ export default function DeliveryProfileScreen({ navigation }) {
           >
             <View style={{ width: 44, height: 5, backgroundColor: C.gray200, borderRadius: 3, alignSelf: 'center', marginBottom: 16 }} />
             <LanguageSwitcher inline onClose={() => setShowLanguage(false)} />
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Logout Confirmation Modal */}
+      <Modal
+        visible={showLogoutModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLogoutModal(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' }}
+          onPress={() => setShowLogoutModal(false)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: C.white,
+              borderRadius: 20,
+              padding: 24,
+              width: '80%',
+              alignItems: 'center',
+            }}
+            onPress={(e) => e.stopPropagation?.()}
+          >
+            <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray900, marginBottom: 8 }}>
+              {t('profile.logoutConfirmTitle', 'Log out')}
+            </Text>
+            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_500Medium', color: C.gray500, marginBottom: 24, textAlign: 'center' }}>
+              {t('profile.logoutConfirmMsg', 'Are you sure you want to log out?')}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: C.gray200, alignItems: 'center' }}
+                onPress={() => setShowLogoutModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: C.gray700 }}>
+                  {t('delivery.cancel', 'Cancel')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: C.red, alignItems: 'center' }}
+                onPress={confirmLogout}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: C.white }}>
+                  {t('profile.logout', 'Log out')}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>

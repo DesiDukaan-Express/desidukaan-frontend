@@ -1071,8 +1071,8 @@ export default function CheckoutScreen() {
                 total: order.total,
                 note: order.vendor_note,
                 slot: order.delivery_slot ? {
-                  start: order.delivery_slot.vendor_slot_start || order.delivery_slot.slot_start,
-                  end: order.delivery_slot.vendor_slot_end || order.delivery_slot.slot_end,
+                start: order.delivery_slot.vendor_slot_start || order.delivery_slot.slot_start,
+                end: order.delivery_slot.vendor_slot_end || order.delivery_slot.slot_end,
                 } : null,
               });
             }
@@ -1388,9 +1388,10 @@ export default function CheckoutScreen() {
               delivery_fee: order.delivery_fee,
               total: order.total,
               note: order.vendor_note,
-              slot: order.delivery_slot && order.delivery_slot.start_time ? {
-                start: order.delivery_slot.start_time,
-                end: order.delivery_slot.end_time,
+              slot: order.delivery_slot ? {
+                start: order.delivery_slot.vendor_slot_start || order.delivery_slot.slot_start,
+                end: order.delivery_slot.vendor_slot_end || order.delivery_slot.slot_end,
+              
               } : null,
             });
           }
@@ -2792,6 +2793,15 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
             </TouchableOpacity>
           </View>
           <Text style={sm.sub}>{t('checkout.pickTimeSlot', 'Pick a time slot for your delivery')}</Text>
+
+          {vendor?.opening_time && vendor?.closing_time && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.greenLight, borderRadius: 12, padding: 12, marginBottom: 16 }}>
+              <Feather name="clock" size={16} color={C.green} />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: C.greenDark }}>
+                {t('checkout.storeOpen', 'Store open')}: {vendor.opening_time} – {vendor.closing_time}
+              </Text>
+            </View>
+          )}
 
           <View style={{ marginBottom: 18 }}>
             <Text style={{ fontWeight: '700', marginBottom: 10, color: C.gray700 }}>{t('checkout.selectDay', 'Select Day')}</Text>

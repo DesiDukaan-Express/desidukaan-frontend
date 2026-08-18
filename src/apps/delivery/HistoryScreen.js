@@ -47,6 +47,8 @@ const TABS = ['Today', 'This Week', 'This Month'];
 function HistoryCard({ delivery, onRate, onViewRating }) {
   const { t } = useTranslation();
   const isDelivered = delivery.status === 'delivered';
+  const isFailed = delivery.status === 'failed';
+  const isDeclined = delivery.status === 'declined' || delivery.action_type === 'declined';
   const earnings = delivery.partner_earnings || 0;
   const pickupName = delivery.order?.vendor?.shop_name || 'Unknown Store';
   const dropCity = delivery.order?.delivery_address?.city
@@ -60,19 +62,28 @@ function HistoryCard({ delivery, onRate, onViewRating }) {
     ? new Date(orderTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
     : '';
 
+  const cardColor = isDelivered ? C.greenLight : isDeclined ? '#FFF7ED' : C.redLight;
+  const iconColor = isDelivered ? C.greenText : isDeclined ? '#C2410C' : C.redText;
+  const iconChar = isDelivered ? '↓' : isDeclined ? '—' : '✕';
+  const statusLabel = isDelivered
+    ? t('delivery.delivered', 'Delivered')
+    : isDeclined
+      ? t('delivery.declined', 'Declined')
+      : t('delivery.failed', 'Failed');
+
   return (
     <View style={s.card}>
       <View style={s.cardLeft}>
-        <View style={[s.cardIcon, { backgroundColor: isDelivered ? C.greenLight : C.redLight }]}>
-          <Text style={[s.cardIconText, { color: isDelivered ? C.greenText : C.redText }]}>
-            {isDelivered ? '↓' : '✕'}
+        <View style={[s.cardIcon, { backgroundColor: cardColor }]}>
+          <Text style={[s.cardIconText, { color: iconColor }]}>
+            {iconChar}
           </Text>
         </View>
       </View>
       <View style={{ flex: 1 }}>
         <View style={s.cardRow}>
           <Text style={s.cardOrderId} numberOfLines={1}>
-            {delivery.order?.order_number || `#${delivery.id}`}
+            {delivery.order?.order_number || `#${delivery.order_id || delivery.id}`}
           </Text>
           <Text style={[s.cardEarnings, { color: isDelivered ? C.greenDark : C.gray400 }]}>
             {isDelivered ? `+₹${Math.round(earnings)}` : '—'}
@@ -281,6 +292,7 @@ export default function HistoryScreen() {
   const filtered      = filterDeliveries();
   const deliveredCount = filtered.filter(d => d.status === 'delivered').length;
   const failedCount    = filtered.filter(d => d.status === 'failed').length;
+  const declinedCount  = filtered.filter(d => d.status === 'declined' || d.action_type === 'declined').length;
   const totalEarnings  = filtered.reduce((sum, d) =>
     sum + (d.status === 'delivered' ? (d.partner_earnings || 0) : 0), 0);
 
@@ -321,6 +333,11 @@ export default function HistoryScreen() {
           <View style={s.heroStat}>
             <Text style={[s.heroStatValue, { color: '#FCA5A5' }]}>{failedCount}</Text>
             <Text style={s.heroStatLabel}>{t('delivery.failed', 'Failed')}</Text>
+          </View>
+          <View style={s.heroStatDivider} />
+          <View style={s.heroStat}>
+            <Text style={[s.heroStatValue, { color: '#FDBA74' }]}>{declinedCount}</Text>
+            <Text style={s.heroStatLabel}>{t('delivery.declined', 'Declined')}</Text>
           </View>
           <View style={s.heroStatDivider} />
           <View style={s.heroStat}>

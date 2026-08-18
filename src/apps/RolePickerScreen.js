@@ -7,7 +7,6 @@ import {
   Animated,
   Dimensions,
   StatusBar,
-  ActivityIndicator,
   Platform,
   SafeAreaView,
   Modal,
@@ -57,57 +56,6 @@ const ROLES = [
     lockGradient: ["#C7D2FE", "#A5B4FC"],
   },
 ];
-
-// ─── Unlock modal ─────────────────────────────────────────────────────────────
-function UnlockModal({ role, visible, onConfirm, onCancel, loading }) {
-  if (!role) return null;
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={um.backdrop} onPress={onCancel}>
-        <Pressable style={um.card} onPress={() => {}}>
-          <LinearGradient colors={role.gradientColors} style={um.iconCircle}>
-            <RoleIcon role={role} size={32} color="#fff" />
-          </LinearGradient>
-          <Text style={um.title}>Unlock {role.label} Mode</Text>
-          <Text style={um.sub}>
-            Add <Text style={[um.bold, { color: role.gradientColors[0] }]}>{role.label}</Text> access to your account.
-            You can switch between roles anytime.
-          </Text>
-          <View style={um.btns}>
-            <TouchableOpacity style={um.cancel} onPress={onCancel} disabled={loading}>
-              <Text style={um.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[um.confirm, { backgroundColor: role.gradientColors[0] }]}
-              onPress={onConfirm}
-              disabled={loading}
-              activeOpacity={0.85}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={um.confirmText}>Enable</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-const um = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center" },
-  card: { backgroundColor: "#fff", borderRadius: 28, padding: 28, width: W * 0.85, alignItems: "center", gap: 10, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 30, elevation: 20 },
-  iconCircle: { width: 72, height: 72, borderRadius: 22, alignItems: "center", justifyContent: "center", marginBottom: 6 },
-  title: { fontSize: 20, fontWeight: "900", color: "#111827", textAlign: "center" },
-  sub: { fontSize: 13.5, color: "#6B7280", textAlign: "center", lineHeight: 20, paddingHorizontal: 8 },
-  bold: { fontWeight: "800" },
-  btns: { flexDirection: "row", gap: 12, marginTop: 12, width: "100%" },
-  cancel: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: "#F3F4F6", alignItems: "center" },
-  cancelText: { fontSize: 15, fontWeight: "700", color: "#374151" },
-  confirm: { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: "center" },
-  confirmText: { fontSize: 15, fontWeight: "800", color: "#fff" },
-});
 
 // ─── Icon helper ──────────────────────────────────────────────────────────────
 function RoleIcon({ role, size = 28, color = "#fff" }) {
@@ -266,10 +214,8 @@ const rc = StyleSheet.create({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function RolePickerScreen({ onRolePicked }) {
-  const { user, enabledRoles, setActiveRole, enableRole, logout } = useAuthStore();
+  const { user, enabledRoles, setActiveRole, logout } = useAuthStore();
 
-  const [unlockTarget, setUnlockTarget] = useState(null);
-  const [unlocking, setUnlocking]       = useState(false);
   const [logoutModal, setLogoutModal]   = useState(false);
 
   // ── Entry animations
@@ -299,21 +245,6 @@ export default function RolePickerScreen({ onRolePicked }) {
   const handleRoleTap = async (role) => {
     await setActiveRole(role.key);
     onRolePicked(role.key);
-  };
-
-  // ── Handle unlock confirm
-  const handleUnlockConfirm = async () => {
-    if (!unlockTarget) return;
-    setUnlocking(true);
-    const result = await enableRole(unlockTarget.key);
-    setUnlocking(false);
-    if (result.success) {
-      setUnlockTarget(null);
-      await setActiveRole(unlockTarget.key);
-      onRolePicked(unlockTarget.key);
-    } else {
-      Alert.alert("Couldn't unlock", result.msg || "Please try again.");
-    }
   };
 
   return (
@@ -373,15 +304,6 @@ export default function RolePickerScreen({ onRolePicked }) {
           <Text style={s.hint}>Locked roles can be enabled with one tap</Text>
         </Animated.View>
       </SafeAreaView>
-
-      {/* ── Unlock modal */}
-      <UnlockModal
-        role={unlockTarget}
-        visible={!!unlockTarget}
-        onConfirm={handleUnlockConfirm}
-        onCancel={() => setUnlockTarget(null)}
-        loading={unlocking}
-      />
 
       {/* ── Logout confirm modal */}
       <Modal visible={logoutModal} transparent animationType="fade" onRequestClose={() => setLogoutModal(false)}>

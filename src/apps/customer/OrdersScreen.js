@@ -14,6 +14,7 @@ import {
   Pressable,
   Animated,
   Linking,
+  Dimensions,
 } from "react-native";
 import { Feather, FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -34,6 +35,8 @@ import useDriverLocation from "../../hooks/useDriverLocation";
 import CustomerMapView from "../../components/CustomerMapView";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+
+const TIP_PRESETS = [10, 20, 50, 100];
 
 const C = {
   yellow: "#F59E0B",
@@ -260,7 +263,23 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
 
   const isLocating = !partnerPos;
 
+  // Distance & ETA from driver to customer
+  const distKm = partnerPos?.lat && destLat && destLng
+    ? haversineKm(partnerPos.lat, partnerPos.lng, destLat, destLng)
+    : null;
+  const distDisplay = distKm != null ? Number(distKm) : null;
+  const etaMins = distDisplay != null ? Math.max(2, Math.round(distDisplay * 4)) : null;
+  const etaLabel = etaMins != null
+    ? etaMins < 60
+      ? `~${etaMins} min`
+      : (() => { const h = Math.floor(etaMins / 60); const m = etaMins % 60; return m > 0 ? `~${h}h ${m}m` : `~${h}h`; })()
+    : null;
+
+  const [showFullMap, setShowFullMap] = useState(false);
+  const SCREEN_H = Dimensions.get("window").height;
+
   return (
+    <>
     <View style={dlm.card}>
       {/* Card header */}
       <View style={dlm.header}>
@@ -270,9 +289,19 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
           </View>
           <Text style={dlm.headerTitle}>Driver Location</Text>
         </View>
-        <View style={dlm.liveBadge}>
-          <Animated.View style={[dlm.liveDot, { opacity: pulseAnim }]} />
-          <Text style={dlm.liveText}>LIVE</Text>
+        <View style={dlm.headerRight}>
+          <TouchableOpacity
+            style={dlm.viewBtn}
+            onPress={() => setShowFullMap(true)}
+            activeOpacity={0.7}
+          >
+            <Feather name="maximize-2" size={13} color={C.green} />
+            <Text style={dlm.viewBtnText}>View</Text>
+          </TouchableOpacity>
+          <View style={dlm.liveBadge}>
+            <Animated.View style={[dlm.liveDot, { opacity: pulseAnim }]} />
+            <Text style={dlm.liveText}>LIVE</Text>
+          </View>
         </View>
       </View>
 
@@ -283,6 +312,19 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
           destLat={destLat}
           destLng={destLng}
         />
+
+        {/* Arriving banner on map */}
+        {partnerPos && etaMins != null && (
+          <View style={dlm.mapArriveBanner}>
+            <Feather name="navigation" size={14} color={C.green} />
+            <Text style={dlm.mapArriveText}>
+              Arriving in{" "}
+              <Text style={dlm.mapArriveBold}>
+                ~{etaMins} {etaMins === 1 ? "min" : "mins"}
+              </Text>
+            </Text>
+          </View>
+        )}
 
         {/* Locating overlay — shown until first position arrives */}
         {isLocating && (
@@ -319,6 +361,93 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
         )}
       </View>
     </View>
+
+    {/* ── Full-Screen Map Modal ── */}
+    <Modal
+      visible={showFullMap}
+      animationType="slide"
+      onRequestClose={() => setShowFullMap(false)}
+    >
+      <View style={dlm.fullScreenWrap}>
+        {/* Header row */}
+        <View style={dlm.fullMapHeader}>
+          <View style={dlm.fullMapHeaderLeft}>
+            <View style={dlm.mapIconBg}>
+              <Feather name="map" size={14} color={C.green} />
+            </View>
+            <Text style={dlm.fullMapTitle}>Live Tracking</Text>
+          </View>
+          <View style={dlm.fullMapHeaderRight}>
+            {partnerPos && (
+              <View style={dlm.fullMapLiveBadge}>
+                <Animated.View style={[dlm.liveDot, { opacity: pulseAnim }]} />
+                <Text style={dlm.liveText}>LIVE</Text>
+              </View>
+            )}
+            <TouchableOpacity
+              style={dlm.fullMapCloseBtn}
+              onPress={() => setShowFullMap(false)}
+              activeOpacity={0.7}
+            >
+              <Feather name="x" size={18} color={C.white} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Arriving banner on full map */}
+        {partnerPos && etaMins != null && (
+          <View style={dlm.fullMapArriveBanner}>
+            <Feather name="navigation" size={15} color={C.green} />
+            <Text style={dlm.fullMapArriveText}>
+              Arriving in{" "}
+              <Text style={dlm.fullMapArriveBold}>
+                ~{etaMins} {etaMins === 1 ? "min" : "mins"}
+              </Text>
+            </Text>
+          </View>
+        )}
+
+        {/* Full map — fills remaining space */}
+          <View style={dlm.fullMapContainer}>
+            <CustomerMapView
+              partnerPos={partnerPos}
+              destLat={destLat}
+              destLng={destLng}
+              style={{ height: "100%", borderRadius: 0 }}
+            />
+
+          {/* Locating overlay */}
+          {isLocating && (
+            <View style={dlm.locatingOverlayFull}>
+              <ActivityIndicator size="small" color={C.green} />
+              <Text style={dlm.locatingText}>
+                {hasDriver ? "Locating driver…" : "Waiting for driver assignment…"}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Bottom info bar */}
+        <View style={dlm.fullMapInfoBar}>
+          <View style={dlm.fullMapInfoLeft}>
+            <View style={[dlm.connDot, { backgroundColor: connected ? C.green : C.gray300 }]} />
+            <Text style={dlm.fullMapInfoText}>
+              {connected ? "Connected — live updates" : "Reconnecting…"}
+            </Text>
+          </View>
+          {lastUpdate && (
+            <Text style={dlm.fullMapInfoTime}>
+              {lastUpdate.toLocaleTimeString("en-IN", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
+            </Text>
+          )}
+        </View>
+      </View>
+    </Modal>
+    </>
   );
 }
 
@@ -396,7 +525,16 @@ const dlm = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     zIndex: 10,
-    minHeight: 220,
+    minHeight: 280,
+  },
+  locatingOverlayFull: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(248,250,252,0.88)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    zIndex: 10,
   },
   locatingText: {
     fontSize: 13,
@@ -429,6 +567,158 @@ const dlm = StyleSheet.create({
     color: C.gray400,
     fontWeight: "500",
   },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  viewBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: C.white,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.greenBorder,
+  },
+  viewBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.green,
+  },
+  // ── Half-Screen Map Modal ──
+  fullScreenWrap: {
+    flex: 1,
+    backgroundColor: C.gray50,
+  },
+  fullMapHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 10,
+    backgroundColor: C.green,
+  },
+  fullMapHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  fullMapHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  fullMapTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: C.white,
+  },
+  fullMapLiveBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: C.green,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  fullMapCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fullMapContainer: {
+    flex: 1,
+    position: "relative",
+  },
+  fullMapInfoBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: C.white,
+  },
+  fullMapInfoLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  fullMapInfoText: {
+    fontSize: 12,
+    color: C.gray500,
+    fontWeight: "500",
+  },
+  fullMapInfoTime: {
+    fontSize: 11,
+    color: C.gray400,
+    fontWeight: "500",
+  },
+  mapArriveBanner: {
+    position: "absolute",
+    top: 10,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: C.white,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 6,
+    zIndex: 20,
+  },
+  mapArriveText: {
+    fontSize: 13,
+    color: C.gray600,
+    fontWeight: "500",
+  },
+  mapArriveBold: {
+    fontSize: 16,
+    color: C.green,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+  },
+  fullMapArriveBanner: {
+    position: "absolute",
+    top: 60,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: C.white,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 26,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 8,
+    zIndex: 20,
+  },
+  fullMapArriveText: {
+    fontSize: 14,
+    color: C.gray600,
+    fontWeight: "500",
+  },
+  fullMapArriveBold: {
+    fontSize: 18,
+    color: C.green,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+  },
 });
 
 // ─── Order Detail Modal ───────────────────────────────────────────────────────
@@ -439,6 +729,13 @@ function OrderDetailModal({ order, onClose }) {
   const [fullOrder, setFullOrder] = useState(null);
   const [fetching, setFetching] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [tipSent, setTipSent] = useState(false);
+  const [feedbackSent, setFeedbackSent] = useState(false);
+  const [selectedTip, setSelectedTip] = useState(null);
+  const [customTip, setCustomTip] = useState("");
+  const [tipSending, setTipSending] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackSending, setFeedbackSending] = useState(false);
   const showMap = MAP_ACTIVE_STATUSES.includes(order?.status);
 
   useEffect(() => {
@@ -473,6 +770,47 @@ function OrderDetailModal({ order, onClose }) {
       console.error("Invoice error:", e);
     } finally {
       setGenerating(false);
+    }
+  };
+
+  // Reset tip/feedback state whenever a different order is opened
+  useEffect(() => {
+    setTipSent(false);
+    setFeedbackSent(false);
+    setSelectedTip(null);
+    setCustomTip("");
+    setFeedbackText("");
+  }, [order?.id]);
+
+  const handleSendTip = () => {
+    if (!(selectedTip || customTip)) return;
+    Alert.alert("Tipping coming soon", "Tips aren't available yet. Hang tight!");
+  };
+
+  const handleSendFeedback = async () => {
+    const text = feedbackText.trim();
+    if (!text) return;
+    setFeedbackSending(true);
+    try {
+      const res = await fetch(`${BASE_URL}/orders/${order.id}/review`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ comment: text }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFeedbackSent(true);
+      } else {
+        Alert.alert("Error", data.message || "Failed to submit feedback.");
+      }
+    } catch (e) {
+      console.error("Feedback error:", e);
+      Alert.alert("Error", "Failed to submit feedback.");
+    } finally {
+      setFeedbackSending(false);
     }
   };
 
@@ -533,6 +871,7 @@ function OrderDetailModal({ order, onClose }) {
   const stepIdx = stepIndex(order.status);
   const isFailed = order.status === "cancelled" || order.status === "rejected";
   const isDelivered = order?.status === "delivered";
+  const canTip = order?.status === "picked_up" || order?.status === "delivered";
   const items = displayOrder.order_items || displayOrder.items || [];
   const subtotal = displayOrder.subtotal || 0;
   const deliveryFee = displayOrder.delivery_fee ?? 20;
@@ -580,7 +919,14 @@ function OrderDetailModal({ order, onClose }) {
                   <Text style={od.statusTitle}>
                     {isActive
                       ? partnerPos?.lat
-                        ? `Arriving in ~${liveEtaMins} ${liveEtaMins === 1 ? "min" : "mins"}`
+                        ? (
+                          <>
+                            {"Arriving in "}
+                            <Text style={od.statusEtaBold}>
+                              ~{liveEtaMins} {liveEtaMins === 1 ? "min" : "mins"}
+                            </Text>
+                          </>
+                        )
                         : hasDriver
                           ? "Locating driver…"
                           : order?.status === "ready"
@@ -613,10 +959,124 @@ function OrderDetailModal({ order, onClose }) {
                   partnerPos={partnerPos}
                   connected={connected}
                   lastUpdate={lastUpdate}
-                />
+/>
               )}
 
-              {/* ── Delivery Partner Card — shown when partner is assigned ── */}
+              {/* ── TIP & FEEDBACK SECTION ── */}
+              {canTip && (
+                <View style={od.tipFeedbackCard}>
+                  {/* ── Tipping ── */}
+                  {!tipSent ? (
+                    <>
+                      <View style={od.tfHeader}>
+                        <View style={od.tfIconBg}>
+                          <Feather name="heart" size={18} color={C.orange} />
+                        </View>
+                        <View>
+                          <Text style={od.tfTitle}>{t('orders.tipTitle', 'Show some love')}</Text>
+                          <Text style={od.tfSubtitle}>{t('orders.tipSubtitle', 'Thank your delivery partner')}</Text>
+                        </View>
+                      </View>
+                      <View style={od.tipPresets}>
+                        {TIP_PRESETS.map((amt) => (
+                          <TouchableOpacity
+                            key={amt}
+                            style={[od.tipPresetBtn, selectedTip === amt && od.tipPresetBtnActive]}
+                            onPress={() => { setSelectedTip(amt); setCustomTip(""); }}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[od.tipPresetRupee, selectedTip === amt && od.tipPresetRupeeActive]}>₹</Text>
+                            <Text style={[od.tipPresetAmount, selectedTip === amt && od.tipPresetAmountActive]}>{amt}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <View style={od.tipCustomRow}>
+                        <View style={od.tipCustomInputWrap}>
+                          <Text style={od.tipCurrency}>₹</Text>
+                          <TextInput
+                            style={od.tipCustomInput}
+                            placeholder={t('orders.customTip', 'Custom amount')}
+                            placeholderTextColor={C.gray400}
+                            keyboardType="number-pad"
+                            maxLength={4}
+                            value={customTip}
+                            onChangeText={(t) => { setCustomTip(t); setSelectedTip(null); }}
+                          />
+                        </View>
+                        <TouchableOpacity
+                          style={[od.tipSendBtn, (!(selectedTip || customTip) || tipSending) && { opacity: 0.5 }]}
+                          onPress={handleSendTip}
+                          disabled={!(selectedTip || customTip) || tipSending}
+                          activeOpacity={0.7}
+                        >
+                          {tipSending ? (
+                            <ActivityIndicator size="small" color={C.white} />
+                          ) : (
+                            <>
+                              <Feather name="heart" size={14} color={C.white} />
+                              <Text style={od.tipSendBtnText}>{t('orders.sendTip', 'Send Tip')}</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : (
+                    <View style={od.tipSuccess}>
+                      <Feather name="heart" size={24} color={C.green} />
+                      <Text style={od.tipSuccessText}>{t('orders.tipThanks', 'Thank you for tipping!')}</Text>
+                    </View>
+                  )}
+
+                  {/* ── Divider ── */}
+                  <View style={od.tfDivider} />
+
+                  {/* ── Feedback — only after delivery ── */}
+                  {isDelivered ? (
+                    !feedbackSent ? (
+                      <>
+                        <View style={od.tfHeader}>
+                          <View style={od.tfIconBg}>
+                            <Feather name="message-circle" size={18} color={C.orange} />
+                          </View>
+                          <View>
+                            <Text style={od.tfTitle}>{t('orders.feedbackTitle', 'Leave Feedback')}</Text>
+                            <Text style={od.tfSubtitle}>{t('orders.feedbackSubtitle', 'How was your delivery?')}</Text>
+                          </View>
+                        </View>
+                        <View style={od.feedbackRow}>
+                          <TextInput
+                            style={od.feedbackInput}
+                            placeholder={t('orders.feedbackPlaceholder', 'Great delivery, polite partner…')}
+                            placeholderTextColor={C.gray400}
+                            value={feedbackText}
+                            onChangeText={setFeedbackText}
+                            maxLength={200}
+                          />
+                          <TouchableOpacity
+                            style={[od.feedbackSendBtn, (!feedbackText.trim() || feedbackSending) && { opacity: 0.5 }]}
+                            onPress={handleSendFeedback}
+                            disabled={!feedbackText.trim() || feedbackSending}
+                            activeOpacity={0.7}
+                          >
+                            {feedbackSending ? (
+                              <ActivityIndicator size="small" color={C.white} />
+                            ) : (
+                              <Feather name="send" size={16} color={C.white} />
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                      </>
+                    ) : (
+                      <View style={od.tipSuccess}>
+                        <Feather name="check-circle" size={24} color={C.green} />
+                        <Text style={od.tipSuccessText}>{t('orders.feedbackThanks', 'Feedback sent!')}</Text>
+                      </View>
+                    )
+                  ) : null}
+                </View>
+              )}
+
+              {/* ── Delivery Partner Card ── */}
               {hasDriver && isActive && (
                 <View style={od.partnerInfoCard}>
                   <View style={od.partnerAvatar}>
@@ -979,6 +1439,15 @@ const od = StyleSheet.create({
     color: C.white,
     lineHeight: 21,
   },
+  statusEtaBold: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: C.white,
+    letterSpacing: 0.3,
+    textShadowColor: "rgba(0,0,0,0.25)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
   statusLivePill: {
     flexDirection: "row",
     alignItems: "center",
@@ -1317,6 +1786,156 @@ const od = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: C.gray600,
+  },
+
+  // ── Tip & Feedback Modal Styles ──
+  tipFeedbackCard: {
+    backgroundColor: C.white,
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    marginBottom: 16,
+  },
+  tfHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 14,
+  },
+  tfIconBg: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#FFF7ED",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  
+  tfTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: C.gray900,
+  },
+  tfSubtitle: {
+    fontSize: 12,
+    color: C.gray500,
+  },
+  tipPresets: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
+  },
+  tipPresetBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: C.greenLight,
+    borderWidth: 2,
+    borderColor: C.greenBorder,
+  },
+  tipPresetBtnActive: {
+    backgroundColor: C.green,
+    borderColor: C.green,
+  },
+  tipPresetRupee: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.green,
+  },
+  tipPresetRupeeActive: {
+    color: "rgba(255,255,255,0.8)",
+  },
+  tipPresetAmount: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: C.greenDark,
+    marginTop: 2,
+  },
+  tipPresetAmountActive: {
+    color: C.white,
+  },
+  tipCustomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  tipCustomInputWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 48,
+  },
+  tipCurrency: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: C.gray500,
+    marginRight: 4,
+  },
+  tipCustomInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+    color: C.gray900,
+    paddingVertical: 0,
+  },
+  tipSendBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: C.green,
+    paddingHorizontal: 20,
+    height: 48,
+    borderRadius: 14,
+  },
+  tipSendBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: C.white,
+  },
+  tipSuccess: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 20,
+  },
+  tipSuccessText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: C.green,
+  },
+  tfDivider: {
+    height: 1,
+    backgroundColor: C.gray100,
+    marginVertical: 16,
+  },
+  feedbackRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  feedbackInput: {
+    flex: 1,
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    fontSize: 14,
+    color: C.gray900,
+  },
+  feedbackSendBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: C.green,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
 
