@@ -41,6 +41,10 @@ export default function Navigation() {
   const checkVendorStatus = useAuthStore((s) => s.checkVendorStatus);
   const flagVendorSuspended = useAuthStore((s) => s.flagVendorSuspended);
   const clearVendorSuspended = useAuthStore((s) => s.clearVendorSuspended);
+  const deliverySuspended = useAuthStore((s) => s.deliverySuspended);
+  const checkDeliveryStatus = useAuthStore((s) => s.checkDeliveryStatus);
+  const flagDeliverySuspended = useAuthStore((s) => s.flagDeliverySuspended);
+  const clearDeliverySuspended = useAuthStore((s) => s.clearDeliverySuspended);
 
   const [vendorOnboarded,    setVendorOnboarded]    = useState(null);
   const [deliveryOnboarded,  setDeliveryOnboarded]  = useState(null);
@@ -161,6 +165,14 @@ export default function Navigation() {
         clearVendorSuspended();
         if (activeRole === "vendor") checkVendorProfile();
       });
+      socket.on("delivery:suspended", () => {
+        flagDeliverySuspended();
+        if (activeRole === "delivery") checkDeliveryProfile();
+      });
+      socket.on("delivery:reactivated", () => {
+        clearDeliverySuspended();
+        if (activeRole === "delivery") checkDeliveryProfile();
+      });
     } catch (err) {
       // Socket init failed — poll + login/refresh checks still cover both directions.
     }
@@ -168,7 +180,7 @@ export default function Navigation() {
     return () => {
       if (socket) socket.disconnect();
     };
-  }, [isAuthenticated, token, activeRole, flagDeactivated, clearDeactivation, flagVendorSuspended, clearVendorSuspended, checkVendorProfile]);
+  }, [isAuthenticated, token, activeRole, flagDeactivated, clearDeactivation, flagVendorSuspended, clearVendorSuspended, flagDeliverySuspended, clearDeliverySuspended, checkVendorProfile]);
 
   const checkDeliveryProfile = async () => {
     setCheckingOnboard(true);
@@ -180,6 +192,11 @@ export default function Navigation() {
       const profile = data.data?.profile;
       if (profile) {
         useAuthStore.getState().addEnabledRole("delivery");
+        if (profile.is_active === false) {
+          flagDeliverySuspended();
+        } else {
+          clearDeliverySuspended();
+        }
       }
       if (!profile?.onboarding_submitted) {
         setDeliveryOnboarded('not_submitted');
@@ -212,13 +229,16 @@ export default function Navigation() {
     );
   }
 
-  // ── Hard gate: account deactivated → block the entire app ────────────────
-  if (accountDeactivated) {
+  // ── Role-Scoped Hard Gates: suspension blocks apply ONLY to activeRole ────────
+  if (accountDeactivated && activeRole === "customer") {
     return <AccountDeactivatedScreen />;
   }
 
-  // ── Hard gate: vendor shop suspended → block the vendor app ──────────────
   if (vendorSuspended && activeRole === "vendor") {
+    return <AccountSuspendedScreen />;
+  }
+
+  if (deliverySuspended && activeRole === "delivery") {
     return <AccountSuspendedScreen />;
   }
 

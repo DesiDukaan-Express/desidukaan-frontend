@@ -2500,7 +2500,7 @@ export default function VendorOrdersScreen() {
                       <Text style={omStyles.acceptBtnText}>{t('vendor.markReady', 'Mark as Ready')}</Text>
                     </TouchableOpacity>
                   )}
-                  {selectedOrder?.status === "ready" && (
+                  {['accepted', 'preparing', 'ready'].includes(selectedOrder?.status) && (
                     <TouchableOpacity
                       style={[
                         omStyles.acceptBtn,

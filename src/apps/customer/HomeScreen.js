@@ -1132,7 +1132,7 @@ function CategoryBrowseSheet({
   const subCatItems = React.useMemo(() => {
     if (!category || !hierarchy) return [];
     const targetCat = activeSubCat || category;
-    
+
     let items = [];
     if (hierarchy[targetCat]) {
       Object.keys(hierarchy[targetCat]).forEach(k => {
@@ -1226,9 +1226,11 @@ function CategoryBrowseSheet({
               </Text>
               <View style={cbs.subCatGrid}>
                 {currentChildSubCats.map(sc => {
+                  const subCatNode = findCategoryNode(apiCategories, sc);
                   const subItems = hierarchy[category]?.[sc] || hierarchy[sc]?.["All"] || (hierarchy[sc] ? Object.values(hierarchy[sc]).flat() : []);
                   const count = subItems.length;
                   const firstItemImg = subItems[0]?.product?.image_url;
+                  const displayImg = subCatNode?.image_url || subCatNode?.image || firstItemImg;
 
                   return (
                     <TouchableOpacity
@@ -1238,8 +1240,8 @@ function CategoryBrowseSheet({
                       activeOpacity={0.85}
                     >
                       <View style={[cbs.subCatCardIconWrap, { backgroundColor: catAccent.bg }]}>
-                        {firstItemImg ? (
-                          <Image source={{ uri: firstItemImg }} style={cbs.subCatCardImg} resizeMode="cover" />
+                        {displayImg ? (
+                          <Image source={{ uri: displayImg }} style={cbs.subCatCardImg} resizeMode="cover" />
                         ) : (
                           <Text style={cbs.subCatCardEmoji}>{catAccent.icon || "📂"}</Text>
                         )}
@@ -1659,16 +1661,27 @@ function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPre
   const hasMrp = item.orig && item.orig > item.price;
   const discPct = hasMrp ? Math.round((1 - item.price / item.orig) * 100) : 0;
   const loose = isLooseItem(item);
+  const available = item.isAvailableNearby !== false;
 
   return (
-    <TouchableOpacity style={pic.card} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity
+      style={[pic.card, !available && { opacity: 0.55 }]}
+      onPress={available ? onPress : undefined}
+      activeOpacity={available ? 0.85 : 1}
+    >
       {/* ── Image section ── */}
       <View style={[pic.imgWrap, { height: IMG_H }]}>
-        {/* Discount badge – top-left */}
-        {hasMrp && (
-          <View style={pic.discBadge}>
-            <Text style={pic.discBadgeText}>{t("home.discountOffUpper", { count: discPct })}</Text>
+        {/* Out of stock or Discount badge – top-left */}
+        {!available ? (
+          <View style={[pic.discBadge, { backgroundColor: "#EF4444", left: 6, top: 6 }]}>
+            <Text style={pic.discBadgeText}>Out of stock</Text>
           </View>
+        ) : (
+          hasMrp && (
+            <View style={pic.discBadge}>
+              <Text style={pic.discBadgeText}>{t("home.discountOffUpper", { count: discPct })}</Text>
+            </View>
+          )
         )}
         {/* Loose badge – top-right */}
         {loose && (
@@ -1702,7 +1715,11 @@ function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPre
             {hasMrp && <Text style={pic.orig}>₹{item.orig}</Text>}
           </View>
 
-          {qty === 0 ? (
+          {!available ? (
+            <View style={[pic.addBtn, { backgroundColor: "#9CA3AF" }]}>
+              <Text style={{ color: "#FFF", fontSize: 10, fontWeight: "700" }}>N/A</Text>
+            </View>
+          ) : qty === 0 ? (
             <TouchableOpacity
               style={pic.addBtn}
               onPress={() => {
@@ -1934,6 +1951,9 @@ function WeightPickerModal({ item, onClose, onAdd }) {
 
   if (!item) return null;
 
+  const selectedWeightStr = formatWeight(selected);
+  const selectedPrice = calculateProportionalPrice(item.price, selectedWeightStr, item.unit || "1kg");
+
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={wp.backdrop} onPress={onClose}>
@@ -1953,8 +1973,10 @@ function WeightPickerModal({ item, onClose, onAdd }) {
               </View>
               <Text style={wp.productName} numberOfLines={2}>{item.name}</Text>
               <Text style={wp.basePriceText}>
-                ₹{item.price}{" "}
-                <Text style={wp.perUnit}>{t("home.perUnit", { unit: item.unit || "unit" })}</Text>
+                ₹{selectedPrice}{" "}
+                <Text style={wp.perUnit}>
+                  for {selectedWeightStr} (₹{item.price}/{item.unit || "1kg"})
+                </Text>
               </Text>
             </View>
           </View>
@@ -1965,6 +1987,7 @@ function WeightPickerModal({ item, onClose, onAdd }) {
             {weightOptions.map(w => {
               const formatted = formatWeight(w);
               const isActive = selected === w;
+              const chipPrice = calculateProportionalPrice(item.price, formatted, item.unit || "1kg");
               return (
                 <TouchableOpacity
                   key={formatted}
@@ -1972,7 +1995,9 @@ function WeightPickerModal({ item, onClose, onAdd }) {
                   onPress={() => setSelected(w)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[wp.chipText, isActive && wp.chipTextActive]}>{formatted}</Text>
+                  <Text style={[wp.chipText, isActive && wp.chipTextActive]}>
+                    {formatted} • ₹{chipPrice}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
@@ -1990,7 +2015,9 @@ function WeightPickerModal({ item, onClose, onAdd }) {
               style={wp.addBtnGrad}
             >
               <MaterialIcons name="shopping-cart" size={16} color={C.white} />
-              <Text style={wp.addBtnText}>{t("home.addWeightToCart", { weight: formatWeight(selected) })}</Text>
+              <Text style={wp.addBtnText}>
+                Add {selectedWeightStr} to Cart • ₹{selectedPrice}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         </Pressable>
@@ -2483,12 +2510,12 @@ export default function HomeScreen() {
           const f = fresh.find((x) => x.id === v.id);
           return f
             ? {
-                ...v,
-                is_open: f.is_open,
-                opening_time: f.opening_time,
-                closing_time: f.closing_time,
-                is_currently_open: f.is_currently_open,
-              }
+              ...v,
+              is_open: f.is_open,
+              opening_time: f.opening_time,
+              closing_time: f.closing_time,
+              is_currently_open: f.is_currently_open,
+            }
             : v;
         }),
       );
@@ -2683,41 +2710,48 @@ export default function HomeScreen() {
     [allInventoryItems, getCategoryName, apiCategories],
   );
 
-  // ── Popular items — API-based with inventory fallback ─────────────────────
+  // ── Popular items — show all items & check nearby store availability ──────
   const popularItems = useMemo(() => {
-    if (popularFromAPI.length > 0) return popularFromAPI;
-
-    // Fallback: derive from inventory, deduplicate by product ID
     const seen = new Set();
-    const vendorCount = {};
-    const itemMap = {};
+    const items = [];
 
+    // First add all inventory items
     allInventoryItems.forEach((inv) => {
       const p = inv.product;
-      if (!p?.id) return;
+      if (!p?.id || seen.has(p.id)) return;
+      seen.add(p.id);
       const catName = getCategoryName(inv) || "Other";
-      vendorCount[p.id] = (vendorCount[p.id] || 0) + 1;
-      if (!seen.has(p.id)) {
-        seen.add(p.id);
-        itemMap[p.id] = {
-          id: p.id,
-          name: p.name,
-          unit: p.unit || "1 pc",
-          price: p.price,
-          orig: p.mrp != null && p.mrp > p.price ? p.mrp : null,
-          img: p.image_url || null,
-          category: catName,
-          item_type: p.item_type,
-          weight_options: p.weight_options,
-        };
-      }
+
+      items.push({
+        id: p.id,
+        name: p.name,
+        unit: p.unit || "1 pc",
+        price: p.price,
+        orig: p.mrp != null && p.mrp > p.price ? p.mrp : null,
+        img: p.image_url || null,
+        category: catName,
+        item_type: p.item_type,
+        weight_options: p.weight_options,
+        isAvailableNearby: true,
+      });
     });
 
-    return Object.entries(vendorCount)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 12)
-      .map(([id]) => itemMap[Number(id)])
-      .filter(Boolean);
+    // Next add API products if available, marking whether available in nearby inventory
+    if (popularFromAPI.length > 0) {
+      popularFromAPI.forEach((p) => {
+        if (!p?.id || seen.has(p.id)) return;
+        seen.add(p.id);
+        const hasNearby = allInventoryItems.some(
+          (inv) => Number(inv.product_id || inv.product?.id) === Number(p.id)
+        );
+        items.push({
+          ...p,
+          isAvailableNearby: hasNearby,
+        });
+      });
+    }
+
+    return items;
   }, [popularFromAPI, allInventoryItems, getCategoryName]);
 
   // ── Address Handlers ────────────────────────────────────────────────────────
@@ -3298,128 +3332,132 @@ export default function HomeScreen() {
               paddingBottom: 6,
             }}
           >
-            {vendors.map((vendor) => (
-              <TouchableOpacity
-                key={vendor.id}
-                style={[s.storeCard, wide && s.storeCardWide]}
-                onPress={() =>
-                  navigation.navigate("VendorStore", {
-                    vendorId: vendor.id,
-                    vendorName: vendor.shop_name,
-                  })
-                }
-                activeOpacity={0.88}
-              >
-                {/* Everything except the CLOSED badge — dimmed when closed */}
-                <View
-                  style={[
-                    s.cardContent,
-                    !isStoreCurrentlyOpen(vendor) && s.cardContentClosed,
-                  ]}
+            {vendors.map((vendor) => {
+              const isOpen = isStoreCurrentlyOpen(vendor);
+              return (
+                <TouchableOpacity
+                  key={vendor.id}
+                  style={[s.storeCard, wide && s.storeCardWide]}
+                  disabled={!isOpen}
+                  onPress={isOpen ? () =>
+                    navigation.navigate("VendorStore", {
+                      vendorId: vendor.id,
+                      vendorName: vendor.shop_name,
+                    })
+                    : undefined}
+                  activeOpacity={isOpen ? 0.88 : 1}
                 >
-                <View style={s.storeImgWrap}>
-                  <Image
-                    source={{
-                      uri:
-                        vendor.shop_image_url ||
-                        `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${vendor.id}`,
-                    }}
-                    style={s.storeImg}
-                  />
-                  <LinearGradient
-                    colors={["transparent", "rgba(0,0,0,0.5)"]}
-                    style={s.storeImgOverlay}
-                  />
-                  <View style={s.ratingBadge}>
-                    <MaterialIcons name="star" size={10} color="#FBBF24" />
-                    <Text style={s.ratingText}>
-                      {vendor.avg_rating
-                        ? parseFloat(vendor.avg_rating).toFixed(1)
-                        : t("home.new")}
-                    </Text>
-                  </View>
-                </View>
-                <View style={s.storeInfo}>
-                  <Text style={s.storeName} numberOfLines={1}>
-                    {vendor.shop_name}
-                  </Text>
-                  <View style={s.storeMetaRow}>
-                    <MaterialIcons name="location-on" size={10} color={C.green} />
-                    <Text style={s.storeMeta}>
-                      {vendor.distance_km
-                        ? t("home.kmDistance", { count: parseFloat(vendor.distance_km).toFixed(1) })
-                        : t("home.nearby")}
-                    </Text>
-                    <View style={s.metaDot} />
-                    <MaterialIcons name="access-time" size={10} color={C.gray400} />
-                    <Text style={s.storeMeta}>{t("home.deliveryTime")}</Text>
-                  </View>
-                  <View style={s.storeTagRow}>
-                    {/* Min order — orange pill */}
-                    <View style={[s.storeTag, { backgroundColor: C.orangeLight, borderColor: "#FED7AA" }]}>
-                      <Text style={[s.storeTagText, { color: C.orangeDark }]}>
-                        {t("home.minOrder", { min: vendor.min_order || 99 })}
-                      </Text>
-                    </View>
-                    {isStoreCurrentlyOpen(vendor) && (
-                      <View
-                        style={[
-                          s.storeTag,
-                          {
-                            backgroundColor: C.greenLight,
-                            borderColor: C.greenBorder,
-                          },
-                        ]}
-                      >
-                        <Text style={[s.storeTagText, { color: C.green }]}>
-                          {t("home.acceptingOrders")}
+                  {/* Everything except the CLOSED badge — dimmed when closed */}
+                  <View
+                    style={[
+                      s.cardContent,
+                      !isStoreCurrentlyOpen(vendor) && s.cardContentClosed,
+                    ]}
+                  >
+                    <View style={s.storeImgWrap}>
+                      <Image
+                        source={{
+                          uri:
+                            vendor.shop_image_url ||
+                            `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${vendor.id}`,
+                        }}
+                        style={s.storeImg}
+                      />
+                      <LinearGradient
+                        colors={["transparent", "rgba(0,0,0,0.5)"]}
+                        style={s.storeImgOverlay}
+                      />
+                      <View style={s.ratingBadge}>
+                        <MaterialIcons name="star" size={10} color="#FBBF24" />
+                        <Text style={s.ratingText}>
+                          {vendor.avg_rating
+                            ? parseFloat(vendor.avg_rating).toFixed(1)
+                            : t("home.new")}
                         </Text>
                       </View>
-                    )}
-                    {vendor.vendor_type && vendor.vendor_type !== "all" &&
-                      VENDOR_TYPE_META[vendor.vendor_type] && (
-                        <View
-                          style={[
-                            s.storeTag,
-                            {
-                              backgroundColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
-                              borderColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              s.storeTagText,
-                              { color: VENDOR_TYPE_META[vendor.vendor_type].color },
-                            ]}
-                          >
-                            {VENDOR_TYPE_META[vendor.vendor_type].label}
+                    </View>
+                    <View style={s.storeInfo}>
+                      <Text style={s.storeName} numberOfLines={1}>
+                        {vendor.shop_name}
+                      </Text>
+                      <View style={s.storeMetaRow}>
+                        <MaterialIcons name="location-on" size={10} color={C.green} />
+                        <Text style={s.storeMeta}>
+                          {vendor.distance_km
+                            ? t("home.kmDistance", { count: parseFloat(vendor.distance_km).toFixed(1) })
+                            : t("home.nearby")}
+                        </Text>
+                        <View style={s.metaDot} />
+                        <MaterialIcons name="access-time" size={10} color={C.gray400} />
+                        <Text style={s.storeMeta}>{t("home.deliveryTime")}</Text>
+                      </View>
+                      <View style={s.storeTagRow}>
+                        {/* Min order — orange pill */}
+                        <View style={[s.storeTag, { backgroundColor: C.orangeLight, borderColor: "#FED7AA" }]}>
+                          <Text style={[s.storeTagText, { color: C.orangeDark }]}>
+                            {t("home.minOrder", { min: vendor.min_order || 99 })}
                           </Text>
                         </View>
-                      )}
+                        {isStoreCurrentlyOpen(vendor) && (
+                          <View
+                            style={[
+                              s.storeTag,
+                              {
+                                backgroundColor: C.greenLight,
+                                borderColor: C.greenBorder,
+                              },
+                            ]}
+                          >
+                            <Text style={[s.storeTagText, { color: C.green }]}>
+                              {t("home.acceptingOrders")}
+                            </Text>
+                          </View>
+                        )}
+                        {vendor.vendor_type && vendor.vendor_type !== "all" &&
+                          VENDOR_TYPE_META[vendor.vendor_type] && (
+                            <View
+                              style={[
+                                s.storeTag,
+                                {
+                                  backgroundColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
+                                  borderColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
+                                },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  s.storeTagText,
+                                  { color: VENDOR_TYPE_META[vendor.vendor_type].color },
+                                ]}
+                              >
+                                {VENDOR_TYPE_META[vendor.vendor_type].label}
+                              </Text>
+                            </View>
+                          )}
+                      </View>
+                    </View>
                   </View>
-                </View>
-                </View>
 
-                {/* OPEN/CLOSED pill — solid, no dot. Kept OUTSIDE the dimmed
+                  {/* OPEN/CLOSED pill — solid, no dot. Kept OUTSIDE the dimmed
                     wrapper so it always renders at full opacity and stays
                     clearly legible even on a CLOSED (dimmed) card. */}
-                <View
-                  style={[
-                    s.statusBadge,
-                    {
-                      backgroundColor: isStoreCurrentlyOpen(vendor)
-                        ? C.green
-                        : "rgba(0,0,0,0.72)",
-                    },
-                  ]}
-                >
-                  <Text style={s.statusText}>
-                    {isStoreCurrentlyOpen(vendor) ? t("home.open") : t("home.closed")}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+                  <View
+                    style={[
+                      s.statusBadge,
+                      {
+                        backgroundColor: isStoreCurrentlyOpen(vendor)
+                          ? C.green
+                          : "rgba(0,0,0,0.72)",
+                      },
+                    ]}
+                  >
+                    <Text style={s.statusText}>
+                      {isStoreCurrentlyOpen(vendor) ? t("home.open") : t("home.closed")}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         )}
 
