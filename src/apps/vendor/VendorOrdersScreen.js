@@ -339,6 +339,17 @@ export default function VendorOrdersScreen() {
   const [counterSlotStart, setCounterSlotStart] = useState("");
   const [counterSlotEnd, setCounterSlotEnd] = useState("");
 
+  const getItemQty = (item) => {
+    if (!item) return 1;
+    if (item.quantity && Number(item.quantity) > 0) return Number(item.quantity);
+    if (item.qty && Number(item.qty) > 0) return Number(item.qty);
+    if (item.new_quantity && Number(item.new_quantity) > 0) return Number(item.new_quantity);
+    const price = parseFloat(item.product_price || 0);
+    const subtotal = parseFloat(item.subtotal || 0);
+    if (price > 0 && subtotal > 0) return Math.round(subtotal / price);
+    return 1;
+  };
+
   // Helper to parse simple slot strings
   const parseSlotLocally = (input) => {
     if (!input?.trim()) return null;
@@ -821,7 +832,7 @@ export default function VendorOrdersScreen() {
       setCounterItems(
         (selectedOrder.items || []).map((i) => ({
           ...i,
-          new_quantity: i.quantity,
+          new_quantity: getItemQty(i),
           available: true,
         })),
       );
@@ -1335,7 +1346,7 @@ export default function VendorOrdersScreen() {
                     </View>
                     <Text style={styles.historyOrderItems} numberOfLines={1}>
                       {(order.items || [])
-                        .map((i) => `${i.quantity}× ${i.product_name}`)
+                        .map((i) => `${getItemQty(i)}× ${i.product_name}`)
                         .join(" · ")}
                     </Text>
                     <Text style={styles.historyOrderTime}>
@@ -1495,7 +1506,7 @@ export default function VendorOrdersScreen() {
                       </View>
                       <Text style={styles.historyOrderItems} numberOfLines={1}>
                         {(order.items || [])
-                          .map((i) => `${i.quantity}× ${i.product_name}`)
+                          .map((i) => `${getItemQty(i)}× ${i.product_name}`)
                           .join(" · ")}
                       </Text>
                       <Text style={styles.orderTime}>
@@ -1563,7 +1574,7 @@ export default function VendorOrdersScreen() {
               <View style={[styles.requestDetails, { alignItems: "center", justifyContent: "space-between" }]}>
                 <View style={{ flex: 1, marginRight: 12 }}>
                   <Text style={styles.slotRange} numberOfLines={1}>
-                    {(item.items || []).map((i) => `${i.quantity}× ${i.product_name}`).join(" · ")}
+                    {(item.items || []).map((i) => `${getItemQty(i)}× ${i.product_name}`).join(" · ")}
                   </Text>
                 </View>
                 <Text style={styles.slotDay}>
@@ -1829,7 +1840,7 @@ export default function VendorOrdersScreen() {
                 <Text style={dmStyles.orderStripItems} numberOfLines={1}>
                   {(selectedOrder?.items || [])
                     .slice(0, 2)
-                    .map((i) => `${i.quantity}× ${i.product_name}`)
+                    .map((i) => `${getItemQty(i)}× ${i.product_name}`)
                     .join(" · ")}
                   {(selectedOrder?.items || []).length > 2
                     ? ` +${(selectedOrder?.items || []).length - 2} more`
@@ -2244,10 +2255,10 @@ export default function VendorOrdersScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={omStyles.itemName}>{item.product_name}</Text>
                       <Text style={omStyles.itemQty}>
-                        {item.quantity} × ₹{item.product_price}
+                        {getItemQty(item)} × ₹{item.product_price}
                       </Text>
                     </View>
-                    <Text style={omStyles.itemTotal}>₹{(item.quantity * parseFloat(item.product_price)).toFixed(2).replace(/\.00$/, '')}</Text>
+                    <Text style={omStyles.itemTotal}>₹{(getItemQty(item) * parseFloat(item.product_price || 0)).toFixed(2).replace(/\.00$/, '')}</Text>
                   </View>
                 ))}
               </View>
@@ -2500,7 +2511,7 @@ export default function VendorOrdersScreen() {
                       <Text style={omStyles.acceptBtnText}>{t('vendor.markReady', 'Mark as Ready')}</Text>
                     </TouchableOpacity>
                   )}
-                  {selectedOrder?.status === "ready" && (
+                  {['accepted', 'preparing', 'ready'].includes(selectedOrder?.status) && (
                     <TouchableOpacity
                       style={[
                         omStyles.acceptBtn,
