@@ -597,7 +597,7 @@ function ItemsAccordion({ items, vendorName }) {
         <View style={ac.body}>
           {items?.map((item, i) => (
             <View key={i} style={ac.itemRow}>
-              <Text style={ac.itemQty}>{item.quantity}x</Text>
+              <Text style={ac.itemQty}>{(item.quantity || item.qty || 1)}x</Text>
               <Text style={ac.itemName}>{item.product_name}</Text>
               <Text style={ac.itemPrice}>₹{item.subtotal}</Text>
             </View>
