@@ -20,7 +20,11 @@ export const parseWeightValue = (w) => {
   }
 
   const match = str.match(/^(\d+(?:\.\d+)?)\s*([a-z]+)$/);
-  if (!match) return 1000;
+  if (!match) {
+    if (str === "kg" || str === "l" || str === "litre") return 1000;
+    if (str === "g" || str === "ml" || str === "gm") return 1;
+    return 1000;
+  }
 
   const val = parseFloat(match[1]);
   const unit = match[2];

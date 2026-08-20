@@ -483,10 +483,10 @@ function VendorCard({ vendor, distKm: dist, matchCount, onPress, tooFar }) {
   const isOpen = isStoreCurrentlyOpen(vendor);
   return (
     <TouchableOpacity
-      style={[vc.card, tooFar && vc.cardFar]}
-      onPress={onPress}
-      activeOpacity={0.88}
-      disabled={tooFar}
+      style={[vc.card, (tooFar || !isOpen) && vc.cardFar]}
+      onPress={isOpen && !tooFar ? onPress : undefined}
+      activeOpacity={isOpen && !tooFar ? 0.88 : 1}
+      disabled={tooFar || !isOpen}
     >
       <View style={vc.imgWrap}>
         <Image

@@ -1151,9 +1151,7 @@ export default function CheckoutScreen() {
   const placeOrder = async () => {
     console.log("placeOrder function INVOKED"); // START LOG
     if (!confirmedSlot) {
-      const slotReqMsg = t('checkout.selectDeliverySlotRequired', 'To send an order request, you must select a delivery slot.');
-      setErrorMsg(slotReqMsg);
-      Alert.alert(t('checkout.deliverySlotRequired', 'Delivery Slot Required'), slotReqMsg);
+      setSlotModalVisible(true);
       return;
     }
     setErrorMsg(null);
