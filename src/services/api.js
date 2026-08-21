@@ -216,6 +216,11 @@ export const productsAPI = {
     request("GET", `/products/popular?lat=${lat}&lng=${lng}&radius_km=${radius_km}&limit=${limit}`, null, token),
   getVendors: (productId, token) =>
     request("GET", `/products/${productId}/vendors`, null, token),
+  getTrending: (lat = null, lng = null, limit = 12) => {
+    let url = `/products/trending?limit=${limit}`;
+    if (lat != null && lng != null) url += `&lat=${lat}&lng=${lng}`;
+    return request("GET", url);
+  },
 };
 
 // ─── Inventory ────────────────────────────────────────────────────────────────
@@ -247,13 +252,7 @@ export const categoriesAPI = {
 };
 
 // ─── Products (extended) ──────────────────────────────────────────────────────
-export const productsExtendedAPI = {
-  getTrending: (lat = null, lng = null, limit = 12) => {
-    let url = `/products/trending?limit=${limit}`;
-    if (lat != null && lng != null) url += `&lat=${lat}&lng=${lng}`;
-    return request("GET", url);
-  },
-};
+export const productsExtendedAPI = productsAPI;
 
 // ─── Admin Categories ─────────────────────────────────────────────────────────
 export const adminCategoriesAPI = {
