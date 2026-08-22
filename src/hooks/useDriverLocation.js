@@ -20,7 +20,7 @@ const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL ||
   (BASE_URL.includes("/api") ? BASE_URL.split("/api")[0] : "http://localhost:3000");
 
 // Statuses where a driver can actually be en-route
-const ACTIVE_DELIVERY_STATUSES = ["accepted", "preparing", "ready", "picked_up"];
+const ACTIVE_DELIVERY_STATUSES = ["accepted", "preparing", "ready", "at_pickup", "picked_up"];
 
 const POLL_INTERVAL_MS = 15_000; // 15 seconds
 
@@ -80,8 +80,6 @@ export default function useDriverLocation(orderId, token, orderStatus, hasDriver
     const socket = io(SOCKET_URL, {
       auth: { token },
       transports: ["websocket"],
-      reconnectionAttempts: 10,
-      reconnectionDelay: 2000,
     });
     socketRef.current = socket;
 

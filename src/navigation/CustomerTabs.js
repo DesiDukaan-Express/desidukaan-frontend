@@ -340,6 +340,19 @@ function PendingOrderMonitor() {
       );
     });
 
+    socket.on('delivery:declined', (data) => {
+      const current = useOrderStore.getState().pendingOrder;
+      const orderId = data.order_id || data.orderId;
+      if (current?.id && String(orderId) !== String(current.id)) return;
+
+      showToast(
+        t('orders.deliveryPartnerDeclinedToast', '🛵 Delivery partner declined. Finding a new partner...'),
+        'warning',
+        null,
+        5000
+      );
+    });
+
     return () => socket.disconnect();
   }, [token]);
 

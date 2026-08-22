@@ -34,14 +34,23 @@ const BIKE_SVG = `
   </g>
 </svg>`;
 
+// Red pin icon for destination — matches CustomerMapView style
+const DEST_ICON_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
+  <path d="M16 0C7.163 0 0 7.163 0 16c0 10 16 24 16 24S32 26 32 16C32 7.163 24.837 0 16 0z" fill="#DC2626"/>
+  <circle cx="16" cy="16" r="6" fill="#fff"/>
+  <circle cx="16" cy="16" r="3" fill="#DC2626"/>
+</svg>`;
+
 function svgToDataUrl(svg) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-export default function DeliveryMapView({ currentRegion, markers }) {
+export default function DeliveryMapView({ currentRegion, markers, destLat, destLng, destTitle }) {
   const mapRef = useRef(null);
   const leafletMap = useRef(null);
   const markersRef = useRef([]);
+  const routeLineRef = useRef(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
@@ -80,17 +89,25 @@ export default function DeliveryMapView({ currentRegion, markers }) {
 
     const L = window.L;
 
-    const center = currentRegion 
-      ? [currentRegion.latitude, currentRegion.longitude] 
-      : [28.6139, 77.2090];
+    const hasPartner = currentRegion && currentRegion.latitude != null;
+    const hasDest = destLat != null && destLng != null;
+
+    const center = hasPartner
+      ? [currentRegion.latitude, currentRegion.longitude]
+      : hasDest
+        ? [destLat, destLng]
+        : [28.6139, 77.2090];
 
     if (!leafletMap.current) {
       leafletMap.current = L.map(mapRef.current, {
         zoomControl: false,
         attributionControl: false
-      }).setView(center, 14);
+      }).setView(center, 15);
 
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(leafletMap.current);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        subdomains: 'abcd',
+        maxZoom: 20,
+      }).addTo(leafletMap.current);
     } else {
       leafletMap.current.setView(center);
     }
@@ -99,7 +116,13 @@ export default function DeliveryMapView({ currentRegion, markers }) {
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
-    // Add new markers — use bike icon for delivery partner
+    // Clear old route line
+    if (routeLineRef.current) {
+      routeLineRef.current.remove();
+      routeLineRef.current = null;
+    }
+
+    // Add partner bike markers
     if (markers) {
       markers.forEach(m => {
         const markerIcon = L.icon({
@@ -115,7 +138,48 @@ export default function DeliveryMapView({ currentRegion, markers }) {
       });
     }
 
-  }, [isLoaded, currentRegion, markers]);
+    // Add destination pin marker
+    if (hasDest) {
+      const destIcon = L.icon({
+        iconUrl: svgToDataUrl(DEST_ICON_SVG),
+        iconSize: [32, 40],
+        iconAnchor: [16, 40],
+        popupAnchor: [0, -40],
+      });
+      const destMarker = L.marker([destLat, destLng], { icon: destIcon })
+        .addTo(leafletMap.current)
+        .bindTooltip(destTitle || "Destination", { permanent: false, direction: "top" });
+      markersRef.current.push(destMarker);
+    }
+
+    // Add route polyline
+    if (hasPartner && hasDest) {
+      routeLineRef.current = L.polyline(
+        [
+          [currentRegion.latitude, currentRegion.longitude],
+          [destLat, destLng],
+        ],
+        {
+          color: "#16A34A",
+          weight: 4,
+          dashArray: "10 8",
+          opacity: 0.75,
+          lineCap: "round",
+          lineJoin: "round",
+        }
+      ).addTo(leafletMap.current);
+    }
+
+    // Auto-fit bounds when both markers are present
+    if (hasPartner && hasDest) {
+      const bounds = L.latLngBounds(
+        [currentRegion.latitude, currentRegion.longitude],
+        [destLat, destLng]
+      );
+      leafletMap.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 15, animate: true, duration: 0.8 });
+    }
+
+  }, [isLoaded, currentRegion, markers, destLat, destLng, destTitle]);
 
   return (
     <View style={styles.container}>

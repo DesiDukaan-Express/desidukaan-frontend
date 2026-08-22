@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { View, ActivityIndicator, AppState } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -41,6 +41,9 @@ export default function Navigation() {
   const checkVendorStatus = useAuthStore((s) => s.checkVendorStatus);
   const flagVendorSuspended = useAuthStore((s) => s.flagVendorSuspended);
   const clearVendorSuspended = useAuthStore((s) => s.clearVendorSuspended);
+
+  const activeRoleRef = useRef(activeRole);
+  useEffect(() => { activeRoleRef.current = activeRole; }, [activeRole]);
 
   const [vendorOnboarded,    setVendorOnboarded]    = useState(null);
   const [deliveryOnboarded,  setDeliveryOnboarded]  = useState(null);
@@ -152,14 +155,14 @@ export default function Navigation() {
       // vendor:{id} room. The block only applies to the vendor role, so we
       // ignore it while the same user is using the customer/delivery role.
       socket.on("vendor:suspended", () => {
-        if (activeRole === "vendor") {
+        if (activeRoleRef.current === "vendor") {
           flagVendorSuspended();
           checkVendorProfile();
         }
       });
       socket.on("vendor:reactivated", () => {
         clearVendorSuspended();
-        if (activeRole === "vendor") checkVendorProfile();
+        if (activeRoleRef.current === "vendor") checkVendorProfile();
       });
     } catch (err) {
       // Socket init failed — poll + login/refresh checks still cover both directions.
@@ -168,7 +171,7 @@ export default function Navigation() {
     return () => {
       if (socket) socket.disconnect();
     };
-  }, [isAuthenticated, token, activeRole, flagDeactivated, clearDeactivation, flagVendorSuspended, clearVendorSuspended, checkVendorProfile]);
+  }, [isAuthenticated, token, flagDeactivated, clearDeactivation, flagVendorSuspended, clearVendorSuspended, checkVendorProfile]);
 
   const checkDeliveryProfile = async () => {
     setCheckingOnboard(true);
