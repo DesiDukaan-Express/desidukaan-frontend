@@ -307,8 +307,12 @@ function PendingOrderMonitor() {
 
       if (data.status === 'accepted') {
         showToast(t('orders.orderAcceptedTapToPayToast', '✅ Order accepted! Tap to pay.'), 'success', () => openCheckout('accepted'), null);
-      } else if (data.status === 'rejected') {
-        showToast(data.reason || t('orders.storeDeclinedOrderToast', '❌ Store declined your order.'), 'danger', null, 8000);
+      } else if (data.status === 'rejected' || data.status === 'cancelled') {
+        const declineNote = data.reason || data.cancellation_reason;
+        const msg = declineNote
+          ? `❌ Order Declined: "${declineNote}"`
+          : t('orders.storeDeclinedOrderToast', '❌ Store declined your order.');
+        showToast(msg, 'danger', null, 8000);
         setTimeout(() => clearPending(), 8000);
       }
     });

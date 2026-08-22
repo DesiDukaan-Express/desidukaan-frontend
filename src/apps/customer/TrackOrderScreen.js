@@ -267,7 +267,7 @@ export default function TrackOrderScreen() {
     }
     if (s === "picked_up") return { icon: "truck", label: "OUT FOR DELIVERY", title: etaStr };
     if (s === "delivered") return { icon: "check-circle", label: "DELIVERED", title: "Order delivered successfully!" };
-    if (["cancelled", "rejected"].includes(s)) return { icon: "x-circle", label: s.toUpperCase(), title: `This order was ${s}` };
+    if (["cancelled", "rejected"].includes(s)) return { icon: "x-circle", label: s.toUpperCase(), title: order?.cancellation_reason ? `Decline Note: ${order.cancellation_reason}` : `This order was ${s}` };
     return { icon: "clock", label: s.replace("_", " ").toUpperCase(), title: "Processing…" };
   };
   const statusH = getStatusHeader();
