@@ -1014,7 +1014,9 @@ export default function SearchScreen() {
         });
       }
     });
-    return cats.sort((a, b) => a.label.localeCompare(b.label));
+    // Preserve the backend order (display_order ASC from /products/categories),
+    // NOT alphabetical — admin drag-and-drop reorder must show up here too.
+    return cats;
   }, [apiCategories]);
 
   const inputRef = useRef(null);
