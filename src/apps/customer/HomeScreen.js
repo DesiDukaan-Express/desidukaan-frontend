@@ -796,10 +796,19 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
   const { t } = useTranslation();
   if (!item) return null;
 
+  const itemNormName = item.name ? item.name.trim().toLowerCase() : "";
+
   const vendorsWithItem = vendors.filter((v) =>
-    v._inventory?.some(
-      (inv) => inv.product?.id === item.id && (inv.is_active ?? true),
-    ),
+    v._inventory?.some((inv) => {
+      if (!inv.product) return false;
+      const invActive = inv.is_active ?? true;
+      const prodActive = inv.product.is_active ?? true;
+      if (!invActive || !prodActive) return false;
+
+      const matchId = item.id && Number(inv.product.id || inv.product_id) === Number(item.id);
+      const matchName = itemNormName && inv.product.name?.trim()?.toLowerCase() === itemNormName;
+      return matchId || matchName;
+    }),
   );
 
   return (
@@ -829,9 +838,12 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
               </View>
             ) : (
               vendorsWithItem.map((v) => {
-                const invItem = v._inventory?.find(
-                  (inv) => inv.product?.id === item.id,
-                );
+                const invItem = v._inventory?.find((inv) => {
+                  if (!inv.product) return false;
+                  const matchId = item.id && Number(inv.product.id || inv.product_id) === Number(item.id);
+                  const matchName = itemNormName && inv.product.name?.trim()?.toLowerCase() === itemNormName;
+                  return matchId || matchName;
+                });
                 const price = invItem?.product?.price ?? item.price;
                 return (
                   <TouchableOpacity
@@ -1089,7 +1101,7 @@ function buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCate
 function CategoryBrowseSheet({
   visible, category, hierarchy, onClose,
   onAdd, onRemove, getCartQty, onOpenWeightPicker, vendors,
-  onStoreSelect, apiCategories, onItemDetail,
+  onStoreSelect, apiCategories, onItemDetail, allInventoryItems,
 }) {
   const { t } = useTranslation();
   const [subCatPath, setSubCatPath] = React.useState([]);
@@ -1108,8 +1120,9 @@ function CategoryBrowseSheet({
 
   const findCategoryNode = (nodes, targetName) => {
     if (!nodes || !targetName) return null;
+    const targetLower = targetName.trim().toLowerCase();
     for (const node of nodes) {
-      if (node.name === targetName) return node;
+      if (node.name?.trim()?.toLowerCase() === targetLower) return node;
       if (node.children && node.children.length > 0) {
         const found = findCategoryNode(node.children, targetName);
         if (found) return found;
@@ -1118,40 +1131,120 @@ function CategoryBrowseSheet({
     return null;
   };
 
-  // Direct child subcategories at current level ONLY
+  // Direct child subcategories at current level (from API tree or hierarchy)
   const currentChildSubCats = React.useMemo(() => {
     const targetCat = activeSubCat || category;
+    const subCatsSet = new Set();
+
     const node = findCategoryNode(apiCategories, targetCat);
     if (node && node.children && node.children.length > 0) {
-      return node.children.map(c => c.name);
+      node.children.forEach(c => { if (c.name) subCatsSet.add(c.name); });
     }
-    return [];
-  }, [activeSubCat, category, apiCategories]);
 
-  // Determine items for current active subcategory
-  const subCatItems = React.useMemo(() => {
-    if (!category || !hierarchy) return [];
-    const targetCat = activeSubCat || category;
-    
-    let items = [];
-    if (hierarchy[targetCat]) {
+    if (hierarchy && hierarchy[targetCat]) {
       Object.keys(hierarchy[targetCat]).forEach(k => {
-        items.push(...(hierarchy[targetCat][k] || []));
+        if (k !== "All") subCatsSet.add(k);
       });
     }
 
-    if (hierarchy[category] && hierarchy[category][targetCat]) {
-      items.push(...(hierarchy[category][targetCat] || []));
+    return Array.from(subCatsSet);
+  }, [activeSubCat, category, apiCategories, hierarchy]);
+
+  // Determine items for current active subcategory or category
+  const subCatItems = React.useMemo(() => {
+    if (!category) return [];
+    const targetCat = activeSubCat || category;
+    const targetLower = targetCat.trim().toLowerCase();
+
+    // Map variant names (singular/plural)
+    const SYNONYMS = {
+      grocery: "groceries", groceries: "grocery",
+      snack: "snacks", snacks: "snack",
+      beverage: "beverages", beverages: "beverage",
+      fruit: "fruits", fruits: "fruit",
+      medicine: "medicines", medicines: "medicine",
+    };
+
+    const allowedNames = new Set([targetLower]);
+    if (SYNONYMS[targetLower]) allowedNames.add(SYNONYMS[targetLower]);
+
+    // Add descendant subcategories from apiCategories tree
+    const collectDescendants = (nodes) => {
+      for (const node of nodes || []) {
+        const nodeLower = node.name?.trim()?.toLowerCase();
+        if (nodeLower && allowedNames.has(nodeLower)) {
+          const addChildren = (children) => {
+            for (const child of children || []) {
+              if (child.name) {
+                const cLower = child.name.trim().toLowerCase();
+                allowedNames.add(cLower);
+                if (SYNONYMS[cLower]) allowedNames.add(SYNONYMS[cLower]);
+              }
+              if (child.children?.length) addChildren(child.children);
+            }
+          };
+          if (node.children) addChildren(node.children);
+        } else if (node.children?.length) {
+          collectDescendants(node.children);
+        }
+      }
+    };
+    collectDescendants(apiCategories);
+
+    let items = [];
+
+    // 1. Collect from hierarchy
+    if (hierarchy) {
+      Object.keys(hierarchy).forEach(topKey => {
+        const topLower = topKey.trim().toLowerCase();
+        // If we are looking for a top category or specific subcategory
+        if (allowedNames.has(topLower)) {
+          Object.keys(hierarchy[topKey]).forEach(subKey => {
+            if (!activeSubCat || subKey.trim().toLowerCase() === targetLower || allowedNames.has(subKey.trim().toLowerCase())) {
+              items.push(...(hierarchy[topKey][subKey] || []));
+            }
+          });
+        } else {
+          // Check subcategories inside other top-level keys
+          Object.keys(hierarchy[topKey]).forEach(subKey => {
+            if (subKey.trim().toLowerCase() === targetLower || allowedNames.has(subKey.trim().toLowerCase())) {
+              items.push(...(hierarchy[topKey][subKey] || []));
+            }
+          });
+        }
+      });
     }
 
+    // 2. Collect from allInventoryItems
+    if (allInventoryItems && allInventoryItems.length > 0) {
+      allInventoryItems.forEach((inv) => {
+        if (!inv.product) return;
+        const catObj = inv.product.category;
+        let rawCat = "";
+        if (typeof catObj === "object" && catObj?.name) rawCat = catObj.name;
+        else if (typeof catObj === "string") rawCat = catObj;
+        else if (inv.product.category_id && apiCategories) {
+          const foundNode = apiCategories.find(c => Number(c.id) === Number(inv.product.category_id));
+          if (foundNode) rawCat = foundNode.name;
+        }
+
+        const catLower = rawCat ? rawCat.trim().toLowerCase() : "";
+        if (catLower && allowedNames.has(catLower)) {
+          items.push(inv);
+        }
+      });
+    }
+
+    // 3. Deduplicate by unique inventory item / product id
     const seen = new Set();
     return items.filter(inv => {
-      if (!inv?.id) return false;
-      if (seen.has(inv.id)) return false;
-      seen.add(inv.id);
+      if (!inv?.id && !inv?.product?.id) return false;
+      const key = inv.product?.id || inv.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
-  }, [category, activeSubCat, hierarchy]);
+  }, [category, activeSubCat, hierarchy, apiCategories, allInventoryItems]);
 
   if (!visible || !category) return null;
 
@@ -1215,52 +1308,58 @@ function CategoryBrowseSheet({
             </View>
           )}
 
-          {/* ── Subcategory Grid View ── */}
-          {showSubCatGrid ? (
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={cbs.subCatGridContainer}
-            >
-              <Text style={cbs.subCatGridTitle}>
-                {subCatPath.length === 0 ? t("home.selectSubCategory") : `Subcategories of ${activeSubCat}`}
-              </Text>
-              <View style={cbs.subCatGrid}>
-                {currentChildSubCats.map(sc => {
-                  const subItems = hierarchy[category]?.[sc] || hierarchy[sc]?.["All"] || (hierarchy[sc] ? Object.values(hierarchy[sc]).flat() : []);
-                  const count = subItems.length;
-                  const firstItemImg = subItems[0]?.product?.image_url;
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+            {/* ── Section 1: Subcategories (if any) ── */}
+            {showSubCatGrid && (
+              <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 }}>
+                <Text style={cbs.subCatGridTitle}>
+                  {subCatPath.length === 0 ? t("home.selectSubCategory") : `Subcategories of ${activeSubCat}`}
+                </Text>
+                <View style={cbs.subCatGrid}>
+                  {currentChildSubCats.map(sc => {
+                    const subCatNode = findCategoryNode(apiCategories, sc);
+                    const subItems = hierarchy[category]?.[sc] || hierarchy[sc]?.["All"] || (hierarchy[sc] ? Object.values(hierarchy[sc]).flat() : []);
+                    const count = subItems.length;
+                    const firstItemImg = subItems[0]?.product?.image_url;
+                    const displayImg = subCatNode?.image_url || subCatNode?.image || firstItemImg;
 
-                  return (
-                    <TouchableOpacity
-                      key={sc}
-                      style={[cbs.subCatCard, { borderColor: catAccent.bg }]}
-                      onPress={() => handlePushPath(sc)}
-                      activeOpacity={0.85}
-                    >
-                      <View style={[cbs.subCatCardIconWrap, { backgroundColor: catAccent.bg }]}>
-                        {firstItemImg ? (
-                          <Image source={{ uri: firstItemImg }} style={cbs.subCatCardImg} resizeMode="cover" />
-                        ) : (
-                          <Text style={cbs.subCatCardEmoji}>{catAccent.icon || "📂"}</Text>
-                        )}
-                      </View>
-                      <View style={cbs.subCatCardInfo}>
-                        <Text style={cbs.subCatCardName} numberOfLines={2}>{sc}</Text>
-                        {count > 0 && (
-                          <Text style={cbs.subCatCardCount}>{t("home.itemsCount", { count })}</Text>
-                        )}
-                      </View>
-                      <MaterialIcons name="chevron-right" size={20} color={catAccent.accent} />
-                    </TouchableOpacity>
-                  );
-                })}
+                    return (
+                      <TouchableOpacity
+                        key={sc}
+                        style={[cbs.subCatCard, { borderColor: catAccent.bg }]}
+                        onPress={() => handlePushPath(sc)}
+                        activeOpacity={0.85}
+                      >
+                        <View style={[cbs.subCatCardIconWrap, { backgroundColor: catAccent.bg }]}>
+                          {displayImg ? (
+                            <Image source={{ uri: displayImg }} style={cbs.subCatCardImg} resizeMode="cover" />
+                          ) : (
+                            <Text style={cbs.subCatCardEmoji}>{catAccent.icon || "📂"}</Text>
+                          )}
+                        </View>
+                        <View style={cbs.subCatCardInfo}>
+                          <Text style={cbs.subCatCardName} numberOfLines={2}>{sc}</Text>
+                          {count > 0 && (
+                            <Text style={cbs.subCatCardCount}>{t("home.itemsCount", { count })}</Text>
+                          )}
+                        </View>
+                        <MaterialIcons name="chevron-right" size={20} color={catAccent.accent} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
-            </ScrollView>
-          ) : (
-            <>
-              {/* Note: Upper gray pills bar removed as requested to keep UI clean & strictly hierarchical */}
+            )}
 
-              {/* ── Column Headers ── */}
+            {/* ── Section 2: Items in Category ── */}
+            <View style={{ borderTopWidth: showSubCatGrid ? 1 : 0, borderTopColor: "#E2E8F0", paddingTop: showSubCatGrid ? 12 : 4 }}>
+              {showSubCatGrid && (
+                <Text style={[cbs.subCatGridTitle, { paddingHorizontal: 16, marginBottom: 8 }]}>
+                  Items in {activeSubCat || category}
+                </Text>
+              )}
+
+              {/* Column Headers */}
               <View style={cbs.tableHeader}>
                 <Text style={[cbs.thCell, { flex: 2 }]}>{t("home.colProduct")}</Text>
                 <Text style={[cbs.thCell, { flex: 1, textAlign: "center" }]}>{t("home.brand")}</Text>
@@ -1268,121 +1367,116 @@ function CategoryBrowseSheet({
                 <Text style={[cbs.thCell, { width: 80, textAlign: "right" }]}>{t("home.price")}</Text>
               </View>
 
-              {/* ── Product Rows ── */}
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                style={{ flex: 1 }}
-              >
-                {subCatItems.length === 0 ? (
-                  <View style={cbs.emptyWrap}>
-                    <MaterialIcons name="inventory" size={32} color={C.gray300} />
-                    <Text style={cbs.emptyText}>{t("home.noSubCatItems")}</Text>
-                  </View>
-                ) : (
-                  subCatItems.map((inv, idx) => {
-                    const p = inv.product;
-                    if (!p) return null;
-                    const qty = getCartQty(p.id);
-                    const loose = isLooseItem(p);
-                    const hasMrp = p.mrp && p.mrp > p.price;
-                    const discPct = hasMrp ? Math.round((1 - p.price / p.mrp) * 100) : 0;
-                    const vendorName = inv._vendorName || "";
+              {/* Product Rows */}
+              {subCatItems.length === 0 ? (
+                <View style={cbs.emptyWrap}>
+                  <MaterialIcons name="inventory" size={32} color={C.gray300} />
+                  <Text style={cbs.emptyText}>{t("home.noSubCatItems")}</Text>
+                </View>
+              ) : (
+                subCatItems.map((inv, idx) => {
+                  const p = inv.product;
+                  if (!p) return null;
+                  const qty = getCartQty(p.id);
+                  const loose = isLooseItem(p);
+                  const hasMrp = p.mrp && p.mrp > p.price;
+                  const discPct = hasMrp ? Math.round((1 - p.price / p.mrp) * 100) : 0;
+                  const vendorName = inv._vendorName || "";
 
-                    const item = {
-                      id: p.id, name: p.name, price: p.price,
-                      img: p.image_url || null, unit: p.unit || "1 pc",
-                      orig: hasMrp ? p.mrp : null, category,
-                      item_type: p.item_type, weight_options: p.weight_options,
-                    };
+                  const item = {
+                    id: p.id, name: p.name, price: p.price,
+                    img: p.image_url || null, unit: p.unit || "1 pc",
+                    orig: hasMrp ? p.mrp : null, category,
+                    item_type: p.item_type, weight_options: p.weight_options,
+                  };
 
-                    return (
-                      <View key={`${p.id}-${idx}`} style={[
-                        cbs.productRow,
-                        idx % 2 === 0 && cbs.productRowAlt,
-                      ]}>
-                        {/* Image + Name */}
-                        <View style={[cbs.productCell, { flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }]}>
-                          <View style={cbs.productImgWrap}>
-                            <Image
-                              source={{
-                                uri: p.image_url ||
-                                  CAT_FALLBACK_IMGS[category] ||
-                                  CAT_FALLBACK_IMGS._default
-                              }}
-                              style={cbs.productImg}
-                              resizeMode="cover"
-                            />
-                            {hasMrp && (
-                              <View style={cbs.discPill}>
-                                <Text style={cbs.discPillText}>{discPct}%</Text>
-                              </View>
-                            )}
-                            {loose && (
-                              <View style={[cbs.discPill, { backgroundColor: "#0891B2" }]}>
-                                <Text style={cbs.discPillText}>{t("home.loose")}</Text>
-                              </View>
-                            )}
-                            <TouchableOpacity
-                              style={cbs.eyeBtn}
-                              activeOpacity={0.7}
-                              onPress={() => onItemDetail && onItemDetail(item, p)}
-                            >
-                              <MaterialIcons name="visibility" size={11} color={C.white} />
-                            </TouchableOpacity>
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={cbs.productName} numberOfLines={2}>{p.name}</Text>
-                            {p.description ? (
-                              <Text style={cbs.productDesc} numberOfLines={1}>{p.description}</Text>
-                            ) : null}
-                          </View>
-                        </View>
-
-                        {/* Brand (vendor) */}
-                        <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
-                          <Text style={cbs.brandText} numberOfLines={2}>{vendorName}</Text>
-                        </View>
-
-                        {/* Qty / Unit (Particulars) */}
-                        <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
-                          <Text style={cbs.unitText}>{p.unit || "1 pc"}</Text>
-                        </View>
-
-                        {/* Price + ADD */}
-                        <View style={[cbs.productCell, { width: 80, alignItems: "flex-end" }]}>
-                          <Text style={cbs.priceText}>₹{p.price}</Text>
-                          {hasMrp && <Text style={cbs.mrpText}>₹{p.mrp}</Text>}
-                          {qty === 0 ? (
-                            <TouchableOpacity
-                              style={[cbs.addBtn, loose && { backgroundColor: "#0891B2" }]}
-                              activeOpacity={0.8}
-                              onPress={() => {
-                                if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
-                                else onAdd(item);
-                              }}
-                            >
-                              <Text style={cbs.addBtnText}>{loose ? t("home.select") : t("common.add")}</Text>
-                            </TouchableOpacity>
-                          ) : (
-                            <View style={cbs.qtyRow}>
-                              <TouchableOpacity style={cbs.qtyBtn} onPress={() => onRemove(item)}>
-                                <MaterialIcons name="remove" size={10} color={C.white} />
-                              </TouchableOpacity>
-                              <Text style={cbs.qtyNum}>{qty}</Text>
-                              <TouchableOpacity style={cbs.qtyBtn} onPress={() => onAdd(item)}>
-                                <MaterialIcons name="add" size={10} color={C.white} />
-                              </TouchableOpacity>
+                  return (
+                    <View key={`${p.id}-${idx}`} style={[
+                      cbs.productRow,
+                      idx % 2 === 0 && cbs.productRowAlt,
+                    ]}>
+                      {/* Image + Name */}
+                      <View style={[cbs.productCell, { flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }]}>
+                        <View style={cbs.productImgWrap}>
+                          <Image
+                            source={{
+                              uri: p.image_url ||
+                                CAT_FALLBACK_IMGS[category] ||
+                                CAT_FALLBACK_IMGS._default
+                            }}
+                            style={cbs.productImg}
+                            resizeMode="cover"
+                          />
+                          {hasMrp && (
+                            <View style={cbs.discPill}>
+                              <Text style={cbs.discPillText}>{discPct}%</Text>
                             </View>
                           )}
+                          {loose && (
+                            <View style={[cbs.discPill, { backgroundColor: "#0891B2" }]}>
+                              <Text style={cbs.discPillText}>{t("home.loose")}</Text>
+                            </View>
+                          )}
+                          <TouchableOpacity
+                            style={cbs.eyeBtn}
+                            activeOpacity={0.7}
+                            onPress={() => onItemDetail && onItemDetail(item, p)}
+                          >
+                            <MaterialIcons name="visibility" size={11} color={C.white} />
+                          </TouchableOpacity>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={cbs.productName} numberOfLines={2}>{p.name}</Text>
+                          {p.description ? (
+                            <Text style={cbs.productDesc} numberOfLines={1}>{p.description}</Text>
+                          ) : null}
                         </View>
                       </View>
-                    );
-                  })
-                )}
-                <View style={{ height: 24 }} />
-              </ScrollView>
-            </>
-          )}
+
+                      {/* Brand (vendor) */}
+                      <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
+                        <Text style={cbs.brandText} numberOfLines={2}>{vendorName}</Text>
+                      </View>
+
+                      {/* Qty / Unit (Particulars) */}
+                      <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
+                        <Text style={cbs.unitText}>{p.unit || "1 pc"}</Text>
+                      </View>
+
+                      {/* Price + ADD */}
+                      <View style={[cbs.productCell, { width: 80, alignItems: "flex-end" }]}>
+                        <Text style={cbs.priceText}>₹{p.price}</Text>
+                        {hasMrp && <Text style={cbs.mrpText}>₹{p.mrp}</Text>}
+                        {qty === 0 ? (
+                          <TouchableOpacity
+                            style={[cbs.addBtn, loose && { backgroundColor: "#0891B2" }]}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                              if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
+                              else onAdd(item);
+                            }}
+                          >
+                            <Text style={cbs.addBtnText}>{loose ? t("home.select") : t("common.add")}</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={cbs.qtyRow}>
+                            <TouchableOpacity style={cbs.qtyBtn} onPress={() => onRemove(item)}>
+                              <MaterialIcons name="remove" size={10} color={C.white} />
+                            </TouchableOpacity>
+                            <Text style={cbs.qtyNum}>{qty}</Text>
+                            <TouchableOpacity style={cbs.qtyBtn} onPress={() => onAdd(item)}>
+                              <MaterialIcons name="add" size={10} color={C.white} />
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+              <View style={{ height: 24 }} />
+            </View>
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -1659,16 +1753,27 @@ function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPre
   const hasMrp = item.orig && item.orig > item.price;
   const discPct = hasMrp ? Math.round((1 - item.price / item.orig) * 100) : 0;
   const loose = isLooseItem(item);
+  const available = item.isAvailableNearby !== false;
 
   return (
-    <TouchableOpacity style={pic.card} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity
+      style={[pic.card, !available && { opacity: 0.55 }]}
+      onPress={available ? onPress : undefined}
+      activeOpacity={available ? 0.85 : 1}
+    >
       {/* ── Image section ── */}
       <View style={[pic.imgWrap, { height: IMG_H }]}>
-        {/* Discount badge – top-left */}
-        {hasMrp && (
-          <View style={pic.discBadge}>
-            <Text style={pic.discBadgeText}>{t("home.discountOffUpper", { count: discPct })}</Text>
+        {/* Out of stock or Discount badge – top-left */}
+        {!available ? (
+          <View style={[pic.discBadge, { backgroundColor: "#EF4444", left: 6, top: 6 }]}>
+            <Text style={pic.discBadgeText}>Out of stock</Text>
           </View>
+        ) : (
+          hasMrp && (
+            <View style={pic.discBadge}>
+              <Text style={pic.discBadgeText}>{t("home.discountOffUpper", { count: discPct })}</Text>
+            </View>
+          )
         )}
         {/* Loose badge – top-right */}
         {loose && (
@@ -1702,7 +1807,11 @@ function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPre
             {hasMrp && <Text style={pic.orig}>₹{item.orig}</Text>}
           </View>
 
-          {qty === 0 ? (
+          {!available ? (
+            <View style={[pic.addBtn, { backgroundColor: "#9CA3AF" }]}>
+              <Text style={{ color: "#FFF", fontSize: 10, fontWeight: "700" }}>N/A</Text>
+            </View>
+          ) : qty === 0 ? (
             <TouchableOpacity
               style={pic.addBtn}
               onPress={() => {
@@ -1934,6 +2043,9 @@ function WeightPickerModal({ item, onClose, onAdd }) {
 
   if (!item) return null;
 
+  const selectedWeightStr = formatWeight(selected);
+  const selectedPrice = calculateProportionalPrice(item.price, selectedWeightStr, item.unit || "1kg");
+
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={wp.backdrop} onPress={onClose}>
@@ -1953,8 +2065,10 @@ function WeightPickerModal({ item, onClose, onAdd }) {
               </View>
               <Text style={wp.productName} numberOfLines={2}>{item.name}</Text>
               <Text style={wp.basePriceText}>
-                ₹{item.price}{" "}
-                <Text style={wp.perUnit}>{t("home.perUnit", { unit: item.unit || "unit" })}</Text>
+                ₹{selectedPrice}{" "}
+                <Text style={wp.perUnit}>
+                  for {selectedWeightStr} (₹{item.price}/{item.unit || "1kg"})
+                </Text>
               </Text>
             </View>
           </View>
@@ -1965,6 +2079,7 @@ function WeightPickerModal({ item, onClose, onAdd }) {
             {weightOptions.map(w => {
               const formatted = formatWeight(w);
               const isActive = selected === w;
+              const chipPrice = calculateProportionalPrice(item.price, formatted, item.unit || "1kg");
               return (
                 <TouchableOpacity
                   key={formatted}
@@ -1972,7 +2087,9 @@ function WeightPickerModal({ item, onClose, onAdd }) {
                   onPress={() => setSelected(w)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[wp.chipText, isActive && wp.chipTextActive]}>{formatted}</Text>
+                  <Text style={[wp.chipText, isActive && wp.chipTextActive]}>
+                    {formatted} • ₹{chipPrice}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
@@ -1990,7 +2107,9 @@ function WeightPickerModal({ item, onClose, onAdd }) {
               style={wp.addBtnGrad}
             >
               <MaterialIcons name="shopping-cart" size={16} color={C.white} />
-              <Text style={wp.addBtnText}>{t("home.addWeightToCart", { weight: formatWeight(selected) })}</Text>
+              <Text style={wp.addBtnText}>
+                Add {selectedWeightStr} to Cart • ₹{selectedPrice}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         </Pressable>
@@ -2511,12 +2630,12 @@ export default function HomeScreen() {
           const f = fresh.find((x) => x.id === v.id);
           return f
             ? {
-                ...v,
-                is_open: f.is_open,
-                opening_time: f.opening_time,
-                closing_time: f.closing_time,
-                is_currently_open: f.is_currently_open,
-              }
+              ...v,
+              is_open: f.is_open,
+              opening_time: f.opening_time,
+              closing_time: f.closing_time,
+              is_currently_open: f.is_currently_open,
+            }
             : v;
         }),
       );
@@ -2643,7 +2762,7 @@ export default function HomeScreen() {
     const items = [];
     vendors.forEach((v) => {
       (v._inventory || []).forEach((inv) => {
-        if ((inv.is_active ?? true) && inv.product) {
+        if (inv.product) {
           items.push({ ...inv, _vendorId: v.id, _vendorName: v.shop_name });
         }
       });
@@ -2653,7 +2772,6 @@ export default function HomeScreen() {
 
   // ── Address Handlers ────────────────────────────────────────────────────────
 
-  // In normalizeCatName — add Personal Care to the exclusion list
   const normalizeCatName = (name) => {
     if (!name) return null;
     const EXCLUDE = new Set(["Personal Care", "personal care", "PersonalCare"]);
@@ -2702,7 +2820,9 @@ export default function HomeScreen() {
         });
       }
     });
-    return cats.sort((a, b) => a.label.localeCompare(b.label));
+    // Preserve the backend order (display_order ASC from /products/categories),
+    // NOT alphabetical — admin drag-and-drop reorder must show up here.
+    return cats;
   }, [apiCategories]);
 
   // ── 3-level hierarchy for CategoryBrowseSheet ─────────────────────────────
@@ -2711,42 +2831,74 @@ export default function HomeScreen() {
     [allInventoryItems, getCategoryName, apiCategories],
   );
 
-  // ── Popular items — API-based with inventory fallback ─────────────────────
+  // ── Popular items — show all items & check nearby store availability ──────
   const popularItems = useMemo(() => {
-    if (popularFromAPI.length > 0) return popularFromAPI;
+    const seenNames = new Set();
+    const items = [];
 
-    // Fallback: derive from inventory, deduplicate by product ID
-    const seen = new Set();
-    const vendorCount = {};
-    const itemMap = {};
+    // Helper: Check if product has stock & active status in any nearby vendor
+    const isStockAvailable = (productName, productId) => {
+      return vendors.some((v) => {
+        return (v._inventory || []).some((inv) => {
+          if (!inv.product) return false;
+          const matchId = productId && Number(inv.product_id || inv.product.id) === Number(productId);
+          const matchName = productName && inv.product.name?.trim().toLowerCase() === productName.trim().toLowerCase();
+          if (!matchId && !matchName) return false;
 
+          const invActive = inv.is_active ?? true;
+          const prodActive = inv.product.is_active ?? true;
+          if (!invActive || !prodActive) return false;
+
+          if (inv.stock_qty !== undefined && inv.stock_qty !== null && Number(inv.stock_qty) <= 0) return false;
+
+          return true;
+        });
+      });
+    };
+
+    // First add all inventory items
     allInventoryItems.forEach((inv) => {
       const p = inv.product;
-      if (!p?.id) return;
+      if (!p?.id || !p?.name) return;
+      const normName = p.name.trim().toLowerCase();
+      if (seenNames.has(normName)) return;
+      seenNames.add(normName);
+
       const catName = getCategoryName(inv) || "Other";
-      vendorCount[p.id] = (vendorCount[p.id] || 0) + 1;
-      if (!seen.has(p.id)) {
-        seen.add(p.id);
-        itemMap[p.id] = {
-          id: p.id,
-          name: p.name,
-          unit: p.unit || "1 pc",
-          price: p.price,
-          orig: p.mrp != null && p.mrp > p.price ? p.mrp : null,
-          img: p.image_url || null,
-          category: catName,
-          item_type: p.item_type,
-          weight_options: p.weight_options,
-        };
-      }
+      const available = isStockAvailable(p.name, p.id);
+
+      items.push({
+        id: p.id,
+        name: p.name,
+        unit: p.unit || "1 pc",
+        price: p.price,
+        orig: p.mrp != null && p.mrp > p.price ? p.mrp : null,
+        img: p.image_url || null,
+        category: catName,
+        item_type: p.item_type,
+        weight_options: p.weight_options,
+        isAvailableNearby: available,
+      });
     });
 
-    return Object.entries(vendorCount)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 12)
-      .map(([id]) => itemMap[Number(id)])
-      .filter(Boolean);
-  }, [popularFromAPI, allInventoryItems, getCategoryName]);
+    // Next add API products if available, marking whether available in nearby inventory
+    if (popularFromAPI.length > 0) {
+      popularFromAPI.forEach((p) => {
+        if (!p?.id || !p?.name) return;
+        const normName = p.name.trim().toLowerCase();
+        if (seenNames.has(normName)) return;
+        seenNames.add(normName);
+
+        const available = isStockAvailable(p.name, p.id);
+        items.push({
+          ...p,
+          isAvailableNearby: available,
+        });
+      });
+    }
+
+    return items;
+  }, [popularFromAPI, allInventoryItems, vendors, getCategoryName]);
 
   // ── Address Handlers ────────────────────────────────────────────────────────
   const openAddressPicker = () => {
@@ -3327,128 +3479,132 @@ export default function HomeScreen() {
               paddingBottom: 6,
             }}
           >
-            {vendors.map((vendor) => (
-              <TouchableOpacity
-                key={vendor.id}
-                style={[s.storeCard, wide && s.storeCardWide]}
-                onPress={() =>
-                  navigation.navigate("VendorStore", {
-                    vendorId: vendor.id,
-                    vendorName: vendor.shop_name,
-                  })
-                }
-                activeOpacity={0.88}
-              >
-                {/* Everything except the CLOSED badge — dimmed when closed */}
-                <View
-                  style={[
-                    s.cardContent,
-                    !isStoreCurrentlyOpen(vendor) && s.cardContentClosed,
-                  ]}
+            {vendors.map((vendor) => {
+              const isOpen = isStoreCurrentlyOpen(vendor);
+              return (
+                <TouchableOpacity
+                  key={vendor.id}
+                  style={[s.storeCard, wide && s.storeCardWide]}
+                  disabled={!isOpen}
+                  onPress={isOpen ? () =>
+                    navigation.navigate("VendorStore", {
+                      vendorId: vendor.id,
+                      vendorName: vendor.shop_name,
+                    })
+                    : undefined}
+                  activeOpacity={isOpen ? 0.88 : 1}
                 >
-                <View style={s.storeImgWrap}>
-                  <Image
-                    source={{
-                      uri:
-                        vendor.shop_image_url ||
-                        `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${vendor.id}`,
-                    }}
-                    style={s.storeImg}
-                  />
-                  <LinearGradient
-                    colors={["transparent", "rgba(0,0,0,0.5)"]}
-                    style={s.storeImgOverlay}
-                  />
-                  <View style={s.ratingBadge}>
-                    <MaterialIcons name="star" size={10} color="#FBBF24" />
-                    <Text style={s.ratingText}>
-                      {vendor.avg_rating
-                        ? parseFloat(vendor.avg_rating).toFixed(1)
-                        : t("home.new")}
-                    </Text>
-                  </View>
-                </View>
-                <View style={s.storeInfo}>
-                  <Text style={s.storeName} numberOfLines={1}>
-                    {vendor.shop_name}
-                  </Text>
-                  <View style={s.storeMetaRow}>
-                    <MaterialIcons name="location-on" size={10} color={C.green} />
-                    <Text style={s.storeMeta}>
-                      {vendor.distance_km
-                        ? t("home.kmDistance", { count: parseFloat(vendor.distance_km).toFixed(1) })
-                        : t("home.nearby")}
-                    </Text>
-                    <View style={s.metaDot} />
-                    <MaterialIcons name="access-time" size={10} color={C.gray400} />
-                    <Text style={s.storeMeta}>{t("home.deliveryTime")}</Text>
-                  </View>
-                  <View style={s.storeTagRow}>
-                    {/* Min order — orange pill */}
-                    <View style={[s.storeTag, { backgroundColor: C.orangeLight, borderColor: "#FED7AA" }]}>
-                      <Text style={[s.storeTagText, { color: C.orangeDark }]}>
-                        {t("home.minOrder", { min: vendor.min_order || 99 })}
-                      </Text>
-                    </View>
-                    {isStoreCurrentlyOpen(vendor) && (
-                      <View
-                        style={[
-                          s.storeTag,
-                          {
-                            backgroundColor: C.greenLight,
-                            borderColor: C.greenBorder,
-                          },
-                        ]}
-                      >
-                        <Text style={[s.storeTagText, { color: C.green }]}>
-                          {t("home.acceptingOrders")}
+                  {/* Everything except the CLOSED badge — dimmed when closed */}
+                  <View
+                    style={[
+                      s.cardContent,
+                      !isStoreCurrentlyOpen(vendor) && s.cardContentClosed,
+                    ]}
+                  >
+                    <View style={s.storeImgWrap}>
+                      <Image
+                        source={{
+                          uri:
+                            vendor.shop_image_url ||
+                            `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${vendor.id}`,
+                        }}
+                        style={s.storeImg}
+                      />
+                      <LinearGradient
+                        colors={["transparent", "rgba(0,0,0,0.5)"]}
+                        style={s.storeImgOverlay}
+                      />
+                      <View style={s.ratingBadge}>
+                        <MaterialIcons name="star" size={10} color="#FBBF24" />
+                        <Text style={s.ratingText}>
+                          {vendor.avg_rating
+                            ? parseFloat(vendor.avg_rating).toFixed(1)
+                            : t("home.new")}
                         </Text>
                       </View>
-                    )}
-                    {vendor.vendor_type && vendor.vendor_type !== "all" &&
-                      VENDOR_TYPE_META[vendor.vendor_type] && (
-                        <View
-                          style={[
-                            s.storeTag,
-                            {
-                              backgroundColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
-                              borderColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              s.storeTagText,
-                              { color: VENDOR_TYPE_META[vendor.vendor_type].color },
-                            ]}
-                          >
-                            {VENDOR_TYPE_META[vendor.vendor_type].label}
+                    </View>
+                    <View style={s.storeInfo}>
+                      <Text style={s.storeName} numberOfLines={1}>
+                        {vendor.shop_name}
+                      </Text>
+                      <View style={s.storeMetaRow}>
+                        <MaterialIcons name="location-on" size={10} color={C.green} />
+                        <Text style={s.storeMeta}>
+                          {vendor.distance_km
+                            ? t("home.kmDistance", { count: parseFloat(vendor.distance_km).toFixed(1) })
+                            : t("home.nearby")}
+                        </Text>
+                        <View style={s.metaDot} />
+                        <MaterialIcons name="access-time" size={10} color={C.gray400} />
+                        <Text style={s.storeMeta}>{t("home.deliveryTime")}</Text>
+                      </View>
+                      <View style={s.storeTagRow}>
+                        {/* Min order — orange pill */}
+                        <View style={[s.storeTag, { backgroundColor: C.orangeLight, borderColor: "#FED7AA" }]}>
+                          <Text style={[s.storeTagText, { color: C.orangeDark }]}>
+                            {t("home.minOrder", { min: vendor.min_order || 99 })}
                           </Text>
                         </View>
-                      )}
+                        {isStoreCurrentlyOpen(vendor) && (
+                          <View
+                            style={[
+                              s.storeTag,
+                              {
+                                backgroundColor: C.greenLight,
+                                borderColor: C.greenBorder,
+                              },
+                            ]}
+                          >
+                            <Text style={[s.storeTagText, { color: C.green }]}>
+                              {t("home.acceptingOrders")}
+                            </Text>
+                          </View>
+                        )}
+                        {vendor.vendor_type && vendor.vendor_type !== "all" &&
+                          VENDOR_TYPE_META[vendor.vendor_type] && (
+                            <View
+                              style={[
+                                s.storeTag,
+                                {
+                                  backgroundColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
+                                  borderColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
+                                },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  s.storeTagText,
+                                  { color: VENDOR_TYPE_META[vendor.vendor_type].color },
+                                ]}
+                              >
+                                {VENDOR_TYPE_META[vendor.vendor_type].label}
+                              </Text>
+                            </View>
+                          )}
+                      </View>
+                    </View>
                   </View>
-                </View>
-                </View>
 
-                {/* OPEN/CLOSED pill — solid, no dot. Kept OUTSIDE the dimmed
+                  {/* OPEN/CLOSED pill — solid, no dot. Kept OUTSIDE the dimmed
                     wrapper so it always renders at full opacity and stays
                     clearly legible even on a CLOSED (dimmed) card. */}
-                <View
-                  style={[
-                    s.statusBadge,
-                    {
-                      backgroundColor: isStoreCurrentlyOpen(vendor)
-                        ? C.green
-                        : "rgba(0,0,0,0.72)",
-                    },
-                  ]}
-                >
-                  <Text style={s.statusText}>
-                    {isStoreCurrentlyOpen(vendor) ? t("home.open") : t("home.closed")}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+                  <View
+                    style={[
+                      s.statusBadge,
+                      {
+                        backgroundColor: isStoreCurrentlyOpen(vendor)
+                          ? C.green
+                          : "rgba(0,0,0,0.72)",
+                      },
+                    ]}
+                  >
+                    <Text style={s.statusText}>
+                      {isStoreCurrentlyOpen(vendor) ? t("home.open") : t("home.closed")}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
           </Animated.View>
         )}
@@ -3717,6 +3873,7 @@ export default function HomeScreen() {
         visible={catSheetVisible}
         category={catSheetCategory}
         hierarchy={categoryHierarchy}
+        allInventoryItems={allInventoryItems}
         onClose={() => setCatSheetVisible(false)}
         onAdd={handleAdd}
         onRemove={handleRemove}

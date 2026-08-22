@@ -108,52 +108,9 @@ export default function VendorOrdersScreen() {
     }
   };
 
-  // ── Demand Surcharge (vendor can set surge % for rain/peak hours) ─────────
-  const [demandSurcharge, setDemandSurcharge] = useState(0);   // current %
-  const [surchargeInput, setSurchargeInput] = useState('0');
-  const [surchargeLoading, setSurchargeLoading] = useState(false);
-  const [showSurchargeEdit, setShowSurchargeEdit] = useState(false);
-  const [vendorId, setVendorId] = useState(null);
-
   const ordersRef = useRef(orders);
   const selectedOrderRef = useRef(selectedOrder);
   const updateOrderStatusRef = useRef(null);
-
-  // Fetch vendor profile to read current demand_surcharge_pct
-  useEffect(() => {
-    if (!token) return;
-    (async () => {
-      try {
-        const res = await fetch(`${API_BASE}/vendors/me/profile`, { headers: { Authorization: `Bearer ${token}` } });
-        const json = await res.json();
-        const v = json.data?.vendor || json.vendor;
-        if (v) {
-          setVendorId(v.id);
-          const pct = v.demand_surcharge_pct ?? 0;
-          setDemandSurcharge(pct);
-          setSurchargeInput(String(pct));
-        }
-      } catch (e) { console.warn('vendor profile fetch:', e.message); }
-    })();
-  }, [token]);
-
-  const saveDemandSurcharge = async (pct) => {
-    if (!vendorId) return;
-    setSurchargeLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/vendors/${vendorId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ demand_surcharge_pct: parseFloat(pct) || 0 }),
-      });
-      if (res.ok) {
-        setDemandSurcharge(parseFloat(pct) || 0);
-        setShowSurchargeEdit(false);
-        setVendorToast({ visible: true, message: `Demand surcharge set to ${pct}%`, type: 'success' });
-      }
-    } catch (e) { console.warn('save surcharge:', e.message); }
-    finally { setSurchargeLoading(false); }
-  };
 
   const toggleCustomer = (name) => {
     setExpandedCustomers((prev) => ({ ...prev, [name]: !prev[name] }));
@@ -341,6 +298,17 @@ export default function VendorOrdersScreen() {
   const [counterSlotDay, setCounterSlotDay] = useState("today"); // today | tomorrow
   const [counterSlotStart, setCounterSlotStart] = useState("");
   const [counterSlotEnd, setCounterSlotEnd] = useState("");
+
+  const getItemQty = (item) => {
+    if (!item) return 1;
+    if (item.quantity && Number(item.quantity) > 0) return Number(item.quantity);
+    if (item.qty && Number(item.qty) > 0) return Number(item.qty);
+    if (item.new_quantity && Number(item.new_quantity) > 0) return Number(item.new_quantity);
+    const price = parseFloat(item.product_price || 0);
+    const subtotal = parseFloat(item.subtotal || 0);
+    if (price > 0 && subtotal > 0) return Math.round(subtotal / price);
+    return 1;
+  };
 
   // Helper to parse simple slot strings
   const parseSlotLocally = (input) => {
@@ -824,7 +792,7 @@ export default function VendorOrdersScreen() {
       setCounterItems(
         (selectedOrder.items || []).map((i) => ({
           ...i,
-          new_quantity: i.quantity,
+          new_quantity: getItemQty(i),
           available: true,
         })),
       );
@@ -1075,52 +1043,6 @@ export default function VendorOrdersScreen() {
         </View>
       </View>
 
-      {/* ── DEMAND SURCHARGE BANNER ── */}
-      <View style={{ marginHorizontal: 16, marginBottom: 8 }}>
-        {showSurchargeEdit ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF3C7', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#FDE68A' }}>
-            <Text style={{ fontSize: 12, color: '#92400E', fontWeight: '700', flex: 1 }}>Set surge %</Text>
-            <TextInput
-              style={{ borderWidth: 1, borderColor: '#FDE68A', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, fontSize: 14, fontWeight: '700', width: 64, textAlign: 'center', backgroundColor: '#FFF' }}
-              keyboardType="numeric"
-              value={surchargeInput}
-              onChangeText={setSurchargeInput}
-              maxLength={3}
-            />
-            <TouchableOpacity
-              style={{ backgroundColor: '#D97706', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
-              onPress={() => saveDemandSurcharge(surchargeInput)}
-              disabled={surchargeLoading}
-            >
-              <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 12 }}>{surchargeLoading ? '...' : 'Save'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowSurchargeEdit(false)}>
-              <Text style={{ color: '#92400E', fontSize: 18, fontWeight: '700' }}>×</Text>
-            </TouchableOpacity>
-          </View>
-        ) : demandSurcharge > 0 ? (
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF3C7', borderRadius: 12, padding: 10, borderWidth: 1.5, borderColor: '#F59E0B' }}
-            onPress={() => setShowSurchargeEdit(true)}
-            activeOpacity={0.8}
-          >
-            <Feather name="cloud-rain" size={16} color="#92400E" />
-            <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: '#92400E' }}>Demand surcharge ACTIVE: +{demandSurcharge}% on delivery</Text>
-            <Text style={{ fontSize: 11, color: '#B45309', fontWeight: '600' }}>Edit</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F9FAFB', borderRadius: 10, padding: 8, borderWidth: 1, borderColor: '#E5E7EB' }}
-            onPress={() => setShowSurchargeEdit(true)}
-            activeOpacity={0.8}
-          >
-            <Feather name="zap" size={13} color="#9CA3AF" />
-            <Text style={{ fontSize: 12, color: '#9CA3AF', flex: 1 }}>Set demand surcharge (rain, peak hours...)</Text>
-            <Text style={{ fontSize: 11, color: '#D97706', fontWeight: '700' }}>+ Add</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[styles.tab, activeTab === "orders" && styles.activeTab]}
@@ -1338,7 +1260,7 @@ export default function VendorOrdersScreen() {
                     </View>
                     <Text style={styles.historyOrderItems} numberOfLines={1}>
                       {(order.items || [])
-                        .map((i) => `${i.quantity}× ${i.product_name}`)
+                        .map((i) => `${getItemQty(i)}× ${i.product_name}`)
                         .join(" · ")}
                     </Text>
                     <Text style={styles.historyOrderTime}>
@@ -1498,7 +1420,7 @@ export default function VendorOrdersScreen() {
                       </View>
                       <Text style={styles.historyOrderItems} numberOfLines={1}>
                         {(order.items || [])
-                          .map((i) => `${i.quantity}× ${i.product_name}`)
+                          .map((i) => `${getItemQty(i)}× ${i.product_name}`)
                           .join(" · ")}
                       </Text>
                       <Text style={styles.orderTime}>
@@ -1566,7 +1488,7 @@ export default function VendorOrdersScreen() {
               <View style={[styles.requestDetails, { alignItems: "center", justifyContent: "space-between" }]}>
                 <View style={{ flex: 1, marginRight: 12 }}>
                   <Text style={styles.slotRange} numberOfLines={1}>
-                    {(item.items || []).map((i) => `${i.quantity}× ${i.product_name}`).join(" · ")}
+                    {(item.items || []).map((i) => `${getItemQty(i)}× ${i.product_name}`).join(" · ")}
                   </Text>
                 </View>
                 <Text style={styles.slotDay}>
@@ -1832,7 +1754,7 @@ export default function VendorOrdersScreen() {
                 <Text style={dmStyles.orderStripItems} numberOfLines={1}>
                   {(selectedOrder?.items || [])
                     .slice(0, 2)
-                    .map((i) => `${i.quantity}× ${i.product_name}`)
+                    .map((i) => `${getItemQty(i)}× ${i.product_name}`)
                     .join(" · ")}
                   {(selectedOrder?.items || []).length > 2
                     ? ` +${(selectedOrder?.items || []).length - 2} more`
@@ -2247,10 +2169,10 @@ export default function VendorOrdersScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={omStyles.itemName}>{item.product_name}</Text>
                       <Text style={omStyles.itemQty}>
-                        {item.quantity} × ₹{item.product_price}
+                        {getItemQty(item)} × ₹{item.product_price}
                       </Text>
                     </View>
-                    <Text style={omStyles.itemTotal}>₹{(item.quantity * parseFloat(item.product_price)).toFixed(2).replace(/\.00$/, '')}</Text>
+                    <Text style={omStyles.itemTotal}>₹{(getItemQty(item) * parseFloat(item.product_price || 0)).toFixed(2).replace(/\.00$/, '')}</Text>
                   </View>
                 ))}
               </View>
@@ -2503,7 +2425,7 @@ export default function VendorOrdersScreen() {
                       <Text style={omStyles.acceptBtnText}>{t('vendor.markReady', 'Mark as Ready')}</Text>
                     </TouchableOpacity>
                   )}
-                  {selectedOrder?.status === "ready" && (
+                  {['accepted', 'preparing', 'ready'].includes(selectedOrder?.status) && (
                     <TouchableOpacity
                       style={[
                         omStyles.acceptBtn,

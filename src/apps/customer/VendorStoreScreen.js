@@ -243,8 +243,8 @@ function WeightPickerModal({ item, onClose, onAdd }) {
               </View>
               <Text style={wp.productName} numberOfLines={2}>{p.name}</Text>
               <Text style={wp.basePriceText}>
-                ₹{p.price}{" "}
-                <Text style={wp.perUnit}>{t('vendorStore.perUnit', { unit: p.unit || "unit" })}</Text>
+                ₹{formatRupee(selectedPrice)}{" "}
+                <Text style={wp.perUnit}>for {selectedWeightStr} (₹{p.price}/{p.unit || "1kg"})</Text>
               </Text>
             </View>
           </View>
@@ -255,6 +255,7 @@ function WeightPickerModal({ item, onClose, onAdd }) {
             {weightOptions.map(w => {
               const formatted = formatWeight(w);
               const isActive = selected === w;
+              const chipPrice = calculateProportionalPrice(p.price, formatted, p.unit || "1kg");
               return (
                 <TouchableOpacity
                   key={formatted}
@@ -262,7 +263,9 @@ function WeightPickerModal({ item, onClose, onAdd }) {
                   onPress={() => setSelected(w)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[wp.chipText, isActive && wp.chipTextActive]}>{formatted}</Text>
+                  <Text style={[wp.chipText, isActive && wp.chipTextActive]}>
+                    {formatted} • ₹{formatRupee(chipPrice)}
+                  </Text>
                 </TouchableOpacity>
               );
             })}

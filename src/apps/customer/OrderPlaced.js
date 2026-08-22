@@ -79,7 +79,12 @@ export default function OrderPlaced() {
       console.log("Order update received:", data);
       if (String(data.order_id) === String(orderId)) {
         if (data.status === "accepted") setStatus("accepted");
-        if (data.status === "rejected") setStatus("rejected");
+        if (data.status === "rejected") {
+          setStatus("rejected");
+          if (data.reason || data.cancellation_reason) {
+            setDeclineReason(data.reason || data.cancellation_reason);
+          }
+        }
       }
     });
 
@@ -116,7 +121,7 @@ export default function OrderPlaced() {
   const getStatusConfig = () => {
     switch(status) {
       case "accepted": return { title: t('orders.orderConfirmed') || "Order Confirmed!", sub: t('orders.storeAccepted') || "The store has accepted your order.", icon: "check-circle", color: C.green, bg: C.greenLight };
-      case "rejected": return { title: t('orders.orderDeclined') || "Order Declined", sub: t('orders.storeDeclinedSub') || "The store couldn't fulfill your order.", icon: "x-circle", color: C.red, bg: C.redLight };
+      case "rejected": return { title: t('orders.orderDeclined') || "Order Declined", sub: declineReason ? `Note: "${declineReason}"` : (t('orders.storeDeclinedSub') || "The store couldn't fulfill your order."), icon: "x-circle", color: C.red, bg: C.redLight };
       case "expired":  return { title: t('orders.requestExpired') || "Request Expired", sub: t('orders.storeExpiredSub') || "The store didn't respond in time.", icon: "clock", color: C.orange, bg: "#FFF7ED" };
       default:         return { title: t('orders.orderSent') || "Order Sent! 🚀", sub: t('orders.waitingConfirmation') || "Waiting for store confirmation...", icon: "loader", color: C.orange, bg: "#FEF3C7" };
     }

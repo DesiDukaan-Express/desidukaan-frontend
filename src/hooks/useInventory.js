@@ -182,6 +182,8 @@ export default function useInventory() {
       }),
     bulkImport: (items) =>
       withSave(() => inventoryService.bulkImport(token, items)),
+    reorderProducts: (orderedItems) =>
+      withSave(() => inventoryService.reorderProducts(token, orderedItems)),
     globalCategories,
 
     deleteCategoryProducts: async (categoryId) => {

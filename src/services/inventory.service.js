@@ -40,6 +40,7 @@ export const inventoryService = {
           weight_options: p.weight_options || [],
           image_url: p.image_url || null,
           brand: p.brand || null,
+          display_order: p.display_order ?? 0,
         };
       });
 
@@ -155,6 +156,33 @@ export const inventoryService = {
     } catch (err) {
       console.error("getVendorProfile error:", err);
       return { success: false };
+    }
+  },
+
+
+
+  /**
+   * Persist the vendor's manual product order (drag-and-drop).
+   * Sends the full ordered list once; backend recomputes display_order from index.
+   */
+  async reorderProducts(token, orderedItems) {
+    try {
+      const res = await fetch(`${API_BASE}/vendor-products/reorder`, {
+        method: "PUT",
+        headers: authHeaders(token),
+        body: JSON.stringify({
+          items: orderedItems.map((p, idx) => ({
+            id: Number(p.id),
+            display_order: idx + 1,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to reorder products");
+      return data;
+    } catch (err) {
+      console.error("reorderProducts error:", err);
+      throw err;
     }
   },
 
