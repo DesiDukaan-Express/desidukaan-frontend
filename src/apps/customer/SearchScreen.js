@@ -16,6 +16,8 @@ import {
   TextInput,
   ActivityIndicator,
   Animated,
+  LayoutAnimation,
+  UIManager,
   Platform,
   StatusBar,
   Keyboard,
@@ -35,6 +37,7 @@ import {
   searchAPI,
   vendorsAPI,
   productsAPI,
+  productsExtendedAPI,
 } from "../../services/api";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
@@ -914,6 +917,13 @@ export default function SearchScreen() {
   const addressStore = useAddressStore();
   const { isDesktop, isTablet } = useBreakpoint();
 
+  // ── Enable LayoutAnimation on Android ────────────────────────────────────
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      UIManager.setLayoutAnimationEnabledExperimental?.(true);
+    }
+  }, []);
+
   // ── State ─────────────────────────────────────────────────────────────────
   const [query, setQuery] = useState("");
   const [committed, setCommitted] = useState(false);
@@ -970,14 +980,19 @@ export default function SearchScreen() {
   const [focusedItems, setFocusedItems] = useState([]);
   const [focusLoading, setFocusLoading] = useState(false);
 
+  const vendorListAnim = useRef(new Animated.Value(0)).current;
+
   const handleStoreCatSelect = async (cat) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     const newCat = selectedStoreCategory === cat ? null : cat;
     setSelectedStoreCategory(newCat);
     if (!newCat || !userCoords) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setStoreCatVendors([]);
       return;
     }
     setLoadingStoreCat(true);
+    vendorListAnim.setValue(0);
     try {
       const res = await vendorsAPI.getNearby(
         userCoords.lat,
@@ -985,8 +1000,15 @@ export default function SearchScreen() {
         10,
         newCat,
       );
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setStoreCatVendors(res.data || []);
+      Animated.timing(vendorListAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     } catch {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setStoreCatVendors([]);
     } finally {
       setLoadingStoreCat(false);
@@ -1058,7 +1080,7 @@ export default function SearchScreen() {
         : null;
 
   useEffect(() => {
-    productsAPI
+    productsExtendedAPI
       .getTrending(userCoords?.lat, userCoords?.lng, 10)
       .then((res) => setTrendingItems(res.data || []))
       .catch(() => setTrendingItems([]));
@@ -1076,6 +1098,18 @@ export default function SearchScreen() {
       setTimeout(() => inputRef.current?.focus(), 300);
     }
   }, []);
+
+  // ── Sync focusField when route params change (e.g. re-navigated from Home) ─
+  useEffect(() => {
+    const newField = route.params?.focusField || null;
+    if (newField !== focusField) {
+      setFocusField(newField);
+      if (newField) {
+        setCommitted(false);
+        setQuery("");
+      }
+    }
+  }, [route.params?.focusField]);
 
   // ── Load focused data when navigated from HomeScreen section buttons ────
   useEffect(() => {
@@ -1095,7 +1129,7 @@ export default function SearchScreen() {
           const list = Array.isArray(d) ? d : d.data || d.vendors || [];
           setAllNearbyVendors(list);
         } else if (focusField === "items") {
-          const res = await productsAPI.getTrending(userCoords.lat, userCoords.lng, 50);
+          const res = await productsExtendedAPI.getTrending(userCoords.lat, userCoords.lng, 50);
           setFocusedItems(res.data || []);
         }
         // "categories" uses dbCategories which are already loaded
@@ -1943,7 +1977,7 @@ export default function SearchScreen() {
                     </View>
                   )}
                 {!loadingStoreCat && storeCatVendors.length > 0 && (
-                  <View style={{ marginTop: 12 }}>
+                  <Animated.View style={{ marginTop: 12, opacity: vendorListAnim }}>
                     {storeCatVendors.map((v) => (
                       <VendorCard
                         key={v.id}
@@ -1963,7 +1997,7 @@ export default function SearchScreen() {
                         tooFar={false}
                       />
                     ))}
-                  </View>
+                  </Animated.View>
                 )}
               </View>
             )}
@@ -1971,7 +2005,19 @@ export default function SearchScreen() {
             {/* ── FOCUSED BROWSE VIEW (from HomeScreen section buttons) ── */}
             {isFocused && (
               <View style={{ paddingHorizontal: px, paddingTop: 16 }}>
-                {focusLoading && (
+                {!userCoords ? (
+                  <View style={s.emptyWrap}>
+                    <Feather name="map-pin" size={32} color={C.gray300} />
+                    <Text style={s.emptyTitle}>Location needed</Text>
+                    <Text style={s.emptySub}>
+                      {focusField === "items"
+                        ? "Please set your location to browse items."
+                        : focusField === "stores"
+                          ? "Please set your location to browse stores."
+                          : "Please set your location to browse categories."}
+                    </Text>
+                  </View>
+                ) : focusLoading ? (
                   <View style={s.loadingWrap}>
                     <ActivityIndicator size="large" color={C.green} />
                     <Text style={s.loadingText}>
@@ -1982,10 +2028,10 @@ export default function SearchScreen() {
                           : "Loading items…"}
                     </Text>
                   </View>
-                )}
+                ) : null}
 
                 {/* ── Focused: ALL STORES ── */}
-                {!focusLoading && focusField === "stores" && (
+                {!focusLoading && userCoords && focusField === "stores" && (
                   <>
                     <SectionHeading title="All Nearby Stores" />
                     {allNearbyVendors.length === 0 ? (
@@ -2024,7 +2070,7 @@ export default function SearchScreen() {
                 )}
 
                 {/* ── Focused: ALL CATEGORIES ── */}
-                {!focusLoading && focusField === "categories" && (
+                {!focusLoading && userCoords && focusField === "categories" && (
                   <>
                     <SectionHeading title="All Categories" />
                     {dbCategories.length === 0 ? (
@@ -2069,7 +2115,7 @@ export default function SearchScreen() {
                 )}
 
                 {/* ── Focused: ALL ITEMS ── */}
-                {!focusLoading && focusField === "items" && (
+                {!focusLoading && userCoords && focusField === "items" && (
                   <>
                     <SectionHeading title="Popular Items" />
                     {focusedItems.length === 0 ? (

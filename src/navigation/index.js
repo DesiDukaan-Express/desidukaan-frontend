@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { View, ActivityIndicator, AppState } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -29,28 +29,31 @@ const Stack = createNativeStackNavigator();
 
 export default function Navigation() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const activeRole      = useAuthStore((s) => s.activeRole);
-  const isLoading       = useAuthStore((s) => s.isLoading);
-  const token           = useAuthStore((s) => s.token);
-  const setActiveRole   = useAuthStore((s) => s.setActiveRole);
+  const activeRole = useAuthStore((s) => s.activeRole);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const token = useAuthStore((s) => s.token);
+  const setActiveRole = useAuthStore((s) => s.setActiveRole);
   const accountDeactivated = useAuthStore((s) => s.accountDeactivated);
   const checkAccountStatus = useAuthStore((s) => s.checkAccountStatus);
-  const flagDeactivated     = useAuthStore((s) => s.flagDeactivated);
-  const clearDeactivation   = useAuthStore((s) => s.clearDeactivation);
+  const flagDeactivated = useAuthStore((s) => s.flagDeactivated);
+  const clearDeactivation = useAuthStore((s) => s.clearDeactivation);
   const vendorSuspended = useAuthStore((s) => s.vendorSuspended);
   const checkVendorStatus = useAuthStore((s) => s.checkVendorStatus);
   const flagVendorSuspended = useAuthStore((s) => s.flagVendorSuspended);
   const clearVendorSuspended = useAuthStore((s) => s.clearVendorSuspended);
+
+  const activeRoleRef = useRef(activeRole);
+  useEffect(() => { activeRoleRef.current = activeRole; }, [activeRole]);
   const deliverySuspended = useAuthStore((s) => s.deliverySuspended);
   const checkDeliveryStatus = useAuthStore((s) => s.checkDeliveryStatus);
   const flagDeliverySuspended = useAuthStore((s) => s.flagDeliverySuspended);
   const clearDeliverySuspended = useAuthStore((s) => s.clearDeliverySuspended);
 
-  const [vendorOnboarded,    setVendorOnboarded]    = useState(null);
-  const [deliveryOnboarded,  setDeliveryOnboarded]  = useState(null);
-  const [checkingOnboard,    setCheckingOnboard]    = useState(false);
-  const [vendorStatus,       setVendorStatus]       = useState(null);
-  const [vendorMissingDocs,  setVendorMissingDocs]  = useState([]);
+  const [vendorOnboarded, setVendorOnboarded] = useState(null);
+  const [deliveryOnboarded, setDeliveryOnboarded] = useState(null);
+  const [checkingOnboard, setCheckingOnboard] = useState(false);
+  const [vendorStatus, setVendorStatus] = useState(null);
+  const [vendorMissingDocs, setVendorMissingDocs] = useState([]);
 
   // Fetch the vendor profile. Also acts as the login-time / reload fallback:
   // if the vendor is suspended, it flags the full-screen block so the app
@@ -156,14 +159,22 @@ export default function Navigation() {
       // vendor:{id} room. The block only applies to the vendor role, so we
       // ignore it while the same user is using the customer/delivery role.
       socket.on("vendor:suspended", () => {
-        if (activeRole === "vendor") {
+        if (activeRoleRef.current === "vendor") {
           flagVendorSuspended();
           checkVendorProfile();
         }
       });
       socket.on("vendor:reactivated", () => {
         clearVendorSuspended();
-        if (activeRole === "vendor") checkVendorProfile();
+        if (activeRoleRef.current === "vendor") checkVendorProfile();
+      });
+      socket.on("delivery:suspended", () => {
+        flagDeliverySuspended();
+        if (activeRole === "delivery") checkDeliveryProfile();
+      });
+      socket.on("delivery:reactivated", () => {
+        clearDeliverySuspended();
+        if (activeRole === "delivery") checkDeliveryProfile();
       });
       socket.on("delivery:suspended", () => {
         flagDeliverySuspended();
@@ -180,7 +191,7 @@ export default function Navigation() {
     return () => {
       if (socket) socket.disconnect();
     };
-  }, [isAuthenticated, token, activeRole, flagDeactivated, clearDeactivation, flagVendorSuspended, clearVendorSuspended, flagDeliverySuspended, clearDeliverySuspended, checkVendorProfile]);
+  }, [isAuthenticated, token, flagDeactivated, clearDeactivation, flagVendorSuspended, clearVendorSuspended, flagDeliverySuspended, clearDeliverySuspended, checkVendorProfile]);
 
   const checkDeliveryProfile = async () => {
     setCheckingOnboard(true);
@@ -247,7 +258,7 @@ export default function Navigation() {
     isAuthenticated &&
     activeRole &&
     (checkingOnboard ||
-      (activeRole === "vendor"   && vendorOnboarded   === null) ||
+      (activeRole === "vendor" && vendorOnboarded === null) ||
       (activeRole === "delivery" && deliveryOnboarded === null))
   ) {
     return (
@@ -262,7 +273,7 @@ export default function Navigation() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
           <>
-            <Stack.Screen name="Login"  component={LoginScreen} />
+            <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Signup" component={SignupScreen} />
           </>
         ) : !activeRole ? (
@@ -325,8 +336,8 @@ export default function Navigation() {
             )}
 
             {/* ── Shared screens accessible from any role app ─── */}
-            <Stack.Screen name="Checkout"    component={CheckoutScreen} />
-            <Stack.Screen name="Payment"     component={PaymentScreen} />
+            <Stack.Screen name="Checkout" component={CheckoutScreen} />
+            <Stack.Screen name="Payment" component={PaymentScreen} />
             <Stack.Screen name="OrderPlaced" component={OrderPlaced} />
           </>
         )}

@@ -1,17 +1,10 @@
 /**
  * Inventory Service
  * All API calls related to inventory management for vendors.
- * Base URL from EXPO_PUBLIC_API_URL environment variable.
+ * Uses the shared `request` helper from api.js for automatic token refresh.
  */
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
-
-const authHeaders = (token) => ({
-  "Content-Type": "application/json",
-  Authorization: `Bearer ${token}`,
-});
-
-// Deriving status from is_active flag instead of stock
+import { request } from "./api";
 
 export const inventoryService = {
   /**
@@ -20,28 +13,24 @@ export const inventoryService = {
   async getProducts(token, vendorId, { status = "all", q = "" } = {}) {
     if (!vendorId) return { data: [], total: 0 };
     try {
-      const res = await fetch(`${API_BASE}/products/vendor/${vendorId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await res.json();
+      const result = await request("GET", `/products/vendor/${vendorId}`, null, token);
       let data = (result.data?.products || []).map((p) => {
         const isActive = p.is_active ?? true;
-        // category is the top-level name, subcategory is the child name
         const categoryName =
           typeof p.category === "string"
             ? p.category
             : p.category?.name || "Other";
-        const subcategoryName = p.subcategory || null; // returned by updated controller
+        const subcategoryName = p.subcategory || null;
         return {
           id: p.id.toString(),
           name: p.name,
           description: p.description || "",
-          category: { name: categoryName }, // ← keep as object so p.category?.name works in screen
+          category: { name: categoryName },
           subcategory: subcategoryName,
           category_id: p.category_id || null,
           unit: p.unit || "kg",
           price: p.price,
-          priceDisplay: `₹${p.price}`,
+          priceDisplay: `\u20B9${p.price}`,
           updatedAt: new Date(p.updated_at ?? p.created_at).toLocaleDateString(
             "en-IN",
           ),
@@ -55,13 +44,11 @@ export const inventoryService = {
         };
       });
 
-      // Filter by active status
       if (status === "available")
         data = data.filter((p) => p.is_active === true);
       if (status === "unavailable")
         data = data.filter((p) => p.is_active === false);
 
-      // Search filter
       if (q.trim()) {
         const lq = q.toLowerCase();
         data = data.filter(
@@ -83,10 +70,7 @@ export const inventoryService = {
    */
   async getStats(token) {
     try {
-      const res = await fetch(`${API_BASE}/vendors/me/stats`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await res.json();
+      const result = await request("GET", "/vendors/me/stats", null, token);
       const s = result.data?.stats || {};
       return {
         totalProducts: s.total_products ?? 0,
@@ -108,108 +92,59 @@ export const inventoryService = {
    * Create a new product (with inventory record created by backend).
    */
   async createProduct(token, payload) {
-    try {
-      const res = await fetch(`${API_BASE}/products`, {
-        method: "POST",
-        headers: authHeaders(token),
-        body: JSON.stringify({
-          name: payload.name,
-          description: payload.description || "",
-          brand: payload.brand || null,
-          category: payload.category || "Other",
-          // Send subcategory_id if available; backend will use it as category_id
-          subcategory_id: payload.subcategory_id || null,
-          category_id: payload.category_id || null,
-          unit: payload.unit || "kg",
-          price: parseFloat(String(payload.price).replace(/[^0-9.]/g, "")) || 0,
-          mrp: payload.mrp ? parseFloat(String(payload.mrp).replace(/[^0-9.]/g, "")) : null,
-          barcode: payload.barcode || null,
-          type: payload.type || "packed",
-          weight_options: payload.weight_options || null,
-          image_url: payload.image_url || null,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || data.message || "Failed to create product");
-      return data;
-    } catch (err) {
-      console.error("createProduct error:", err);
-      throw err;
-    }
+    const data = await request("POST", "/products", {
+      name: payload.name,
+      description: payload.description || "",
+      brand: payload.brand || null,
+      category: payload.category || "Other",
+      subcategory_id: payload.subcategory_id || null,
+      category_id: payload.category_id || null,
+      unit: payload.unit || "kg",
+      price: parseFloat(String(payload.price).replace(/[^0-9.]/g, "")) || 0,
+      mrp: payload.mrp ? parseFloat(String(payload.mrp).replace(/[^0-9.]/g, "")) : null,
+      barcode: payload.barcode || null,
+      type: payload.type || "packed",
+      weight_options: payload.weight_options || null,
+      image_url: payload.image_url || null,
+    }, token);
+    return data;
   },
 
   /**
    * Update an existing product.
    */
   async updateProduct(token, id, payload) {
-    try {
-      // Build body with only defined fields
-      const body = {};
-      if (payload.name !== undefined) body.name = payload.name;
-      if (payload.description !== undefined)
-        body.description = payload.description;
-      if (payload.category !== undefined) body.category = payload.category;
-      if (payload.category_id !== undefined)
-        body.category_id = payload.category_id;
-      if (payload.unit !== undefined) body.unit = payload.unit;
-      if (payload.price !== undefined)
-        body.price =
-          parseFloat(String(payload.price).replace(/[^0-9.]/g, "")) || 0;
-      if (payload.mrp !== undefined) body.mrp = payload.mrp;
-      if (payload.type !== undefined) body.item_type = payload.type;
-      if (payload.barcode !== undefined) body.barcode = payload.barcode;
-      if (payload.weight_options !== undefined)
-        body.weight_options = payload.weight_options;
-      if (payload.image_url !== undefined) body.image_url = payload.image_url;
-      if (payload.is_active !== undefined) body.is_active = payload.is_active;
+    const body = {};
+    if (payload.name !== undefined) body.name = payload.name;
+    if (payload.description !== undefined)
+      body.description = payload.description;
+    if (payload.category !== undefined) body.category = payload.category;
+    if (payload.category_id !== undefined)
+      body.category_id = payload.category_id;
+    if (payload.unit !== undefined) body.unit = payload.unit;
+    if (payload.price !== undefined)
+      body.price =
+        parseFloat(String(payload.price).replace(/[^0-9.]/g, "")) || 0;
+    if (payload.mrp !== undefined) body.mrp = payload.mrp;
+    if (payload.type !== undefined) body.item_type = payload.type;
+    if (payload.barcode !== undefined) body.barcode = payload.barcode;
+    if (payload.weight_options !== undefined)
+      body.weight_options = payload.weight_options;
+    if (payload.image_url !== undefined) body.image_url = payload.image_url;
+    if (payload.is_active !== undefined) body.is_active = payload.is_active;
 
-
-      const res = await fetch(`${API_BASE}/products/${id}`, {
-        method: "PUT",
-        headers: authHeaders(token),
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to update product");
-      return data;
-    } catch (err) {
-      console.error("updateProduct error:", err);
-      throw err;
-    }
+    return await request("PUT", `/products/${id}`, body, token);
   },
 
   async toggleAvailability(token, productId, available) {
-    try {
-      const res = await fetch(`${API_BASE}/products/${productId}`, {
-        method: "PUT",
-        headers: authHeaders(token),
-        body: JSON.stringify({ is_active: available }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to toggle availability");
-      return data;
-    } catch (err) {
-      console.error("toggleAvailability error:", err);
-      throw err;
-    }
+    return await request("PUT", `/products/${productId}`, { is_active: available }, token);
   },
 
   /**
    * Soft-delete a product (backend sets is_active = false).
    */
   async deleteProduct(token, id) {
-    try {
-      const res = await fetch(`${API_BASE}/products/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to delete product");
-      return data;
-    } catch (err) {
-      console.error("deleteProduct error:", err);
-      throw err;
-    }
+    return await request("DELETE", `/products/${id}`, null, token);
   },
 
   /**
@@ -217,10 +152,7 @@ export const inventoryService = {
    */
   async getVendorProfile(token) {
     try {
-      const res = await fetch(`${API_BASE}/vendors/me/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return await res.json();
+      return await request("GET", "/vendors/me/profile", null, token);
     } catch (err) {
       console.error("getVendorProfile error:", err);
       return { success: false };
@@ -255,18 +187,6 @@ export const inventoryService = {
   },
 
   async bulkImport(token, items) {
-    try {
-      const res = await fetch(`${API_BASE}/inventory/bulk-import`, {
-        method: "POST",
-        headers: authHeaders(token),
-        body: JSON.stringify({ items }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Bulk import failed");
-      return data;
-    } catch (err) {
-      console.error("bulkImport error:", err);
-      throw err;
-    }
+    return await request("POST", "/inventory/bulk-import", { items }, token);
   },
 };

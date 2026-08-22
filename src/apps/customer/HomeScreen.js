@@ -27,7 +27,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, CommonActions } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import { vendorsAPI, ordersAPI, categoriesAPI } from "../../services/api";
 import ChatWidget from "./ChatWidget";
@@ -2436,8 +2436,12 @@ export default function HomeScreen() {
   const goToSearch = (focusField) => {
     const validFields = ["stores", "categories", "items"];
     const field = validFields.includes(focusField) ? focusField : null;
-    const root = navigation.getParent?.() || navigation;
-    root.navigate('Search', field ? { focusField: field } : undefined);
+    navigation.dispatch(
+      CommonActions.navigate({
+        name: 'Search',
+        params: field ? { focusField: field } : undefined,
+      })
+    );
   };
   const addressStore = useAddressStore();
   const cart = useCartStore();
@@ -2541,6 +2545,9 @@ export default function HomeScreen() {
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const contentY = useRef(new Animated.Value(16)).current;
   const floatingY = useRef(new Animated.Value(120)).current;
+  const vendorListAnim = useRef(new Animated.Value(0)).current;
+  const vendorListY = useRef(new Animated.Value(12)).current;
+  const prevLoadingVendors = useRef(true);
 
   useEffect(() => {
     Animated.stagger(100, [
@@ -2574,6 +2581,27 @@ export default function HomeScreen() {
       useNativeDriver: true,
     }).start();
   }, [cartCount, wide]);
+
+  useEffect(() => {
+    if (prevLoadingVendors.current && !loadingVendors && vendors.length > 0) {
+      vendorListAnim.setValue(0);
+      vendorListY.setValue(12);
+      Animated.parallel([
+        Animated.timing(vendorListAnim, {
+          toValue: 1,
+          duration: 350,
+          useNativeDriver: true,
+        }),
+        Animated.spring(vendorListY, {
+          toValue: 0,
+          tension: 60,
+          friction: 9,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+    prevLoadingVendors.current = loadingVendors;
+  }, [loadingVendors, vendors.length]);
 
   useEffect(() => {
     if (locationCoords) {
@@ -2680,13 +2708,13 @@ export default function HomeScreen() {
     try {
       const res = await vendorsAPI.getNearby(lat, lng, 10, storeCategory);
       const list = res.data || [];
-      // ── TEMP DEBUG — remove after checking terminal ──
+
       setVendors(list);
-      // Pass list directly — state update is async, list is synchronous
+      setLoadingVendors(false);
+
       await fetchInventoryForVendors(list);
     } catch {
       setVendors([]);
-    } finally {
       setLoadingVendors(false);
     }
   };
@@ -3441,6 +3469,7 @@ export default function HomeScreen() {
             <Text style={s.emptySub}>{t("home.tryUpdatingLocation")}</Text>
           </View>
         ) : (
+          <Animated.View style={{ opacity: vendorListAnim, transform: [{ translateY: vendorListY }] }}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -3577,6 +3606,7 @@ export default function HomeScreen() {
               );
             })}
           </ScrollView>
+          </Animated.View>
         )}
 
         {/* 4. SHOP BY CATEGORY */}

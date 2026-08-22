@@ -15,6 +15,8 @@ import {
   Alert,
   Platform,
   Pressable,
+  KeyboardAvoidingView,
+  Keyboard,
 } from "react-native";
 import { Linking } from "react-native";
 
@@ -51,6 +53,7 @@ export default function VendorOrdersScreen() {
   const [counterModalVisible, setCounterModalVisible] = useState(false);
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [rejectLoading, setRejectLoading] = useState(false);
   const [liveRiderLocations, setLiveRiderLocations] = useState({});
   const [nearbyRiders, setNearbyRiders] = useState([]);
   const [autoAssigning, setAutoAssigning] = useState(false);
@@ -2520,8 +2523,10 @@ export default function VendorOrdersScreen() {
                     <TouchableOpacity
                       style={omStyles.declineBtn}
                       onPress={() => {
+                        setModalVisible(false);
                         setRejectModalVisible(true);
                         setRejectReason("");
+                        setRejectLoading(false);
                       }}
                       activeOpacity={0.85}
                     >
@@ -3846,6 +3851,10 @@ export default function VendorOrdersScreen() {
 
       {/* REJECT MODAL */}
       <Modal visible={rejectModalVisible} animationType="fade" transparent>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
         <View style={styles.modalContainer}>
           <View style={[styles.modalContent, { paddingBottom: 40 }]}>
             <View style={styles.modalHeader}>
@@ -3864,10 +3873,11 @@ export default function VendorOrdersScreen() {
               multiline
               placeholder={t('vendor.rejectReasonPlaceholder', 'e.g. Items out of stock, shop closing soon...')}
               numberOfLines={4}
+              maxLength={200}
             />
             <TouchableOpacity
               style={{
-                backgroundColor: "#EF4444",
+                backgroundColor: rejectLoading ? "#F87171" : "#EF4444",
                 marginTop: 10,
                 borderRadius: 10,
                 paddingVertical: 14,
@@ -3875,35 +3885,50 @@ export default function VendorOrdersScreen() {
                 alignItems: "center",
                 justifyContent: "center",
                 width: "100%",
+                opacity: rejectLoading ? 0.7 : 1,
               }}
+              disabled={rejectLoading}
               onPress={() => {
-                if (rejectReason.trim().length === 0) {
+                console.log('[VendorDecline] >>> Button pressed, rejectReason:', JSON.stringify(rejectReason), 'selectedOrder:', selectedOrder?.id);
+                Keyboard.dismiss();
+                if (!rejectReason || rejectReason.trim().length === 0) {
+                  console.log('[VendorDecline] No reason provided, showing alert');
                   Alert.alert(
                     t('vendor.reasonRequired', 'Reason Required'),
                     t('vendor.pleaseProvideReason', 'Please provide a reason for rejecting.'),
                   );
                   return;
                 }
-                // Use 'rejected' (not 'cancelled') — backend VALID_TRANSITIONS
-                // for 'pending' only allows: accepted, rejected, countered
-                updateOrderStatus(
-                  selectedOrder.id,
-                  "rejected",
-                  rejectReason.trim(),
-                );
-                setRejectModalVisible(false);
-                setRejectReason("");
-                setModalVisible(false);
+                setRejectLoading(true);
+                console.log(`[VendorDecline] Vendor declining order #${selectedOrder?.id} (${selectedOrder?.order_number}) — reason: "${rejectReason.trim()}"`);
+                setTimeout(async () => {
+                  try {
+                    const res = await updateOrderStatus(
+                      selectedOrder.id,
+                      "rejected",
+                      rejectReason.trim(),
+                    );
+                    console.log('[VendorDecline] API response:', res);
+                    setRejectModalVisible(false);
+                    setRejectReason("");
+                    setModalVisible(false);
+                  } catch (e) {
+                    console.log('[VendorDecline] Error:', e);
+                  } finally {
+                    setRejectLoading(false);
+                  }
+                }, 300);
               }}
             >
               <Text
                 style={[styles.rejectText, { color: "#fff", fontSize: 16 }]}
               >
-                {t('vendor.confirmRejection', 'Confirm Rejection')}
+                {rejectLoading ? t('vendor.rejecting', 'Rejecting...') : t('vendor.confirmRejection', 'Confirm Rejection')}
               </Text>
             </TouchableOpacity>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Vendor Toast Notification ──────────────────────────────────── */}
