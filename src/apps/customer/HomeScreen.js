@@ -2792,7 +2792,9 @@ export default function HomeScreen() {
         });
       }
     });
-    return cats.sort((a, b) => a.label.localeCompare(b.label));
+    // Preserve the backend order (display_order ASC from /products/categories),
+    // NOT alphabetical — admin drag-and-drop reorder must show up here.
+    return cats;
   }, [apiCategories]);
 
   // ── 3-level hierarchy for CategoryBrowseSheet ─────────────────────────────
