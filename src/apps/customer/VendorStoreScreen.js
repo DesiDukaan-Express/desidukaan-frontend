@@ -596,13 +596,15 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
           source={{ uri: p.image_url || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300" }}
           style={pc.img} resizeMode={loose ? "cover" : "contain"}
         />
-        <TouchableOpacity
-          style={pc.eyeBtn}
-          onPress={(e) => { e.stopPropagation?.(); setWishlisted(w => !w); }}
-          disabled={!inStock}
-          onPress={(e) => { e.stopPropagation?.(); onPress?.(); }}
-          activeOpacity={0.7}
-        >
+       <TouchableOpacity
+  style={pc.eyeBtn}
+  onPress={(e) => {
+    e.stopPropagation?.();
+    setWishlisted(w => !w);
+  }}
+  disabled={!inStock}
+  activeOpacity={0.7}
+>
           <Feather name="heart" size={14} color={wishlisted ? "#EF4444" : C.white} fill={wishlisted ? "#EF4444" : "none"} />
         </TouchableOpacity>
         {/* Top-left status badge — matches reference chips: Loose / Fresh / X% OFF */}
@@ -1345,31 +1347,6 @@ export default function VendorStoreScreen() {
             <Feather name={sortMenuOpen ? "chevron-up" : "chevron-down"} size={14} color={C.gray700} />
           </TouchableOpacity>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.sortRow}>
-          {[
-            { key: "default", label: t('vendorStore.default') },
-            { key: "price_asc", label: t('vendorStore.priceLowHigh'), icon: "arrow-up" },
-            { key: "price_desc", label: t('vendorStore.priceHighLow'), icon: "arrow-down" },
-            { key: "discount", label: t('vendorStore.bestDiscount'), icon: "percent" },
-            { key: "name_asc", label: t('vendorStore.nameAZ') },
-            { key: "name_desc", label: t('vendorStore.nameZA') },
-          ]
-
-            .map((opt) => {
-              const active = sortBy === opt.key;
-              return (
-                <TouchableOpacity
-                  key={opt.key}
-                  onPress={() => setSortBy(opt.key)}
-                  style={[s.sortPill, active && s.sortPillActive]}
-                  activeOpacity={0.8}
-                >
-                  {opt.icon && <Feather name={opt.icon} size={10} color={active ? C.white : C.gray600} style={{ marginRight: 4 }} />}
-                  <Text style={[s.sortPillText, active && s.sortPillTextActive]}>{opt.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-        </ScrollView>
       </View>
 
       {/* SORT DROPDOWN — small popover anchored right under the Sort button */}
