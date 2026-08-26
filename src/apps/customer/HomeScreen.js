@@ -27,7 +27,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, CommonActions } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import { vendorsAPI, ordersAPI, categoriesAPI } from "../../services/api";
 import { io } from "socket.io-client";
@@ -800,10 +800,19 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
   const { t } = useTranslation();
   if (!item) return null;
 
+  const itemNormName = item.name ? item.name.trim().toLowerCase() : "";
+
   const vendorsWithItem = vendors.filter((v) =>
-    v._inventory?.some(
-      (inv) => inv.product?.id === item.id && (inv.is_active ?? true),
-    ),
+    v._inventory?.some((inv) => {
+      if (!inv.product) return false;
+      const invActive = inv.is_active ?? true;
+      const prodActive = inv.product.is_active ?? true;
+      if (!invActive || !prodActive) return false;
+
+      const matchId = item.id && Number(inv.product.id || inv.product_id) === Number(item.id);
+      const matchName = itemNormName && inv.product.name?.trim()?.toLowerCase() === itemNormName;
+      return matchId || matchName;
+    }),
   );
 
   return (
@@ -833,9 +842,12 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
               </View>
             ) : (
               vendorsWithItem.map((v) => {
-                const invItem = v._inventory?.find(
-                  (inv) => inv.product?.id === item.id,
-                );
+                const invItem = v._inventory?.find((inv) => {
+                  if (!inv.product) return false;
+                  const matchId = item.id && Number(inv.product.id || inv.product_id) === Number(item.id);
+                  const matchName = itemNormName && inv.product.name?.trim()?.toLowerCase() === itemNormName;
+                  return matchId || matchName;
+                });
                 const price = invItem?.product?.price ?? item.price;
                 return (
                   <TouchableOpacity
@@ -1093,7 +1105,7 @@ function buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCate
 function CategoryBrowseSheet({
   visible, category, hierarchy, onClose,
   onAdd, onRemove, getCartQty, onOpenWeightPicker, vendors,
-  onStoreSelect, apiCategories, onItemDetail,
+  onStoreSelect, apiCategories, onItemDetail, allInventoryItems,
 }) {
   const { t } = useTranslation();
   const [subCatPath, setSubCatPath] = React.useState([]);
@@ -1112,8 +1124,9 @@ function CategoryBrowseSheet({
 
   const findCategoryNode = (nodes, targetName) => {
     if (!nodes || !targetName) return null;
+    const targetLower = targetName.trim().toLowerCase();
     for (const node of nodes) {
-      if (node.name === targetName) return node;
+      if (node.name?.trim()?.toLowerCase() === targetLower) return node;
       if (node.children && node.children.length > 0) {
         const found = findCategoryNode(node.children, targetName);
         if (found) return found;
@@ -1122,40 +1135,120 @@ function CategoryBrowseSheet({
     return null;
   };
 
-  // Direct child subcategories at current level ONLY
+  // Direct child subcategories at current level (from API tree or hierarchy)
   const currentChildSubCats = React.useMemo(() => {
     const targetCat = activeSubCat || category;
+    const subCatsSet = new Set();
+
     const node = findCategoryNode(apiCategories, targetCat);
     if (node && node.children && node.children.length > 0) {
-      return node.children.map(c => c.name);
+      node.children.forEach(c => { if (c.name) subCatsSet.add(c.name); });
     }
-    return [];
-  }, [activeSubCat, category, apiCategories]);
 
-  // Determine items for current active subcategory
-  const subCatItems = React.useMemo(() => {
-    if (!category || !hierarchy) return [];
-    const targetCat = activeSubCat || category;
-
-    let items = [];
-    if (hierarchy[targetCat]) {
+    if (hierarchy && hierarchy[targetCat]) {
       Object.keys(hierarchy[targetCat]).forEach(k => {
-        items.push(...(hierarchy[targetCat][k] || []));
+        if (k !== "All") subCatsSet.add(k);
       });
     }
 
-    if (hierarchy[category] && hierarchy[category][targetCat]) {
-      items.push(...(hierarchy[category][targetCat] || []));
+    return Array.from(subCatsSet);
+  }, [activeSubCat, category, apiCategories, hierarchy]);
+
+  // Determine items for current active subcategory or category
+  const subCatItems = React.useMemo(() => {
+    if (!category) return [];
+    const targetCat = activeSubCat || category;
+    const targetLower = targetCat.trim().toLowerCase();
+
+    // Map variant names (singular/plural)
+    const SYNONYMS = {
+      grocery: "groceries", groceries: "grocery",
+      snack: "snacks", snacks: "snack",
+      beverage: "beverages", beverages: "beverage",
+      fruit: "fruits", fruits: "fruit",
+      medicine: "medicines", medicines: "medicine",
+    };
+
+    const allowedNames = new Set([targetLower]);
+    if (SYNONYMS[targetLower]) allowedNames.add(SYNONYMS[targetLower]);
+
+    // Add descendant subcategories from apiCategories tree
+    const collectDescendants = (nodes) => {
+      for (const node of nodes || []) {
+        const nodeLower = node.name?.trim()?.toLowerCase();
+        if (nodeLower && allowedNames.has(nodeLower)) {
+          const addChildren = (children) => {
+            for (const child of children || []) {
+              if (child.name) {
+                const cLower = child.name.trim().toLowerCase();
+                allowedNames.add(cLower);
+                if (SYNONYMS[cLower]) allowedNames.add(SYNONYMS[cLower]);
+              }
+              if (child.children?.length) addChildren(child.children);
+            }
+          };
+          if (node.children) addChildren(node.children);
+        } else if (node.children?.length) {
+          collectDescendants(node.children);
+        }
+      }
+    };
+    collectDescendants(apiCategories);
+
+    let items = [];
+
+    // 1. Collect from hierarchy
+    if (hierarchy) {
+      Object.keys(hierarchy).forEach(topKey => {
+        const topLower = topKey.trim().toLowerCase();
+        // If we are looking for a top category or specific subcategory
+        if (allowedNames.has(topLower)) {
+          Object.keys(hierarchy[topKey]).forEach(subKey => {
+            if (!activeSubCat || subKey.trim().toLowerCase() === targetLower || allowedNames.has(subKey.trim().toLowerCase())) {
+              items.push(...(hierarchy[topKey][subKey] || []));
+            }
+          });
+        } else {
+          // Check subcategories inside other top-level keys
+          Object.keys(hierarchy[topKey]).forEach(subKey => {
+            if (subKey.trim().toLowerCase() === targetLower || allowedNames.has(subKey.trim().toLowerCase())) {
+              items.push(...(hierarchy[topKey][subKey] || []));
+            }
+          });
+        }
+      });
     }
 
+    // 2. Collect from allInventoryItems
+    if (allInventoryItems && allInventoryItems.length > 0) {
+      allInventoryItems.forEach((inv) => {
+        if (!inv.product) return;
+        const catObj = inv.product.category;
+        let rawCat = "";
+        if (typeof catObj === "object" && catObj?.name) rawCat = catObj.name;
+        else if (typeof catObj === "string") rawCat = catObj;
+        else if (inv.product.category_id && apiCategories) {
+          const foundNode = apiCategories.find(c => Number(c.id) === Number(inv.product.category_id));
+          if (foundNode) rawCat = foundNode.name;
+        }
+
+        const catLower = rawCat ? rawCat.trim().toLowerCase() : "";
+        if (catLower && allowedNames.has(catLower)) {
+          items.push(inv);
+        }
+      });
+    }
+
+    // 3. Deduplicate by unique inventory item / product id
     const seen = new Set();
     return items.filter(inv => {
-      if (!inv?.id) return false;
-      if (seen.has(inv.id)) return false;
-      seen.add(inv.id);
+      if (!inv?.id && !inv?.product?.id) return false;
+      const key = inv.product?.id || inv.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
-  }, [category, activeSubCat, hierarchy]);
+  }, [category, activeSubCat, hierarchy, apiCategories, allInventoryItems]);
 
   if (!visible || !category) return null;
 
@@ -1219,54 +1312,58 @@ function CategoryBrowseSheet({
             </View>
           )}
 
-          {/* ── Subcategory Grid View ── */}
-          {showSubCatGrid ? (
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={cbs.subCatGridContainer}
-            >
-              <Text style={cbs.subCatGridTitle}>
-                {subCatPath.length === 0 ? t("home.selectSubCategory") : `Subcategories of ${activeSubCat}`}
-              </Text>
-              <View style={cbs.subCatGrid}>
-                {currentChildSubCats.map(sc => {
-                  const subCatNode = findCategoryNode(apiCategories, sc);
-                  const subItems = hierarchy[category]?.[sc] || hierarchy[sc]?.["All"] || (hierarchy[sc] ? Object.values(hierarchy[sc]).flat() : []);
-                  const count = subItems.length;
-                  const firstItemImg = subItems[0]?.product?.image_url;
-                  const displayImg = subCatNode?.image_url || subCatNode?.image || firstItemImg;
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+            {/* ── Section 1: Subcategories (if any) ── */}
+            {showSubCatGrid && (
+              <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 }}>
+                <Text style={cbs.subCatGridTitle}>
+                  {subCatPath.length === 0 ? t("home.selectSubCategory") : `Subcategories of ${activeSubCat}`}
+                </Text>
+                <View style={cbs.subCatGrid}>
+                  {currentChildSubCats.map(sc => {
+                    const subCatNode = findCategoryNode(apiCategories, sc);
+                    const subItems = hierarchy[category]?.[sc] || hierarchy[sc]?.["All"] || (hierarchy[sc] ? Object.values(hierarchy[sc]).flat() : []);
+                    const count = subItems.length;
+                    const firstItemImg = subItems[0]?.product?.image_url;
+                    const displayImg = subCatNode?.image_url || subCatNode?.image || firstItemImg;
 
-                  return (
-                    <TouchableOpacity
-                      key={sc}
-                      style={[cbs.subCatCard, { borderColor: catAccent.bg }]}
-                      onPress={() => handlePushPath(sc)}
-                      activeOpacity={0.85}
-                    >
-                      <View style={[cbs.subCatCardIconWrap, { backgroundColor: catAccent.bg }]}>
-                        {displayImg ? (
-                          <Image source={{ uri: displayImg }} style={cbs.subCatCardImg} resizeMode="cover" />
-                        ) : (
-                          <Text style={cbs.subCatCardEmoji}>{catAccent.icon || "📂"}</Text>
-                        )}
-                      </View>
-                      <View style={cbs.subCatCardInfo}>
-                        <Text style={cbs.subCatCardName} numberOfLines={2}>{sc}</Text>
-                        {count > 0 && (
-                          <Text style={cbs.subCatCardCount}>{t("home.itemsCount", { count })}</Text>
-                        )}
-                      </View>
-                      <MaterialIcons name="chevron-right" size={20} color={catAccent.accent} />
-                    </TouchableOpacity>
-                  );
-                })}
+                    return (
+                      <TouchableOpacity
+                        key={sc}
+                        style={[cbs.subCatCard, { borderColor: catAccent.bg }]}
+                        onPress={() => handlePushPath(sc)}
+                        activeOpacity={0.85}
+                      >
+                        <View style={[cbs.subCatCardIconWrap, { backgroundColor: catAccent.bg }]}>
+                          {displayImg ? (
+                            <Image source={{ uri: displayImg }} style={cbs.subCatCardImg} resizeMode="cover" />
+                          ) : (
+                            <Text style={cbs.subCatCardEmoji}>{catAccent.icon || "📂"}</Text>
+                          )}
+                        </View>
+                        <View style={cbs.subCatCardInfo}>
+                          <Text style={cbs.subCatCardName} numberOfLines={2}>{sc}</Text>
+                          {count > 0 && (
+                            <Text style={cbs.subCatCardCount}>{t("home.itemsCount", { count })}</Text>
+                          )}
+                        </View>
+                        <MaterialIcons name="chevron-right" size={20} color={catAccent.accent} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
-            </ScrollView>
-          ) : (
-            <>
-              {/* Note: Upper gray pills bar removed as requested to keep UI clean & strictly hierarchical */}
+            )}
 
-              {/* ── Column Headers ── */}
+            {/* ── Section 2: Items in Category ── */}
+            <View style={{ borderTopWidth: showSubCatGrid ? 1 : 0, borderTopColor: "#E2E8F0", paddingTop: showSubCatGrid ? 12 : 4 }}>
+              {showSubCatGrid && (
+                <Text style={[cbs.subCatGridTitle, { paddingHorizontal: 16, marginBottom: 8 }]}>
+                  Items in {activeSubCat || category}
+                </Text>
+              )}
+
+              {/* Column Headers */}
               <View style={cbs.tableHeader}>
                 <Text style={[cbs.thCell, { flex: 2 }]}>{t("home.colProduct")}</Text>
                 <Text style={[cbs.thCell, { flex: 1, textAlign: "center" }]}>{t("home.brand")}</Text>
@@ -1274,121 +1371,116 @@ function CategoryBrowseSheet({
                 <Text style={[cbs.thCell, { width: 80, textAlign: "right" }]}>{t("home.price")}</Text>
               </View>
 
-              {/* ── Product Rows ── */}
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                style={{ flex: 1 }}
-              >
-                {subCatItems.length === 0 ? (
-                  <View style={cbs.emptyWrap}>
-                    <MaterialIcons name="inventory" size={32} color={C.gray300} />
-                    <Text style={cbs.emptyText}>{t("home.noSubCatItems")}</Text>
-                  </View>
-                ) : (
-                  subCatItems.map((inv, idx) => {
-                    const p = inv.product;
-                    if (!p) return null;
-                    const qty = getCartQty(p.id);
-                    const loose = isLooseItem(p);
-                    const hasMrp = p.mrp && p.mrp > p.price;
-                    const discPct = hasMrp ? Math.round((1 - p.price / p.mrp) * 100) : 0;
-                    const vendorName = inv._vendorName || "";
+              {/* Product Rows */}
+              {subCatItems.length === 0 ? (
+                <View style={cbs.emptyWrap}>
+                  <MaterialIcons name="inventory" size={32} color={C.gray300} />
+                  <Text style={cbs.emptyText}>{t("home.noSubCatItems")}</Text>
+                </View>
+              ) : (
+                subCatItems.map((inv, idx) => {
+                  const p = inv.product;
+                  if (!p) return null;
+                  const qty = getCartQty(p.id);
+                  const loose = isLooseItem(p);
+                  const hasMrp = p.mrp && p.mrp > p.price;
+                  const discPct = hasMrp ? Math.round((1 - p.price / p.mrp) * 100) : 0;
+                  const vendorName = inv._vendorName || "";
 
-                    const item = {
-                      id: p.id, name: p.name, price: p.price,
-                      img: p.image_url || null, unit: p.unit || "1 pc",
-                      orig: hasMrp ? p.mrp : null, category,
-                      item_type: p.item_type, weight_options: p.weight_options,
-                    };
+                  const item = {
+                    id: p.id, name: p.name, price: p.price,
+                    img: p.image_url || null, unit: p.unit || "1 pc",
+                    orig: hasMrp ? p.mrp : null, category,
+                    item_type: p.item_type, weight_options: p.weight_options,
+                  };
 
-                    return (
-                      <View key={`${p.id}-${idx}`} style={[
-                        cbs.productRow,
-                        idx % 2 === 0 && cbs.productRowAlt,
-                      ]}>
-                        {/* Image + Name */}
-                        <View style={[cbs.productCell, { flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }]}>
-                          <View style={cbs.productImgWrap}>
-                            <Image
-                              source={{
-                                uri: p.image_url ||
-                                  CAT_FALLBACK_IMGS[category] ||
-                                  CAT_FALLBACK_IMGS._default
-                              }}
-                              style={cbs.productImg}
-                              resizeMode="cover"
-                            />
-                            {hasMrp && (
-                              <View style={cbs.discPill}>
-                                <Text style={cbs.discPillText}>{discPct}%</Text>
-                              </View>
-                            )}
-                            {loose && (
-                              <View style={[cbs.discPill, { backgroundColor: "#0891B2" }]}>
-                                <Text style={cbs.discPillText}>{t("home.loose")}</Text>
-                              </View>
-                            )}
-                            <TouchableOpacity
-                              style={cbs.eyeBtn}
-                              activeOpacity={0.7}
-                              onPress={() => onItemDetail && onItemDetail(item, p)}
-                            >
-                              <MaterialIcons name="visibility" size={11} color={C.white} />
-                            </TouchableOpacity>
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={cbs.productName} numberOfLines={2}>{p.name}</Text>
-                            {p.description ? (
-                              <Text style={cbs.productDesc} numberOfLines={1}>{p.description}</Text>
-                            ) : null}
-                          </View>
-                        </View>
-
-                        {/* Brand (vendor) */}
-                        <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
-                          <Text style={cbs.brandText} numberOfLines={2}>{vendorName}</Text>
-                        </View>
-
-                        {/* Qty / Unit (Particulars) */}
-                        <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
-                          <Text style={cbs.unitText}>{p.unit || "1 pc"}</Text>
-                        </View>
-
-                        {/* Price + ADD */}
-                        <View style={[cbs.productCell, { width: 80, alignItems: "flex-end" }]}>
-                          <Text style={cbs.priceText}>₹{p.price}</Text>
-                          {hasMrp && <Text style={cbs.mrpText}>₹{p.mrp}</Text>}
-                          {qty === 0 ? (
-                            <TouchableOpacity
-                              style={[cbs.addBtn, loose && { backgroundColor: "#0891B2" }]}
-                              activeOpacity={0.8}
-                              onPress={() => {
-                                if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
-                                else onAdd(item);
-                              }}
-                            >
-                              <Text style={cbs.addBtnText}>{loose ? t("home.select") : t("common.add")}</Text>
-                            </TouchableOpacity>
-                          ) : (
-                            <View style={cbs.qtyRow}>
-                              <TouchableOpacity style={cbs.qtyBtn} onPress={() => onRemove(item)}>
-                                <MaterialIcons name="remove" size={10} color={C.white} />
-                              </TouchableOpacity>
-                              <Text style={cbs.qtyNum}>{qty}</Text>
-                              <TouchableOpacity style={cbs.qtyBtn} onPress={() => onAdd(item)}>
-                                <MaterialIcons name="add" size={10} color={C.white} />
-                              </TouchableOpacity>
+                  return (
+                    <View key={`${p.id}-${idx}`} style={[
+                      cbs.productRow,
+                      idx % 2 === 0 && cbs.productRowAlt,
+                    ]}>
+                      {/* Image + Name */}
+                      <View style={[cbs.productCell, { flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }]}>
+                        <View style={cbs.productImgWrap}>
+                          <Image
+                            source={{
+                              uri: p.image_url ||
+                                CAT_FALLBACK_IMGS[category] ||
+                                CAT_FALLBACK_IMGS._default
+                            }}
+                            style={cbs.productImg}
+                            resizeMode="cover"
+                          />
+                          {hasMrp && (
+                            <View style={cbs.discPill}>
+                              <Text style={cbs.discPillText}>{discPct}%</Text>
                             </View>
                           )}
+                          {loose && (
+                            <View style={[cbs.discPill, { backgroundColor: "#0891B2" }]}>
+                              <Text style={cbs.discPillText}>{t("home.loose")}</Text>
+                            </View>
+                          )}
+                          <TouchableOpacity
+                            style={cbs.eyeBtn}
+                            activeOpacity={0.7}
+                            onPress={() => onItemDetail && onItemDetail(item, p)}
+                          >
+                            <MaterialIcons name="visibility" size={11} color={C.white} />
+                          </TouchableOpacity>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={cbs.productName} numberOfLines={2}>{p.name}</Text>
+                          {p.description ? (
+                            <Text style={cbs.productDesc} numberOfLines={1}>{p.description}</Text>
+                          ) : null}
                         </View>
                       </View>
-                    );
-                  })
-                )}
-                <View style={{ height: 24 }} />
-              </ScrollView>
-            </>
-          )}
+
+                      {/* Brand (vendor) */}
+                      <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
+                        <Text style={cbs.brandText} numberOfLines={2}>{vendorName}</Text>
+                      </View>
+
+                      {/* Qty / Unit (Particulars) */}
+                      <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
+                        <Text style={cbs.unitText}>{p.unit || "1 pc"}</Text>
+                      </View>
+
+                      {/* Price + ADD */}
+                      <View style={[cbs.productCell, { width: 80, alignItems: "flex-end" }]}>
+                        <Text style={cbs.priceText}>₹{p.price}</Text>
+                        {hasMrp && <Text style={cbs.mrpText}>₹{p.mrp}</Text>}
+                        {qty === 0 ? (
+                          <TouchableOpacity
+                            style={[cbs.addBtn, loose && { backgroundColor: "#0891B2" }]}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                              if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
+                              else onAdd(item);
+                            }}
+                          >
+                            <Text style={cbs.addBtnText}>{loose ? t("home.select") : t("common.add")}</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={cbs.qtyRow}>
+                            <TouchableOpacity style={cbs.qtyBtn} onPress={() => onRemove(item)}>
+                              <MaterialIcons name="remove" size={10} color={C.white} />
+                            </TouchableOpacity>
+                            <Text style={cbs.qtyNum}>{qty}</Text>
+                            <TouchableOpacity style={cbs.qtyBtn} onPress={() => onAdd(item)}>
+                              <MaterialIcons name="add" size={10} color={C.white} />
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+              <View style={{ height: 24 }} />
+            </View>
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -2348,8 +2440,12 @@ export default function HomeScreen() {
   const goToSearch = (focusField) => {
     const validFields = ["stores", "categories", "items"];
     const field = validFields.includes(focusField) ? focusField : null;
-    const root = navigation.getParent?.() || navigation;
-    root.navigate('Search', field ? { focusField: field } : undefined);
+    navigation.dispatch(
+      CommonActions.navigate({
+        name: 'Search',
+        params: field ? { focusField: field } : undefined,
+      })
+    );
   };
   const addressStore = useAddressStore();
   const cart = useCartStore();
@@ -2459,6 +2555,9 @@ export default function HomeScreen() {
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const contentY = useRef(new Animated.Value(16)).current;
   const floatingY = useRef(new Animated.Value(120)).current;
+  const vendorListAnim = useRef(new Animated.Value(0)).current;
+  const vendorListY = useRef(new Animated.Value(12)).current;
+  const prevLoadingVendors = useRef(true);
 
   useEffect(() => {
     Animated.stagger(100, [
@@ -2492,6 +2591,27 @@ export default function HomeScreen() {
       useNativeDriver: true,
     }).start();
   }, [cartCount, wide]);
+
+  useEffect(() => {
+    if (prevLoadingVendors.current && !loadingVendors && vendors.length > 0) {
+      vendorListAnim.setValue(0);
+      vendorListY.setValue(12);
+      Animated.parallel([
+        Animated.timing(vendorListAnim, {
+          toValue: 1,
+          duration: 350,
+          useNativeDriver: true,
+        }),
+        Animated.spring(vendorListY, {
+          toValue: 0,
+          tension: 60,
+          friction: 9,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+    prevLoadingVendors.current = loadingVendors;
+  }, [loadingVendors, vendors.length]);
 
   useEffect(() => {
     if (locationCoords) {
@@ -2730,13 +2850,13 @@ export default function HomeScreen() {
     try {
       const res = await vendorsAPI.getNearby(lat, lng, 10, storeCategory);
       const list = res.data || [];
-      // ── TEMP DEBUG — remove after checking terminal ──
+
       setVendors(list);
-      // Pass list directly — state update is async, list is synchronous
+      setLoadingVendors(false);
+
       await fetchInventoryForVendors(list);
     } catch {
       setVendors([]);
-    } finally {
       setLoadingVendors(false);
     }
   };
@@ -2784,7 +2904,11 @@ export default function HomeScreen() {
     const items = [];
     vendors.forEach((v) => {
       (v._inventory || []).forEach((inv) => {
+<<<<<<< HEAD
         if ((inv.product?.is_active ?? true) && inv.product) {
+=======
+        if (inv.product) {
+>>>>>>> cb1832865e9ea9d9514296f177065355af387803
           items.push({ ...inv, _vendorId: v.id, _vendorName: v.shop_name });
         }
       });
@@ -2794,7 +2918,6 @@ export default function HomeScreen() {
 
   // ── Address Handlers ────────────────────────────────────────────────────────
 
-  // In normalizeCatName — add Personal Care to the exclusion list
   const normalizeCatName = (name) => {
     if (!name) return null;
     const EXCLUDE = new Set(["Personal Care", "personal care", "PersonalCare"]);
@@ -2858,14 +2981,42 @@ export default function HomeScreen() {
   // Backend broadcasts product:updated globally, so _inventory is always current.
   // No need for a separate popularFromAPI — it was stale after mount.
   const popularItems = useMemo(() => {
-    const seen = new Set();
+    const seenNames = new Set();
     const items = [];
 
+<<<<<<< HEAD
+=======
+    // Helper: Check if product has stock & active status in any nearby vendor
+    const isStockAvailable = (productName, productId) => {
+      return vendors.some((v) => {
+        return (v._inventory || []).some((inv) => {
+          if (!inv.product) return false;
+          const matchId = productId && Number(inv.product_id || inv.product.id) === Number(productId);
+          const matchName = productName && inv.product.name?.trim().toLowerCase() === productName.trim().toLowerCase();
+          if (!matchId && !matchName) return false;
+
+          const invActive = inv.is_active ?? true;
+          const prodActive = inv.product.is_active ?? true;
+          if (!invActive || !prodActive) return false;
+
+          if (inv.stock_qty !== undefined && inv.stock_qty !== null && Number(inv.stock_qty) <= 0) return false;
+
+          return true;
+        });
+      });
+    };
+
+    // First add all inventory items
+>>>>>>> cb1832865e9ea9d9514296f177065355af387803
     allInventoryItems.forEach((inv) => {
       const p = inv.product;
-      if (!p?.id || seen.has(p.id)) return;
-      seen.add(p.id);
+      if (!p?.id || !p?.name) return;
+      const normName = p.name.trim().toLowerCase();
+      if (seenNames.has(normName)) return;
+      seenNames.add(normName);
+
       const catName = getCategoryName(inv) || "Other";
+      const available = isStockAvailable(p.name, p.id);
 
       items.push({
         id: p.id,
@@ -2877,12 +3028,33 @@ export default function HomeScreen() {
         category: catName,
         item_type: p.item_type,
         weight_options: p.weight_options,
-        isAvailableNearby: true,
+        isAvailableNearby: available,
       });
     });
 
+<<<<<<< HEAD
     return items;
   }, [allInventoryItems, getCategoryName]);
+=======
+    // Next add API products if available, marking whether available in nearby inventory
+    if (popularFromAPI.length > 0) {
+      popularFromAPI.forEach((p) => {
+        if (!p?.id || !p?.name) return;
+        const normName = p.name.trim().toLowerCase();
+        if (seenNames.has(normName)) return;
+        seenNames.add(normName);
+
+        const available = isStockAvailable(p.name, p.id);
+        items.push({
+          ...p,
+          isAvailableNearby: available,
+        });
+      });
+    }
+
+    return items;
+  }, [popularFromAPI, allInventoryItems, vendors, getCategoryName]);
+>>>>>>> cb1832865e9ea9d9514296f177065355af387803
 
   // ── Address Handlers ────────────────────────────────────────────────────────
   const openAddressPicker = () => {
@@ -3454,6 +3626,7 @@ export default function HomeScreen() {
             <Text style={s.emptySub}>{t("home.tryUpdatingLocation")}</Text>
           </View>
         ) : (
+          <Animated.View style={{ opacity: vendorListAnim, transform: [{ translateY: vendorListY }] }}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -3590,6 +3763,7 @@ export default function HomeScreen() {
               );
             })}
           </ScrollView>
+          </Animated.View>
         )}
 
         {/* 4. SHOP BY CATEGORY */}
@@ -3856,6 +4030,7 @@ export default function HomeScreen() {
         visible={catSheetVisible}
         category={catSheetCategory}
         hierarchy={categoryHierarchy}
+        allInventoryItems={allInventoryItems}
         onClose={() => setCatSheetVisible(false)}
         onAdd={handleAdd}
         onRemove={handleRemove}

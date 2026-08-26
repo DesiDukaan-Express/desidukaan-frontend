@@ -448,7 +448,7 @@ const dts = StyleSheet.create({
 
 
 // ─── Negotiation Banner (Shown while waiting or after response) ──────────────
-function NegotiationBanner({ status, countdown, vendorName, onDismiss }) {
+function NegotiationBanner({ status, countdown, vendorName, onDismiss, declineReason }) {
   const { t } = useTranslation();
   const configs = {
     pending: {
@@ -469,7 +469,7 @@ function NegotiationBanner({ status, countdown, vendorName, onDismiss }) {
     },
     rejected: {
       title: t('checkout.orderDeclined', 'Order Declined'),
-      sub: t('orders.storeDeclinedSub', "The store couldn't fulfill your order right now."),
+      sub: declineReason ? `Note: "${declineReason}"` : t('orders.storeDeclinedSub', "The store couldn't fulfill your order right now."),
       icon: "x-circle",
       color: C.red,
       bg: C.redLight,
@@ -731,6 +731,9 @@ export default function CheckoutScreen() {
   const [orderStatus, setOrderStatus] = useState(
     route.params?.initialOrderStatus || resumeOrder?.status || "idle"
   ); // idle, pending, accepted, rejected, expired, countered
+  const [declineReason, setDeclineReason] = useState(
+    route.params?.cancellation_reason || resumeOrder?.cancellation_reason || resumeOrder?.reason || null
+  );
   const [countdown, setCountdown] = useState(300);
   const [counterData, setCounterData] = useState(() => {
     const rawCounter = resumeOrder?.counter_offer || null;
@@ -2219,6 +2222,7 @@ export default function CheckoutScreen() {
               countdown={countdown}
               vendorName={vendorName}
               onDismiss={null}
+              declineReason={declineReason}
             />
 
             {orderStatus === "countered" && (

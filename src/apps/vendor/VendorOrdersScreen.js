@@ -15,6 +15,8 @@ import {
   Alert,
   Platform,
   Pressable,
+  KeyboardAvoidingView,
+  Keyboard,
 } from "react-native";
 import { Linking } from "react-native";
 
@@ -64,6 +66,7 @@ export default function VendorOrdersScreen() {
   const [counterModalVisible, setCounterModalVisible] = useState(false);
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [rejectLoading, setRejectLoading] = useState(false);
   const [liveRiderLocations, setLiveRiderLocations] = useState({});
   const [nearbyRiders, setNearbyRiders] = useState([]);
   const [autoAssigning, setAutoAssigning] = useState(false);
@@ -118,6 +121,7 @@ export default function VendorOrdersScreen() {
     }
   };
 
+<<<<<<< HEAD
   // ── Demand Surcharge (vendor can set surge % for rain/peak hours) ─────────
   const [demandSurcharge, setDemandSurcharge] = useState(0);   // current %
   const [surchargeInput, setSurchargeInput] = useState('0');
@@ -130,42 +134,11 @@ const selectedOrderRef = useRef(selectedOrder);
 const updateOrderStatusRef = useRef(null);
 // Latest store coords for the live rider listeners (avoids stale closures)
 const storeLocationRef = useRef({ latitude: 28.6139, longitude: 77.209 });
-
-  // Fetch vendor profile to read current demand_surcharge_pct
-  useEffect(() => {
-    if (!token) return;
-    (async () => {
-      try {
-        const res = await fetch(`${API_BASE}/vendors/me/profile`, { headers: { Authorization: `Bearer ${token}` } });
-        const json = await res.json();
-        const v = json.data?.vendor || json.vendor;
-        if (v) {
-          setVendorId(v.id);
-          const pct = v.demand_surcharge_pct ?? 0;
-          setDemandSurcharge(pct);
-          setSurchargeInput(String(pct));
-        }
-      } catch (e) { console.warn('vendor profile fetch:', e.message); }
-    })();
-  }, [token]);
-
-  const saveDemandSurcharge = async (pct) => {
-    if (!vendorId) return;
-    setSurchargeLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/vendors/${vendorId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ demand_surcharge_pct: parseFloat(pct) || 0 }),
-      });
-      if (res.ok) {
-        setDemandSurcharge(parseFloat(pct) || 0);
-        setShowSurchargeEdit(false);
-        setVendorToast({ visible: true, message: `Demand surcharge set to ${pct}%`, type: 'success' });
-      }
-    } catch (e) { console.warn('save surcharge:', e.message); }
-    finally { setSurchargeLoading(false); }
-  };
+=======
+  const ordersRef = useRef(orders);
+  const selectedOrderRef = useRef(selectedOrder);
+  const updateOrderStatusRef = useRef(null);
+>>>>>>> cb1832865e9ea9d9514296f177065355af387803
 
   const toggleCustomer = (name) => {
     setExpandedCustomers((prev) => ({ ...prev, [name]: !prev[name] }));
@@ -1264,52 +1237,6 @@ socket.on("delivery:declined", (data) => {
             </View>
           )}
         </View>
-      </View>
-
-      {/* ── DEMAND SURCHARGE BANNER ── */}
-      <View style={{ marginHorizontal: 16, marginBottom: 8 }}>
-        {showSurchargeEdit ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF3C7', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#FDE68A' }}>
-            <Text style={{ fontSize: 12, color: '#92400E', fontWeight: '700', flex: 1 }}>Set surge %</Text>
-            <TextInput
-              style={{ borderWidth: 1, borderColor: '#FDE68A', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, fontSize: 14, fontWeight: '700', width: 64, textAlign: 'center', backgroundColor: '#FFF' }}
-              keyboardType="numeric"
-              value={surchargeInput}
-              onChangeText={setSurchargeInput}
-              maxLength={3}
-            />
-            <TouchableOpacity
-              style={{ backgroundColor: '#D97706', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
-              onPress={() => saveDemandSurcharge(surchargeInput)}
-              disabled={surchargeLoading}
-            >
-              <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 12 }}>{surchargeLoading ? '...' : 'Save'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowSurchargeEdit(false)}>
-              <Text style={{ color: '#92400E', fontSize: 18, fontWeight: '700' }}>×</Text>
-            </TouchableOpacity>
-          </View>
-        ) : demandSurcharge > 0 ? (
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF3C7', borderRadius: 12, padding: 10, borderWidth: 1.5, borderColor: '#F59E0B' }}
-            onPress={() => setShowSurchargeEdit(true)}
-            activeOpacity={0.8}
-          >
-            <Feather name="cloud-rain" size={16} color="#92400E" />
-            <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: '#92400E' }}>Demand surcharge ACTIVE: +{demandSurcharge}% on delivery</Text>
-            <Text style={{ fontSize: 11, color: '#B45309', fontWeight: '600' }}>Edit</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F9FAFB', borderRadius: 10, padding: 8, borderWidth: 1, borderColor: '#E5E7EB' }}
-            onPress={() => setShowSurchargeEdit(true)}
-            activeOpacity={0.8}
-          >
-            <Feather name="zap" size={13} color="#9CA3AF" />
-            <Text style={{ fontSize: 12, color: '#9CA3AF', flex: 1 }}>Set demand surcharge (rain, peak hours...)</Text>
-            <Text style={{ fontSize: 11, color: '#D97706', fontWeight: '700' }}>+ Add</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       <View style={styles.tabContainer}>
@@ -2792,8 +2719,10 @@ socket.on("delivery:declined", (data) => {
                     <TouchableOpacity
                       style={omStyles.declineBtn}
                       onPress={() => {
+                        setModalVisible(false);
                         setRejectModalVisible(true);
                         setRejectReason("");
+                        setRejectLoading(false);
                       }}
                       activeOpacity={0.85}
                     >
@@ -4118,6 +4047,10 @@ socket.on("delivery:declined", (data) => {
 
       {/* REJECT MODAL */}
       <Modal visible={rejectModalVisible} animationType="fade" transparent>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
         <View style={styles.modalContainer}>
           <View style={[styles.modalContent, { paddingBottom: 40 }]}>
             <View style={styles.modalHeader}>
@@ -4136,10 +4069,11 @@ socket.on("delivery:declined", (data) => {
               multiline
               placeholder={t('vendor.rejectReasonPlaceholder', 'e.g. Items out of stock, shop closing soon...')}
               numberOfLines={4}
+              maxLength={200}
             />
             <TouchableOpacity
               style={{
-                backgroundColor: "#EF4444",
+                backgroundColor: rejectLoading ? "#F87171" : "#EF4444",
                 marginTop: 10,
                 borderRadius: 10,
                 paddingVertical: 14,
@@ -4147,35 +4081,50 @@ socket.on("delivery:declined", (data) => {
                 alignItems: "center",
                 justifyContent: "center",
                 width: "100%",
+                opacity: rejectLoading ? 0.7 : 1,
               }}
+              disabled={rejectLoading}
               onPress={() => {
-                if (rejectReason.trim().length === 0) {
+                console.log('[VendorDecline] >>> Button pressed, rejectReason:', JSON.stringify(rejectReason), 'selectedOrder:', selectedOrder?.id);
+                Keyboard.dismiss();
+                if (!rejectReason || rejectReason.trim().length === 0) {
+                  console.log('[VendorDecline] No reason provided, showing alert');
                   Alert.alert(
                     t('vendor.reasonRequired', 'Reason Required'),
                     t('vendor.pleaseProvideReason', 'Please provide a reason for rejecting.'),
                   );
                   return;
                 }
-                // Use 'rejected' (not 'cancelled') — backend VALID_TRANSITIONS
-                // for 'pending' only allows: accepted, rejected, countered
-                updateOrderStatus(
-                  selectedOrder.id,
-                  "rejected",
-                  rejectReason.trim(),
-                );
-                setRejectModalVisible(false);
-                setRejectReason("");
-                setModalVisible(false);
+                setRejectLoading(true);
+                console.log(`[VendorDecline] Vendor declining order #${selectedOrder?.id} (${selectedOrder?.order_number}) — reason: "${rejectReason.trim()}"`);
+                setTimeout(async () => {
+                  try {
+                    const res = await updateOrderStatus(
+                      selectedOrder.id,
+                      "rejected",
+                      rejectReason.trim(),
+                    );
+                    console.log('[VendorDecline] API response:', res);
+                    setRejectModalVisible(false);
+                    setRejectReason("");
+                    setModalVisible(false);
+                  } catch (e) {
+                    console.log('[VendorDecline] Error:', e);
+                  } finally {
+                    setRejectLoading(false);
+                  }
+                }, 300);
               }}
             >
               <Text
                 style={[styles.rejectText, { color: "#fff", fontSize: 16 }]}
               >
-                {t('vendor.confirmRejection', 'Confirm Rejection')}
+                {rejectLoading ? t('vendor.rejecting', 'Rejecting...') : t('vendor.confirmRejection', 'Confirm Rejection')}
               </Text>
             </TouchableOpacity>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Vendor Toast Notification ──────────────────────────────────── */}

@@ -85,13 +85,13 @@ const C = {
 
 // ──────────────────────────────────────────────────────────────────────────────────────────────────
 const getSteps = (t) => [
-  { key: 'reach_pickup', label: t('delivery.reachPickup', 'Reach Pickup'),  api: null,        btnLabel: t('delivery.reachedPickupLocation', 'REACHED PICKUP LOCATION') },
+  { key: 'reach_pickup', label: t('delivery.reachPickup', 'Reach Pickup'),  api: 'at_pickup', btnLabel: t('delivery.reachedPickupLocation', 'REACHED PICKUP LOCATION') },
   { key: 'pick_order',   label: t('delivery.pickOrder', 'Pick Order'),    api: 'picked_up', btnLabel: t('delivery.pickedOrder', 'PICKED ORDER')            },
   { key: 'reach_drop',   label: t('delivery.reachDrop', 'Reach Drop'),    api: null,        btnLabel: t('delivery.reachedDropLocation', 'REACHED DROP LOCATION')   },
   { key: 'drop_order',   label: t('delivery.dropOrder', 'Drop Order'),    api: 'delivered', btnLabel: t('delivery.orderDelivered', 'ORDER DELIVERED')         },
 ];
 const STEPS = [
-  { key: 'reach_pickup', label: 'Reach Pickup',  api: null,        btnLabel: 'Reached Pickup Location' },
+  { key: 'reach_pickup', label: 'Reach Pickup',  api: 'at_pickup', btnLabel: 'Reached Pickup Location' },
   { key: 'pick_order',   label: 'Pick Order',    api: 'picked_up', btnLabel: 'Picked Order'            },
   { key: 'reach_drop',   label: 'Reach Drop',    api: null,        btnLabel: 'Reached Drop Location'   },
   { key: 'drop_order',   label: 'Drop Order',    api: 'delivered', btnLabel: 'Order Delivered'         },
@@ -630,22 +630,15 @@ function StepContent({ step, activeOrder, myLocation }) {
 
   const getMarkers = () => {
     if (!myLocation) return [];
-    const me = { coordinate: myLocation, title: 'You' };
-    if (step === 0 || step === 1) {
-      const markers = [me];
-      if (vendorLoc?.latitude) markers.push({ coordinate: vendorLoc, title: activeOrder.pickup });
-      return markers;
-    }
-    if (step === 2 || step === 3) {
-      const markers = [me];
-      if (dropLoc?.latitude) markers.push({ coordinate: dropLoc, title: activeOrder.drop });
-      return markers;
-    }
-    return [me];
+    return [{ coordinate: myLocation, title: 'You' }];
   };
 
+  // Show vendor location during pickup phase (steps 0-1), customer/drop location during drop phase (steps 2-3)
   const targetLoc = step <= 1 ? vendorLoc : dropLoc;
-  const mapRegion = targetLoc?.latitude != null ? targetLoc : null;
+  const destLat = targetLoc?.latitude ?? null;
+  const destLng = targetLoc?.longitude ?? null;
+  const destTitle = step <= 1 ? activeOrder?.pickup : activeOrder?.drop;
+  const mapRegion = destLat != null ? targetLoc : null;
 
   const openMap = (loc, fallbackAddress) => {
     let url = null;
@@ -674,7 +667,13 @@ function StepContent({ step, activeOrder, myLocation }) {
     <View>
       {/* Map */}
       <View style={styles.stepMap}>
-        <DeliveryMapView currentRegion={mapRegion || myLocation} markers={getMarkers()} />
+        <DeliveryMapView
+          currentRegion={mapRegion || myLocation}
+          markers={getMarkers()}
+          destLat={destLat}
+          destLng={destLng}
+          destTitle={destTitle}
+        />
       </View>
 
       {/* Drag handle pill */}
@@ -1210,14 +1209,12 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
             </View>
           </View>
         ) : (
-          <>
-            <View style={styles.mapBox}>
-              <DeliveryMapView
-                currentRegion={myLocation}
-                markers={myLocation ? [{ coordinate: myLocation, title: 'You' }] : []}
-              />
-            </View>
-          </>
+          <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+            <MaterialIcons name="local-shipping" size={48} color={C.textSecond} />
+            <Text style={{ color: C.textSecond, marginTop: 12, fontSize: 15 }}>
+              {t('delivery.noActiveDelivery', 'No active delivery')}
+            </Text>
+          </View>
         )}
       </ScrollView>
     </>
