@@ -34,6 +34,19 @@ const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const SOCKET_URL =
   process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
+// Great-circle distance between two points, in km (for rider list display)
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export default function VendorOrdersScreen() {
   const { t } = useTranslation();
   const { token } = useAuthStore();
@@ -112,9 +125,11 @@ export default function VendorOrdersScreen() {
   const [showSurchargeEdit, setShowSurchargeEdit] = useState(false);
   const [vendorId, setVendorId] = useState(null);
 
-  const ordersRef = useRef(orders);
-  const selectedOrderRef = useRef(selectedOrder);
-  const updateOrderStatusRef = useRef(null);
+const ordersRef = useRef(orders);
+const selectedOrderRef = useRef(selectedOrder);
+const updateOrderStatusRef = useRef(null);
+// Latest store coords for the live rider listeners (avoids stale closures)
+const storeLocationRef = useRef({ latitude: 28.6139, longitude: 77.209 });
 
   // Fetch vendor profile to read current demand_surcharge_pct
   useEffect(() => {
@@ -219,9 +234,33 @@ export default function VendorOrdersScreen() {
         10,
         token
       );
-      if (result.success) {
-        setNearbyRiders(result.data.riders || []);
+      let riders = result.success ? [...(result.data.riders || [])] : [];
+      // Merge the live presence snapshot — partners who are online but have
+      // no GPS fix in the DB yet would otherwise be invisible until they move.
+      try {
+        const res = await fetch(
+          `${API_BASE}/delivery/online?latitude=${storeLocation.latitude}&longitude=${storeLocation.longitude}&radius_km=10`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        const data = await res.json();
+        const live = data.data?.riders || [];
+        live.forEach((p) => {
+          if (!riders.some((r) => Number(r.id) === Number(p.partnerId))) {
+            riders.push({
+              id: p.partnerId,
+              name: p.name || "Partner",
+              latitude: p.latitude ?? storeLocation.latitude,
+              longitude: p.longitude ?? storeLocation.longitude,
+              is_busy: false,
+              active_deliveries: 0,
+              distance_km: p.distance_km ?? 0,
+            });
+          }
+        });
+      } catch {
+        // presence snapshot is best-effort — REST list still applies
       }
+      setNearbyRiders(riders);
     } catch (err) {
       console.log(err);
     }
@@ -231,6 +270,10 @@ export default function VendorOrdersScreen() {
     latitude: selectedOrder?.vendor?.latitude || 28.6139,
     longitude: selectedOrder?.vendor?.longitude || 77.209,
   };
+
+  useEffect(() => {
+    storeLocationRef.current = storeLocation;
+  }, [storeLocation.latitude, storeLocation.longitude]);
 
   // Dynamic riders list derived from backend + sockets instead of mocks
   const riders = selectedOrder?.delivery?.partner
@@ -249,13 +292,18 @@ export default function VendorOrdersScreen() {
           },
           distance: "Live",
           fastest: true,
+          is_available: true,
+          is_online: true,
         },
       ]
-    : nearbyRiders.map((r, i) => ({
+    : nearbyRiders
+      .filter((r) => r.is_available)
+      .map((r, i) => ({
         id: r.id,
         name: r.name || "Partner",
-        status: r.is_busy ? `On Delivery (${r.active_deliveries})` : "Available",
-        is_busy: r.is_busy,
+        status: r.is_busy ? `On Delivery (${r.active_deliveries || 0})` : "Available",
+        is_busy: !!r.is_busy,
+        is_online: r.is_available === true,
         active_deliveries: r.active_deliveries || 0,
         image: "https://cdn-icons-png.flaticon.com/512/3208/3208726.png",
         coordinate: {
@@ -269,6 +317,15 @@ export default function VendorOrdersScreen() {
   const [assignedPartnerIds, setAssignedPartnerIds] = useState(new Set());
 
   const handleAssignRider = async (partnerId) => {
+    if (!partnerId || typeof partnerId !== 'number') {
+      Alert.alert("Error", "Invalid partner selection");
+      return;
+    }
+    setDeclinedOrders(prev => {
+      const next = { ...prev };
+      delete next[String(selectedOrder.id)];
+      return next;
+    });
     try {
       const res = await fetch(
         `${API_BASE}/delivery/assign/${selectedOrder.id}`,
@@ -299,6 +356,11 @@ export default function VendorOrdersScreen() {
     if (!selectedOrder) return;
     setAutoAssigning(true);
     setBroadcastStatus(null);
+    setDeclinedOrders(prev => {
+      const next = { ...prev };
+      delete next[String(selectedOrder.id)];
+      return next;
+    });
     try {
       const res = await fetch(
         `${API_BASE}/delivery/auto-assign/${selectedOrder.id}`,
@@ -313,10 +375,17 @@ export default function VendorOrdersScreen() {
       );
       const result = await res.json();
       if (result.success) {
-        setBroadcastStatus({
-          count: result.data.broadcastCount,
-          message: `Sent to ${result.data.broadcastCount} nearby rider${result.data.broadcastCount !== 1 ? "s" : ""}. Waiting for acceptance...`,
-        });
+        if (result.data.broadcastCount === 0) {
+          setBroadcastStatus({
+            count: 0,
+            message: result.data.message || "No riders available nearby right now",
+          });
+        } else {
+          setBroadcastStatus({
+            count: result.data.broadcastCount,
+            message: `Sent to ${result.data.broadcastCount} nearby rider${result.data.broadcastCount !== 1 ? "s" : ""}. Waiting for acceptance...`,
+          });
+        }
       } else {
         Alert.alert(
           "Auto Assign Failed",
@@ -582,7 +651,7 @@ export default function VendorOrdersScreen() {
       transports: ["websocket", "polling"],
     });
 
-    socket.on("delivery:declined", (data) => {
+socket.on("delivery:declined", (data) => {
       console.log("[VendorOrdersScreen] ★★★ delivery:declined ★★★", JSON.stringify(data));
       fetchOrdersRef.current?.();
       const declinedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -599,6 +668,39 @@ export default function VendorOrdersScreen() {
             : data.message || `${data.partner_name} declined the delivery request`,
         },
       }));
+
+      // Clear the "waiting for acceptance" banner when a decline is received
+      setBroadcastStatus(null);
+
+      // Re-add the declining partner to nearbyRiders if they're still online
+      // (declining one order doesn't make them offline)
+      const decliningPartnerId = Number(data.partner_id);
+      if (decliningPartnerId > 0) {
+        setNearbyRiders((prev) => {
+          // Check if partner is already in the list
+          const alreadyExists = prev.some((r) => Number(r.id) === decliningPartnerId);
+          if (!alreadyExists) {
+            // Add partner as available (they're still online, just declined this order)
+            const newRider = {
+              id: decliningPartnerId,
+              name: data.partner_name || "Partner",
+              status: "Available",
+              is_available: true,
+              is_busy: false,
+              active_deliveries: 0,
+              distance_km: 0,
+              coordinate: {
+                latitude: 28.6139,
+                longitude: 77.209,
+              },
+              distance: "0 km",
+              fastest: prev.length === 0,
+            };
+            return [...prev, newRider];
+          }
+          return prev;
+        });
+      }
 
       let customerPhone = null;
       let customerName = "the customer";
@@ -637,12 +739,88 @@ export default function VendorOrdersScreen() {
               updateOrderStatusRef.current?.(data.order_id, "picked_up");
             }
           },
-          { text: "Dismiss", style: "cancel" }
+          {
+            text: "Dismiss",
+            style: "cancel"
+          }
         ],
         { cancelable: true }
       );
     });
     socket.on("connect", () => console.log("Vendor Socket Connected"));
+
+    // ── Live rider presence for the Assign Rider modal ──────────────────────
+    // Listen for partner online/offline status changes so the Available Riders
+    // list updates in real time without requiring a manual refresh.
+    socket.on("partner:statusChanged", (data) => {
+      const pid = Number(data.partnerId);
+      const isAvailable = data?.is_available;
+      if (pid === undefined || isAvailable === undefined) return;
+      setNearbyRiders((prev) => {
+        // Always remove offline partners from the list entirely
+        if (!isAvailable) {
+          return prev.filter((r) => Number(r.id) !== pid);
+        }
+        // Partner coming online — update or add them
+        const idx = prev.findIndex((r) => Number(r.id) === pid);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = { ...next[idx], is_available: true, status: "Available" };
+          return next;
+        }
+        const newRider = {
+          id: pid,
+          name: data.name || "Partner",
+          latitude: data.latitude || 28.6139,
+          longitude: data.longitude || 77.209,
+          is_busy: false,
+          active_deliveries: 0,
+          distance_km: 0,
+          is_available: true,
+          status: "Available",
+        };
+        return [...prev, newRider];
+      });
+    });
+    // No separate partner:online handler — partner:statusChanged covers both directions
+    socket.on("partner:location", (data) => {
+      const pid = Number(data.partnerId);
+      if (!pid || data.latitude == null) return;
+      setNearbyRiders((prev) => {
+        const idx = prev.findIndex((r) => Number(r.id) === pid);
+        const distanceKm =
+          storeLocationRef.current &&
+          typeof storeLocationRef.current.latitude === "number"
+            ? haversineKm(
+                storeLocationRef.current.latitude,
+                storeLocationRef.current.longitude,
+                data.latitude,
+                data.longitude,
+              ).toFixed(2)
+            : null;
+        const rider = {
+          id: pid,
+          name: data.name || "Partner",
+          latitude: data.latitude,
+          longitude: data.longitude,
+          is_available: true,
+          is_busy: false,
+          active_deliveries: 0,
+          distance_km: distanceKm != null ? Number(distanceKm) : 0,
+        };
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = { ...next[idx], ...rider, name: next[idx].name || rider.name };
+          return next;
+        }
+        return [...prev, rider];
+      });
+    });
+    socket.on("partner:removed", (data) => {
+      const pid = Number(data.partnerId);
+      if (!pid) return;
+      setNearbyRiders((prev) => prev.filter((r) => Number(r.id) !== pid));
+    });
 
     // Real-time order notifications
     socket.on("order:new", (data) => {
@@ -820,6 +998,11 @@ export default function VendorOrdersScreen() {
     selectedOrderRef.current = selectedOrder;
     if (selectedOrder?.delivery?.partner) {
       setBroadcastStatus(null);
+      setDeclinedOrders(prev => {
+        const next = { ...prev };
+        delete next[String(selectedOrder.id)];
+        return next;
+      });
     }
   }, [selectedOrder]);
 
@@ -2017,7 +2200,7 @@ export default function VendorOrdersScreen() {
                 </View>
               )}
 
-              {broadcastStatus && broadcastStatus.type !== "declined" && (
+              {broadcastStatus && broadcastStatus.type !== "declined" && riders.length === 0 && (
                 <View
                   style={[dmStyles.broadcastBanner]}
                 >
@@ -2077,7 +2260,7 @@ export default function VendorOrdersScreen() {
                           color="#147538"
                         />
                       </TouchableOpacity>
-                      {rider.status === "Available" || rider.is_busy ? (
+                      {((rider.status === "Available" && rider.is_online) || !!rider.is_busy) ? (
                         <TouchableOpacity
                           style={[
                             dmStyles.assignBtn,
