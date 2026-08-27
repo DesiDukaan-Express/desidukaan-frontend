@@ -188,8 +188,6 @@ export default function Navigation() {
   checkVendorProfileRef.current = checkVendorProfile;
   const checkDeliveryProfileRef = React.useRef(checkDeliveryProfile);
   checkDeliveryProfileRef.current = checkDeliveryProfile;
-  const activeRoleRef = React.useRef(activeRole);
-  activeRoleRef.current = activeRole;
 
   useEffect(() => {
     if (!isAuthenticated || !token) return;
@@ -205,7 +203,6 @@ export default function Navigation() {
       });
       socket.on("vendor:suspended", () => {
         if (activeRoleRef.current === "vendor") {
-<<<<<<< HEAD
           flagVendorSuspendedRef.current();
           checkVendorProfileRef.current();
         }
@@ -213,23 +210,6 @@ export default function Navigation() {
       socket.on("vendor:reactivated", () => {
         clearVendorSuspendedRef.current();
         if (activeRoleRef.current === "vendor") checkVendorProfileRef.current();
-=======
-          flagVendorSuspended();
-          checkVendorProfile();
-        }
-      });
-      socket.on("vendor:reactivated", () => {
-        clearVendorSuspended();
-        if (activeRoleRef.current === "vendor") checkVendorProfile();
-      });
-      socket.on("delivery:suspended", () => {
-        flagDeliverySuspended();
-        if (activeRole === "delivery") checkDeliveryProfile();
-      });
-      socket.on("delivery:reactivated", () => {
-        clearDeliverySuspended();
-        if (activeRole === "delivery") checkDeliveryProfile();
->>>>>>> cb1832865e9ea9d9514296f177065355af387803
       });
       socket.on("delivery:suspended", () => {
         flagDeliverySuspendedRef.current();
@@ -246,41 +226,7 @@ export default function Navigation() {
     return () => {
       if (socket) socket.disconnect();
     };
-<<<<<<< HEAD
   }, [isAuthenticated, token]);
-=======
-  }, [isAuthenticated, token, flagDeactivated, clearDeactivation, flagVendorSuspended, clearVendorSuspended, flagDeliverySuspended, clearDeliverySuspended, checkVendorProfile]);
-
-  const checkDeliveryProfile = async () => {
-    setCheckingOnboard(true);
-    try {
-      const res = await fetch(`${API_BASE}/delivery/me/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      const profile = data.data?.profile;
-      if (profile) {
-        useAuthStore.getState().addEnabledRole("delivery");
-        if (profile.is_active === false) {
-          flagDeliverySuspended();
-        } else {
-          clearDeliverySuspended();
-        }
-      }
-      if (!profile?.onboarding_submitted) {
-        setDeliveryOnboarded('not_submitted');
-      } else if (profile?.is_certified) {
-        setDeliveryOnboarded('approved');
-      } else {
-        setDeliveryOnboarded('pending');
-      }
-    } catch (err) {
-      setDeliveryOnboarded('not_submitted');
-    } finally {
-      setCheckingOnboard(false);
-    }
-  };
->>>>>>> cb1832865e9ea9d9514296f177065355af387803
 
   // ── Callback from RolePickerScreen once a role is chosen ──────────────────
   // Resets onboarding state so it's re-checked for the new role

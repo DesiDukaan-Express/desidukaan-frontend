@@ -2904,11 +2904,7 @@ export default function HomeScreen() {
     const items = [];
     vendors.forEach((v) => {
       (v._inventory || []).forEach((inv) => {
-<<<<<<< HEAD
         if ((inv.product?.is_active ?? true) && inv.product) {
-=======
-        if (inv.product) {
->>>>>>> cb1832865e9ea9d9514296f177065355af387803
           items.push({ ...inv, _vendorId: v.id, _vendorName: v.shop_name });
         }
       });
@@ -2984,8 +2980,6 @@ export default function HomeScreen() {
     const seenNames = new Set();
     const items = [];
 
-<<<<<<< HEAD
-=======
     // Helper: Check if product has stock & active status in any nearby vendor
     const isStockAvailable = (productName, productId) => {
       return vendors.some((v) => {
@@ -3007,7 +3001,6 @@ export default function HomeScreen() {
     };
 
     // First add all inventory items
->>>>>>> cb1832865e9ea9d9514296f177065355af387803
     allInventoryItems.forEach((inv) => {
       const p = inv.product;
       if (!p?.id || !p?.name) return;
@@ -3032,10 +3025,6 @@ export default function HomeScreen() {
       });
     });
 
-<<<<<<< HEAD
-    return items;
-  }, [allInventoryItems, getCategoryName]);
-=======
     // Next add API products if available, marking whether available in nearby inventory
     if (popularFromAPI.length > 0) {
       popularFromAPI.forEach((p) => {
@@ -3054,7 +3043,6 @@ export default function HomeScreen() {
 
     return items;
   }, [popularFromAPI, allInventoryItems, vendors, getCategoryName]);
->>>>>>> cb1832865e9ea9d9514296f177065355af387803
 
   // ── Address Handlers ────────────────────────────────────────────────────────
   const openAddressPicker = () => {

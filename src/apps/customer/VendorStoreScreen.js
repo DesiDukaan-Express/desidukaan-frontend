@@ -1085,11 +1085,7 @@ export default function VendorStoreScreen() {
   }), [inventory, search, activeCat, getCatName, parentOfMap]);
 
   const inStock = useMemo(() => {
-<<<<<<< HEAD
-  let list = [...filtered.filter(i => i.product?.is_active ?? true)];
-=======
-    let list = [...filtered.filter(i => i.is_active ?? true)];
->>>>>>> cb1832865e9ea9d9514296f177065355af387803
+    let list = [...filtered.filter(i => i.product?.is_active ?? true)];
 
     switch (sortBy) {
       case "price_asc":
@@ -1134,11 +1130,7 @@ export default function VendorStoreScreen() {
   }, [filtered, sortBy]);
 
   const outStock = useMemo(() => {
-<<<<<<< HEAD
-  let list = [...filtered.filter(i => !(i.product?.is_active ?? true))];
-=======
-    let list = [...filtered.filter(i => !(i.is_active ?? true))];
->>>>>>> cb1832865e9ea9d9514296f177065355af387803
+    let list = [...filtered.filter(i => !(i.product?.is_active ?? true))];
 
     switch (sortBy) {
       case "price_asc":
