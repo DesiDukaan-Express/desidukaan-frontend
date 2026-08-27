@@ -30,6 +30,7 @@ import useAddressStore from "../../store/addressStore";
 import { useNavigation, CommonActions } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import { vendorsAPI, ordersAPI, categoriesAPI } from "../../services/api";
+import { io } from "socket.io-client";
 import ChatWidget from "./ChatWidget";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
@@ -39,6 +40,9 @@ import UseCurrentLocationButton from "../../components/UseCurrentLocationButton"
 // Use env var works on device, emulator, and web
 // In your .env: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+const SOCKET_URL =
+  process.env.EXPO_PUBLIC_SOCKET_URL ||
+  (BASE_URL.includes("/api") ? BASE_URL.split("/api")[0] : "http://localhost:3000");
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -2483,7 +2487,13 @@ export default function HomeScreen() {
   const locationLoading = currentLocation.loading;
 
   const [vendors, setVendors] = useState([]);
+  const vendorsRef = useRef(vendors);
+  vendorsRef.current = vendors;
   const [recentOrders, setRecentOrders] = useState([]);
+  // Kept for backward-compat (fetchPopularProducts still writes to it) but no
+  // longer used in the popularItems derivation — popular items are now derived
+  // entirely from live inventory, which the backend keeps current via global
+  // product:updated socket broadcasts.
   const [popularFromAPI, setPopularFromAPI] = useState([]);
   const [loadingVendors, setLoadingVendors] = useState(false);
   const [loadingInventory, setLoadingInventory] = useState(false);
@@ -2652,6 +2662,138 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, [refreshVendorStatus]);
 
+  // ── Real-time store open/close updates ──────────────────────────────────────
+  // The backend broadcasts 'shop:statusChanged' (with is_open) whenever a vendor
+  // toggles their Store Status — for BOTH open and close directions. Update the
+  // matching vendor in local state immediately so no manual refresh is needed.
+  useEffect(() => {
+    let socket;
+    try {
+      socket = io(SOCKET_URL, {
+        auth: token ? { token } : {},
+        transports: ["websocket"],
+      });
+      socket.on("shop:statusChanged", ({ vendorId, is_open }) => {
+        if (vendorId == null || is_open === undefined) return;
+        setVendors((prev) =>
+          prev.map((v) =>
+            v.id === Number(vendorId) || String(v.id) === String(vendorId)
+              ? { ...v, is_open, is_currently_open: is_open }
+              : v,
+          ),
+        );
+      });
+    } catch {
+      // socket best-effort — the 60s status poll still covers sync
+    }
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [token]);
+
+  // ── Real-time product updates for Popular Items / Home screen ──────────────────
+  // The backend emits product:updated to ALL connected clients (global broadcast),
+  // so we receive events for ANY vendor without needing store:join rooms.
+  // We also join store:{vendorId} rooms as a belt-and-suspenders fallback.
+  // Uses vendorsRef to avoid stale closures — the ref always holds the latest
+  // vendors state without triggering effect re-runs on every state change.
+  useEffect(() => {
+    if (!token) return;
+    let socket;
+    const joinedRooms = new Set();
+
+    const setupSocket = () => {
+      try {
+        socket = io(SOCKET_URL, {
+          auth: { token },
+          transports: ["websocket"],
+        });
+
+        socket.on("connect", () => {
+          // Join store rooms for all vendors that currently have inventory
+          const cur = vendorsRef.current;
+          cur.forEach((v) => {
+            if (v._inventory?.length && v.id && !joinedRooms.has(v.id)) {
+              socket.emit("store:join", { storeId: v.id });
+              joinedRooms.add(v.id);
+            }
+          });
+        });
+
+        socket.on("product:updated", ({ productId, available, vendorId, ...changed }) => {
+          if (productId == null || vendorId == null) return;
+          const pid = Number(productId);
+          const vid = Number(vendorId);
+
+          setVendors((prev) =>
+            prev.map((vendor) => {
+              if (vendor.id !== vid) return vendor;
+              const inv = vendor._inventory || [];
+              return {
+                ...vendor,
+                _inventory: inv.map((item) => {
+                  const itemPid = Number(item.product_id || item.product?.id);
+                  if (itemPid !== pid) return item;
+                  const nextProduct = item.product ? { ...item.product } : { id: pid };
+                  Object.keys(changed).forEach((k) => {
+                    if (changed[k] !== undefined) nextProduct[k] = changed[k];
+                  });
+                  if (available !== undefined) {
+                    nextProduct.is_active = available;
+                    return { ...item, is_active: available, product: nextProduct };
+                  }
+                  return { ...item, product: nextProduct };
+                }),
+              };
+            }),
+          );
+        });
+
+        socket.on("product:deleted", ({ productId, vendorId }) => {
+          if (productId == null || vendorId == null) return;
+          const pid = Number(productId);
+          const vid = Number(vendorId);
+
+          setVendors((prev) =>
+            prev.map((vendor) => {
+              if (vendor.id !== vid) return vendor;
+              const inv = vendor._inventory || [];
+              return {
+                ...vendor,
+                _inventory: inv.filter(
+                  (item) =>
+                    Number(item.product_id || item.product?.id) !== pid,
+                ),
+              };
+            }),
+          );
+        });
+      } catch {
+        // socket best-effort — page load still fetches fresh inventory
+      }
+    };
+
+    setupSocket();
+
+    // Periodically join rooms for newly-loaded vendors (ref always has latest list)
+    const rejoinInterval = setInterval(() => {
+      if (socket?.connected) {
+        const cur = vendorsRef.current;
+        cur.forEach((v) => {
+          if (v._inventory?.length && v.id && !joinedRooms.has(v.id)) {
+            socket.emit("store:join", { storeId: v.id });
+            joinedRooms.add(v.id);
+          }
+        });
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(rejoinInterval);
+      if (socket) socket.disconnect();
+    };
+  }, [token]);
+
   useEffect(() => {
     if (token) fetchRecentOrders();
   }, [token]);
@@ -2726,7 +2868,7 @@ export default function HomeScreen() {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const results = await Promise.all(
         vendorList.map((v) =>
-          fetch(`${BASE_URL}/inventory/vendor/${v.id}`, { headers })
+          fetch(`${BASE_URL}/inventory/vendor/${v.id}?active_only=true`, { headers })
             .then((r) => r.json())
             .then((d) => {
               // Handle both array and wrapped response shapes
@@ -2762,7 +2904,11 @@ export default function HomeScreen() {
     const items = [];
     vendors.forEach((v) => {
       (v._inventory || []).forEach((inv) => {
+<<<<<<< HEAD
+        if ((inv.product?.is_active ?? true) && inv.product) {
+=======
         if (inv.product) {
+>>>>>>> cb1832865e9ea9d9514296f177065355af387803
           items.push({ ...inv, _vendorId: v.id, _vendorName: v.shop_name });
         }
       });
@@ -2831,11 +2977,15 @@ export default function HomeScreen() {
     [allInventoryItems, getCategoryName, apiCategories],
   );
 
-  // ── Popular items — show all items & check nearby store availability ──────
+  // ── Popular items — derived from live inventory only ────────────────────────
+  // Backend broadcasts product:updated globally, so _inventory is always current.
+  // No need for a separate popularFromAPI — it was stale after mount.
   const popularItems = useMemo(() => {
     const seenNames = new Set();
     const items = [];
 
+<<<<<<< HEAD
+=======
     // Helper: Check if product has stock & active status in any nearby vendor
     const isStockAvailable = (productName, productId) => {
       return vendors.some((v) => {
@@ -2857,6 +3007,7 @@ export default function HomeScreen() {
     };
 
     // First add all inventory items
+>>>>>>> cb1832865e9ea9d9514296f177065355af387803
     allInventoryItems.forEach((inv) => {
       const p = inv.product;
       if (!p?.id || !p?.name) return;
@@ -2881,6 +3032,10 @@ export default function HomeScreen() {
       });
     });
 
+<<<<<<< HEAD
+    return items;
+  }, [allInventoryItems, getCategoryName]);
+=======
     // Next add API products if available, marking whether available in nearby inventory
     if (popularFromAPI.length > 0) {
       popularFromAPI.forEach((p) => {
@@ -2899,6 +3054,7 @@ export default function HomeScreen() {
 
     return items;
   }, [popularFromAPI, allInventoryItems, vendors, getCategoryName]);
+>>>>>>> cb1832865e9ea9d9514296f177065355af387803
 
   // ── Address Handlers ────────────────────────────────────────────────────────
   const openAddressPicker = () => {
@@ -2923,6 +3079,7 @@ export default function HomeScreen() {
   // In handleAdd — check if THIS item is in cart, not just whether vendorId exists
   const handleAdd = useCallback(
     (item, selectedWeight = null) => {
+      if (item.isAvailableNearby === false || item.product?.is_active === false) return;
       if (isLooseItem(item) && !selectedWeight) {
         setLoosePickerItem(item);
         return;
