@@ -121,7 +121,6 @@ export default function VendorOrdersScreen() {
     }
   };
 
-<<<<<<< HEAD
   // ── Demand Surcharge (vendor can set surge % for rain/peak hours) ─────────
   const [demandSurcharge, setDemandSurcharge] = useState(0);   // current %
   const [surchargeInput, setSurchargeInput] = useState('0');
@@ -132,13 +131,7 @@ export default function VendorOrdersScreen() {
 const ordersRef = useRef(orders);
 const selectedOrderRef = useRef(selectedOrder);
 const updateOrderStatusRef = useRef(null);
-// Latest store coords for the live rider listeners (avoids stale closures)
 const storeLocationRef = useRef({ latitude: 28.6139, longitude: 77.209 });
-=======
-  const ordersRef = useRef(orders);
-  const selectedOrderRef = useRef(selectedOrder);
-  const updateOrderStatusRef = useRef(null);
->>>>>>> cb1832865e9ea9d9514296f177065355af387803
 
   const toggleCustomer = (name) => {
     setExpandedCustomers((prev) => ({ ...prev, [name]: !prev[name] }));
