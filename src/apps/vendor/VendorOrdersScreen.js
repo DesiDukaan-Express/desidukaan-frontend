@@ -129,9 +129,9 @@ export default function VendorOrdersScreen() {
   const [vendorId, setVendorId] = useState(null);
 
 const ordersRef = useRef(orders);
-const selectedOrderRef = useRef(selectedOrder);
-const updateOrderStatusRef = useRef(null);
-const storeLocationRef = useRef({ latitude: 28.6139, longitude: 77.209 });
+  const selectedOrderRef = useRef(selectedOrder);
+  const updateOrderStatusRef = useRef(null);
+  const storeLocationRef = useRef({ latitude: 28.6139, longitude: 77.209 });
 
   const toggleCustomer = (name) => {
     setExpandedCustomers((prev) => ({ ...prev, [name]: !prev[name] }));

@@ -186,8 +186,6 @@ export default function Navigation() {
   checkVendorProfileRef.current = checkVendorProfile;
   const checkDeliveryProfileRef = React.useRef(checkDeliveryProfile);
   checkDeliveryProfileRef.current = checkDeliveryProfile;
-  const activeRoleRef = React.useRef(activeRole);
-  activeRoleRef.current = activeRole;
 
   useEffect(() => {
     if (!isAuthenticated || !token) return;

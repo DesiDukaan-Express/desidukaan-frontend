@@ -2904,7 +2904,7 @@ export default function HomeScreen() {
     const items = [];
     vendors.forEach((v) => {
       (v._inventory || []).forEach((inv) => {
-if ((inv.product?.is_active ?? true) && inv.product) {
+        if ((inv.product?.is_active ?? true) && inv.product) {
           items.push({ ...inv, _vendorId: v.id, _vendorName: v.shop_name });
         }
       });
@@ -3000,7 +3000,7 @@ if ((inv.product?.is_active ?? true) && inv.product) {
       });
     };
 
-    // First add all inventory items>>> cb1832865e9ea9d9514296f177065355af387803
+// First add all inventory items
     allInventoryItems.forEach((inv) => {
       const p = inv.product;
       if (!p?.id || !p?.name) return;
@@ -3025,8 +3025,7 @@ if ((inv.product?.is_active ?? true) && inv.product) {
       });
     });
 
-    return items;
-  }, [allInventoryItems, getCategoryName]);
+// Next add API products if available, marking whether available in nearby inventory
     // Next add API products if available, marking whether available in nearby inventory
     if (popularFromAPI.length > 0) {
       popularFromAPI.forEach((p) => {
