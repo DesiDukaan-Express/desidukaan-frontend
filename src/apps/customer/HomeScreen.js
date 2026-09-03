@@ -35,6 +35,7 @@ import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
 import LocationMapPicker from "../../components/LocationMapPicker";
 import UseCurrentLocationButton from "../../components/UseCurrentLocationButton";
+import WishlistHeart from "../../components/WishlistHeart";
 
 // Use env var works on device, emulator, and web
 // In your .env: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api
@@ -1598,6 +1599,7 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
             <Text style={ic.badgeText}>{t("home.discountOff", { count: discPct })}</Text>
           </View>
         )}
+        <WishlistHeart productId={item.id} size={18} style={{ position: "absolute", top: 6, right: 6 }} />
         <Image
           source={{ uri: imgUri }}
           style={[ic.img, { width: size - 16, height: size - 16 }]}
@@ -1676,6 +1678,7 @@ function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPre
             <Text style={pic.discBadgeText}>{t("home.loose")}</Text>
           </View>
         )}
+        <WishlistHeart productId={item.id} size={16} style={{ position: "absolute", bottom: 6, left: 6 }} />
         <TouchableOpacity
           style={pic.eyeBtn}
           onPress={(e) => { e.stopPropagation?.(); onPress?.(); }}
@@ -2989,6 +2992,16 @@ export default function HomeScreen() {
               <MaterialIcons name="expand-more" size={13} color={C.gray500} />
             </TouchableOpacity>
             <TouchableOpacity
+              style={s.accountBtn}
+              onPress={() => navigation.navigate("Wishlist")}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="favorite-border" size={16} color={C.red} />
+              {winW >= 900 && (
+                <Text style={s.accountBtnText}>Wishlist</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[s.cartBtn, cartCount > 0 && s.cartBtnActive]}
               onPress={() => navigation.navigate("Cart")}
               activeOpacity={0.8}
@@ -3065,6 +3078,13 @@ export default function HomeScreen() {
                 >
                   <MaterialIcons name="storefront" size={18} color={C.white} />
                 </LinearGradient>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.mobileWishBtn}
+                onPress={() => navigation.navigate("Wishlist")}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="favorite-border" size={28} color={C.red} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.mobileProfileBtn}
@@ -3362,8 +3382,8 @@ export default function HomeScreen() {
                   <View style={s.ratingBadge}>
                     <MaterialIcons name="star" size={10} color="#FBBF24" />
                     <Text style={s.ratingText}>
-                      {vendor.avg_rating
-                        ? parseFloat(vendor.avg_rating).toFixed(1)
+                      {vendor.rating
+                        ? parseFloat(vendor.rating).toFixed(1)
                         : t("home.new")}
                     </Text>
                   </View>
@@ -3919,6 +3939,7 @@ const s = StyleSheet.create({
   },
   mobileLocBtn: { flex: 1, marginRight: 8 },
   mobileLocBottom: { fontSize: 18, fontWeight: "700", color: C.gray900, flexShrink: 1 },
+  mobileWishBtn: { padding: 4 },
   mobileProfileBtn: {
     alignItems: "center",
     justifyContent: "center",

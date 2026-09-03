@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import useAddressStore from "./addressStore";
+import useWishlistStore from "./wishlistStore";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -207,6 +208,7 @@ const useAuthStore = create((set, get) => ({
           isLoading: false,
         });
         await useAddressStore.getState().loadAddresses(refreshResult.token);
+        await useWishlistStore.getState().loadIds(refreshResult.token);
       } else if (refreshResult && refreshResult.error === "ACCOUNT_DEACTIVATED") {
         set({ accountDeactivated: true, isLoading: false });
       } else if (refreshResult && refreshResult.error === "INVALID_TOKEN") {
@@ -273,6 +275,7 @@ const useAuthStore = create((set, get) => ({
     try { await AsyncStorage.removeItem(ENABLED_ROLES_KEY); } catch (_) {}
     try { await secureDelete(REFRESH_KEY); } catch (_) {}
     try { useAddressStore.getState().clearAddresses(); } catch (_) {}
+    try { useWishlistStore.getState().clearWishlist(); } catch (_) {}
     set({ user: null, token: null, role: null, activeRole: null, enabledRoles: ["customer", "vendor", "delivery"], isAuthenticated: false, accountDeactivated: false, vendorSuspended: false });
   },
 

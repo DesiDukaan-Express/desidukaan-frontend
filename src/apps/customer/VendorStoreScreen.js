@@ -6,13 +6,16 @@ import {
 } from "react-native";
 import { Feather, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import useCartStore from "../../store/cartStore";
 import useAuthStore from "../../store/authStore";
 import { categoriesAPI } from "../../services/api";
+import { productReviewsAPI } from "../../services/productReviews";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
 import { useTranslation } from "react-i18next";
+import ProductStarRating from "../../components/ProductStarRating";
+import WishlistHeart from "../../components/WishlistHeart";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -327,7 +330,7 @@ const wp = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════ //
 // ─── Product Detail Modal ────────────────────────────────────────────────── //
 // ═══════════════════════════════════════════════════════════════════════════ //
-function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker }) {
+function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker, rating }) {
   const { t } = useTranslation();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.88)).current;
@@ -410,6 +413,15 @@ function ProductModal({ item, onClose, onAdd, onRemove, qty, onOpenWeightPicker 
 
               <Text style={pm.name}>{p.name}</Text>
               <Text style={pm.unit}>{p.unit}</Text>
+              <ProductStarRating
+                productId={p.id}
+                avgRating={rating?.avgRating}
+                totalReviews={rating?.totalReviews}
+                myRating={rating?.myRating}
+                myComment={rating?.myComment}
+                canRate={rating?.canRate}
+                comments={rating?.comments}
+              />
               {loose && (
                 <View style={pm.looseNote}>
                   <Feather name="droplet" size={12} color={C.cyan} />
@@ -529,7 +541,7 @@ const pm = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════ //
 // ─── Product Card — responsive 2-5 col grid ──────────────────────────────── //
 // ═══════════════════════════════════════════════════════════════════════════ //
-function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
+function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW, rating }) {
   const { t } = useTranslation();
   const p = item.product || {};
   const inStock = item.product?.is_active;
@@ -578,6 +590,24 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
       <View style={pc.info}>
         <Text style={pc.name} numberOfLines={2}>{p.name}</Text>
         <Text style={pc.unit} numberOfLines={1}>{p.unit || "1 pc"}</Text>
+        {rating && (rating.totalReviews > 0 || rating.myRating) ? (
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <ProductStarRating
+              productId={p.id}
+              compact
+              avgRating={rating.avgRating}
+              totalReviews={rating.totalReviews}
+              myRating={rating.myRating}
+              myComment={rating.myComment}
+              canRate={false}
+            />
+            <WishlistHeart productId={p.id} size={18} />
+          </View>
+        ) : (
+          <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
+            <WishlistHeart productId={p.id} size={18} />
+          </View>
+        )}
         <View style={pc.priceRow}>
           <Text style={pc.price}>₹{qty > 0 ? p.price * qty : p.price}</Text>
           {p.mrp && p.mrp > p.price && <Text style={pc.mrp}>₹{p.mrp}</Text>}
@@ -780,6 +810,8 @@ export default function VendorStoreScreen() {
   }, [sortBy]);
   const [detailItem, setDetailItem] = useState(null);
   const [loosePickerItem, setLoosePickerItem] = useState(null); // weight picker
+  const [ratingsMap, setRatingsMap] = useState({});
+  const [vendorReviews, setVendorReviews] = useState([]);
 
   // Fetch category tree on mount
   useEffect(() => {
@@ -828,6 +860,52 @@ export default function VendorStoreScreen() {
       finally { setLoading(false); }
     })();
   }, [vendorId, token]);
+
+  // ── Fetch bulk product ratings after inventory loads ──────────────────────
+  useEffect(() => {
+    if (inventory.length === 0) return;
+    const productIds = inventory.map(i => i.product_id).filter(Boolean);
+    if (productIds.length === 0) return;
+    productReviewsAPI.getBulk(productIds, token)
+      .then(res => { if (res.success) setRatingsMap(res.data); })
+      .catch(() => {});
+  }, [inventory, token]);
+
+  // ── Re-fetch ratings when screen regains focus (e.g. after rating in orders) ──
+  useFocusEffect(
+    useCallback(() => {
+      if (inventory.length === 0) return;
+      const productIds = inventory.map(i => i.product_id).filter(Boolean);
+      if (productIds.length === 0) return;
+      productReviewsAPI.getBulk(productIds, token)
+        .then(res => { if (res.success) setRatingsMap(res.data); })
+        .catch(() => {});
+    }, [inventory, token])
+  );
+
+  // ── Real-time refetch when ProductModal opens ──
+  useEffect(() => {
+    if (!detailItem?.product_id || !token) return;
+    productReviewsAPI.getBulk([detailItem.product_id], token)
+      .then(res => {
+        if (res.success && res.data) {
+          setRatingsMap(prev => ({ ...prev, [detailItem.product_id]: res.data[detailItem.product_id] }));
+        }
+      })
+      .catch(() => {});
+  }, [detailItem?.product_id, token]);
+
+  // ── Fetch vendor reviews (for store reviews section) ──
+  useEffect(() => {
+    if (!vendorId) return;
+    fetch(`${BASE_URL}/vendors/${vendorId}/reviews`)
+      .then(r => r.json())
+      .then(res => {
+        const reviews = res.data?.reviews || [];
+        setVendorReviews(reviews.filter(r => r.rating > 0 || r.comment));
+      })
+      .catch(() => {});
+  }, [vendorId]);
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const getCatName = useCallback((item) => {
@@ -1053,6 +1131,7 @@ export default function VendorStoreScreen() {
           onPress={() => setDetailItem(item)}
           onAdd={handleAdd} onRemove={handleRemove}
           cardW={cardW}
+          rating={ratingsMap[item.product_id]}
         />
       ))}
     </View>
@@ -1097,6 +1176,18 @@ export default function VendorStoreScreen() {
           <View style={s.shopMetaRow}>
             <View style={[s.statusDot, { backgroundColor: isStoreCurrentlyOpen(vendor) ? "#4ADE80" : "#F87171" }]} />
             <Text style={s.metaText}>{isStoreCurrentlyOpen(vendor) ? t('vendorStore.open') : t('vendorStore.closed')}</Text>
+            {vendor?.rating > 0 && (
+              <>
+                <Text style={s.metaSep}>·</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+                  <MaterialIcons name="star" size={12} color="#F59E0B" />
+                  <Text style={[s.metaText, { fontWeight: "700", color: "#374151" }]}>{vendor.rating.toFixed(1)}</Text>
+                  {vendor.total_ratings > 0 && (
+                    <Text style={[s.metaText, { color: "#9CA3AF" }]}>({vendor.total_ratings})</Text>
+                  )}
+                </View>
+              </>
+            )}
             <Text style={s.metaSep}>·</Text>
             <Text style={s.metaText}>{t('vendorStore.inStock', { count: inStockTotal })}</Text>
           </View>
@@ -1290,6 +1381,64 @@ export default function VendorStoreScreen() {
               )}
             </>
           )}
+          {/* Store Reviews Section */}
+          {vendorReviews.length > 0 && !search && activeCat === "All" && (
+            <View style={{ marginTop: 24 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <MaterialIcons name="store" size={16} color={C.green} />
+                <Text style={[s.oosSectionTitle, { color: "#374151" }]}>Store Reviews</Text>
+                {vendor?.rating > 0 && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 2, marginLeft: 4 }}>
+                    <MaterialIcons name="star" size={14} color="#F59E0B" />
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#374151" }}>{vendor.rating.toFixed(1)}</Text>
+                  </View>
+                )}
+              </View>
+              {vendorReviews.slice(0, 5).map((review, idx) => (
+                <View key={idx} style={{
+                  backgroundColor: "#F9FAFB",
+                  borderRadius: 10,
+                  padding: 12,
+                  marginBottom: 8,
+                  borderWidth: 1,
+                  borderColor: "#F3F4F6",
+                }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                    <View style={{
+                      width: 28, height: 28, borderRadius: 14,
+                      backgroundColor: (review.rating || 0) >= 3 ? "#DCFCE7" : "#FEE2E2",
+                      alignItems: "center", justifyContent: "center",
+                    }}>
+                      <Text style={{
+                        fontSize: 11, fontWeight: "700",
+                        color: (review.rating || 0) >= 3 ? "#16A34A" : "#DC2626",
+                      }}>
+                        {(review.customer_name || "C")[0].toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151", flex: 1 }}>
+                      {review.customer_name || "Customer"}
+                    </Text>
+                    <View style={{ flexDirection: "row", gap: 1 }}>
+                      {[1, 2, 3, 4, 5].map(s => (
+                        <MaterialIcons
+                          key={s}
+                          name={s <= (review.rating || 0) ? "star" : "star-outline"}
+                          size={12}
+                          color={s <= (review.rating || 0) ? "#F59E0B" : "#D1D5DB"}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                  {review.comment ? (
+                    <Text style={{ fontSize: 12, color: "#6B7280", lineHeight: 16, marginLeft: 34 }}>
+                      {review.comment}
+                    </Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          )}
           <View style={{ height: 130 }} />
         </ScrollView>
       </View>
@@ -1302,6 +1451,7 @@ export default function VendorStoreScreen() {
         onAdd={handleAdd}
         onRemove={handleRemove}
         onOpenWeightPicker={(item) => { setDetailItem(null); setLoosePickerItem(item); }}
+        rating={detailItem ? ratingsMap[detailItem.product_id] : null}
       />
 
       {/* WEIGHT PICKER MODAL */}

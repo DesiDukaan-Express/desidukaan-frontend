@@ -22,6 +22,7 @@ import { useNavigation } from "@react-navigation/native";
 import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
+import { productReviewsAPI } from "../../services/productReviews";
 import { TextInput, Alert } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -730,12 +731,13 @@ function OrderDetailModal({ order, onClose }) {
   const [fetching, setFetching] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [tipSent, setTipSent] = useState(false);
-  const [feedbackSent, setFeedbackSent] = useState(false);
   const [selectedTip, setSelectedTip] = useState(null);
   const [customTip, setCustomTip] = useState("");
   const [tipSending, setTipSending] = useState(false);
-  const [feedbackText, setFeedbackText] = useState("");
-  const [feedbackSending, setFeedbackSending] = useState(false);
+
+  // Per-item product reviews (read-only display for delivered orders)
+  const [itemRatingsMap, setItemRatingsMap] = useState({});
+  const [itemRatingsLoading, setItemRatingsLoading] = useState(false);
 
   // Use fullOrder if available for more details, otherwise fallback to order
   const displayOrder = fullOrder || order;
@@ -783,45 +785,38 @@ function OrderDetailModal({ order, onClose }) {
     }
   };
 
-  // Reset tip/feedback state whenever a different order is opened
+  // Reset tip state whenever a different order is opened
   useEffect(() => {
     setTipSent(false);
-    setFeedbackSent(false);
     setSelectedTip(null);
     setCustomTip("");
-    setFeedbackText("");
   }, [order?.id]);
+
+  // Fetch per-item product reviews for read-only display in delivered orders
+  useEffect(() => {
+    if (!order || order.status !== "delivered") return;
+    const items = order.order_items || order.items || [];
+    const productIds = items.map(i => i.product_id).filter(Boolean);
+    if (productIds.length === 0) return;
+
+    setItemRatingsLoading(true);
+    productReviewsAPI.getBulk(productIds, token, order.id)
+      .then(res => {
+        if (res.success) {
+          const map = {};
+          Object.entries(res.data).forEach(([pid, info]) => {
+            map[pid] = info;
+          });
+          setItemRatingsMap(map);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setItemRatingsLoading(false));
+  }, [order?.id, order?.status, token]);
 
   const handleSendTip = () => {
     if (!(selectedTip || customTip)) return;
     Alert.alert("Tipping coming soon", "Tips aren't available yet. Hang tight!");
-  };
-
-  const handleSendFeedback = async () => {
-    const text = feedbackText.trim();
-    if (!text) return;
-    setFeedbackSending(true);
-    try {
-      const res = await fetch(`${BASE_URL}/orders/${order.id}/review`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ comment: text }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setFeedbackSent(true);
-      } else {
-        Alert.alert("Error", data.message || "Failed to submit feedback.");
-      }
-    } catch (e) {
-      console.error("Feedback error:", e);
-      Alert.alert("Error", "Failed to submit feedback.");
-    } finally {
-      setFeedbackSending(false);
-    }
   };
 
   // ── Live driver location & ETA — MUST be before early return (hooks rule) ──
@@ -1030,53 +1025,6 @@ function OrderDetailModal({ order, onClose }) {
                       <Text style={od.tipSuccessText}>{t('orders.tipThanks', 'Thank you for tipping!')}</Text>
                     </View>
                   )}
-
-                  {/* ── Divider ── */}
-                  <View style={od.tfDivider} />
-
-                  {/* ── Feedback — only after delivery ── */}
-                  {isDelivered ? (
-                    !feedbackSent ? (
-                      <>
-                        <View style={od.tfHeader}>
-                          <View style={od.tfIconBg}>
-                            <Feather name="message-circle" size={18} color={C.orange} />
-                          </View>
-                          <View>
-                            <Text style={od.tfTitle}>{t('orders.feedbackTitle', 'Leave Feedback')}</Text>
-                            <Text style={od.tfSubtitle}>{t('orders.feedbackSubtitle', 'How was your delivery?')}</Text>
-                          </View>
-                        </View>
-                        <View style={od.feedbackRow}>
-                          <TextInput
-                            style={od.feedbackInput}
-                            placeholder={t('orders.feedbackPlaceholder', 'Great delivery, polite partner…')}
-                            placeholderTextColor={C.gray400}
-                            value={feedbackText}
-                            onChangeText={setFeedbackText}
-                            maxLength={200}
-                          />
-                          <TouchableOpacity
-                            style={[od.feedbackSendBtn, (!feedbackText.trim() || feedbackSending) && { opacity: 0.5 }]}
-                            onPress={handleSendFeedback}
-                            disabled={!feedbackText.trim() || feedbackSending}
-                            activeOpacity={0.7}
-                          >
-                            {feedbackSending ? (
-                              <ActivityIndicator size="small" color={C.white} />
-                            ) : (
-                              <Feather name="send" size={16} color={C.white} />
-                            )}
-                          </TouchableOpacity>
-                        </View>
-                      </>
-                    ) : (
-                      <View style={od.tipSuccess}>
-                        <Feather name="check-circle" size={24} color={C.green} />
-                        <Text style={od.tipSuccessText}>{t('orders.feedbackThanks', 'Feedback sent!')}</Text>
-                      </View>
-                    )
-                  ) : null}
                 </View>
               )}
 
@@ -1209,29 +1157,61 @@ function OrderDetailModal({ order, onClose }) {
                 const name = item.product_name || p.name || "Item";
                 const price = item.product_price || p.price || item.price || 0;
                 const qty = item.quantity || 1;
+                const pid = item.product_id;
+                const alreadyRated = pid && itemRatingsMap[pid]?.ratedInOrder;
                 return (
-                  <View key={i} style={od.itemRow}>
-                    <Image
-                      source={{
-                        uri:
-                          p.image_url ||
-                          "https://images.unsplash.com/photo-1542838132-92c53300491e?w=200",
-                      }}
-                      style={od.itemImg}
-                      resizeMode="cover"
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={od.itemName} numberOfLines={2}>
-                        {name}
-                      </Text>
-                      <Text style={od.itemUnit}>
-                        {p.unit || item.unit || "1 pc"}
-                      </Text>
+                  <View key={i}>
+                    <View style={od.itemRow}>
+                      <Image
+                        source={{
+                          uri:
+                            p.image_url ||
+                            "https://images.unsplash.com/photo-1542838132-92c53300491e?w=200",
+                        }}
+                        style={od.itemImg}
+                        resizeMode="cover"
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={od.itemName} numberOfLines={2}>
+                          {name}
+                        </Text>
+                        <Text style={od.itemUnit}>
+                          {p.unit || item.unit || "1 pc"}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: "flex-end" }}>
+                        <Text style={od.itemQty}>×{qty}</Text>
+                        <Text style={od.itemPrice}>₹{price * qty}</Text>
+                      </View>
                     </View>
-                    <View style={{ alignItems: "flex-end" }}>
-                      <Text style={od.itemQty}>×{qty}</Text>
-                      <Text style={od.itemPrice}>₹{price * qty}</Text>
-                    </View>
+                    {/* Per-item review display (delivered orders only) */}
+                    {isDelivered && pid && itemRatingsLoading && (
+                      <View style={od.itemRatingRow}>
+                        <ActivityIndicator size="small" color={C.yellow} />
+                      </View>
+                    )}
+                    {isDelivered && pid && !itemRatingsLoading && alreadyRated && (
+                      <View style={od.itemRatingRow}>
+                        <View>
+                          <View style={od.itemRatingDone}>
+                            <Text style={od.itemRatingDoneText}>Rated </Text>
+                            {[1, 2, 3, 4, 5].map(s => (
+                              <MaterialIcons
+                                key={s}
+                                name={s <= (itemRatingsMap[pid]?.myRatingInOrder || 0) ? "star" : "star-outline"}
+                                size={14}
+                                color={s <= (itemRatingsMap[pid]?.myRatingInOrder || 0) ? "#F59E0B" : "#D1D5DB"}
+                              />
+                            ))}
+                          </View>
+                          {itemRatingsMap[pid]?.myComment && (
+                            <Text style={{ fontSize: 11, color: "#6B7280", fontStyle: "italic", marginLeft: 4, marginTop: 2 }}>
+                              {itemRatingsMap[pid].myComment}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    )}
                   </View>
                 );
               })}
@@ -1640,6 +1620,45 @@ const od = StyleSheet.create({
     fontWeight: "800",
     color: C.gray900,
     marginTop: 2,
+  },
+  itemRatingRow: {
+    paddingLeft: 60,
+    paddingBottom: 8,
+  },
+  itemRatingDone: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  itemRatingDoneText: {
+    fontSize: 12,
+    color: C.green,
+    fontWeight: "600",
+    marginRight: 2,
+  },
+  itemRatingInteractive: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  itemRatingLabel: {
+    fontSize: 12,
+    color: C.gray500,
+    fontWeight: "600",
+    marginRight: 2,
+  },
+  submitRatingsBtn: {
+    backgroundColor: C.green,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  submitRatingsBtnText: {
+    color: C.white,
+    fontSize: 14,
+    fontWeight: "700",
   },
 
   // Bill
@@ -2328,12 +2347,17 @@ export default function MyOrdersScreen() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [reviewOrder, setReviewOrder] = useState(null);
+  const [reviewMode, setReviewMode] = useState(null); // null | "select" | "product" | "shop"
   const [viewRatingOrder, setViewRatingOrder] = useState(null);
   const [viewRatingLoading, setViewRatingLoading] = useState(false);
   const [fetchedRating, setFetchedRating] = useState(null);
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [shopFeedback, setShopFeedback] = useState("");
+  const [productRatings, setProductRatings] = useState({});
+  const [productComments, setProductComments] = useState({});
+  const [productRatingsSubmitting, setProductRatingsSubmitting] = useState(false);
 
   const handleOpenViewRating = async (order) => {
     setViewRatingOrder(order);
@@ -2361,7 +2385,7 @@ export default function MyOrdersScreen() {
     }
   };
 
-  const submitReview = async () => {
+  const submitShopReview = async () => {
     if (reviewRating === 0) {
       Alert.alert("Please select a rating");
       return;
@@ -2376,7 +2400,7 @@ export default function MyOrdersScreen() {
         },
         body: JSON.stringify({
           vendor_rating: reviewRating,
-          comment: reviewComment,
+          comment: shopFeedback.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -2391,15 +2415,67 @@ export default function MyOrdersScreen() {
           )
         );
         setReviewOrder(null);
+        setReviewMode(null);
         setReviewRating(0);
-        setReviewComment("");
+        setShopFeedback("");
         fetchOrders(true);
-        Alert.alert("Thank you!", "Your review has been submitted.");
+        Alert.alert("Thank you!", "Shop review submitted.");
+      } else {
+        Alert.alert("Error", data.message || "Failed to submit review.");
       }
     } catch (e) {
       Alert.alert("Error", "Failed to submit review.");
     } finally {
       setReviewLoading(false);
+    }
+  };
+
+  const submitProductReviews = async () => {
+    const items = reviewOrder.order_items || reviewOrder.items || [];
+    const orderId = reviewOrder.id;
+    const toSubmit = items
+      .map((item) => {
+        const pid = item.product_id;
+        if (!pid) return null;
+        const r = productRatings[pid];
+        if (!r) return null;
+        return {
+          product_id: pid,
+          rating: r,
+          order_id: orderId,
+          ...(productComments[pid]?.trim() ? { comment: productComments[pid].trim() } : {}),
+        };
+      })
+      .filter(Boolean);
+
+    if (toSubmit.length === 0) {
+      Alert.alert("Please rate at least one product");
+      return;
+    }
+    setProductRatingsSubmitting(true);
+    try {
+      const res = await productReviewsAPI.submitBulk(toSubmit, token);
+      if (res.success) {
+        const currentOrderId = reviewOrder.id;
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === currentOrderId
+              ? { ...o, has_reviewed: true }
+              : o
+          )
+        );
+        setReviewOrder(null);
+        setReviewMode(null);
+        setProductRatings({});
+        setProductComments({});
+        Alert.alert("Thank you!", "Product ratings submitted.");
+      } else {
+        Alert.alert("Error", res.message || "Failed to submit ratings.");
+      }
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to submit ratings.");
+    } finally {
+      setProductRatingsSubmitting(false);
     }
   };
 
@@ -2728,8 +2804,12 @@ export default function MyOrdersScreen() {
               onPress={() => setDetailOrder(order)}
               onRate={() => {
                 setReviewOrder(order);
+                setReviewMode("select");
                 setReviewRating(0);
                 setReviewComment("");
+                setShopFeedback("");
+                setProductRatings({});
+                setProductComments({});
               }}
               onViewRating={(o) => handleOpenViewRating(o)}
               alreadyRated={!!order.has_reviewed}
@@ -2753,7 +2833,7 @@ export default function MyOrdersScreen() {
         visible={!!reviewOrder}
         animationType="slide"
         transparent
-        onRequestClose={() => setReviewOrder(null)}
+        onRequestClose={() => { setReviewOrder(null); setReviewMode(null); }}
       >
         <Pressable
           style={{
@@ -2761,7 +2841,7 @@ export default function MyOrdersScreen() {
             backgroundColor: "rgba(0,0,0,0.5)",
             justifyContent: "flex-end",
           }}
-          onPress={() => setReviewOrder(null)}
+          onPress={() => { setReviewOrder(null); setReviewMode(null); }}
         >
           <Pressable
             style={{
@@ -2770,101 +2850,219 @@ export default function MyOrdersScreen() {
               borderTopRightRadius: 24,
               padding: 24,
               paddingBottom: 40,
+              maxHeight: "85%",
             }}
-            onPress={() => {}}
+            onTouchStart={(e) => e.stopPropagation()}
           >
-            <View
-              style={{
-                width: 40,
-                height: 4,
-                backgroundColor: C.gray200,
-                borderRadius: 2,
-                alignSelf: "center",
-                marginBottom: 20,
-              }}
-            />
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "900",
-                color: C.gray900,
-                marginBottom: 4,
-              }}
-            >
-              Rate your order
-            </Text>
-            <Text style={{ fontSize: 13, color: C.gray400, marginBottom: 20 }}>
-              {reviewOrder?.vendor?.shop_name || "Your order"}
-            </Text>
+            <View style={{ width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 }} />
 
-            {/* Star picker */}
-            <View
-              style={{
-                flexDirection: "row",
-                gap: 10,
-                marginBottom: 20,
-                justifyContent: "center",
-              }}
-            >
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity
-                  key={star}
-                  onPress={() => setReviewRating(star)}
-                >
-                  <Text
-                    style={{
-                      fontSize: 36,
-                      opacity: star <= reviewRating ? 1 : 0.25,
-                    }}
-                  >
-                    ⭐
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Comment input */}
-            <TextInput
-              style={{
-                backgroundColor: C.gray100,
-                borderRadius: 12,
-                padding: 14,
-                fontSize: 14,
-                color: C.gray900,
-                minHeight: 80,
-                textAlignVertical: "top",
-                marginBottom: 20,
-                borderWidth: 1,
-                borderColor: C.gray200,
-              }}
-              placeholder="Tell us about your experience (optional)"
-              placeholderTextColor={C.gray400}
-              multiline
-              value={reviewComment}
-              onChangeText={setReviewComment}
-            />
-
-            <TouchableOpacity
-              onPress={submitReview}
-              disabled={reviewLoading}
-              style={{
-                backgroundColor: reviewLoading ? C.gray200 : C.green,
-                borderRadius: 14,
-                padding: 16,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {reviewLoading ? (
-                <ActivityIndicator color={C.white} />
-              ) : (
-                <Text
-                  style={{ fontSize: 16, fontWeight: "800", color: C.white }}
-                >
-                  Submit Review
+            {/* ═══════ SELECT VIEW ═══════ */}
+            {reviewMode === "select" && (
+              <>
+                <Text style={{ fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 4 }}>
+                  Rate Your Order
                 </Text>
-              )}
-            </TouchableOpacity>
+                <Text style={{ fontSize: 13, color: C.gray400, marginBottom: 20 }}>
+                  {reviewOrder?.vendor?.shop_name || "Your order"}
+                </Text>
+
+                {/* Rate Product Card */}
+                <TouchableOpacity
+                  onPress={() => {
+                    setReviewMode("product");
+                    setReviewRating(0);
+                  }}
+                  activeOpacity={0.7}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    backgroundColor: C.greenLight,
+                    borderWidth: 1,
+                    borderColor: C.greenBorder,
+                    borderRadius: 16,
+                    padding: 18,
+                    marginBottom: 14,
+                    gap: 14,
+                  }}
+                >
+                  <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: C.green, alignItems: "center", justifyContent: "center" }}>
+                    <Feather name="package" size={22} color={C.white} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 16, fontWeight: "800", color: C.gray900 }}>Rate Product</Text>
+                    <Text style={{ fontSize: 12, color: C.gray500, marginTop: 2 }}>Rate the products you ordered</Text>
+                  </View>
+                  <Feather name="chevron-right" size={20} color={C.gray400} />
+                </TouchableOpacity>
+
+                {/* Rate Shop Card */}
+                <TouchableOpacity
+                  onPress={() => {
+                    setReviewMode("shop");
+                    setReviewRating(0);
+                    setShopFeedback("");
+                  }}
+                  activeOpacity={0.7}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    backgroundColor: "#FFF7ED",
+                    borderWidth: 1,
+                    borderColor: "#FED7AA",
+                    borderRadius: 16,
+                    padding: 18,
+                    gap: 14,
+                  }}
+                >
+                  <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: C.orange, alignItems: "center", justifyContent: "center" }}>
+                    <Feather name="store" size={22} color={C.white} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 16, fontWeight: "800", color: C.gray900 }}>Rate Shop</Text>
+                    <Text style={{ fontSize: 12, color: C.gray500, marginTop: 2 }}>Rate your experience with {reviewOrder?.vendor?.shop_name || "the shop"}</Text>
+                  </View>
+                  <Feather name="chevron-right" size={20} color={C.gray400} />
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* ═══════ PRODUCT VIEW ═══════ */}
+            {reviewMode === "product" && (
+              <>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                  <TouchableOpacity onPress={() => setReviewMode("select")} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <Feather name="arrow-left" size={20} color={C.gray700} />
+                  </TouchableOpacity>
+                  <Text style={{ fontSize: 18, fontWeight: "900", color: C.gray900 }}>Rate Products</Text>
+                </View>
+
+                <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+                  {(reviewOrder?.order_items || reviewOrder?.items || []).map((item, idx) => {
+                    const pid = item.product_id;
+                    if (!pid) return null;
+                    const name = item.product_name || item.product?.name || "Item";
+                    const pRating = productRatings[pid] || 0;
+                    return (
+                      <View key={pid} style={{ marginBottom: 18, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.gray100 }}>
+                        <Text style={{ fontSize: 14, fontWeight: "700", color: C.gray800, marginBottom: 8 }}>{name}</Text>
+                        <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <TouchableOpacity key={s} onPress={() => setProductRatings(prev => ({ ...prev, [pid]: s }))}>
+                              <MaterialIcons
+                                name={s <= pRating ? "star" : "star-outline"}
+                                size={28}
+                                color={s <= pRating ? "#F59E0B" : "#D1D5DB"}
+                              />
+                            </TouchableOpacity>
+                          ))}
+                          {pRating > 0 && (
+                            <TouchableOpacity onPress={() => setProductRatings(prev => { const n = { ...prev }; delete n[pid]; return n; })} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginLeft: 6, alignSelf: "center" }}>
+                              <Text style={{ fontSize: 11, color: C.red }}>Clear</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                        {pRating > 0 && (
+                          <TextInput
+                            style={{ backgroundColor: C.gray100, borderRadius: 10, padding: 10, fontSize: 12, color: C.gray800, borderWidth: 1, borderColor: C.gray200, minHeight: 36, maxHeight: 60 }}
+                            placeholder="Add a comment (optional)"
+                            placeholderTextColor={C.gray400}
+                            value={productComments[pid] || ""}
+                            onChangeText={(t) => setProductComments(prev => ({ ...prev, [pid]: t }))}
+                            maxLength={200}
+                          />
+                        )}
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+
+                <TouchableOpacity
+                  onPress={submitProductReviews}
+                  disabled={productRatingsSubmitting || Object.keys(productRatings).length === 0}
+                  style={{
+                    backgroundColor: productRatingsSubmitting || Object.keys(productRatings).length === 0 ? C.gray200 : C.green,
+                    borderRadius: 14,
+                    padding: 16,
+                    alignItems: "center",
+                    marginTop: 16,
+                  }}
+                >
+                  {productRatingsSubmitting ? (
+                    <ActivityIndicator color={C.white} />
+                  ) : (
+                    <Text style={{ fontSize: 16, fontWeight: "800", color: C.white }}>
+                      Submit Ratings ({Object.keys(productRatings).length})
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* ═══════ SHOP VIEW ═══════ */}
+            {reviewMode === "shop" && (
+              <>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                  <TouchableOpacity onPress={() => setReviewMode("select")} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <Feather name="arrow-left" size={20} color={C.gray700} />
+                  </TouchableOpacity>
+                  <Text style={{ fontSize: 18, fontWeight: "900", color: C.gray900 }}>Rate Shop</Text>
+                </View>
+                <Text style={{ fontSize: 13, color: C.gray400, marginBottom: 20, marginLeft: 30 }}>
+                  {reviewOrder?.vendor?.shop_name || "Your shop"}
+                </Text>
+
+                {/* Star picker */}
+                <View style={{ flexDirection: "row", gap: 10, marginBottom: 20, justifyContent: "center" }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
+                      <MaterialIcons
+                        name={star <= reviewRating ? "star" : "star-outline"}
+                        size={40}
+                        color={star <= reviewRating ? "#F59E0B" : "#D1D5DB"}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Feedback textarea */}
+                <TextInput
+                  style={{
+                    backgroundColor: C.gray100,
+                    borderRadius: 12,
+                    padding: 14,
+                    fontSize: 14,
+                    color: C.gray900,
+                    minHeight: 80,
+                    textAlignVertical: "top",
+                    marginBottom: 20,
+                    borderWidth: 1,
+                    borderColor: C.gray200,
+                  }}
+                  placeholder="Share your feedback about the shop (optional)"
+                  placeholderTextColor={C.gray400}
+                  multiline
+                  value={shopFeedback}
+                  onChangeText={setShopFeedback}
+                />
+
+                <TouchableOpacity
+                  onPress={submitShopReview}
+                  disabled={reviewLoading || reviewRating === 0}
+                  style={{
+                    backgroundColor: reviewLoading || reviewRating === 0 ? C.gray200 : C.green,
+                    borderRadius: 14,
+                    padding: 16,
+                    alignItems: "center",
+                  }}
+                >
+                  {reviewLoading ? (
+                    <ActivityIndicator color={C.white} />
+                  ) : (
+                    <Text style={{ fontSize: 16, fontWeight: "800", color: C.white }}>Submit Review</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
@@ -2944,15 +3142,12 @@ export default function MyOrdersScreen() {
                 >
                   <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <Text
+                      <MaterialIcons
                         key={star}
-                        style={{
-                          fontSize: 36,
-                          opacity: star <= num ? 1 : 0.25,
-                        }}
-                      >
-                        ⭐
-                      </Text>
+                        name={star <= num ? "star" : "star-outline"}
+                        size={36}
+                        color={star <= num ? "#F59E0B" : "#D1D5DB"}
+                      />
                     ))}
                   </View>
 

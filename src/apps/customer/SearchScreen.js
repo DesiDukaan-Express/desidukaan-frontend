@@ -30,6 +30,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
+import WishlistHeart from "../../components/WishlistHeart";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
 import {
@@ -322,6 +323,7 @@ function ProductCard({ product, vendorId, vendorName, onSeeStores }) {
           style={pc.img}
           resizeMode="cover"
         />
+        <WishlistHeart productId={product.id} size={18} style={{ position: "absolute", top: 5, right: 5 }} />
         {disc && !outOfStock && (
           <View style={pc.discBadge}>
             <Text style={pc.discText}>{disc}% off</Text>

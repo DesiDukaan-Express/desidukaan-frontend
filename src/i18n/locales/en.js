@@ -235,6 +235,10 @@ export default {
   description: "Description",
   youSave: "You save ₹{{amount}} per item",
   totalPayable: "Total Payable",
+  rateProduct: "Rate this product",
+  yourRating: "Your rating",
+  loginRequired: "Login required",
+  loginToRate: "Please log in as a customer to rate this product.",
   },
 
   // ── Checkout & Payment ──
@@ -963,5 +967,18 @@ export default {
     placeholder: "Search products, categories...",
     noResults: "No results found",
     results: "Results",
+  },
+
+  // ── Wishlist ──
+  wishlist: {
+    title: "My Wishlist",
+    empty: "Your wishlist is empty",
+    emptySub: "Browse products and tap the heart icon to save them here",
+    browse: "Browse Products",
+    added: "Added to wishlist",
+    removed: "Removed from wishlist",
+    itemCount: "{{count}} items",
+    addToCart: "Add to Cart",
+    remove: "Remove",
   },
 };

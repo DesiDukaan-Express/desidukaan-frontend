@@ -343,6 +343,14 @@ export const deliveryAPI = {
   markNotificationsRead:  (token)        => request("PATCH", "/delivery/vendor-notifications/read", null,                        token),
 };
 
+// ─── Wishlist ──────────────────────────────────────────────────────────────────
+export const wishlistAPI = {
+  getAll:   (token)              => request("GET",    "/wishlist",       null, token),
+  getIds:   (token)              => request("GET",    "/wishlist/ids",   null, token),
+  add:      (productId, token)   => request("POST",   "/wishlist",       { product_id: productId }, token),
+  remove:   (productId, token)   => request("DELETE", `/wishlist/${productId}`, null, token),
+};
+
 // ─── Search ───────────────────────────────────────────────────────────────────
 export const searchAPI = {
   /**
