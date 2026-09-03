@@ -29,14 +29,14 @@ const Stack = createNativeStackNavigator();
 
 export default function Navigation() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const activeRole      = useAuthStore((s) => s.activeRole);
-  const isLoading       = useAuthStore((s) => s.isLoading);
-  const token           = useAuthStore((s) => s.token);
-  const setActiveRole   = useAuthStore((s) => s.setActiveRole);
+  const activeRole = useAuthStore((s) => s.activeRole);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const token = useAuthStore((s) => s.token);
+  const setActiveRole = useAuthStore((s) => s.setActiveRole);
   const accountDeactivated = useAuthStore((s) => s.accountDeactivated);
   const checkAccountStatus = useAuthStore((s) => s.checkAccountStatus);
-  const flagDeactivated     = useAuthStore((s) => s.flagDeactivated);
-  const clearDeactivation   = useAuthStore((s) => s.clearDeactivation);
+  const flagDeactivated = useAuthStore((s) => s.flagDeactivated);
+  const clearDeactivation = useAuthStore((s) => s.clearDeactivation);
   const vendorSuspended = useAuthStore((s) => s.vendorSuspended);
   const checkVendorStatus = useAuthStore((s) => s.checkVendorStatus);
   const flagVendorSuspended = useAuthStore((s) => s.flagVendorSuspended);
@@ -44,12 +44,16 @@ export default function Navigation() {
 
   const activeRoleRef = useRef(activeRole);
   useEffect(() => { activeRoleRef.current = activeRole; }, [activeRole]);
+  const deliverySuspended = useAuthStore((s) => s.deliverySuspended);
+  const checkDeliveryStatus = useAuthStore((s) => s.checkDeliveryStatus);
+  const flagDeliverySuspended = useAuthStore((s) => s.flagDeliverySuspended);
+  const clearDeliverySuspended = useAuthStore((s) => s.clearDeliverySuspended);
 
-  const [vendorOnboarded,    setVendorOnboarded]    = useState(null);
-  const [deliveryOnboarded,  setDeliveryOnboarded]  = useState(null);
-  const [checkingOnboard,    setCheckingOnboard]    = useState(false);
-  const [vendorStatus,       setVendorStatus]       = useState(null);
-  const [vendorMissingDocs,  setVendorMissingDocs]  = useState([]);
+  const [vendorOnboarded, setVendorOnboarded] = useState(null);
+  const [deliveryOnboarded, setDeliveryOnboarded] = useState(null);
+  const [checkingOnboard, setCheckingOnboard] = useState(false);
+  const [vendorStatus, setVendorStatus] = useState(null);
+  const [vendorMissingDocs, setVendorMissingDocs] = useState([]);
 
   // Fetch the vendor profile. Also acts as the login-time / reload fallback:
   // if the vendor is suspended, it flags the full-screen block so the app
@@ -164,6 +168,22 @@ export default function Navigation() {
         clearVendorSuspended();
         if (activeRoleRef.current === "vendor") checkVendorProfile();
       });
+      socket.on("delivery:suspended", () => {
+        flagDeliverySuspended();
+        if (activeRole === "delivery") checkDeliveryProfile();
+      });
+      socket.on("delivery:reactivated", () => {
+        clearDeliverySuspended();
+        if (activeRole === "delivery") checkDeliveryProfile();
+      });
+      socket.on("delivery:suspended", () => {
+        flagDeliverySuspended();
+        if (activeRole === "delivery") checkDeliveryProfile();
+      });
+      socket.on("delivery:reactivated", () => {
+        clearDeliverySuspended();
+        if (activeRole === "delivery") checkDeliveryProfile();
+      });
     } catch (err) {
       // Socket init failed — poll + login/refresh checks still cover both directions.
     }
@@ -171,7 +191,7 @@ export default function Navigation() {
     return () => {
       if (socket) socket.disconnect();
     };
-  }, [isAuthenticated, token, flagDeactivated, clearDeactivation, flagVendorSuspended, clearVendorSuspended, checkVendorProfile]);
+  }, [isAuthenticated, token, flagDeactivated, clearDeactivation, flagVendorSuspended, clearVendorSuspended, flagDeliverySuspended, clearDeliverySuspended, checkVendorProfile]);
 
   const checkDeliveryProfile = async () => {
     setCheckingOnboard(true);
@@ -183,6 +203,11 @@ export default function Navigation() {
       const profile = data.data?.profile;
       if (profile) {
         useAuthStore.getState().addEnabledRole("delivery");
+        if (profile.is_active === false) {
+          flagDeliverySuspended();
+        } else {
+          clearDeliverySuspended();
+        }
       }
       if (!profile?.onboarding_submitted) {
         setDeliveryOnboarded('not_submitted');
@@ -215,13 +240,16 @@ export default function Navigation() {
     );
   }
 
-  // ── Hard gate: account deactivated → block the entire app ────────────────
-  if (accountDeactivated) {
+  // ── Role-Scoped Hard Gates: suspension blocks apply ONLY to activeRole ────────
+  if (accountDeactivated && activeRole === "customer") {
     return <AccountDeactivatedScreen />;
   }
 
-  // ── Hard gate: vendor shop suspended → block the vendor app ──────────────
   if (vendorSuspended && activeRole === "vendor") {
+    return <AccountSuspendedScreen />;
+  }
+
+  if (deliverySuspended && activeRole === "delivery") {
     return <AccountSuspendedScreen />;
   }
 
@@ -230,7 +258,7 @@ export default function Navigation() {
     isAuthenticated &&
     activeRole &&
     (checkingOnboard ||
-      (activeRole === "vendor"   && vendorOnboarded   === null) ||
+      (activeRole === "vendor" && vendorOnboarded === null) ||
       (activeRole === "delivery" && deliveryOnboarded === null))
   ) {
     return (
@@ -245,7 +273,7 @@ export default function Navigation() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
           <>
-            <Stack.Screen name="Login"  component={LoginScreen} />
+            <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Signup" component={SignupScreen} />
           </>
         ) : !activeRole ? (
@@ -308,8 +336,8 @@ export default function Navigation() {
             )}
 
             {/* ── Shared screens accessible from any role app ─── */}
-            <Stack.Screen name="Checkout"    component={CheckoutScreen} />
-            <Stack.Screen name="Payment"     component={PaymentScreen} />
+            <Stack.Screen name="Checkout" component={CheckoutScreen} />
+            <Stack.Screen name="Payment" component={PaymentScreen} />
             <Stack.Screen name="OrderPlaced" component={OrderPlaced} />
           </>
         )}

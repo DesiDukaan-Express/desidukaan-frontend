@@ -113,6 +113,9 @@ const useAuthStore = create((set, get) => ({
   // is shown to the vendor role. Scoped to the vendor role only (a suspended
   // shop does not block the same user from using the app as a customer).
   vendorSuspended: false,
+  // deliverySuspended: true → the full-screen "Account Suspended" block screen
+  // is shown to the delivery role. Scoped to delivery role only.
+  deliverySuspended: false,
 
   // Internal setter used by tryRefreshToken without triggering a full re-login
   _setAccessToken: (accessToken) => set({ token: accessToken }),
@@ -204,7 +207,7 @@ const useAuthStore = create((set, get) => ({
           enabledRoles,
           activeRole: null,   // ← always null on app open → triggers role picker
           isAuthenticated: true,
-          accountDeactivated: false,
+          accountDeactivated: currentUser?.is_active === false,
           isLoading: false,
         });
         await useAddressStore.getState().loadAddresses(refreshResult.token);
@@ -275,8 +278,12 @@ const useAuthStore = create((set, get) => ({
     try { await AsyncStorage.removeItem(ENABLED_ROLES_KEY); } catch (_) {}
     try { await secureDelete(REFRESH_KEY); } catch (_) {}
     try { useAddressStore.getState().clearAddresses(); } catch (_) {}
+<<<<<<< HEAD
     try { useWishlistStore.getState().clearWishlist(); } catch (_) {}
     set({ user: null, token: null, role: null, activeRole: null, enabledRoles: ["customer", "vendor", "delivery"], isAuthenticated: false, accountDeactivated: false, vendorSuspended: false });
+=======
+    set({ user: null, token: null, role: null, activeRole: null, enabledRoles: ["customer", "vendor", "delivery"], isAuthenticated: false, accountDeactivated: false, vendorSuspended: false, deliverySuspended: false });
+>>>>>>> c1e6ae26bfbf4548ac09b488d887318351dd6456
   },
 
   updateUser: (updates) =>
@@ -295,6 +302,30 @@ const useAuthStore = create((set, get) => ({
 
   // ── Clear the vendor suspension block (socket "vendor:reactivated") ──────
   clearVendorSuspended: () => set({ vendorSuspended: false }),
+
+  // ── Flag delivery partner as suspended (socket "delivery:suspended") ────
+  flagDeliverySuspended: () => set({ deliverySuspended: true }),
+
+  // ── Clear delivery suspension (socket "delivery:reactivated") ────────────
+  clearDeliverySuspended: () => set({ deliverySuspended: false }),
+
+  checkDeliveryStatus: async () => {
+    const { token, isAuthenticated, activeRole, deliverySuspended } = get();
+    if (!token || !isAuthenticated || activeRole !== "delivery") return;
+    try {
+      const res = await fetch(`${BASE_URL}/delivery/me/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const partner = data?.data || data?.partner;
+      if (!partner) return;
+      const isSuspended = partner.is_active === false;
+      if (isSuspended !== deliverySuspended) {
+        set({ deliverySuspended: isSuspended });
+      }
+    } catch {}
+  },
 
   // ── Live vendor-status check ─────────────────────────────────────────────
   // Called periodically + on app foreground while authenticated as a vendor,
@@ -331,21 +362,21 @@ const useAuthStore = create((set, get) => ({
   // backend reports is_active=false (admin deactivated the account), we flag
   // it so the full-screen block appears immediately, without needing a reload.
   checkAccountStatus: async () => {
-    const { token, isAuthenticated, accountDeactivated } = get();
-    if (!token || !isAuthenticated || accountDeactivated) return;
+    const { token, isAuthenticated } = get();
+    if (!token || !isAuthenticated) return;
 
     try {
       const res = await fetch(`${BASE_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return; // ignore TOKEN_EXPIRED etc. — normal refresh flow handles it
+      if (!res.ok) return;
       const data = await res.json();
-      if (data.user && data.user.is_active === false) {
-        set({ accountDeactivated: true });
-        return;
-      }
-      if (data.user && JSON.stringify(data.user) !== JSON.stringify(get().user)) {
-        set({ user: data.user, role: data.user.role });
+      if (data.user) {
+        set({
+          accountDeactivated: data.user.is_active === false,
+          user: data.user,
+          role: data.user.role,
+        });
       }
     } catch {
       // network error — leave as-is, retry on next tick

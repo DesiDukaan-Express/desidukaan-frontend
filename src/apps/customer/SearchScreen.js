@@ -488,10 +488,10 @@ function VendorCard({ vendor, distKm: dist, matchCount, onPress, tooFar }) {
   const isOpen = isStoreCurrentlyOpen(vendor);
   return (
     <TouchableOpacity
-      style={[vc.card, tooFar && vc.cardFar]}
-      onPress={onPress}
-      activeOpacity={0.88}
-      disabled={tooFar}
+      style={[vc.card, (tooFar || !isOpen) && vc.cardFar]}
+      onPress={isOpen && !tooFar ? onPress : undefined}
+      activeOpacity={isOpen && !tooFar ? 0.88 : 1}
+      disabled={tooFar || !isOpen}
     >
       <View style={vc.imgWrap}>
         <Image
@@ -1038,7 +1038,9 @@ export default function SearchScreen() {
         });
       }
     });
-    return cats.sort((a, b) => a.label.localeCompare(b.label));
+    // Preserve the backend order (display_order ASC from /products/categories),
+    // NOT alphabetical — admin drag-and-drop reorder must show up here too.
+    return cats;
   }, [apiCategories]);
 
   const inputRef = useRef(null);
