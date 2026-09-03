@@ -1295,7 +1295,6 @@ export default function VendorStoreScreen() {
             </View>
           </View>
           <View style={s.shopMetaRow}>
-<<<<<<< HEAD
             <View style={[s.statusDot, { backgroundColor: isStoreCurrentlyOpen(vendor) ? "#4ADE80" : "#F87171" }]} />
             <Text style={s.metaText}>{isStoreCurrentlyOpen(vendor) ? t('vendorStore.open') : t('vendorStore.closed')}</Text>
             {vendor?.rating > 0 && (
@@ -1310,17 +1309,6 @@ export default function VendorStoreScreen() {
                 </View>
               </>
             )}
-=======
-            <Text style={s.metaLink}>{vendor?.owner_name ? vendor.owner_name.split(" ")[0].toLowerCase() : "store"}</Text>
-            <Text style={s.metaSep}>·</Text>
-            <Text style={s.metaText}>{vendor?.shop_type || "Grocery Store"}</Text>
-          </View>
-          <View style={s.shopMetaRow}>
-            <View style={s.ratingChip}>
-              <Feather name="star" size={11} color={C.green} />
-              <Text style={s.ratingText}>{vendor?.rating ? Number(vendor.rating).toFixed(1) : "4.8"}</Text>
-            </View>
->>>>>>> c1e6ae26bfbf4548ac09b488d887318351dd6456
             <Text style={s.metaSep}>·</Text>
             <Text style={s.metaText}>{t('vendorStore.inStock', { count: inStockTotal })}</Text>
             <Text style={s.metaSep}>·</Text>
@@ -1338,7 +1326,7 @@ export default function VendorStoreScreen() {
             <TouchableOpacity
               style={s.headerActionBtn}
               activeOpacity={0.8}
-              onPress={() => { setWishlistCount(c => c + (wishlistCount ? 0 : 1)); }}
+              onPress={() => navigation.navigate("Wishlist")}
             >
               <Feather name="heart" size={16} color={C.gray700} />
               <Text style={s.headerActionText}>Wishlist</Text>
@@ -1652,7 +1640,6 @@ export default function VendorStoreScreen() {
               )}
             </>
           )}
-<<<<<<< HEAD
           {/* Store Reviews Section */}
           {vendorReviews.length > 0 && !search && activeCat === "All" && (
             <View style={{ marginTop: 24 }}>
@@ -1711,7 +1698,6 @@ export default function VendorStoreScreen() {
               ))}
             </View>
           )}
-=======
 
           {/* STORE INFORMATION — shown at the bottom of the products, below everything */}
           {!search && (
@@ -1807,8 +1793,6 @@ export default function VendorStoreScreen() {
               </View>
             </View>
           )}
-
->>>>>>> c1e6ae26bfbf4548ac09b488d887318351dd6456
           <View style={{ height: 130 }} />
         </ScrollView>
       </View>

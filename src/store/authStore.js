@@ -278,14 +278,11 @@ const useAuthStore = create((set, get) => ({
     try { await AsyncStorage.removeItem(ENABLED_ROLES_KEY); } catch (_) {}
     try { await secureDelete(REFRESH_KEY); } catch (_) {}
     try { useAddressStore.getState().clearAddresses(); } catch (_) {}
-<<<<<<< HEAD
     try { useWishlistStore.getState().clearWishlist(); } catch (_) {}
     set({ user: null, token: null, role: null, activeRole: null, enabledRoles: ["customer", "vendor", "delivery"], isAuthenticated: false, accountDeactivated: false, vendorSuspended: false });
-=======
-    set({ user: null, token: null, role: null, activeRole: null, enabledRoles: ["customer", "vendor", "delivery"], isAuthenticated: false, accountDeactivated: false, vendorSuspended: false, deliverySuspended: false });
->>>>>>> c1e6ae26bfbf4548ac09b488d887318351dd6456
   },
 
+  
   updateUser: (updates) =>
     set((state) => ({
       user: { ...state.user, ...updates },

@@ -3514,7 +3514,6 @@ export default function HomeScreen() {
                     : undefined}
                   activeOpacity={isOpen ? 0.88 : 1}
                 >
-<<<<<<< HEAD
                 <View style={s.storeImgWrap}>
                   <Image
                     source={{
@@ -3537,71 +3536,6 @@ export default function HomeScreen() {
                     </Text>
                   </View>
                 </View>
-                <View style={s.storeInfo}>
-                  <Text style={s.storeName} numberOfLines={1}>
-                    {vendor.shop_name}
-                  </Text>
-                  <View style={s.storeMetaRow}>
-                    <MaterialIcons name="location-on" size={10} color={C.green} />
-                    <Text style={s.storeMeta}>
-                      {vendor.distance_km
-                        ? t("home.kmDistance", { count: parseFloat(vendor.distance_km).toFixed(1) })
-                        : t("home.nearby")}
-                    </Text>
-                    <View style={s.metaDot} />
-                    <MaterialIcons name="access-time" size={10} color={C.gray400} />
-                    <Text style={s.storeMeta}>{t("home.deliveryTime")}</Text>
-                  </View>
-                  <View style={s.storeTagRow}>
-                    {/* Min order — orange pill */}
-                    <View style={[s.storeTag, { backgroundColor: C.orangeLight, borderColor: "#FED7AA" }]}>
-                      <Text style={[s.storeTagText, { color: C.orangeDark }]}>
-                        {t("home.minOrder", { min: vendor.min_order || 99 })}
-                      </Text>
-                    </View>
-                    {isStoreCurrentlyOpen(vendor) && (
-                      <View
-                        style={[
-                          s.storeTag,
-                          {
-                            backgroundColor: C.greenLight,
-                            borderColor: C.greenBorder,
-                          },
-                        ]}
-                      >
-                        <Text style={[s.storeTagText, { color: C.green }]}>
-                          {t("home.acceptingOrders")}
-=======
-                  {/* Everything except the CLOSED badge — dimmed when closed */}
-                  <View
-                    style={[
-                      s.cardContent,
-                      !isStoreCurrentlyOpen(vendor) && s.cardContentClosed,
-                    ]}
-                  >
-                    <View style={s.storeImgWrap}>
-                      <Image
-                        source={{
-                          uri:
-                            vendor.shop_image_url ||
-                            `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${vendor.id}`,
-                        }}
-                        style={s.storeImg}
-                      />
-                      <LinearGradient
-                        colors={["transparent", "rgba(0,0,0,0.5)"]}
-                        style={s.storeImgOverlay}
-                      />
-                      <View style={s.ratingBadge}>
-                        <MaterialIcons name="star" size={10} color="#FBBF24" />
-                        <Text style={s.ratingText}>
-                          {vendor.avg_rating
-                            ? parseFloat(vendor.avg_rating).toFixed(1)
-                            : t("home.new")}
->>>>>>> c1e6ae26bfbf4548ac09b488d887318351dd6456
-                        </Text>
-                      </View>
-                    </View>
                     <View style={s.storeInfo}>
                       <Text style={s.storeName} numberOfLines={1}>
                         {vendor.shop_name}
@@ -3662,7 +3596,6 @@ export default function HomeScreen() {
                           )}
                       </View>
                     </View>
-                  </View>
 
                   {/* OPEN/CLOSED pill — solid, no dot. Kept OUTSIDE the dimmed
                     wrapper so it always renders at full opacity and stays
