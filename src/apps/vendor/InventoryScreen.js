@@ -439,6 +439,7 @@ export default function InventoryScreen() {
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [viewMode, setViewMode] = useState("list"); // 'list' | 'grid'
+  const [showAddOptions, setShowAddOptions] = useState(false);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, show: true, type });
@@ -636,18 +637,7 @@ export default function InventoryScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={s.headerBtnRow}>
-          <TouchableOpacity onPress={() => setModal("add")} style={s.primaryBtn} activeOpacity={0.85}>
-            <Feather name="plus" size={15} color={WHITE} />
-            <Text style={s.primaryBtnText}>Add Product</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowCatalogueModal(true)} style={s.outlineBtn} activeOpacity={0.8}>
-            <MaterialIcons name="menu-book" size={15} color={TEXT} />
-            <Text style={s.outlineBtnText}>Add from Catalogue</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ── Stat Cards (2x2 grid) ── */}
+        {/* ── Stat Cards ── */}
         <View style={s.statsGrid}>
           <StatCard
             iconSet="MI"
@@ -667,26 +657,6 @@ export default function InventoryScreen() {
             label="Categories"
             value={allCategories.length}
             sub="All categories"
-          />
-          <StatCard
-            iconSet="F"
-            iconName="alert-triangle"
-            iconColor={ORANGE}
-            iconBg={ORANGE_LIGHT}
-            label="Low Stock Items"
-            value={lowStockCount}
-            sub="Needs attention"
-            subColor={ORANGE}
-          />
-          <StatCard
-            iconSet="MI"
-            iconName="inbox"
-            iconColor={RED}
-            iconBg={RED_LIGHT}
-            label="Out of Stock"
-            value={outOfStockCount}
-            sub="Unavailable"
-            subColor={RED}
           />
         </View>
 
@@ -832,9 +802,60 @@ export default function InventoryScreen() {
       </ScrollView>
 
       {/* ── Floating Add Button ── */}
-      <TouchableOpacity style={s.fab} onPress={() => setModal("add")} activeOpacity={0.85}>
+      <TouchableOpacity style={s.fab} onPress={() => setShowAddOptions(true)} activeOpacity={0.85}>
         <Feather name="plus" size={26} color={WHITE} />
       </TouchableOpacity>
+
+      {/* ── Add Options Sheet (Add Product vs Add from Catalogue) ── */}
+      {showAddOptions && (
+        <View style={s.sheetOverlay}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowAddOptions(false)} />
+          <View style={s.sheetCard}>
+            <Text style={s.sheetTitle}>Add New</Text>
+            <Text style={s.sheetSub}>Choose how you'd like to add a product</Text>
+
+            <TouchableOpacity
+              style={s.addOptionRow}
+              activeOpacity={0.8}
+              onPress={() => {
+                setShowAddOptions(false);
+                setModal("add");
+              }}
+            >
+              <View style={[s.addOptionIcon, { backgroundColor: GREEN_LIGHT }]}>
+                <Feather name="plus" size={20} color={GREEN} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.addOptionTitle}>Add Product</Text>
+                <Text style={s.addOptionSub}>Create a new product manually</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={TEXT_XLIGHT} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={s.addOptionRow}
+              activeOpacity={0.8}
+              onPress={() => {
+                setShowAddOptions(false);
+                setShowCatalogueModal(true);
+              }}
+            >
+              <View style={[s.addOptionIcon, { backgroundColor: "#EAF1FE" }]}>
+                <MaterialIcons name="menu-book" size={20} color="#3B82F6" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.addOptionTitle}>Add from Catalogue</Text>
+                <Text style={s.addOptionSub}>Pick ready-made products from our catalogue</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={TEXT_XLIGHT} />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.sheetCancelBtn} onPress={() => setShowAddOptions(false)} activeOpacity={0.8}>
+              <Text style={s.sheetCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* ── Filter & Sort Sheet ── */}
       <FilterSortSheet
@@ -1294,6 +1315,22 @@ const s = StyleSheet.create({
   sheetCancelText: { fontSize: 14, fontWeight: "700", color: TEXT_LIGHT },
   sheetConfirmBtn: { flex: 2, borderRadius: 14, paddingVertical: 14, alignItems: "center" },
   sheetConfirmText: { fontSize: 14, fontWeight: "800", color: "#fff" },
+
+  // ── Add options sheet (Add Product vs Add from Catalogue) ──
+  addOptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    width: "100%",
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 6,
+  },
+  addOptionIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  addOptionTitle: { fontSize: 14, fontWeight: "800", color: TEXT },
+  addOptionSub: { fontSize: 12, color: TEXT_LIGHT, marginTop: 1 },
 
   // ── Filter & Sort sheet ──
   filterSheetCard: {

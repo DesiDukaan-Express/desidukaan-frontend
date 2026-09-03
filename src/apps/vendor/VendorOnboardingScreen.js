@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, Alert,
-  KeyboardAvoidingView, Platform, Image, Modal, Pressable, Keyboard
+  KeyboardAvoidingView, Platform, Image, Modal, Pressable, Keyboard, Switch, Animated
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import useAuthStore from '../../store/authStore';
 import AddressMapView from "../../components/AddressMapView";
 import UseCurrentLocationButton from "../../components/UseCurrentLocationButton";
@@ -15,9 +16,18 @@ import { uploadAPI } from '../../services/api';
 import { MaterialIcons } from '@expo/vector-icons';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
-const PRIMARY = '#1ca049';
-const PRIMARY_LIGHT = '#e8f5e9';
-const BG = '#f6f6f6';
+// ─── Premium palette — DesiDukaan emerald on soft cloud-white ──────────────────
+const PRIMARY = '#1E8449';
+const PRIMARY_DARK = '#146C38';
+const PRIMARY_DEEP = '#0E5A2C';
+const PRIMARY_LIGHT = '#E9F7EF';
+const PRIMARY_LIGHTER = '#F3FBF6';
+const ACCENT_GOLD = '#C9972F';
+const BG = '#F4F6F5';
+const INK = '#161B19';
+const BORDER = '#E7EBE8';
+const SUBTLE = '#8A9089';
+const CARD_SHADOW = 'rgba(15, 45, 28, 0.08)';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -28,6 +38,16 @@ const STEPS = [
   { id: 4, title: 'Catalog', icon: 'inventory', desc: 'Pick your products' },
   { id: 5, title: 'Review', icon: 'assessment', desc: 'Inventory & pricing' },
   { id: 6, title: 'Go Live', icon: 'publish', desc: 'Submit & launch' },
+];
+
+// Friendly headline shown in the progress card for each step
+const STEP_HERO = [
+  { title: "Let's set up your shop 🎉", sub: 'Add your basic shop details to get started' },
+  { title: 'A few legal details 📋', sub: 'FSSAI & GST keep your shop compliant' },
+  { title: 'Where should we pay you? 💳', sub: "Add your bank or UPI to receive payouts" },
+  { title: 'Build your catalog 🛒', sub: 'Add the products you want to sell' },
+  { title: 'Almost there — review 👀', sub: 'Check your inventory & pricing' },
+  { title: "You're ready to go live 🚀", sub: 'Submit your shop for launch' },
 ];
 
 
@@ -400,10 +420,28 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
   const scrollRef = useRef(null);
 
+  // ── Collapsing header (banner hides on scroll down, reappears on scroll up) ──
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const clampedScroll = useMemo(
+    () => Animated.diffClamp(scrollY, 0, headerHeight || 1),
+    [headerHeight]
+  );
+  const headerTranslate = clampedScroll.interpolate({
+    inputRange: [0, headerHeight || 1],
+    outputRange: [0, -(headerHeight || 1)],
+    extrapolate: 'clamp',
+  });
+  const onContentScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    { useNativeDriver: true }
+  );
+
   useEffect(() => {
     if (scrollRef.current) {
       const timer = setTimeout(() => {
         scrollRef.current?.scrollTo({ y: 0, animated: false });
+        scrollY.setValue(0);
       }, 50);
       return () => clearTimeout(timer);
     }
@@ -414,6 +452,15 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const [ownerName, setOwnerName] = useState('');
   const [estYear, setEstYear] = useState('');
   const [email, setEmail] = useState('');
+  const [yearDropdownOpen, setYearDropdownOpen] = useState(false);
+  const YEAR_OPTIONS = React.useMemo(() => {
+    const current = new Date().getFullYear();
+    return Array.from({ length: 60 }, (_, i) => `${current - i}`);
+  }, []);
+  // Advanced (optional) features — all on by default, toggleable
+  const [advNotifications, setAdvNotifications] = useState(true);
+  const [advAnalytics, setAdvAnalytics] = useState(true);
+  const [advPromotions, setAdvPromotions] = useState(true);
   const [phone, setPhone] = useState(user?.phone || '');
   const [altName, setAltName] = useState('');
   const [altPhone, setAltPhone] = useState('');
@@ -1082,11 +1129,16 @@ export default function VendorOnboardingScreen({ onComplete }) {
         });
       }
 
+      // Refresh vendor status in the background (updates auth store / parent
+      // navigator so it knows onboarding is submitted / approved) but always
+      // show the success popup so the user gets feedback and a way to
+      // continue to the Dashboard — previously this was skipped whenever
+      // onComplete was provided, which is why Submit & Go Live appeared to
+      // do nothing.
       if (onComplete) {
         onComplete();
-      } else {
-        setShowSuccess(true);
       }
+      setShowSuccess(true);
     } catch (err) {
       Alert.alert('Error', err.message);
     } finally {
@@ -1180,85 +1232,278 @@ export default function VendorOnboardingScreen({ onComplete }) {
         </View>
       </Modal>
 
-      {/* Top bar */}
-      <View style={styles.topBar}>
-        <View style={styles.brandRow}>
-          <MaterialIcons name="storefront" size={24} color={PRIMARY} style={{ marginRight: 6 }} />
-          <View>
-            <Text style={styles.brandName}>DesiDukaan</Text>
-            <Text style={styles.brandSub}>Seller Registration</Text>
+      {/* Collapsing header — hides on scroll down, reappears on scroll up */}
+      <Animated.View
+        style={[styles.collapsingHeader, { transform: [{ translateY: headerTranslate }] }]}
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          if (h > 0 && Math.abs(h - headerHeight) > 1) setHeaderHeight(h);
+        }}
+      >
+        {/* Top bar */}
+        <View style={styles.topBar}>
+          <View style={styles.brandRow}>
+            <View style={styles.brandIconWrap}>
+              <MaterialIcons name="storefront" size={18} color="#fff" />
+            </View>
+            <View style={styles.brandTextWrap}>
+              <Text style={styles.brandName} numberOfLines={1}>Desi<Text style={{ color: PRIMARY }}>Dukaan</Text></Text>
+              <Text style={styles.brandSub} numberOfLines={1}>Seller Registration</Text>
+            </View>
+          </View>
+          <TouchableOpacity style={styles.helpPill} activeOpacity={0.8}>
+            <View style={styles.helpIconCircle}>
+              <MaterialIcons name="help-outline" size={13} color={PRIMARY} />
+            </View>
+            <View style={styles.helpTextWrap}>
+              <Text style={styles.helpTitle} numberOfLines={1}>Need help?</Text>
+              <Text style={styles.helpSub} numberOfLines={2}>We're here to assist</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Progress card */}
+        <View style={styles.progressCard}>
+          <View style={styles.stepCountPill}>
+            <Text style={styles.stepCount}>Step {currentStep} of {STEPS.length}</Text>
+          </View>
+
+          <View style={styles.progressCardMain}>
+            <View style={styles.progressCardLeft}>
+              <Text style={styles.heroTitle}>{STEP_HERO[currentStep - 1].title}</Text>
+              <Text style={styles.heroSub}>{STEP_HERO[currentStep - 1].sub}</Text>
+              <View style={styles.safeRow}>
+                <MaterialIcons name="check-circle" size={13} color={PRIMARY} />
+                <Text style={styles.safeText}>Your information is safe &amp; secure</Text>
+              </View>
+            </View>
+
+            <ScrollView
+              horizontal showsHorizontalScrollIndicator={false}
+              style={styles.stepsScroll} contentContainerStyle={styles.stepsRow}
+            >
+              {STEPS.map((step) => (
+                <View key={step.id} style={styles.stepPillWrapper}>
+                  <TouchableOpacity
+                    activeOpacity={step.id < currentStep ? 0.6 : 1}
+                    disabled={step.id >= currentStep}
+                    onPress={() => step.id < currentStep && setCurrentStep(step.id)}
+                    style={styles.stepPill}
+                  >
+                    <View style={[
+                      styles.stepNum,
+                      currentStep === step.id && styles.stepNumActive,
+                      currentStep > step.id && styles.stepNumDone,
+                    ]}>
+                      <Text style={[styles.stepNumText, currentStep >= step.id && styles.stepNumTextActive]}>
+                        {currentStep > step.id ? '✓' : step.id}
+                      </Text>
+                    </View>
+                    <Text style={[
+                      styles.stepPillText,
+                      currentStep === step.id && styles.stepPillTextActive,
+                      currentStep > step.id && styles.stepPillTextDone,
+                    ]} numberOfLines={1}>
+                      {step.title}
+                    </Text>
+                    <View style={[styles.stepUnderline, currentStep === step.id && styles.stepUnderlineActive]} />
+                  </TouchableOpacity>
+                  {step.id < STEPS.length && (
+                    <View style={[styles.connector, currentStep > step.id && styles.connectorDone]} />
+                  )}
+                </View>
+              ))}
+            </ScrollView>
           </View>
         </View>
-        <Text style={styles.stepCount}>{currentStep} of {STEPS.length}</Text>
-      </View>
-
-      {/* Progress bar */}
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
-      </View>
-
-      {/* Step pills */}
-      <ScrollView
-        horizontal showsHorizontalScrollIndicator={false}
-        style={styles.stepsScroll} contentContainerStyle={styles.stepsRow}
-      >
-        {STEPS.map((step) => (
-          <View key={step.id} style={styles.stepPillWrapper}>
-            <View style={[
-              styles.stepPill,
-              currentStep === step.id && styles.stepPillActive,
-              currentStep > step.id && styles.stepPillDone,
-            ]}>
-              <View style={[
-                styles.stepNum,
-                currentStep === step.id && styles.stepNumActive,
-                currentStep > step.id && styles.stepNumDone,
-              ]}>
-                <Text style={[styles.stepNumText, currentStep >= step.id && styles.stepNumTextActive]}>
-                  {currentStep > step.id ? '✓' : step.id}
-                </Text>
-              </View>
-              <Text style={[
-                styles.stepPillText,
-                (currentStep === step.id || currentStep > step.id) && styles.stepPillTextActive,
-              ]}>
-                {step.title}
-              </Text>
-            </View>
-            {step.id < STEPS.length && (
-              <View style={[styles.connector, currentStep > step.id && styles.connectorDone]} />
-            )}
-          </View>
-        ))}
-      </ScrollView>
+      </Animated.View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView ref={scrollRef} style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <Animated.ScrollView
+          ref={scrollRef}
+          style={styles.content}
+          contentContainerStyle={{ paddingTop: headerHeight }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          onScroll={onContentScroll}
+          scrollEventThrottle={16}
+        >
 
           {/* Step header */}
-          <View style={styles.stepHeader}>
-            <MaterialIcons name={`${STEPS[currentStep - 1].icon}`} style={styles.stepIcon} />
-            <View>
-              <Text style={styles.stepTitle}>{STEPS[currentStep - 1].title}</Text>
-              <Text style={styles.stepDesc}>{STEPS[currentStep - 1].desc}</Text>
+          <View style={styles.stepHeaderCard}>
+            <View style={styles.stepHeaderLeft}>
+              <View style={styles.stepIconBadge}>
+                <MaterialIcons name={`${STEPS[currentStep - 1].icon}`} size={20} color={PRIMARY} />
+              </View>
+              <View style={{ flexShrink: 1 }}>
+                <Text style={styles.stepTitle}>{STEPS[currentStep - 1].title === 'Shop Info' ? 'Shop Information' : STEPS[currentStep - 1].title}</Text>
+                <Text style={styles.stepDesc}>{STEPS[currentStep - 1].desc}</Text>
+              </View>
             </View>
+            {currentStep === 1 && (
+              <View style={styles.setupBadge}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <MaterialIcons name="auto-awesome" size={12} color="#4F46E5" />
+                  <Text style={styles.setupBadgeTitle}>Quick &amp; Easy Setup</Text>
+                </View>
+                <Text style={styles.setupBadgeSub}>Takes less than 5 minutes</Text>
+              </View>
+            )}
           </View>
 
           {/* ── STEP 1: Shop Info ── */}
           {currentStep === 1 && (
             <View style={styles.form}>
-              <Text style={styles.label}>Shop Name *</Text>
-              <TextInput style={styles.input} placeholder="e.g. Sharma Kirana Store" value={shopName} onChangeText={setShopName} />
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Shop Name <Text style={styles.req}>*</Text></Text>
+                <MaterialIcons name="info-outline" size={13} color={SUBTLE} />
+              </View>
+              <View style={styles.inputIconWrap}>
+                <MaterialIcons name="storefront" size={17} color={SUBTLE} style={styles.inputIcon} />
+                <TextInput style={[styles.input, styles.inputWithIcon]} placeholder="e.g. Sharma Kirana Store" placeholderTextColor="#A6ACA4" value={shopName} onChangeText={setShopName} />
+              </View>
+              <View style={styles.helperRow}>
+                <Text style={styles.helperText}>This will be visible to your customers</Text>
+                {shopName.trim().length > 0 && (
+                  <View style={styles.looksGoodRow}>
+                    <MaterialIcons name="check-circle" size={12} color={PRIMARY} />
+                    <Text style={styles.looksGoodText}>Looks good</Text>
+                  </View>
+                )}
+              </View>
 
-              <Text style={styles.label}>Shop Owner Name <Text style={styles.req}>*</Text></Text>
-              <TextInput style={styles.input} placeholder="Full name as per ID" value={ownerName} onChangeText={setOwnerName} />
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Shop Owner Name <Text style={styles.req}>*</Text></Text>
+                <MaterialIcons name="info-outline" size={13} color={SUBTLE} />
+              </View>
+              <View style={styles.inputIconWrap}>
+                <MaterialIcons name="person-outline" size={17} color={SUBTLE} style={styles.inputIcon} />
+                <TextInput style={[styles.input, styles.inputWithIcon]} placeholder="Full name as per ID" placeholderTextColor="#A6ACA4" value={ownerName} onChangeText={setOwnerName} />
+              </View>
+              <View style={styles.helperRow}>
+                <Text style={styles.helperText}>Enter your full legal name</Text>
+                {ownerName.trim().length > 0 && (
+                  <View style={styles.looksGoodRow}>
+                    <MaterialIcons name="check-circle" size={12} color={PRIMARY} />
+                    <Text style={styles.looksGoodText}>Looks good</Text>
+                  </View>
+                )}
+              </View>
 
-              <Text style={styles.label}>Establishment Year</Text>
-              <TextInput style={styles.input} placeholder="e.g. 2015" keyboardType="numeric" maxLength={4} value={estYear} onChangeText={setEstYear} />
+              <View style={styles.yearWhyRow}>
+                <Text style={styles.label}>Establishment Year <Text style={styles.req}>*</Text></Text>
+                <View style={styles.inputIconWrap}>
+                  <MaterialIcons name="calendar-today" size={15} color={SUBTLE} style={styles.inputIcon} />
+                  <TouchableOpacity
+                    style={[styles.input, styles.inputWithIcon, styles.selectInput]}
+                    activeOpacity={0.8}
+                    onPress={() => setYearDropdownOpen(o => !o)}
+                  >
+                    <Text style={estYear ? styles.selectValue : styles.selectPlaceholder}>{estYear || 'Select year'}</Text>
+                  </TouchableOpacity>
+                  <MaterialIcons name={yearDropdownOpen ? 'arrow-drop-up' : 'arrow-drop-down'} size={20} color={SUBTLE} style={styles.selectChevron} />
+                </View>
+                {yearDropdownOpen && (
+                  <View style={styles.yearDropdown}>
+                    <ScrollView style={{ maxHeight: 190 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                      {YEAR_OPTIONS.map((y) => (
+                        <TouchableOpacity
+                          key={y}
+                          style={styles.yearOption}
+                          onPress={() => { setEstYear(y); setYearDropdownOpen(false); }}
+                        >
+                          <Text style={[styles.yearOptionText, estYear === y && { color: PRIMARY, fontWeight: '700', fontFamily: 'PlusJakartaSans_700Bold' }]}>{y}</Text>
+                          {estYear === y && <MaterialIcons name="check" size={15} color={PRIMARY} />}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+                <Text style={styles.helperText}>The year your business was started</Text>
 
-              <Text style={styles.label}>Shop Email <Text style={styles.req}>*</Text></Text>
-              <TextInput style={styles.input} placeholder="For order notifications & updates" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
+                <View style={styles.whyAskBox}>
+                  <View style={styles.whyIconCircle}>
+                    <MaterialIcons name="shield" size={14} color={PRIMARY} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.whyAskTitle}>Why we ask this?</Text>
+                    <Text style={styles.whyAskText}>Helps build trust and credibility with your customers.</Text>
+                  </View>
+                </View>
+              </View>
 
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Shop Email <Text style={styles.req}>*</Text></Text>
+                <MaterialIcons name="info-outline" size={13} color={SUBTLE} />
+              </View>
+              <View style={styles.inputIconWrap}>
+                <MaterialIcons name="mail-outline" size={17} color={SUBTLE} style={styles.inputIcon} />
+                <TextInput style={[styles.input, styles.inputWithIcon]} placeholder="For order notifications & updates" placeholderTextColor="#A6ACA4" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
+              </View>
+              <View style={styles.helperRow}>
+                <Text style={styles.helperText}>We'll send important updates to this email</Text>
+                {/^\S+@\S+\.\S+$/.test(email.trim()) && (
+                  <View style={styles.looksGoodRow}>
+                    <MaterialIcons name="check-circle" size={12} color={PRIMARY} />
+                    <Text style={styles.looksGoodText}>Looks good</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* ── Advanced (optional) features ── */}
+          {currentStep === 1 && (
+            <View style={styles.advCard}>
+              <View style={styles.advHeaderRow}>
+                <Text style={styles.advTitle}>Advanced Features</Text>
+                <View style={styles.optionalPill}><Text style={styles.optionalPillText}>Optional</Text></View>
+              </View>
+              <Text style={styles.advSub}>Enable these features to grow your business faster</Text>
+
+              {[
+                { key: 'notifications', icon: 'shopping-cart', title: 'Order Notifications', desc: 'Get real-time alerts for new orders', tag: '⭐ Recommended', value: advNotifications, onToggle: setAdvNotifications },
+                { key: 'analytics', icon: 'bar-chart', title: 'Business Analytics', desc: 'Track sales, customers & products performance', tag: '📈 Grow your business', value: advAnalytics, onToggle: setAdvAnalytics },
+                { key: 'promotions', icon: 'campaign', title: 'Promotions & Offers', desc: 'Run discounts and reach more customers', tag: '📢 Increase visibility', value: advPromotions, onToggle: setAdvPromotions },
+              ].map((f) => (
+                <View key={f.key} style={styles.advItem}>
+                  <View style={styles.advItemTop}>
+                    <View style={styles.advIconCircle}>
+                      <MaterialIcons name={f.icon} size={17} color={PRIMARY} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.advItemTitle}>{f.title}</Text>
+                      <Text style={styles.advItemDesc}>{f.desc}</Text>
+                    </View>
+                    <Switch
+                      value={f.value}
+                      onValueChange={f.onToggle}
+                      trackColor={{ false: '#DADFDC', true: PRIMARY }}
+                      thumbColor="#fff"
+                    />
+                  </View>
+                  <Text style={styles.advItemTag}>{f.tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* ── Security reassurance banner ── */}
+          {currentStep === 1 && (
+            <View style={styles.secureBanner}>
+              <View style={styles.secureBannerIcon}>
+                <MaterialIcons name="verified-user" size={18} color={PRIMARY} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.secureBannerTitle}>Your data is 100% secure</Text>
+                <Text style={styles.secureBannerText}>We use enterprise-grade encryption to keep your information safe and private.</Text>
+              </View>
+              <TouchableOpacity><Text style={styles.learnMore}>Learn more →</Text></TouchableOpacity>
+            </View>
+          )}
+
+          {currentStep === 1 && (
+            <View style={styles.form}>
               {/* Contacts */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16, marginBottom: 12 }}>
                 <MaterialIcons name="phone" size={18} color={PRIMARY} />
@@ -2000,35 +2245,82 @@ export default function VendorOnboardingScreen({ onComplete }) {
             </View>
           )}
 
+          {/* Trust footer */}
+          <View style={styles.trustFooter}>
+            {[
+              { icon: 'groups', title: 'Trusted by', sub: '1000+ sellers across India' },
+              { icon: 'flash-on', title: 'Fast Onboarding', sub: 'Get your shop online in minutes' },
+              { icon: 'support-agent', title: '24/7 Support', sub: "We're here to help you grow" },
+              { icon: 'verified-user', title: 'Secure & Reliable', sub: 'Bank-grade security you can trust' },
+            ].map((item) => (
+              <View key={item.title} style={styles.trustItem}>
+                <View style={styles.trustIconCircle}>
+                  <MaterialIcons name={item.icon} size={18} color={PRIMARY} />
+                </View>
+                <Text style={styles.trustTitle}>{item.title}</Text>
+                <Text style={styles.trustSub}>{item.sub}</Text>
+              </View>
+            ))}
+          </View>
+
           <View style={{ height: 40 }} />
-        </ScrollView>
+        </Animated.ScrollView>
       </KeyboardAvoidingView>
 
       {/* Bottom bar */}
       <View style={styles.bottomBar}>
-        {currentStep > 1 && (
-          <TouchableOpacity style={styles.backBtn} onPress={() => setCurrentStep(prev => prev - 1)}>
-            <Text style={styles.backText}>← Back</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          style={[styles.nextBtn, (loading || geocoding) && { opacity: 0.7 }]}
-          onPress={handleNext}
-          disabled={loading || geocoding}
-        >
-          {loading ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <ActivityIndicator color="#fff" size="small" />
-              <Text style={styles.nextText}>
-                {geocoding ? 'Detecting location…' : 'Submitting…'}
-              </Text>
-            </View>
-          ) : (
-            <Text style={styles.nextText}>
-              {currentStep === STEPS.length ? 'Submit & Go Live' : 'Save & Continue →'}
-            </Text>
+        <View style={styles.bottomBarRow}>
+          {currentStep > 1 && (
+            <TouchableOpacity style={styles.backBtn} onPress={() => setCurrentStep(prev => prev - 1)}>
+              <Text style={styles.backText}>← Back</Text>
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
+          {currentStep === 1 && (
+            <TouchableOpacity
+              style={styles.saveExitBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                Alert.alert(
+                  'Progress saved',
+                  'Your details are saved. Come back anytime to finish setting up your shop.',
+                  [{ text: 'OK', onPress: () => navigation.goBack?.() }]
+                );
+              }}
+            >
+              <MaterialIcons name="bookmark-border" size={16} color={PRIMARY} />
+              <View>
+                <Text style={styles.saveExitText}>Save &amp; Exit</Text>
+                <Text style={styles.saveExitSub}>Continue later</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[styles.nextBtn, (loading || geocoding) && { opacity: 0.7 }]}
+            onPress={handleNext}
+            disabled={loading || geocoding}
+            activeOpacity={0.9}
+          >
+            {loading ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <ActivityIndicator color="#fff" size="small" />
+                <Text style={styles.nextText}>
+                  {geocoding ? 'Detecting location…' : 'Submitting…'}
+                </Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.nextText}>
+                  {currentStep === STEPS.length ? 'Submit & Go Live' : 'Save & Continue'}
+                </Text>
+                <MaterialIcons name="arrow-forward" size={17} color="#fff" />
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+        <View style={styles.secureRow}>
+          <MaterialIcons name="check-circle" size={12} color={SUBTLE} />
+          <Text style={styles.secureText}>All changes are saved automatically</Text>
+        </View>
       </View>
     </View>
   );
@@ -2037,43 +2329,183 @@ export default function VendorOnboardingScreen({ onComplete }) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
+  collapsingHeader: {
+    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
+    backgroundColor: BG,
+  },
 
   topBar: {
-    backgroundColor: PRIMARY, paddingTop: 50, paddingBottom: 14,
-    paddingHorizontal: 20, flexDirection: 'row',
+    backgroundColor: '#fff', paddingTop: 50, paddingBottom: 16,
+    paddingHorizontal: 16, flexDirection: 'row',
     justifyContent: 'space-between', alignItems: 'center',
+    borderBottomWidth: 1, borderBottomColor: BORDER,
+    overflow: 'hidden', width: '100%',
   },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, overflow: 'hidden' },
+  brandIconWrap: {
+    width: 36, height: 36, borderRadius: 11, backgroundColor: PRIMARY,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    shadowColor: PRIMARY, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3,
+  },
   brandEmoji: { fontSize: 26 },
-  brandName: { fontSize: 17, fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#fff' },
-  brandSub: { fontSize: 11, color: 'rgba(255,255,255,0.75)' },
-  stepCount: { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" },
+  brandTextWrap: { flexShrink: 1, minWidth: 0, flex: 1 },
+  brandName: { fontSize: 16, fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: INK },
+  brandSub: { fontSize: 10.5, color: SUBTLE, marginTop: 1 },
+  helpPill: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0, maxWidth: 140, marginLeft: 8, overflow: 'hidden' },
+  helpIconCircle: {
+    width: 22, height: 22, borderRadius: 11, backgroundColor: PRIMARY_LIGHT,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  helpTextWrap: { flexShrink: 1, minWidth: 0 },
+  helpTitle: { fontSize: 11, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: INK },
+  helpSub: { fontSize: 9, color: SUBTLE, flexShrink: 1, flexWrap: 'wrap' },
+  stepCount: { fontSize: 12, color: PRIMARY, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" },
 
-  progressTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.25)' },
-  progressFill: { height: 3, backgroundColor: '#fff' },
+  progressCard: {
+    backgroundColor: PRIMARY_LIGHTER, marginHorizontal: 16, marginTop: 14,
+    borderRadius: 16, padding: 16, borderWidth: 1, borderColor: PRIMARY_LIGHT,
+    shadowColor: CARD_SHADOW, shadowOpacity: 1, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 3,
+    overflow: 'hidden',
+  },
+  progressCardTop: { flexDirection: 'row', marginBottom: 10 },
+  progressCardMain: { flexDirection: 'column', marginTop: 10, gap: 4 },
+  progressCardLeft: { paddingRight: 4 },
+  stepCountPill: { alignSelf: 'flex-start', backgroundColor: PRIMARY_LIGHT, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
+  heroTitle: { fontSize: 15.5, fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: INK, marginTop: 12, lineHeight: 20 },
+  heroSub: { fontSize: 12, color: SUBTLE, marginTop: 4, lineHeight: 16 },
+  safeRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 },
+  safeText: { fontSize: 11, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold", color: PRIMARY },
+  progressTrack: { height: 4, backgroundColor: '#EEF1EE', borderRadius: 4, overflow: 'hidden' },
+  progressFill: { height: 4, backgroundColor: PRIMARY, borderRadius: 4 },
 
-  stepsScroll: { backgroundColor: '#fff', maxHeight: 60, borderBottomWidth: 0.5, borderBottomColor: '#eee' },
-  stepsRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8 },
-  stepPillWrapper: { flexDirection: 'row', alignItems: 'center' },
-  stepPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5 },
+  stepsScroll: { maxHeight: 70, marginTop: 14 },
+  stepsRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  stepPillWrapper: { flexDirection: 'row', alignItems: 'flex-start' },
+  stepPill: { flexDirection: 'column', alignItems: 'center', gap: 6, width: 56 },
   stepPillActive: {},
   stepPillDone: {},
-  stepNum: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' },
-  stepNumActive: { backgroundColor: PRIMARY },
-  stepNumDone: { backgroundColor: PRIMARY },
-  stepNumText: { fontSize: 10, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#aaa' },
+  stepNum: {
+    width: 28, height: 28, borderRadius: 14, backgroundColor: '#fff',
+    borderWidth: 1.5, borderColor: '#DDE2DD',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  stepNumActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  stepNumDone: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  stepNumText: { fontSize: 11.5, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#B0B5AF' },
   stepNumTextActive: { color: '#fff' },
-  stepPillText: { fontSize: 11, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold", color: '#aaa' },
-  stepPillTextActive: { color: PRIMARY },
-  connector: { width: 14, height: 1.5, backgroundColor: '#e0e0e0', marginHorizontal: 2 },
+  stepPillText: { fontSize: 9.5, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold", color: '#AEB3AC', textAlign: 'center' },
+  stepPillTextActive: { color: PRIMARY, fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold" },
+  stepPillTextDone: { color: PRIMARY },
+  stepUnderline: { width: 22, height: 2, borderRadius: 2, backgroundColor: 'transparent', marginTop: 3 },
+  stepUnderlineActive: { backgroundColor: PRIMARY },
+  connector: { width: 10, height: 1.5, backgroundColor: '#DADFDC', marginHorizontal: 0, marginTop: 14 },
   connectorDone: { backgroundColor: PRIMARY },
 
-  content: { flex: 1, paddingHorizontal: 20 },
-  stepHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, marginBottom: 16 },
+  content: { flex: 1, paddingHorizontal: 16 },
+  stepHeaderCard: {
+    flexDirection: 'column', gap: 12,
+    backgroundColor: '#fff', borderRadius: 16, padding: 16,
+    marginTop: 16, marginBottom: 14, overflow: 'hidden',
+    shadowColor: CARD_SHADOW, shadowOpacity: 1, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 2,
+  },
+  stepHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%' },
+  stepIconBadge: {
+    width: 42, height: 42, borderRadius: 12, backgroundColor: PRIMARY_LIGHT,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
   stepIcon: { fontSize: 34 },
-  stepTitle: { fontSize: 20, fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#222' },
-  stepDesc: { fontSize: 13, color: '#888', marginTop: 2 },
-  form: { gap: 2 },
+  stepTitle: { fontSize: 17, fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: INK },
+  stepDesc: { fontSize: 12.5, color: SUBTLE, marginTop: 2 },
+  setupBadge: {
+    backgroundColor: '#EEF0FE', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4,
+  },
+  setupBadgeTitle: { fontSize: 11.5, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#4F46E5' },
+  setupBadgeSub: { fontSize: 10.5, color: '#6366F1' },
+  form: {
+    gap: 2, backgroundColor: '#fff', borderRadius: 16, padding: 16,
+    shadowColor: CARD_SHADOW, shadowOpacity: 1, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 2,
+    marginBottom: 16,
+  },
+  inputIconWrap: { position: 'relative', justifyContent: 'center' },
+  inputIcon: { position: 'absolute', left: 13, zIndex: 2 },
+  inputWithIcon: { paddingLeft: 38 },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 14, marginBottom: 6 },
+  helperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: -4, marginBottom: 4 },
+  helperText: { fontSize: 10.5, color: SUBTLE, flexShrink: 1 },
+  looksGoodRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  looksGoodText: { fontSize: 10.5, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold", color: PRIMARY },
+  yearWhyRow: { position: 'relative' },
+  selectInput: { justifyContent: 'center' },
+  selectValue: { fontSize: 14, color: INK },
+  selectPlaceholder: { fontSize: 14, color: '#A6ACA4' },
+  selectChevron: { position: 'absolute', right: 10, top: 13 },
+  yearDropdown: {
+    position: 'absolute', top: 74, left: 0, right: 0, backgroundColor: '#fff',
+    borderRadius: 12, borderWidth: 1, borderColor: BORDER, zIndex: 30,
+    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8,
+  },
+  yearOption: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: '#F3F5F3',
+  },
+  yearOptionText: { fontSize: 13.5, color: INK },
+  whyAskBox: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    backgroundColor: PRIMARY_LIGHTER, borderRadius: 12, padding: 12, marginTop: 12,
+    borderWidth: 1, borderColor: PRIMARY_LIGHT,
+  },
+  whyAskTitle: { fontSize: 12, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: INK, marginBottom: 2 },
+  whyAskText: { fontSize: 11, color: '#5B6259', lineHeight: 15 },
+  whyBox: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    backgroundColor: PRIMARY_LIGHTER, borderRadius: 12, padding: 13, marginTop: 16,
+    borderWidth: 1, borderColor: PRIMARY_LIGHT,
+  },
+  whyIconCircle: {
+    width: 26, height: 26, borderRadius: 13, backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center', marginTop: 1,
+  },
+  whyTitle: { fontSize: 13, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: INK, marginBottom: 3 },
+  whyText: { fontSize: 12, color: '#5B6259', lineHeight: 17 },
+
+  advCard: {
+    backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16,
+    shadowColor: CARD_SHADOW, shadowOpacity: 1, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 2,
+  },
+  advHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  advTitle: { fontSize: 15.5, fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: INK },
+  optionalPill: { backgroundColor: '#EEF1EE', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 2 },
+  optionalPillText: { fontSize: 10, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: SUBTLE },
+  advSub: { fontSize: 12, color: SUBTLE, marginTop: 4, marginBottom: 14 },
+  advItem: { backgroundColor: '#FAFBFA', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: BORDER, marginBottom: 10 },
+  advItemTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  advIconCircle: { width: 34, height: 34, borderRadius: 10, backgroundColor: PRIMARY_LIGHT, alignItems: 'center', justifyContent: 'center' },
+  advItemTitle: { fontSize: 13, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: INK },
+  advItemDesc: { fontSize: 11, color: SUBTLE, marginTop: 1 },
+  advItemTag: { fontSize: 10.5, color: PRIMARY, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold", marginTop: 8 },
+
+  secureBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: PRIMARY_LIGHTER, borderRadius: 14, padding: 14, marginBottom: 16,
+    borderWidth: 1, borderColor: PRIMARY_LIGHT,
+  },
+  secureBannerIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  secureBannerTitle: { fontSize: 12.5, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: INK },
+  secureBannerText: { fontSize: 10.5, color: '#5B6259', marginTop: 2, lineHeight: 14 },
+  learnMore: { fontSize: 11.5, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: PRIMARY },
+  trustFooter: {
+    flexDirection: 'row', flexWrap: 'wrap', backgroundColor: '#fff',
+    borderRadius: 16, padding: 16, marginTop: 4,
+    shadowColor: CARD_SHADOW, shadowOpacity: 1, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 2,
+  },
+  trustItem: { width: '50%', alignItems: 'center', paddingVertical: 10, gap: 5 },
+  trustIconCircle: {
+    width: 34, height: 34, borderRadius: 17, backgroundColor: PRIMARY_LIGHT,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 2,
+  },
+  trustTitle: { fontSize: 12, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: INK, textAlign: 'center' },
+  trustSub: { fontSize: 10, color: SUBTLE, textAlign: 'center', paddingHorizontal: 6, lineHeight: 13 },
 
   label: { fontSize: 13, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold", color: '#444', marginBottom: 6, marginTop: 14 },
   sectionLabel: { fontSize: 15, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#222', marginTop: 12, marginBottom: 4 },
@@ -2081,8 +2513,8 @@ const styles = StyleSheet.create({
   req: { color: '#e53935' },
   hintText: { fontSize: 11, color: '#999', marginTop: -4, marginBottom: 6 },
   input: {
-    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e0e0e0',
-    borderRadius: 10, padding: 13, fontSize: 14, color: '#333', marginBottom: 6, placeholderTextColor:"#999"
+    backgroundColor: '#FAFBFA', borderWidth: 1.5, borderColor: '#E7EBE8',
+    borderRadius: 12, padding: 13, fontSize: 14, color: INK, marginBottom: 8, placeholderTextColor:"#A6ACA4"
   },
   textArea: { height: 80, textAlignVertical: 'top' },
   row: { flexDirection: 'row' },
@@ -2281,11 +2713,25 @@ const styles = StyleSheet.create({
   summaryValue: { fontSize: 13, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#222', marginTop: 2 },
   summaryDivider: { height: 1, backgroundColor: '#f0f0f0', marginHorizontal: 14 },
 
-  bottomBar: { flexDirection: 'row', padding: 14, gap: 10, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#eee' },
-  backBtn: { paddingHorizontal: 16, paddingVertical: 13, borderRadius: 10, borderWidth: 1.5, borderColor: '#ddd', justifyContent: 'center' },
+  bottomBar: { padding: 14, paddingTop: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: BORDER },
+  bottomBarRow: { flexDirection: 'row', gap: 10 },
+  backBtn: { paddingHorizontal: 16, paddingVertical: 13, borderRadius: 12, borderWidth: 1.5, borderColor: '#ddd', justifyContent: 'center' },
   backText: { fontSize: 14, fontWeight: '600', fontFamily: "PlusJakartaSans_600SemiBold", color: '#555' },
-  nextBtn: { flex: 1, backgroundColor: PRIMARY, paddingVertical: 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  saveExitBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
+    borderWidth: 1.5, borderColor: BORDER,
+  },
+  saveExitText: { fontSize: 12.5, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: INK },
+  saveExitSub: { fontSize: 10, color: SUBTLE, marginTop: 1 },
+  nextBtn: {
+    flex: 1, backgroundColor: PRIMARY, paddingVertical: 15, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: PRIMARY, shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 5,
+  },
   nextText: { color: '#fff', fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", fontSize: 15 },
+  secureRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 10 },
+  secureText: { fontSize: 11, color: SUBTLE },
 
   // ── Success popup ──────────────────────────────────────────────────────────
   successOverlay: {

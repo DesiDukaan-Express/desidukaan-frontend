@@ -596,15 +596,13 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW }) {
           source={{ uri: p.image_url || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300" }}
           style={pc.img} resizeMode={loose ? "cover" : "contain"}
         />
-       <TouchableOpacity
-  style={pc.eyeBtn}
-  onPress={(e) => {
-    e.stopPropagation?.();
-    setWishlisted(w => !w);
-  }}
-  disabled={!inStock}
-  activeOpacity={0.7}
->
+        <TouchableOpacity
+          style={pc.eyeBtn}
+          // onPress={(e) => { e.stopPropagation?.(); setWishlisted(w => !w); }}
+          disabled={!inStock}
+          onPress={(e) => { e.stopPropagation?.(); onPress?.(); }}
+          activeOpacity={0.7}
+        >
           <Feather name="heart" size={14} color={wishlisted ? "#EF4444" : C.white} fill={wishlisted ? "#EF4444" : "none"} />
         </TouchableOpacity>
         {/* Top-left status badge — matches reference chips: Loose / Fresh / X% OFF */}
@@ -870,18 +868,67 @@ export default function VendorStoreScreen() {
   const [searchFocus, setSearchFocus] = useState(false);
   const searchInputRef = useRef(null);
   const [activeCat, setActiveCat] = useState("All");
-  const [sortBy, setSortBy] = useState("default");
-  const [sortMenuOpen, setSortMenuOpen] = useState(false);
-  const sortBtnRef = useRef(null);
-  const [sortBtnLayout, setSortBtnLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
+
+  // ── Filter & Sort (applied state — what's actually used to filter/sort the list) ──
+  const [sortBy, setSortBy] = useState("newest");
+  const [stockStatus, setStockStatus] = useState("all"); // all | in_stock | low_stock | out_of_stock
+  const [availability, setAvailability] = useState(null); // null | "available" | "unavailable"
+  const [priceRange, setPriceRange] = useState(null); // null | "under50" | "50-100" | "100-250" | "250-500" | "500plus"
+  const [customMin, setCustomMin] = useState("");
+  const [customMax, setCustomMax] = useState("");
+
+  // ── Filter & Sort modal (draft state — edited inside the sheet, committed on Apply) ──
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+  const [draftSortBy, setDraftSortBy] = useState(sortBy);
+  const [draftStockStatus, setDraftStockStatus] = useState(stockStatus);
+  const [draftAvailability, setDraftAvailability] = useState(availability);
+  const [draftPriceRange, setDraftPriceRange] = useState(priceRange);
+  const [draftCustomMin, setDraftCustomMin] = useState(customMin);
+  const [draftCustomMax, setDraftCustomMax] = useState(customMax);
+
+  const openFilterModal = useCallback(() => {
+    setDraftSortBy(sortBy);
+    setDraftStockStatus(stockStatus);
+    setDraftAvailability(availability);
+    setDraftPriceRange(priceRange);
+    setDraftCustomMin(customMin);
+    setDraftCustomMax(customMax);
+    setSortDropdownOpen(false);
+    setFilterModalOpen(true);
+  }, [sortBy, stockStatus, availability, priceRange, customMin, customMax]);
+
+  const applyFilters = useCallback(() => {
+    setSortBy(draftSortBy);
+    setStockStatus(draftStockStatus);
+    setAvailability(draftAvailability);
+    setPriceRange(draftPriceRange);
+    setCustomMin(draftCustomMin);
+    setCustomMax(draftCustomMax);
+    setFilterModalOpen(false);
+  }, [draftSortBy, draftStockStatus, draftAvailability, draftPriceRange, draftCustomMin, draftCustomMax]);
+
+  const resetFilters = useCallback(() => {
+    setDraftSortBy("newest");
+    setDraftStockStatus("all");
+    setDraftAvailability(null);
+    setDraftPriceRange(null);
+    setDraftCustomMin("");
+    setDraftCustomMax("");
+  }, []);
+
+  const activeFilterCount =
+    (stockStatus !== "all" ? 1 : 0) +
+    (availability ? 1 : 0) +
+    (priceRange || customMin || customMax ? 1 : 0);
+
+  const LOW_STOCK_THRESHOLD = 5;
+
   const [wishlistCount, setWishlistCount] = useState(0);
   const catScrollRef = useRef(null);
   const [catContentW, setCatContentW] = useState(0);
   const [catTrackW, setCatTrackW] = useState(0);
   const [catScrollX, setCatScrollX] = useState(0);
-  useEffect(() => {
-    console.log("Sort Changed:", sortBy);
-  }, [sortBy]);
   const [detailItem, setDetailItem] = useState(null);
   const [loosePickerItem, setLoosePickerItem] = useState(null); // weight picker
 
@@ -988,7 +1035,7 @@ export default function VendorStoreScreen() {
   }, [categories]);
 
   const inStockTotal = useMemo(() => inventory.filter(i => i.stock_qty > 0).length, [inventory]);
-  
+
   const getTopCatCount = useCallback((catName) => {
     if (catName === "All") return inStockTotal;
     const subCats = categoryHierarchy[catName] || {};
@@ -1006,7 +1053,7 @@ export default function VendorStoreScreen() {
     }
   }, [categories, activeCat]);
 
-  // For global search and category filtering
+  // For global search, category filtering, and Filter & Sort sheet filters
   const filtered = useMemo(() => inventory.filter(item => {
     const name = (item.product?.name || "").toLowerCase();
     const cat = getCatName(item);
@@ -1023,13 +1070,54 @@ export default function VendorStoreScreen() {
         }
       }
     }
-    return matchesSearch && matchesCat;
-  }), [inventory, search, activeCat, getCatName, parentOfMap]);
+
+    // Stock Status
+    let matchesStockStatus = true;
+    if (stockStatus !== "all") {
+      const qty = item.stock_qty ?? 0;
+      if (stockStatus === "in_stock") matchesStockStatus = qty > LOW_STOCK_THRESHOLD;
+      else if (stockStatus === "low_stock") matchesStockStatus = qty > 0 && qty <= LOW_STOCK_THRESHOLD;
+      else if (stockStatus === "out_of_stock") matchesStockStatus = qty <= 0;
+    }
+
+    // Availability
+    let matchesAvailability = true;
+    if (availability === "available") matchesAvailability = item.is_active ?? true;
+    else if (availability === "unavailable") matchesAvailability = !(item.is_active ?? true);
+
+    // Price Range (custom min/max takes priority over the preset chips)
+    let matchesPrice = true;
+    const price = item.product?.price || 0;
+    const min = customMin !== "" ? parseFloat(customMin) : null;
+    const max = customMax !== "" ? parseFloat(customMax) : null;
+    if (min !== null || max !== null) {
+      matchesPrice = (min === null || price >= min) && (max === null || price <= max);
+    } else if (priceRange) {
+      switch (priceRange) {
+        case "under50": matchesPrice = price < 50; break;
+        case "50-100": matchesPrice = price >= 50 && price <= 100; break;
+        case "100-250": matchesPrice = price >= 100 && price <= 250; break;
+        case "250-500": matchesPrice = price >= 250 && price <= 500; break;
+        case "500plus": matchesPrice = price > 500; break;
+        default: matchesPrice = true;
+      }
+    }
+
+    return matchesSearch && matchesCat && matchesStockStatus && matchesAvailability && matchesPrice;
+  }), [inventory, search, activeCat, getCatName, parentOfMap, stockStatus, availability, priceRange, customMin, customMax, LOW_STOCK_THRESHOLD]);
 
   const inStock = useMemo(() => {
-  let list = [...filtered.filter(i => i.is_active ?? true)];
+    let list = [...filtered.filter(i => i.is_active ?? true)];
 
     switch (sortBy) {
+      case "newest":
+        list.sort((a, b) => {
+          const av = a.created_at ? new Date(a.created_at).getTime() : (a.id ?? 0);
+          const bv = b.created_at ? new Date(b.created_at).getTime() : (b.id ?? 0);
+          return bv - av;
+        });
+        break;
+
       case "price_asc":
         list.sort((a, b) => (a.product?.price || 0) - (b.product?.price || 0));
         break;
@@ -1072,9 +1160,17 @@ export default function VendorStoreScreen() {
   }, [filtered, sortBy]);
 
   const outStock = useMemo(() => {
-  let list = [...filtered.filter(i => !(i.is_active ?? true))];
+    let list = [...filtered.filter(i => !(i.is_active ?? true))];
 
     switch (sortBy) {
+      case "newest":
+        list.sort((a, b) => {
+          const av = a.created_at ? new Date(a.created_at).getTime() : (a.id ?? 0);
+          const bv = b.created_at ? new Date(b.created_at).getTime() : (b.id ?? 0);
+          return bv - av;
+        });
+        break;
+
       case "price_asc":
         list.sort((a, b) => (a.product?.price || 0) - (b.product?.price || 0));
         break;
@@ -1255,7 +1351,7 @@ export default function VendorStoreScreen() {
               onPress={() => {
                 const shopName = vendor?.shop_name || vendorName || "this store";
                 if (Platform.OS === "web") { Alert.alert?.("Share", `Check out ${shopName} on KwikPik!`); }
-                else Share.share({ message: `Check out ${shopName} on KwikPik!` }).catch(() => {});
+                else Share.share({ message: `Check out ${shopName} on KwikPik!` }).catch(() => { });
               }}
             >
               <Feather name="share-2" size={16} color={C.gray700} />
@@ -1303,7 +1399,7 @@ export default function VendorStoreScreen() {
         )}
       </View>
 
-      {/* SEARCH + SORT */}
+      {/* SEARCH + FILTER */}
       <View style={s.searchSortWrap}>
         <View style={[s.searchBox, searchFocus && s.searchBoxActive]}>
           <Feather name="search" size={15} color={searchFocus ? C.green : C.gray400} />
@@ -1326,67 +1422,197 @@ export default function VendorStoreScreen() {
           )}
         </View>
 
-        <View style={{ position: "relative" }}>
-          <TouchableOpacity
-            ref={sortBtnRef}
-            style={s.sortBtn}
-            activeOpacity={0.85}
-            onPress={() => {
-              if (sortBtnRef.current?.measureInWindow) {
-                sortBtnRef.current.measureInWindow((x, y, width, height) => {
-                  setSortBtnLayout({ x, y, width, height });
-                  setSortMenuOpen(true);
-                });
-              } else {
-                setSortMenuOpen(true);
-              }
-            }}
-          >
-            <Feather name="bar-chart-2" size={14} color={C.gray700} style={{ transform: [{ rotate: "90deg" }] }} />
-            <Text style={s.sortBtnText}>{t('vendorStore.sort')}</Text>
-            <Feather name={sortMenuOpen ? "chevron-up" : "chevron-down"} size={14} color={C.gray700} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={s.sortBtn}
+          activeOpacity={0.85}
+          onPress={openFilterModal}
+        >
+          <Feather name="sliders" size={14} color={C.gray700} />
+          <Text style={s.sortBtnText}>{t('vendorStore.filter', 'Filter')}</Text>
+          {activeFilterCount > 0 && (
+            <View style={s.filterCountBadge}>
+              <Text style={s.filterCountBadgeText}>{activeFilterCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
-      {/* SORT DROPDOWN — small popover anchored right under the Sort button */}
-      <Modal visible={sortMenuOpen} transparent animationType="fade" onRequestClose={() => setSortMenuOpen(false)}>
-        <Pressable style={s.sortModalBackdrop} onPress={() => setSortMenuOpen(false)}>
-          <View
-            style={[
-              s.sortPopover,
-              {
-                top: sortBtnLayout.y + sortBtnLayout.height + 8,
-                left: Math.max(12, sortBtnLayout.x + sortBtnLayout.width - 220),
-              },
-            ]}
-            onStartShouldSetResponder={() => true}
-          >
-            {[
-              { key: "default", label: t('vendorStore.default') },
-              { key: "price_asc", label: t('vendorStore.priceLowHigh'), icon: "arrow-up" },
-              { key: "price_desc", label: t('vendorStore.priceHighLow'), icon: "arrow-down" },
-              { key: "discount", label: t('vendorStore.bestDiscount'), icon: "percent" },
-              { key: "name_asc", label: t('vendorStore.nameAZ') },
-              { key: "name_desc", label: t('vendorStore.nameZA') },
-            ].map((opt) => {
-              const active = sortBy === opt.key;
-              return (
-                <TouchableOpacity
-                  key={opt.key}
-                  onPress={() => { setSortBy(opt.key); setSortMenuOpen(false); }}
-                  style={[s.sortMenuItem, active && s.sortMenuItemActive]}
-                  activeOpacity={0.8}
-                >
-                  {opt.icon
-                    ? <Feather name={opt.icon} size={13} color={active ? C.green : C.gray500} style={{ width: 18 }} />
-                    : <View style={{ width: 18 }} />}
-                  <Text style={[s.sortMenuItemText, active && s.sortMenuItemTextActive]}>{opt.label}</Text>
-                  {active && <Feather name="check" size={15} color={C.green} style={{ marginLeft: "auto" }} />}
+      {/* FILTER & SORT — bottom sheet modal */}
+      <Modal visible={filterModalOpen} transparent animationType="slide" onRequestClose={() => setFilterModalOpen(false)}>
+        <Pressable style={s.filterModalBackdrop} onPress={() => setFilterModalOpen(false)}>
+          <Pressable style={s.filterSheet} onPress={() => {}}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.filterSheetScroll}>
+              <View style={s.filterSheetHandle} />
+
+              {/* Header */}
+              <View style={s.filterHeaderRow}>
+                <Text style={s.filterHeaderTitle}>{t('vendorStore.filterAndSort', 'Filter & Sort')}</Text>
+                <TouchableOpacity onPress={() => setFilterModalOpen(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Feather name="x" size={20} color={C.gray900} />
                 </TouchableOpacity>
-              );
-            })}
-          </View>
+              </View>
+
+              {/* Stock Status */}
+              <Text style={s.filterSectionLabel}>{t('vendorStore.stockStatus', 'Stock Status')}</Text>
+              <View style={s.filterRadioGroup}>
+                {[
+                  { key: "all", label: t('vendorStore.all', 'All') },
+                  { key: "in_stock", label: t('vendorStore.inStock', 'In Stock'), icon: "check-circle", color: C.green },
+                  { key: "low_stock", label: t('vendorStore.lowStock', 'Low Stock'), icon: "alert-triangle", color: C.orange },
+                  { key: "out_of_stock", label: t('vendorStore.outOfStock', 'Out of Stock'), icon: "x-square", color: "#DC2626" },
+                ].map((opt) => {
+                  const active = draftStockStatus === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={s.filterRadioRow}
+                      activeOpacity={0.7}
+                      onPress={() => setDraftStockStatus(opt.key)}
+                    >
+                      <View style={[s.filterRadioOuter, active && s.filterRadioOuterActive]}>
+                        {active && <View style={s.filterRadioInner} />}
+                      </View>
+                      <Text style={s.filterRadioLabel}>{opt.label}</Text>
+                      {opt.icon && (
+                        <Feather name={opt.icon} size={16} color={opt.color} style={{ marginLeft: "auto" }} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Availability */}
+              <Text style={s.filterSectionLabel}>{t('vendorStore.availability', 'Availability')}</Text>
+              <View style={s.filterToggleRow}>
+                {[
+                  { key: "available", label: t('vendorStore.available', 'Available') },
+                  { key: "unavailable", label: t('vendorStore.unavailable', 'Unavailable') },
+                ].map((opt) => {
+                  const active = draftAvailability === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[s.filterToggleBtn, active && s.filterToggleBtnActive]}
+                      activeOpacity={0.8}
+                      onPress={() => setDraftAvailability(active ? null : opt.key)}
+                    >
+                      <Text style={[s.filterToggleBtnText, active && s.filterToggleBtnTextActive]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Price Range */}
+              <Text style={s.filterSectionLabel}>{t('vendorStore.priceRange', 'Price Range')}</Text>
+              <View style={s.filterChipWrap}>
+                {[
+                  { key: "under50", label: t('vendorStore.under50', 'Under ₹50') },
+                  { key: "50-100", label: "₹50 – ₹100" },
+                  { key: "100-250", label: "₹100 – ₹250" },
+                  { key: "250-500", label: "₹250 – ₹500" },
+                  { key: "500plus", label: t('vendorStore.over500', '₹500+') },
+                ].map((opt) => {
+                  const active = draftPriceRange === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[s.filterChip, active && s.filterChipActive]}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        setDraftPriceRange(active ? null : opt.key);
+                        setDraftCustomMin("");
+                        setDraftCustomMax("");
+                      }}
+                    >
+                      <Text style={[s.filterChipText, active && s.filterChipTextActive]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Custom Range */}
+              <Text style={s.filterSectionLabel}>{t('vendorStore.customRange', 'Custom Range')}</Text>
+              <View style={s.filterCustomRow}>
+                <View style={s.filterCustomInputWrap}>
+                  <Text style={s.filterCustomPrefix}>₹</Text>
+                  <TextInput
+                    style={s.filterCustomInput}
+                    placeholder={t('vendorStore.min', 'Min')}
+                    placeholderTextColor={C.gray400}
+                    keyboardType="numeric"
+                    value={draftCustomMin}
+                    onChangeText={(v) => { setDraftCustomMin(v.replace(/[^0-9]/g, "")); setDraftPriceRange(null); }}
+                  />
+                </View>
+                <Text style={s.filterCustomDash}>—</Text>
+                <View style={s.filterCustomInputWrap}>
+                  <Text style={s.filterCustomPrefix}>₹</Text>
+                  <TextInput
+                    style={s.filterCustomInput}
+                    placeholder={t('vendorStore.max', 'Max')}
+                    placeholderTextColor={C.gray400}
+                    keyboardType="numeric"
+                    value={draftCustomMax}
+                    onChangeText={(v) => { setDraftCustomMax(v.replace(/[^0-9]/g, "")); setDraftPriceRange(null); }}
+                  />
+                </View>
+              </View>
+
+              {/* Sort By */}
+              <Text style={s.filterSectionLabel}>{t('vendorStore.sortBy', 'Sort By')}</Text>
+              {(() => {
+                const sortOptions = [
+                  { key: "newest", label: t('vendorStore.newestFirst', 'Newest First') },
+                  { key: "price_asc", label: t('vendorStore.priceLowHigh', 'Price: Low to High') },
+                  { key: "price_desc", label: t('vendorStore.priceHighLow', 'Price: High to Low') },
+                  { key: "discount", label: t('vendorStore.bestDiscount', 'Best Discount') },
+                  { key: "name_asc", label: t('vendorStore.nameAZ', 'Name: A to Z') },
+                  { key: "name_desc", label: t('vendorStore.nameZA', 'Name: Z to A') },
+                ];
+                const current = sortOptions.find(o => o.key === draftSortBy) || sortOptions[0];
+                return (
+                  <View>
+                    <TouchableOpacity
+                      style={s.filterSortSelect}
+                      activeOpacity={0.85}
+                      onPress={() => setSortDropdownOpen(v => !v)}
+                    >
+                      <Text style={s.filterSortSelectText}>{current.label}</Text>
+                      <Feather name={sortDropdownOpen ? "chevron-up" : "chevron-down"} size={16} color={C.gray600} />
+                    </TouchableOpacity>
+                    {sortDropdownOpen && (
+                      <View style={s.filterSortOptionsBox}>
+                        {sortOptions.map((opt) => {
+                          const active = draftSortBy === opt.key;
+                          return (
+                            <TouchableOpacity
+                              key={opt.key}
+                              style={[s.filterSortOptionRow, active && s.filterSortOptionRowActive]}
+                              activeOpacity={0.8}
+                              onPress={() => { setDraftSortBy(opt.key); setSortDropdownOpen(false); }}
+                            >
+                              <Text style={[s.filterSortOptionText, active && s.filterSortOptionTextActive]}>{opt.label}</Text>
+                              {active && <Feather name="check" size={14} color={C.green} />}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
+
+              {/* Reset / Apply */}
+              <View style={s.filterActionsRow}>
+                <TouchableOpacity style={s.filterResetBtn} activeOpacity={0.8} onPress={resetFilters}>
+                  <Text style={s.filterResetBtnText}>{t('vendorStore.reset', 'Reset')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.filterApplyBtn} activeOpacity={0.9} onPress={applyFilters}>
+                  <Text style={s.filterApplyBtnText}>{t('vendorStore.applyFilters', 'Apply Filters')}</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </Pressable>
         </Pressable>
       </Modal>
 
@@ -1783,23 +2009,99 @@ const s = StyleSheet.create({
     borderRadius: 12, paddingHorizontal: 16, paddingVertical: 13,
   },
   sortBtnText: { fontSize: 13, fontWeight: "800", color: C.gray900 },
-
-  // Transparent full-screen layer — only used to detect taps outside the popover
-  sortModalBackdrop: { flex: 1 },
-  // Small popover anchored just under the Sort button (position set inline via sortBtnLayout)
-  sortPopover: {
-    position: "absolute",
-    width: 220,
-    backgroundColor: C.white,
-    borderRadius: 14,
-    borderWidth: 1, borderColor: C.gray200,
-    paddingVertical: 6, paddingHorizontal: 6,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 14,
+  filterCountBadge: {
+    minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
+    backgroundColor: C.green, alignItems: "center", justifyContent: "center",
   },
-  sortMenuItem: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 10, paddingVertical: 11, borderRadius: 10 },
-  sortMenuItemActive: { backgroundColor: C.greenLight },
-  sortMenuItemText: { fontSize: 13, fontWeight: "600", color: C.gray700 },
-  sortMenuItemTextActive: { color: C.green, fontWeight: "800" },
+  filterCountBadgeText: { fontSize: 10, fontWeight: "800", color: C.white },
+
+  // ── Filter & Sort bottom sheet ──
+  filterModalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
+  filterSheet: {
+    backgroundColor: C.white,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    maxHeight: "88%",
+    shadowColor: "#000", shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 20,
+  },
+  filterSheetScroll: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 24 },
+  filterSheetHandle: {
+    width: 40, height: 4, borderRadius: 2, backgroundColor: C.gray300,
+    alignSelf: "center", marginBottom: 14,
+  },
+  filterHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 18 },
+  filterHeaderTitle: { fontSize: 19, fontWeight: "900", color: C.gray900 },
+
+  filterSectionLabel: { fontSize: 13, fontWeight: "800", color: C.gray900, marginBottom: 10, marginTop: 18 },
+
+  filterRadioGroup: { gap: 14 },
+  filterRadioRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  filterRadioOuter: {
+    width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: C.gray300,
+    alignItems: "center", justifyContent: "center",
+  },
+  filterRadioOuterActive: { borderColor: C.green },
+  filterRadioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: C.green },
+  filterRadioLabel: { fontSize: 14, fontWeight: "700", color: C.gray900 },
+
+  filterToggleRow: { flexDirection: "row", gap: 12 },
+  filterToggleBtn: {
+    flex: 1, alignItems: "center", justifyContent: "center",
+    paddingVertical: 13, borderRadius: 12,
+    borderWidth: 1.5, borderColor: C.gray200, backgroundColor: C.white,
+  },
+  filterToggleBtnActive: { borderColor: C.green, backgroundColor: C.greenLight },
+  filterToggleBtnText: { fontSize: 14, fontWeight: "800", color: C.gray700 },
+  filterToggleBtnTextActive: { color: C.green },
+
+  filterChipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  filterChip: {
+    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999,
+    borderWidth: 1.5, borderColor: C.gray200, backgroundColor: C.white,
+  },
+  filterChipActive: { borderColor: C.green, backgroundColor: C.greenLight },
+  filterChipText: { fontSize: 13, fontWeight: "700", color: C.gray700 },
+  filterChipTextActive: { color: C.green },
+
+  filterCustomRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  filterCustomInputWrap: {
+    flex: 1, flexDirection: "row", alignItems: "center", gap: 6,
+    borderWidth: 1.5, borderColor: C.gray200, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 12,
+  },
+  filterCustomPrefix: { fontSize: 14, color: C.gray400, fontWeight: "600" },
+  filterCustomInput: { flex: 1, fontSize: 14, color: C.gray900, ...Platform.select({ web: { outlineStyle: "none" } }) },
+  filterCustomDash: { fontSize: 14, color: C.gray400 },
+
+  filterSortSelect: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    borderWidth: 1.5, borderColor: C.gray200, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 13,
+  },
+  filterSortSelectText: { fontSize: 14, fontWeight: "700", color: C.gray900 },
+  filterSortOptionsBox: {
+    marginTop: 8, borderWidth: 1, borderColor: C.gray200, borderRadius: 12,
+    paddingVertical: 4, backgroundColor: C.white,
+  },
+  filterSortOptionRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 14, paddingVertical: 11,
+  },
+  filterSortOptionRowActive: { backgroundColor: C.greenLight },
+  filterSortOptionText: { fontSize: 13, fontWeight: "600", color: C.gray700 },
+  filterSortOptionTextActive: { color: C.green, fontWeight: "800" },
+
+  filterActionsRow: { flexDirection: "row", gap: 12, marginTop: 26 },
+  filterResetBtn: {
+    flex: 1, alignItems: "center", justifyContent: "center",
+    paddingVertical: 15, borderRadius: 14,
+    borderWidth: 1.5, borderColor: C.gray200, backgroundColor: C.white,
+  },
+  filterResetBtnText: { fontSize: 14, fontWeight: "800", color: C.gray900 },
+  filterApplyBtn: {
+    flex: 2, alignItems: "center", justifyContent: "center",
+    paddingVertical: 15, borderRadius: 14, backgroundColor: C.green,
+  },
+  filterApplyBtnText: { fontSize: 14, fontWeight: "800", color: C.white },
 
   // ── Promo banners (3-up) ──
   promoRow: { flexDirection: "row", gap: 14, paddingBottom: 6, paddingTop: 12 },

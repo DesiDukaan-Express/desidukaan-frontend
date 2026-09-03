@@ -19,11 +19,16 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     TextInput, Image, Alert, Platform, StatusBar,
-    KeyboardAvoidingView, ActivityIndicator,
+    KeyboardAvoidingView, ActivityIndicator, useWindowDimensions,
+    Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+// Google's Material Symbols (fonts.google.com/icons), packaged for React Native.
+// Ionicons covers the rounded/outline glyphs; MaterialCommunityIcons covers the
+// vehicle glyphs. Both ship with Expo by default — no extra install needed.
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import useAuthStore from '../../store/authStore';
 import { uploadAPI, deliveryAPI } from '../../services/api';
@@ -50,19 +55,31 @@ const INITIAL_FORM = {
         photoMime: '', photoName: '', photoSize: null,
     },
     license: {
-        number: '', expiry: '',
+        number: '', expiry: '', issuingAuthority: '',
         photoUrl: '', photoLocalUri: '', photoPublicId: '',
         photoMime: '', photoName: '', photoSize: null,
     },
-    vehicle: { type: '', registration: '', year: '' },
+    vehicle: { type: '', registration: '', makeModel: '', year: '' },
+    vehicleRc: {
+        photoUrl: '', photoLocalUri: '', photoPublicId: '',
+        photoName: '', photoMime: '', photoSize: null,
+    },
+    insurance: {
+        photoUrl: '', photoLocalUri: '', photoPublicId: '',
+        photoName: '', photoMime: '', photoSize: null,
+    },
     rc: {
         number: '',
         photoUrl: '', photoLocalUri: '', photoPublicId: '',
         photoName: '', photoMime: '', photoSize: null,
     },
+    rcBack: {
+        photoUrl: '', photoLocalUri: '', photoPublicId: '',
+        photoName: '', photoMime: '', photoSize: null,
+    },
     bank: {
         accountHolderName: '', bankName: '', accountNumber: '',
-        confirmAccount: '', ifsc: '',
+        ifsc: '',
     },
     education: { level: '', institution: '', passingYear: '', trainings: [] },
 };
@@ -116,11 +133,6 @@ const validators = {
 
     'bank.accountHolderName': (v) => (v.trim() ? null : 'Account holder name is required'),
     'bank.accountNumber': (v) => (v.trim() ? null : 'Account number is required'),
-    'bank.confirmAccount': (v, form) => {
-        if (!v.trim()) return 'Confirm account number is required';
-        if (v !== form.bank.accountNumber) return 'Account numbers do not match';
-        return null;
-    },
     'bank.ifsc': (v) => {
         if (!v.trim()) return 'IFSC code is required';
         if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(v.trim())) return 'Invalid IFSC (e.g. SBIN0001234)';
@@ -153,7 +165,7 @@ const SECTION_FIELDS = [
     ['license.number', 'license.expiry', 'license.photoUrl'],
     ['vehicle.type', 'vehicle.registration'],
     ['rc.photoUrl'],
-    ['bank.accountHolderName', 'bank.accountNumber', 'bank.confirmAccount', 'bank.ifsc'],
+    ['bank.accountHolderName', 'bank.accountNumber', 'bank.ifsc'],
     ['education.level'],
 ];
 
@@ -171,14 +183,19 @@ function buildPayload(form) {
         profile_photo_public_id: form.profile.photoPublicId || null,
         license_number: form.license.number.trim().toUpperCase() || null,
         license_expiry: form.license.expiry.trim() || null,
+        license_issuing_authority: form.license.issuingAuthority || null,
         license_photo_url: form.license.photoUrl || null,
         license_photo_public_id: form.license.photoPublicId || null,
         vehicle_type: form.vehicle.type.toLowerCase(),
         vehicle_number: form.vehicle.registration.trim().toUpperCase(),
+        vehicle_make_model: form.vehicle.makeModel.trim() || null,
         vehicle_year: form.vehicle.year.trim() || null,
+        vehicle_rc_photo_url: form.vehicleRc.photoUrl || null,
+        insurance_photo_url: form.insurance.photoUrl || null,
         rc_number: form.rc.number.trim().toUpperCase() || null,
         rc_photo_url: form.rc.photoUrl || null,
         rc_photo_public_id: form.rc.photoPublicId || null,
+        rc_back_photo_url: form.rcBack.photoUrl || null,
         bank_account_name: form.bank.accountHolderName.trim(),
         bank_name: form.bank.bankName.trim() || null,
         bank_account_number: form.bank.accountNumber.trim(),
@@ -194,8 +211,23 @@ function buildPayload(form) {
 // 5. CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const VEHICLE_TYPES = ['Motorcycle', 'Scooter'];
-const EDU_LEVELS = ['10th Pass', '12th Pass', 'Diploma', 'Graduate', 'Post Graduate'];
+const VEHICLE_TYPES = [
+    { value: 'Motorcycle', icon: 'motorbike' },
+    { value: 'Scooter', icon: 'scooter' },
+    { value: 'Car', icon: 'car-outline' },
+    { value: 'Other', icon: 'dots-grid' },
+];
+const RTO_OPTIONS = [
+    'TS - Telangana', 'AP - Andhra Pradesh', 'KA - Karnataka', 'MH - Maharashtra',
+    'DL - Delhi', 'TN - Tamil Nadu', 'UP - Uttar Pradesh', 'GJ - Gujarat',
+];
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 26 }, (_, i) => String(CURRENT_YEAR - i));
+const BANK_OPTIONS = [
+    'State Bank of India', 'HDFC Bank', 'ICICI Bank', 'Axis Bank',
+    'Punjab National Bank', 'Bank of Baroda', 'Kotak Mahindra Bank', 'Canara Bank', 'Other',
+];
+const EDU_LEVELS = ['10th Pass', '12th Pass', 'Diploma', 'Graduate', 'Post Graduate', 'Other'];
 const TRAINING_OPTS = [
     'Food Delivery Training', 'Road Safety Course',
     'Customer Service', 'First Aid', 'Navigation & Maps',
@@ -205,17 +237,22 @@ const TRAINING_OPTS = [
 // 6. ATOMS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function SectionCard({ title, subtitle, stepIndex, completed, children }) {
+function SectionCard({ title, subtitle, stepIndex, completed, children, infoBadge }) {
     return (
         <View style={[s.card, completed && s.cardCompleted]}>
             <View style={s.cardHeader}>
                 <View style={[s.stepNumWrap, completed ? s.stepNumWrapDone : s.stepNumWrapPending]}>
-                    {completed ? <Text style={s.stepCheck}>✓</Text> : <Text style={s.stepNum}>{stepIndex}</Text>}
+                    {completed ? <Ionicons name="checkmark" size={16} color="#fff" style={s.stepCheck} /> : <Text style={s.stepNum}>{stepIndex}</Text>}
                 </View>
                 <View style={{ flex: 1 }}>
                     <Text style={s.cardTitle}>{title}</Text>
                     {subtitle ? <Text style={s.cardSubtitle}>{subtitle}</Text> : null}
                 </View>
+                {infoBadge ? (
+                    <TouchableOpacity style={s.infoPill} activeOpacity={0.7} accessibilityRole="button">
+                        <Text style={s.infoPillTxt}>{infoBadge}</Text>
+                    </TouchableOpacity>
+                ) : null}
             </View>
             <View style={s.cardDivider} />
             <View style={s.cardBody}>{children}</View>
@@ -269,11 +306,121 @@ function ChipSelect({ options, selected, onSelect, multi = false }) {
     );
 }
 
-function TipBox({ icon = 'ℹ️', text }) {
+function TipBox({ text }) {
     return (
         <View style={s.tipBox}>
-            <Text style={s.tipIcon}>{icon}</Text>
+            <Ionicons name="bulb-outline" size={16} color="#B8860B" style={s.tipIcon} />
             <Text style={s.tipText}>{text}</Text>
+        </View>
+    );
+}
+
+// Blue informational note (used for RC / vehicle document reminders)
+function InfoNote({ text }) {
+    return (
+        <View style={s.infoNote}>
+            <Ionicons name="information-circle" size={17} color="#2563EB" style={s.infoNoteIcon} />
+            <Text style={s.infoNoteText}>{text}</Text>
+        </View>
+    );
+}
+
+// Two-column responsive row — stacks on narrow screens automatically
+function FieldRow({ children }) {
+    return <View style={s.fieldRow}>{children}</View>;
+}
+
+// Lightweight inline dropdown (no external picker dependency).
+// The option list expands INLINE below the input (pushing the rest of the
+// form down) rather than floating on top of it — this avoids z-index /
+// stacking-order clipping issues across platforms, especially on web where
+// absolutely-positioned overlays can get painted underneath later siblings.
+function SelectInput({ value, onSelect, options, placeholder = 'Select', onBlur }) {
+    const [open, setOpen] = useState(false);
+    return (
+        <View>
+            <TouchableOpacity
+                style={[s.input, s.selectInput, open && s.inputFocused]}
+                activeOpacity={0.8}
+                onPress={() => setOpen((o) => {
+                    const next = !o;
+                    if (!next) onBlur?.();
+                    return next;
+                })}
+                accessibilityRole="button"
+            >
+                <Text style={value ? s.selectValueTxt : s.selectPlaceholderTxt} numberOfLines={1}>
+                    {value || placeholder}
+                </Text>
+                <Text style={s.selectChevron}>{open ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+            {open ? (
+                <View style={s.selectDropdown}>
+                    <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled showsVerticalScrollIndicator>
+                        {options.map((opt) => (
+                            <TouchableOpacity
+                                key={opt}
+                                style={s.selectOption}
+                                onPress={() => { onSelect(opt); setOpen(false); onBlur?.(); }}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={[s.selectOptionTxt, opt === value && s.selectOptionTxtActive]}>{opt}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+            ) : null}
+        </View>
+    );
+}
+
+// 4-across icon grid for vehicle type (Motorcycle / Scooter / Car / Other)
+function VehicleTypeGrid({ options, selected, onSelect }) {
+    return (
+        <View style={s.vehicleGrid}>
+            {options.map((opt) => {
+                const active = selected === opt.value;
+                return (
+                    <TouchableOpacity
+                        key={opt.value}
+                        style={[s.vehicleGridItem, active && s.vehicleGridItemActive]}
+                        onPress={() => onSelect(opt.value)}
+                        activeOpacity={0.8}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                    >
+                        <MaterialCommunityIcons
+                            name={opt.icon}
+                            size={26}
+                            color={active ? C.green : '#8A9088'}
+                            style={s.vehicleGridIcon}
+                        />
+                        <Text style={[s.vehicleGridLabel, active && s.vehicleGridLabelActive]}>{opt.value}</Text>
+                    </TouchableOpacity>
+                );
+            })}
+        </View>
+    );
+}
+
+// Green checklist box shown next to the profile photo uploader
+function PhotoGuidelinesBox() {
+    const points = [
+        'Clear, well-lit photo',
+        'Face must be fully visible',
+        'No sunglasses or filters',
+        'Use a recent photo',
+        'Accepted formats: JPG, PNG (Max 5MB)',
+    ];
+    return (
+        <View style={s.guidelinesBox}>
+            <Text style={s.guidelinesTitle}>Photo Guidelines</Text>
+            {points.map((p) => (
+                <View key={p} style={s.guidelinesRow}>
+                    <Text style={s.guidelinesCheck}>✓</Text>
+                    <Text style={s.guidelinesText}>{p}</Text>
+                </View>
+            ))}
         </View>
     );
 }
@@ -302,6 +449,167 @@ function ProgressBar({ form }) {
     );
 }
 
+const STEP_LABELS = ['Personal Info', 'Documents', 'Vehicle Info', 'Bank Details', 'Business Info', 'Review & Submit'];
+
+function StepperBar({ form }) {
+    const completions = SECTION_FIELDS.map((_, i) => sectionComplete(form, i));
+    const filled = completions.filter(Boolean).length;
+    const firstIncomplete = completions.findIndex((d) => !d);
+    const activeIdx = firstIncomplete === -1 ? completions.length - 1 : firstIncomplete;
+
+    return (
+        <View style={s.stepperCard}>
+            <Text style={s.stepperOfTxt}>Step {activeIdx + 1} of {completions.length}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.stepperRow}>
+                {STEP_LABELS.map((label, i) => {
+                    const done = completions[i];
+                    const isActive = i === activeIdx && !done;
+                    return (
+                        <React.Fragment key={label}>
+                            <View style={s.stepperItem}>
+                                <View style={[
+                                    s.stepperCircle,
+                                    done && s.stepperCircleDone,
+                                    isActive && s.stepperCircleActive,
+                                ]}>
+                                    {done
+                                        ? <Text style={s.stepperCheck}>✓</Text>
+                                        : <Text style={[s.stepperNum, isActive && s.stepperNumActive]}>{i + 1}</Text>}
+                                </View>
+                                <Text style={[s.stepperLabel, isActive && s.stepperLabelActive]} numberOfLines={1}>
+                                    {label}
+                                </Text>
+                            </View>
+                            {i < STEP_LABELS.length - 1 ? (
+                                <View style={[s.stepperLine, done && s.stepperLineDone]} />
+                            ) : null}
+                        </React.Fragment>
+                    );
+                })}
+            </ScrollView>
+        </View>
+    );
+}
+
+const SUMMARY_ITEMS = [
+    'Personal Info', 'Documents', 'Vehicle Info',
+    'Bank Details', 'Business Info', 'Review & Submit',
+];
+
+function OnboardingSummaryCard({ form }) {
+    const completions = SECTION_FIELDS.map((_, i) => sectionComplete(form, i));
+    const done = completions.filter(Boolean).length;
+    const total = completions.length;
+    const firstIncomplete = completions.findIndex((d) => !d);
+    const activeIdx = firstIncomplete === -1 ? -1 : firstIncomplete;
+    const pct = Math.round((done / total) * 100);
+
+    return (
+        <View style={s.sideCard}>
+            <View style={s.summaryHeaderRow}>
+                <Text style={s.sideCardTitle}>Onboarding Summary</Text>
+                <View style={s.progressRing}>
+                    <Text style={s.progressRingTxt}>{pct}%</Text>
+                </View>
+            </View>
+            <Text style={s.summarySubTxt}>{done} of {total} steps completed</Text>
+            <View style={{ gap: 10, marginTop: 12 }}>
+                {SUMMARY_ITEMS.map((label, i) => {
+                    const isDone = completions[i];
+                    const isActive = i === activeIdx && !isDone;
+                    const statusTxt = isDone ? 'Completed' : isActive ? 'In Progress' : 'Not Started';
+                    return (
+                        <View key={label} style={s.summaryItemRow}>
+                            <Text style={s.summaryItemLabel} numberOfLines={1}>{label}</Text>
+                            <View style={[
+                                s.summaryStatusPill,
+                                isDone && s.summaryStatusPillDone,
+                                isActive && s.summaryStatusPillActive,
+                            ]}>
+                                <Text style={[
+                                    s.summaryStatusTxt,
+                                    isDone && s.summaryStatusTxtDone,
+                                    isActive && s.summaryStatusTxtActive,
+                                ]}>
+                                    {statusTxt}
+                                </Text>
+                            </View>
+                        </View>
+                    );
+                })}
+            </View>
+        </View>
+    );
+}
+
+const WHY_ONBOARD_ITEMS = [
+    { icon: '📈', title: 'Grow Your Business', text: 'Access more customers and increase your earnings.' },
+    { icon: '💸', title: 'Fast Payouts', text: 'Get paid directly to your bank account.' },
+    { icon: '🎧', title: '24/7 Support', text: "We're here to help you every step of the way." },
+];
+
+function WhyOnboardCard() {
+    return (
+        <View style={[s.sideCard, s.whyOnboardCard]}>
+            <Text style={s.sideCardTitle}>Why onboard with us?</Text>
+            <View style={{ gap: 14, marginTop: 12 }}>
+                {WHY_ONBOARD_ITEMS.map((item) => (
+                    <View key={item.title} style={s.whyOnboardRow}>
+                        <View style={s.whyOnboardIconWrap}>
+                            <Text style={{ fontSize: 16 }}>{item.icon}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={s.whyOnboardItemTitle}>{item.title}</Text>
+                            <Text style={s.whyOnboardItemText}>{item.text}</Text>
+                        </View>
+                    </View>
+                ))}
+            </View>
+        </View>
+    );
+}
+
+const SMOOTH_TIPS = [
+    'Keep all documents handy',
+    'Use clear and original documents',
+    'Ensure details match on all documents',
+    'Complete all steps to start receiving orders',
+];
+
+function SmoothOnboardingTipsCard() {
+    return (
+        <View style={s.sideCard}>
+            <Text style={s.sideCardTitle}>Tips for Smooth Onboarding</Text>
+            <View style={{ gap: 8, marginTop: 10 }}>
+                {SMOOTH_TIPS.map((t) => (
+                    <View key={t} style={s.smoothTipRow}>
+                        <Text style={s.smoothTipCheck}>✓</Text>
+                        <Text style={s.smoothTipText}>{t}</Text>
+                    </View>
+                ))}
+            </View>
+        </View>
+    );
+}
+
+function NeedHelpCard() {
+    return (
+        <View style={s.sideCard}>
+            <Text style={s.sideCardTitle}>Need Help?</Text>
+            <Text style={s.needHelpText}>
+                Our support team is ready to assist you 24/7.
+            </Text>
+            <TouchableOpacity style={s.contactBtn} activeOpacity={0.85} accessibilityRole="button">
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="call-outline" size={14} color="#fff" />
+                    <Text style={s.contactBtnTxt}>Contact Support</Text>
+                </View>
+            </TouchableOpacity>
+            <Text style={s.callText}>Call: 1800-123-4567</Text>
+        </View>
+    );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 7. MAIN SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
@@ -310,6 +618,8 @@ function ProgressBar({ form }) {
 export default function DeliveryOnboarding({ navigation, onComplete }) {
     const token = useAuthStore((state) => state.token);
     const login = useAuthStore((state) => state.login);
+    const { width } = useWindowDimensions();
+    const isWide = width >= 860;
 
     const [form, setForm] = useState(INITIAL_FORM);
     const [touched, setTouched] = useState({});
@@ -632,10 +942,9 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                 >
                     <View style={s.heroNav}>
                         <TouchableOpacity onPress={() => navigation?.goBack()} style={s.backBtn} activeOpacity={0.7} accessibilityRole="button">
-                            <Text style={s.backArrow}>←</Text>
+                            <Ionicons name="arrow-back" size={19} color="#fff" />
                         </TouchableOpacity>
                         <View style={{ flex: 1, marginLeft: 12 }}>
-                            <Text style={s.heroEyebrow}>PARTNER</Text>
                             <Text style={s.heroTitle}>Partner Onboarding</Text>
                         </View>
                         <View style={s.heroBadge}>
@@ -643,14 +952,21 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                         </View>
                     </View>
 
+                    <Text style={s.heroSubtitle}>Complete all 6 steps to activate your partner account</Text>
+
                     <View style={s.heroStats}>
                         {[
-                            { value: '⚡ 5 min', label: 'Quick setup' },
-                            { value: '🕐 24 hrs', label: 'Verification' },
-                            { value: '🔒 100%', label: 'Secure' },
+                            { icon: 'flash', value: '5 min', label: 'Quick Setup' },
+                            { icon: 'checkmark-circle', value: '24 hrs', label: 'Verification' },
+                            { icon: 'shield-checkmark', value: '100%', label: 'Secure & Safe' },
+                            { icon: 'headset', value: '24/7', label: 'Support' },
+                            { icon: 'gift', value: 'Benefits', label: 'Grow your business' },
                         ].map((stat, i) => (
                             <View key={i} style={s.heroStatPill}>
-                                <Text style={s.heroStatValue}>{stat.value}</Text>
+                                <View style={s.heroStatValueRow}>
+                                    <Ionicons name={stat.icon} size={13} color="#fff" style={{ marginRight: 4 }} />
+                                    <Text style={s.heroStatValue}>{stat.value}</Text>
+                                </View>
                                 <Text style={s.heroStatLabel}>{stat.label}</Text>
                             </View>
                         ))}
@@ -659,7 +975,10 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     <View style={s.heroWave} />
                 </LinearGradient>
 
-                <ProgressBar form={form} />
+                <StepperBar form={form} />
+
+                <View style={isWide ? s.layoutRow : s.layoutStacked}>
+                <View style={isWide ? s.mainCol : s.mainColStacked}>
 
                 {/* ── SECTION 1 — Profile Photo ── */}
                 <SectionCard
@@ -668,6 +987,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     stepIndex="1"
                     completed={sectionComplete(form, 0)}
                 >
+                    <View style={s.photoSectionRow}>
                     <View style={{ alignItems: 'center', gap: 8 }}>
                         <TouchableOpacity
                             onPress={() => pickImage('profile')}
@@ -720,7 +1040,8 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                             <Text style={s.fieldError}>{visibleErrors['profile.photoUrl']}</Text>
                         ) : null}
                     </View>
-                    <TipBox text="Use a clear, well-lit photo. Face must be fully visible — no sunglasses or filters." />
+                    <PhotoGuidelinesBox />
+                    </View>
                 </SectionCard>
 
                 {/* ── SECTION 2 — Driving License ── */}
@@ -729,219 +1050,295 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     subtitle="Must be valid and not expired"
                     stepIndex="2"
                     completed={sectionComplete(form, 1)}
+                    infoBadge="Why is this needed?"
                 >
-                    <OnboardingField label="License Number" required errorKey="license.number" errors={visibleErrors}>
-                        <Input
-                            value={form.license.number}
-                            onChangeText={(v) => setField('license', 'number', v.toUpperCase())}
-                            placeholder="e.g. TS0720190012345"
-                            maxLength={20}
-                            autoCapitalize="characters"
-                            onBlur={() => markTouched('license.number')}
-                        />
-                    </OnboardingField>
+                    <FieldRow>
+                        <View style={s.fieldRowItem}>
+                            <OnboardingField label="License Number" required errorKey="license.number" errors={visibleErrors}>
+                                <Input
+                                    value={form.license.number}
+                                    onChangeText={(v) => setField('license', 'number', v.toUpperCase())}
+                                    placeholder="e.g. TS0720190012345"
+                                    maxLength={20}
+                                    autoCapitalize="characters"
+                                    onBlur={() => markTouched('license.number')}
+                                />
+                            </OnboardingField>
+                        </View>
+                        <View style={s.fieldRowItem}>
+                            <OnboardingField label="Issuing Authority" errorKey="license.issuingAuthority" errors={visibleErrors}>
+                                <SelectInput
+                                    value={form.license.issuingAuthority}
+                                    onSelect={(v) => setField('license', 'issuingAuthority', v)}
+                                    options={RTO_OPTIONS}
+                                    placeholder="Select RTO"
+                                    onBlur={() => markTouched('license.issuingAuthority')}
+                                />
+                            </OnboardingField>
+                        </View>
+                    </FieldRow>
 
-                    <OnboardingField label="Expiry Date" required errorKey="license.expiry" errors={visibleErrors}>
-                        <Input
-                            value={form.license.expiry}
-                            onChangeText={(v) => setField('license', 'expiry', v)}
-                            placeholder="MM/YYYY"
-                            keyboardType="numeric"
-                            maxLength={7}
-                            onBlur={() => markTouched('license.expiry')}
-                        />
-                    </OnboardingField>
+                    <FieldRow>
+                        <View style={s.fieldRowItem}>
+                            <OnboardingField label="Expiry Date" required errorKey="license.expiry" errors={visibleErrors}>
+                                <Input
+                                    value={form.license.expiry}
+                                    onChangeText={(v) => setField('license', 'expiry', v)}
+                                    placeholder="MM/YYYY"
+                                    keyboardType="numeric"
+                                    maxLength={7}
+                                    onBlur={() => markTouched('license.expiry')}
+                                />
+                            </OnboardingField>
+                        </View>
+                        <View style={s.fieldRowItem}>
+                            <OnboardingField label="License Photo" required errorKey="license.photoUrl" errors={visibleErrors}>
+                                <UploadBox
+                                    accept="image-pdf"
+                                    label="Upload front side of license"
+                                    hint="Tap to upload — JPG, PNG, or PDF (max 10 MB)"
+                                    icon="🪪"
+                                    file={form.license.photoUrl
+                                        ? { uri: form.license.photoLocalUri, name: form.license.photoName, mime: form.license.photoMime, size: form.license.photoSize }
+                                        : null}
+                                    onPick={() => pickImage('license')}
+                                    onFile={(fd) => handleDocFile(fd, 'license')}
+                                    onView={form.license.photoMime === 'application/pdf' ? () => openPdfViewer('license') : null}
+                                    onCrop={form.license.photoLocalUri && form.license.photoMime !== 'application/pdf' ? () => handleReCrop('license') : undefined}
+                                    {...uploadBoxProps('license')}
+                                />
+                            </OnboardingField>
+                        </View>
+                    </FieldRow>
 
-                    <OnboardingField label="License Photo" required errorKey="license.photoUrl" errors={visibleErrors}>
-                        <UploadBox
-                            accept="image-pdf"
-                            label="Upload front of license"
-                            hint="Tap to upload — JPG, PNG, or PDF (max 10 MB)"
-                            icon="🪪"
-                            file={form.license.photoUrl
-                                ? { uri: form.license.photoLocalUri, name: form.license.photoName, mime: form.license.photoMime, size: form.license.photoSize }
-                                : null}
-                            onPick={() => pickImage('license')}
-                            onFile={(fd) => handleDocFile(fd, 'license')}
-                            onView={form.license.photoMime === 'application/pdf' ? () => openPdfViewer('license') : null}
-                            onCrop={form.license.photoLocalUri && form.license.photoMime !== 'application/pdf' ? () => handleReCrop('license') : undefined}
-                            {...uploadBoxProps('license')}
-                        />
-                    </OnboardingField>
-
-                    <TipBox text="All 4 corners must be visible. File size under 10 MB. JPG, PNG, or PDF." />
+                    <TipBox text="Ensure your license is valid and clearly visible." />
                 </SectionCard>
 
                 {/* ── SECTION 3 — Vehicle Details ── */}
                 <SectionCard
                     title="Vehicle Details"
-                    subtitle="The vehicle you'll use for deliveries"
+                    subtitle="Information about your vehicle"
                     stepIndex="3"
                     completed={sectionComplete(form, 2)}
+                    infoBadge="Why is this needed?"
                 >
                     <OnboardingField label="Vehicle Type" required errorKey="vehicle.type" errors={visibleErrors}>
-                        <ChipSelect
+                        <VehicleTypeGrid
                             options={VEHICLE_TYPES}
                             selected={form.vehicle.type}
                             onSelect={(v) => { setField('vehicle', 'type', v); markTouched('vehicle.type'); }}
                         />
                     </OnboardingField>
 
-                    <OnboardingField label="Registration Number" required errorKey="vehicle.registration" errors={visibleErrors}>
-                        <Input
-                            value={form.vehicle.registration}
-                            onChangeText={(v) => setField('vehicle', 'registration', v.toUpperCase())}
-                            placeholder="e.g. TS 09 EF 1234"
-                            maxLength={15}
-                            autoCapitalize="characters"
-                            onBlur={() => markTouched('vehicle.registration')}
+                    <FieldRow>
+                        <View style={s.fieldRowItem}>
+                            <OnboardingField label="Vehicle Number" required errorKey="vehicle.registration" errors={visibleErrors}>
+                                <Input
+                                    value={form.vehicle.registration}
+                                    onChangeText={(v) => setField('vehicle', 'registration', v.toUpperCase())}
+                                    placeholder="e.g. TS 07 AB 1234"
+                                    maxLength={15}
+                                    autoCapitalize="characters"
+                                    onBlur={() => markTouched('vehicle.registration')}
+                                />
+                            </OnboardingField>
+                        </View>
+                        <View style={s.fieldRowItem}>
+                            <OnboardingField label="Make & Model" errorKey="vehicle.makeModel" errors={visibleErrors}>
+                                <Input
+                                    value={form.vehicle.makeModel}
+                                    onChangeText={(v) => setField('vehicle', 'makeModel', v)}
+                                    placeholder="e.g. Honda Activa 6G"
+                                    onBlur={() => markTouched('vehicle.makeModel')}
+                                />
+                            </OnboardingField>
+                        </View>
+                    </FieldRow>
+
+                    <OnboardingField label="Year of Manufacture" errorKey="vehicle.year" errors={visibleErrors}>
+                        <SelectInput
+                            value={form.vehicle.year}
+                            onSelect={(v) => { setField('vehicle', 'year', v); markTouched('vehicle.year'); }}
+                            options={YEAR_OPTIONS}
+                            placeholder="Select Year"
                         />
                     </OnboardingField>
 
-                    <OnboardingField label="Year of Manufacture" errorKey="vehicle.year" errors={visibleErrors}>
-                        <Input
-                            value={form.vehicle.year}
-                            onChangeText={(v) => setField('vehicle', 'year', v)}
-                            placeholder="e.g. 2019"
-                            keyboardType="numeric"
-                            maxLength={4}
-                            onBlur={() => markTouched('vehicle.year')}
-                        />
-                    </OnboardingField>
+                    <Text style={s.subGroupLabel}>Registration Certificate (Optional)</Text>
+                    <FieldRow>
+                        <View style={s.fieldRowItem}>
+                            <UploadBox
+                                accept="image-pdf"
+                                label="Upload RC (Front Side)"
+                                hint="JPG, PNG, or PDF"
+                                icon="📄"
+                                file={form.vehicleRc.photoUrl
+                                    ? { uri: form.vehicleRc.photoLocalUri, name: form.vehicleRc.photoName, mime: form.vehicleRc.photoMime, size: form.vehicleRc.photoSize }
+                                    : null}
+                                onPick={() => pickImage('vehicleRc')}
+                                onFile={(fd) => handleDocFile(fd, 'vehicleRc')}
+                                onView={form.vehicleRc.photoMime === 'application/pdf' ? () => openPdfViewer('vehicleRc') : null}
+                                onCrop={form.vehicleRc.photoLocalUri && form.vehicleRc.photoMime !== 'application/pdf' ? () => handleReCrop('vehicleRc') : undefined}
+                                {...uploadBoxProps('vehicleRc')}
+                            />
+                        </View>
+                        <View style={s.fieldRowItem}>
+                            <UploadBox
+                                accept="image-pdf"
+                                label="Upload Insurance Document"
+                                hint="JPG, PNG, or PDF"
+                                icon="🛡️"
+                                file={form.insurance.photoUrl
+                                    ? { uri: form.insurance.photoLocalUri, name: form.insurance.photoName, mime: form.insurance.photoMime, size: form.insurance.photoSize }
+                                    : null}
+                                onPick={() => pickImage('insurance')}
+                                onFile={(fd) => handleDocFile(fd, 'insurance')}
+                                onView={form.insurance.photoMime === 'application/pdf' ? () => openPdfViewer('insurance') : null}
+                                onCrop={form.insurance.photoLocalUri && form.insurance.photoMime !== 'application/pdf' ? () => handleReCrop('insurance') : undefined}
+                                {...uploadBoxProps('insurance')}
+                            />
+                        </View>
+                    </FieldRow>
+
+                    <InfoNote text="Ensure your vehicle documents are valid and up to date." />
                 </SectionCard>
 
                 {/* ── SECTION 4 — RC (Registration Certificate) ── */}
                 <SectionCard
                     title="Registration Certificate (RC)"
-                    subtitle="Proof of vehicle ownership — image or PDF"
+                    subtitle="Upload your vehicle RC"
                     stepIndex="4"
                     completed={sectionComplete(form, 3)}
+                    infoBadge="Why is this needed?"
                 >
                     <OnboardingField label="RC Number" errorKey="rc.number" errors={visibleErrors}>
                         <Input
                             value={form.rc.number}
                             onChangeText={(v) => setField('rc', 'number', v.toUpperCase())}
-                            placeholder="e.g. TS09EF1234"
+                            placeholder="e.g. TS0720194"
                             maxLength={20}
                             autoCapitalize="characters"
                             onBlur={() => markTouched('rc.number')}
                         />
                     </OnboardingField>
 
-                    <OnboardingField label="RC Document" required errorKey="rc.photoUrl" errors={visibleErrors}>
-                        <View style={s.rcButtonRow}>
-                            <TouchableOpacity
-                                style={s.rcPickerBtn}
-                                onPress={() => pickImage('rc')}
-                                disabled={uploading === 'rc'}
-                                activeOpacity={0.8}
-                                accessibilityRole="button"
-                            >
-                                <Text style={s.rcPickerBtnIcon}>📷</Text>
-                                <Text style={s.rcPickerBtnTxt}>Photo</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={s.rcPickerBtn}
-                                onPress={pickDocument}
-                                disabled={uploading === 'rc'}
-                                activeOpacity={0.8}
-                                accessibilityRole="button"
-                            >
-                                <Text style={s.rcPickerBtnIcon}>📄</Text>
-                                <Text style={s.rcPickerBtnTxt}>PDF</Text>
-                            </TouchableOpacity>
+                    <FieldRow>
+                        <View style={s.fieldRowItem}>
+                            <OnboardingField label="Front Side" required errorKey="rc.photoUrl" errors={visibleErrors}>
+                                <UploadBox
+                                    accept="image-pdf"
+                                    label="Upload RC document"
+                                    hint="JPG, PNG, or PDF (max 10 MB)"
+                                    icon="📄"
+                                    file={form.rc.photoUrl
+                                        ? { uri: form.rc.photoLocalUri, name: form.rc.photoName, mime: form.rc.photoMime, size: form.rc.photoSize }
+                                        : null}
+                                    onPick={() => pickImage('rc')}
+                                    onFile={(fd) => handleDocFile(fd, 'rc')}
+                                    onView={form.rc.photoMime === 'application/pdf' ? () => openPdfViewer('rc') : null}
+                                    onCrop={form.rc.photoLocalUri && form.rc.photoMime !== 'application/pdf' ? () => handleReCrop('rc') : undefined}
+                                    {...uploadBoxProps('rc')}
+                                />
+                            </OnboardingField>
                         </View>
+                        <View style={s.fieldRowItem}>
+                            <OnboardingField label="Back Side (Optional)" errorKey="rcBack.photoUrl" errors={visibleErrors}>
+                                <UploadBox
+                                    accept="image-pdf"
+                                    label="Upload back side"
+                                    hint="JPG, PNG, or PDF (max 10 MB)"
+                                    icon="📄"
+                                    file={form.rcBack.photoUrl
+                                        ? { uri: form.rcBack.photoLocalUri, name: form.rcBack.photoName, mime: form.rcBack.photoMime, size: form.rcBack.photoSize }
+                                        : null}
+                                    onPick={() => pickImage('rcBack')}
+                                    onFile={(fd) => handleDocFile(fd, 'rcBack')}
+                                    onView={form.rcBack.photoMime === 'application/pdf' ? () => openPdfViewer('rcBack') : null}
+                                    onCrop={form.rcBack.photoLocalUri && form.rcBack.photoMime !== 'application/pdf' ? () => handleReCrop('rcBack') : undefined}
+                                    {...uploadBoxProps('rcBack')}
+                                />
+                            </OnboardingField>
+                        </View>
+                    </FieldRow>
 
-                        <UploadBox
-                            accept="image-pdf"
-                            label="Upload RC document"
-                            hint="JPG, PNG, or PDF (max 10 MB)"
-                            icon="📄"
-                            file={form.rc.photoUrl
-                                ? { uri: form.rc.photoLocalUri, name: form.rc.photoName, mime: form.rc.photoMime, size: form.rc.photoSize }
-                                : null}
-                            onPick={pickDocument}
-                            onFile={(fd) => handleDocFile(fd, 'rc')}
-                            onView={form.rc.photoMime === 'application/pdf' ? () => openPdfViewer('rc') : null}
-                            onCrop={form.rc.photoLocalUri && form.rc.photoMime !== 'application/pdf' ? () => handleReCrop('rc') : undefined}
-                            {...uploadBoxProps('rc')}
-                        />
-                    </OnboardingField>
-
-                    <TipBox icon="📋" text="Upload the front page of your RC. PDF, JPG, or PNG accepted. Max 10 MB." />
+                    <InfoNote text="Ensure your vehicle documents are valid and up to date." />
                 </SectionCard>
 
                 {/* ── SECTION 5 — Bank Details ── */}
                 <SectionCard
                     title="Bank Details"
-                    subtitle="Your earnings will be credited here weekly"
+                    subtitle="Add your bank account for payments"
                     stepIndex="5"
                     completed={sectionComplete(form, 4)}
                 >
+                    <FieldRow>
+                        <View style={s.fieldRowItem}>
+                            <OnboardingField label="Account Holder Name" required errorKey="bank.accountHolderName" errors={visibleErrors}>
+                                <Input
+                                    value={form.bank.accountHolderName}
+                                    onChangeText={(v) => setField('bank', 'accountHolderName', v)}
+                                    placeholder="As per bank records"
+                                    onBlur={() => markTouched('bank.accountHolderName')}
+                                />
+                            </OnboardingField>
+                        </View>
+                        <View style={s.fieldRowItem}>
+                            <OnboardingField label="Bank Name" errorKey="bank.bankName" errors={visibleErrors}>
+                                <SelectInput
+                                    value={form.bank.bankName}
+                                    onSelect={(v) => setField('bank', 'bankName', v)}
+                                    options={BANK_OPTIONS}
+                                    placeholder="Select bank"
+                                    onBlur={() => markTouched('bank.bankName')}
+                                />
+                            </OnboardingField>
+                        </View>
+                    </FieldRow>
+
+                    <FieldRow>
+                        <View style={s.fieldRowItem}>
+                            <OnboardingField label="Account Number" required errorKey="bank.accountNumber" errors={visibleErrors}>
+                                <Input
+                                    value={form.bank.accountNumber}
+                                    onChangeText={(v) => setField('bank', 'accountNumber', v)}
+                                    placeholder="Enter account number"
+                                    keyboardType="numeric"
+                                    secureTextEntry
+                                    maxLength={18}
+                                    onBlur={() => markTouched('bank.accountNumber')}
+                                />
+                            </OnboardingField>
+                        </View>
+                        <View style={s.fieldRowItem}>
+                            <View style={s.ifscLabelRow}>
+                                <Text style={s.ifscLabelSpacer} />
+                                <TouchableOpacity onPress={() => Linking.openURL('https://www.bankifsccode.com')} accessibilityRole="link">
+                                    <Text style={s.findIfscLink}>Find IFSC</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <OnboardingField label="IFSC Code" required errorKey="bank.ifsc" errors={visibleErrors}>
+                                <Input
+                                    value={form.bank.ifsc}
+                                    onChangeText={(v) => setField('bank', 'ifsc', v.toUpperCase())}
+                                    placeholder="e.g. SBIN0001234"
+                                    maxLength={11}
+                                    autoCapitalize="characters"
+                                    onBlur={() => markTouched('bank.ifsc')}
+                                />
+                            </OnboardingField>
+                        </View>
+                    </FieldRow>
+
                     <View style={s.securityRow}>
                         <Text style={{ fontSize: 15 }}>🔒</Text>
-                        <Text style={s.securityText}>Your bank details are encrypted with 256-bit SSL</Text>
+                        <Text style={s.securityText}>Your bank details are encrypted and 100% secure</Text>
                     </View>
-
-                    <OnboardingField label="Account Holder Name" required errorKey="bank.accountHolderName" errors={visibleErrors}>
-                        <Input
-                            value={form.bank.accountHolderName}
-                            onChangeText={(v) => setField('bank', 'accountHolderName', v)}
-                            placeholder="As per bank records"
-                            onBlur={() => markTouched('bank.accountHolderName')}
-                        />
-                    </OnboardingField>
-
-                    <OnboardingField label="Bank Name" errorKey="bank.bankName" errors={visibleErrors}>
-                        <Input
-                            value={form.bank.bankName}
-                            onChangeText={(v) => setField('bank', 'bankName', v)}
-                            placeholder="e.g. State Bank of India"
-                            onBlur={() => markTouched('bank.bankName')}
-                        />
-                    </OnboardingField>
-
-                    <OnboardingField label="Account Number" required errorKey="bank.accountNumber" errors={visibleErrors}>
-                        <Input
-                            value={form.bank.accountNumber}
-                            onChangeText={(v) => setField('bank', 'accountNumber', v)}
-                            placeholder="Enter account number"
-                            keyboardType="numeric"
-                            secureTextEntry
-                            maxLength={18}
-                            onBlur={() => markTouched('bank.accountNumber')}
-                        />
-                    </OnboardingField>
-
-                    <OnboardingField label="Confirm Account Number" required errorKey="bank.confirmAccount" errors={visibleErrors}>
-                        <Input
-                            value={form.bank.confirmAccount}
-                            onChangeText={(v) => setField('bank', 'confirmAccount', v)}
-                            placeholder="Re-enter account number"
-                            keyboardType="numeric"
-                            maxLength={18}
-                            onBlur={() => markTouched('bank.confirmAccount')}
-                        />
-                    </OnboardingField>
-
-                    <OnboardingField label="IFSC Code" required errorKey="bank.ifsc" errors={visibleErrors}>
-                        <Input
-                            value={form.bank.ifsc}
-                            onChangeText={(v) => setField('bank', 'ifsc', v.toUpperCase())}
-                            placeholder="e.g. SBIN0001234"
-                            maxLength={11}
-                            autoCapitalize="characters"
-                            onBlur={() => markTouched('bank.ifsc')}
-                        />
-                    </OnboardingField>
-
-                    <TipBox text="Find your IFSC on the first page of your cheque book or bank passbook." />
                 </SectionCard>
 
                 {/* ── SECTION 6 — Education & Training ── */}
                 <SectionCard
                     title="Education & Training"
-                    subtitle="Help us understand your background"
+                    subtitle="Tell us about yourself"
                     stepIndex="6"
                     completed={sectionComplete(form, 5)}
                 >
@@ -953,7 +1350,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                         />
                     </OnboardingField>
 
-                    <OnboardingField label="Institution / School Name" errorKey="education.institution" errors={visibleErrors}>
+                    <OnboardingField label="Institution/College Name" errorKey="education.institution" errors={visibleErrors}>
                         <Input
                             value={form.education.institution}
                             onChangeText={(v) => setField('education', 'institution', v)}
@@ -1047,6 +1444,17 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     <Text style={s.bottomNoteLink}>Privacy Policy</Text>
                 </View>
 
+                </View>
+
+                <View style={isWide ? s.sidebarCol : s.sidebarColStacked}>
+                    <OnboardingSummaryCard form={form} />
+                    <WhyOnboardCard />
+                    <NeedHelpCard />
+                    <SmoothOnboardingTipsCard />
+                </View>
+
+                </View>
+
                 <View style={{ height: 40 }} />
             </ScrollView>
 
@@ -1096,9 +1504,11 @@ const s = StyleSheet.create({
     heroBadgeTxt: { fontSize: 10, color: '#fff', fontWeight: '800', letterSpacing: 1.5 },
     heroEyebrow: { fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase' },
     heroTitle: { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: -0.3, lineHeight: 26 },
-    heroStats: { flexDirection: 'row', gap: 8, paddingBottom: 22 },
-    heroStatPill: { flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 6, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
-    heroStatValue: { fontSize: 12, fontWeight: '800', color: '#fff', marginBottom: 1 },
+    heroSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.75)', fontWeight: '500', marginBottom: 16 },
+    heroStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 22 },
+    heroStatPill: { flexBasis: '23%', flexGrow: 1, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 6, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+    heroStatValueRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 1 },
+    heroStatValue: { fontSize: 12, fontWeight: '800', color: '#fff' },
     heroStatLabel: { fontSize: 9, color: 'rgba(255,255,255,0.6)', fontWeight: '600', letterSpacing: 0.2 },
     heroWave: { height: 22, backgroundColor: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, marginHorizontal: -20, marginBottom: -1 },
 
@@ -1157,7 +1567,7 @@ const s = StyleSheet.create({
     rcPickerBtnTxt: { fontSize: 13, fontWeight: '700', color: C.greenDeep },
 
     tipBox: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: C.yellowLight, borderRadius: 10, padding: 12, gap: 8, borderWidth: 1, borderColor: C.yellowBorder },
-    tipIcon: { fontSize: 15 },
+    tipIcon: { marginTop: 1 },
     tipText: { flex: 1, fontSize: 12, color: C.yellowText, lineHeight: 18, fontWeight: '500' },
 
     securityRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.greenLight, borderRadius: 10, padding: 10, gap: 8, borderWidth: 1, borderColor: C.greenMid },
@@ -1192,4 +1602,119 @@ const s = StyleSheet.create({
         shadowOpacity: 0.3, shadowRadius: 10, elevation: 6,
     },
     successBannerText: { fontSize: 15, fontWeight: '800', color: '#fff', textAlign: 'center', lineHeight: 22 },
+
+    // ── Numbered Stepper ──
+    stepperCard: { backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: '#E8F0E8', paddingVertical: 18, paddingHorizontal: 12, marginBottom: 16, shadowColor: '#147832', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 3 },
+    stepperRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 4 },
+    stepperItem: { alignItems: 'center', width: 78 },
+    stepperCircle: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#EDEFEE', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#EDEFEE' },
+    stepperCircleDone: { backgroundColor: C.green, borderColor: C.green },
+    stepperCircleActive: { backgroundColor: '#fff', borderColor: C.green },
+    stepperNum: { fontSize: 12, fontWeight: '800', color: '#9CA3AF' },
+    stepperNumActive: { color: C.green },
+    stepperCheck: { fontSize: 13, fontWeight: '900', color: '#fff' },
+    stepperLabel: { fontSize: 10, color: C.textXLight, fontWeight: '600', marginTop: 6, textAlign: 'center' },
+    stepperLabelActive: { color: C.greenDeep, fontWeight: '800' },
+    stepperLine: { height: 2, backgroundColor: '#E5E7EB', flex: 1, minWidth: 20, marginTop: 14 },
+    stepperLineDone: { backgroundColor: C.green },
+    stepperProgressTxt: { fontSize: 10, color: C.textLight, fontWeight: '700', textAlign: 'right', marginTop: 12, letterSpacing: 0.3 },
+
+    // ── Two-column layout (wide / web view) ──
+    layoutRow: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
+    layoutStacked: { flexDirection: 'column' },
+    mainCol: { flex: 2.4, minWidth: 0 },
+    mainColStacked: { width: '100%' },
+    sidebarCol: { flex: 1, minWidth: 260, gap: 14 },
+    sidebarColStacked: { width: '100%', gap: 14, marginTop: 4 },
+
+    // ── Sidebar cards ──
+    sideCard: { backgroundColor: '#fff', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#E8F0E8', shadowColor: '#147832', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 10, elevation: 3 },
+    sideCardTitle: { fontSize: 14, fontWeight: '800', color: C.text, letterSpacing: -0.2 },
+
+    summaryItemRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    summaryItemLabel: { fontSize: 12, color: C.textLight, fontWeight: '600', flexShrink: 1 },
+    summaryStatusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: '#F1F2F1' },
+    summaryStatusPillDone: { backgroundColor: C.greenLight },
+    summaryStatusTxt: { fontSize: 10, fontWeight: '700', color: '#9CA3AF' },
+    summaryStatusTxtDone: { color: C.greenDeep },
+
+    dataSafeCard: { backgroundColor: C.greenLight, borderColor: C.greenMid, alignItems: 'center', paddingVertical: 22 },
+    dataSafeText: { fontSize: 12, color: C.greenDeep, fontWeight: '500', textAlign: 'center', marginTop: 8, lineHeight: 18 },
+    dataSafeIconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginTop: 16, position: 'relative', borderWidth: 1, borderColor: C.greenMid },
+    dataSafeCheckBadge: { position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, borderRadius: 10, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+
+    needHelpText: { fontSize: 12, color: C.textLight, fontWeight: '500', marginTop: 6, marginBottom: 14, lineHeight: 18 },
+    contactBtn: { backgroundColor: C.greenDeep, borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
+    contactBtnTxt: { fontSize: 13, fontWeight: '800', color: '#fff' },
+    callText: { fontSize: 11, color: C.textXLight, fontWeight: '600', textAlign: 'center', marginTop: 10 },
+
+    // ── Info pill ("Why is this needed?") ──
+    infoPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, backgroundColor: C.greenLight, borderWidth: 1, borderColor: C.greenMid, alignSelf: 'flex-start' },
+    infoPillTxt: { fontSize: 10, fontWeight: '700', color: C.greenDeep },
+
+    // ── Stepper "Step X of N" label ──
+    stepperOfTxt: { alignSelf: 'flex-end', fontSize: 11, color: C.textLight, fontWeight: '700', marginBottom: 8, marginRight: 4 },
+
+    // ── Two-column responsive field row ──
+    fieldRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    fieldRowItem: { flexGrow: 1, flexBasis: 200, minWidth: 160 },
+    subGroupLabel: { fontSize: 12, fontWeight: '800', color: C.text, marginTop: 2 },
+
+    // ── Photo section layout (photo + guidelines) ──
+    photoSectionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start', justifyContent: 'center' },
+
+    // ── Photo Guidelines box ──
+    guidelinesBox: { flexGrow: 1, flexBasis: 220, minWidth: 200, backgroundColor: C.greenLight, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: C.greenMid, gap: 8 },
+    guidelinesTitle: { fontSize: 13, fontWeight: '800', color: C.greenDeep, marginBottom: 4 },
+    guidelinesRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    guidelinesCheck: { fontSize: 12, fontWeight: '900', color: C.green, marginTop: 1 },
+    guidelinesText: { flex: 1, fontSize: 12, color: C.greenDeep, fontWeight: '500', lineHeight: 17 },
+
+    // ── Blue info note (RC / vehicle docs) ──
+    infoNote: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#EFF6FF', borderRadius: 10, padding: 12, gap: 8, borderWidth: 1, borderColor: '#BFDBFE' },
+    infoNoteIcon: { marginTop: 1 },
+    infoNoteText: { flex: 1, fontSize: 12, color: '#1E40AF', fontWeight: '500', lineHeight: 17 },
+
+    // ── Select dropdown (RTO / Year / Bank) ──
+    selectInput: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    selectValueTxt: { fontSize: 14, color: C.text, fontWeight: '500', flex: 1 },
+    selectPlaceholderTxt: { fontSize: 14, color: C.textXLight, fontWeight: '500', flex: 1 },
+    selectChevron: { fontSize: 10, color: C.textLight, marginLeft: 8 },
+    selectDropdown: { marginTop: 4, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1.5, borderColor: '#E8EAE8', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 10, elevation: 8, overflow: 'hidden' },
+    selectOption: { paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: '#F5F6F5' },
+    selectOptionTxt: { fontSize: 13, color: C.text, fontWeight: '500' },
+    selectOptionTxtActive: { color: C.greenDeep, fontWeight: '800' },
+
+    // ── Vehicle type grid (4-across icon cards) ──
+    vehicleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    vehicleGridItem: { flexGrow: 1, flexBasis: 70, minWidth: 70, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: '#E2E8E2', backgroundColor: '#F8FAF8', gap: 4 },
+    vehicleGridItemActive: { borderColor: C.green, backgroundColor: C.greenLight },
+    vehicleGridIcon: { marginBottom: 2 },
+    vehicleGridLabel: { fontSize: 11, fontWeight: '600', color: C.textLight },
+    vehicleGridLabelActive: { color: C.greenDeep, fontWeight: '800' },
+
+    // ── Find IFSC link ──
+    ifscLabelRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: -4 },
+    ifscLabelSpacer: { flex: 1 },
+    findIfscLink: { fontSize: 11, fontWeight: '800', color: C.blue },
+
+    // ── Onboarding Summary: circular progress + In Progress status ──
+    summaryHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    progressRing: { width: 44, height: 44, borderRadius: 22, borderWidth: 4, borderColor: C.green, alignItems: 'center', justifyContent: 'center', backgroundColor: C.greenLight },
+    progressRingTxt: { fontSize: 11, fontWeight: '900', color: C.greenDeep },
+    summarySubTxt: { fontSize: 11, color: C.textXLight, fontWeight: '600', marginTop: 6 },
+    summaryStatusPillActive: { backgroundColor: '#FEF3C7' },
+    summaryStatusTxtActive: { color: '#B45309' },
+
+    // ── Why onboard with us? ──
+    whyOnboardCard: { backgroundColor: C.greenLight, borderColor: C.greenMid },
+    whyOnboardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    whyOnboardIconWrap: { width: 32, height: 32, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.greenMid },
+    whyOnboardItemTitle: { fontSize: 12, fontWeight: '800', color: C.greenDeep, marginBottom: 2 },
+    whyOnboardItemText: { fontSize: 11, color: C.greenDeep, fontWeight: '500', lineHeight: 16 },
+
+    // ── Tips for Smooth Onboarding ──
+    smoothTipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    smoothTipCheck: { fontSize: 12, fontWeight: '900', color: C.green, marginTop: 1 },
+    smoothTipText: { flex: 1, fontSize: 12, color: C.textLight, fontWeight: '500', lineHeight: 17 },
 });
