@@ -1528,45 +1528,7 @@ export default function VendorStoreScreen() {
           contentContainerStyle={[s.body, { paddingHorizontal: hPad }]}
         >
           {/* PROMO BANNERS — 3 equal cards, now inside the scroll so they move with the page */}
-          {!search && (
-            <View style={s.promoRow}>
-              <View style={[s.promoCard, s.promoCardGreen]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.promoCardLabel}>Fresh Vegetables</Text>
-                  <Text style={s.promoCardValue}>Upto 20% OFF</Text>
-                  <Text style={s.promoCardSub}>Farm fresh & handpicked</Text>
-                  <TouchableOpacity style={s.promoShopBtn} onPress={() => setActiveCat("Fruits & Vegetables")} activeOpacity={0.85}>
-                    <Text style={s.promoShopBtnText}>Shop Now</Text>
-                  </TouchableOpacity>
-                </View>
-                <MaterialIcons name="eco" size={40} color={C.green} style={{ opacity: 0.28 }} />
-              </View>
 
-              <View style={[s.promoCard, s.promoCardOrange]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.promoCardLabel}>Daily Essentials</Text>
-                  <Text style={[s.promoCardValue, { color: C.orangeDark }]}>Upto 15% OFF</Text>
-                  <Text style={s.promoCardSub}>On all essentials</Text>
-                  <TouchableOpacity style={[s.promoShopBtn, s.promoShopBtnOrange]} onPress={() => setActiveCat("All")} activeOpacity={0.85}>
-                    <Text style={s.promoShopBtnText}>Shop Now</Text>
-                  </TouchableOpacity>
-                </View>
-                <MaterialIcons name="local-grocery-store" size={40} color={C.orangeDark} style={{ opacity: 0.28 }} />
-              </View>
-
-              <View style={[s.promoCard, s.promoCardGreen]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.promoCardLabel}>Weekend Special</Text>
-                  <Text style={s.promoCardValue}>Extra 5% OFF</Text>
-                  <Text style={s.promoCardSub}>On orders above ₹499</Text>
-                  <View style={s.promoCodeBtn}>
-                    <Text style={s.promoCodeText}>Use Code: WEEKEND5</Text>
-                  </View>
-                </View>
-                <MaterialIcons name="card-giftcard" size={40} color={C.green} style={{ opacity: 0.28 }} />
-              </View>
-            </View>
-          )}
 
           {inStock.length === 0 && outStock.length === 0 ? (
             <View style={s.emptyBox}>

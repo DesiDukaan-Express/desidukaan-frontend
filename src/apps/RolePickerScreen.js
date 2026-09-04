@@ -5,20 +5,17 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
-  Dimensions,
   StatusBar,
   Platform,
   SafeAreaView,
   Modal,
   Pressable,
-  Alert,
+  ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import useAuthStore from "../store/authStore";
-import useAddressStore from "../store/addressStore";
-
-const { width: W, height: H } = Dimensions.get("window");
 
 // ─── Role definitions ─────────────────────────────────────────────────────────
 const ROLES = [
@@ -31,7 +28,6 @@ const ROLES = [
     gradientColors: ["#F97316", "#EA580C"],
     glowColor: "#F97316",
     bgGradient: ["#FFF7ED", "#FFEDD5"],
-    lockGradient: ["#FED7AA", "#FDBA74"],
   },
   {
     key: "vendor",
@@ -42,7 +38,6 @@ const ROLES = [
     gradientColors: ["#10B981", "#059669"],
     glowColor: "#10B981",
     bgGradient: ["#ECFDF5", "#D1FAE5"],
-    lockGradient: ["#A7F3D0", "#6EE7B7"],
   },
   {
     key: "delivery",
@@ -53,7 +48,6 @@ const ROLES = [
     gradientColors: ["#6366F1", "#4F46E5"],
     glowColor: "#6366F1",
     bgGradient: ["#EEF2FF", "#E0E7FF"],
-    lockGradient: ["#C7D2FE", "#A5B4FC"],
   },
 ];
 
@@ -66,7 +60,7 @@ function RoleIcon({ role, size = 28, color = "#fff" }) {
 }
 
 // ─── Role Card ────────────────────────────────────────────────────────────────
-function RoleCard({ role, enabled, onPress, index }) {
+function RoleCard({ role, enabled, onPress, index, cardWidth, cardHeight, isCompact }) {
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const glowAnim  = useRef(new Animated.Value(0)).current;
 
@@ -88,17 +82,20 @@ function RoleCard({ role, enabled, onPress, index }) {
 
   const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.65] });
 
+  const iconCircleSize = isCompact ? Math.min(52, cardWidth * 0.45) : Math.min(68, cardWidth * 0.45);
+  const iconSize = isCompact ? 24 : 32;
+
   return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }], opacity: scaleAnim, borderRadius: 28, overflow: "hidden" }}>
+    <Animated.View style={{ transform: [{ scale: scaleAnim }], opacity: scaleAnim, borderRadius: 24, overflow: "hidden" }}>
       <TouchableOpacity
-        style={rc.card}
+        style={[rc.card, { width: cardWidth, height: cardHeight, paddingVertical: isCompact ? 12 : 16 }]}
         onPress={onPress}
         activeOpacity={0.85}
       >
         {/* Background gradient */}
         <LinearGradient
           colors={role.bgGradient}
-          style={[StyleSheet.absoluteFill, { borderRadius: 28, overflow: "hidden" }]}
+          style={[StyleSheet.absoluteFill, { borderRadius: 24, overflow: "hidden" }]}
         />
 
         {/* Glow ring for enabled roles */}
@@ -110,18 +107,34 @@ function RoleCard({ role, enabled, onPress, index }) {
 
         {/* Icon circle */}
         <View style={rc.iconWrap}>
-          <LinearGradient colors={role.gradientColors} style={rc.iconCircle}>
-            <RoleIcon role={role} size={36} color="#fff" />
+          <LinearGradient
+            colors={role.gradientColors}
+            style={[rc.iconCircle, { width: iconCircleSize, height: iconCircleSize, borderRadius: iconCircleSize / 3 }]}
+          >
+            <RoleIcon role={role} size={iconSize} color="#fff" />
           </LinearGradient>
-          {/* Glow behind icon */}
           {enabled && (
-            <View style={[rc.iconGlow, { backgroundColor: role.glowColor }]} />
+            <View
+              style={[
+                rc.iconGlow,
+                {
+                  backgroundColor: role.glowColor,
+                  width: iconCircleSize,
+                  height: iconCircleSize,
+                  borderRadius: iconCircleSize / 3,
+                },
+              ]}
+            />
           )}
         </View>
 
         {/* Text */}
-        <Text style={rc.label}>{role.label}</Text>
-        <Text style={rc.sublabel}>{role.sublabel}</Text>
+        <Text style={[rc.label, isCompact && { fontSize: 12 }]} numberOfLines={1}>
+          {role.label}
+        </Text>
+        <Text style={[rc.sublabel, isCompact && { fontSize: 9.5 }]} numberOfLines={2}>
+          {role.sublabel}
+        </Text>
 
         {/* Active indicator */}
         <View style={[rc.activeDot, { backgroundColor: role.gradientColors[0] }]} />
@@ -130,16 +143,12 @@ function RoleCard({ role, enabled, onPress, index }) {
   );
 }
 
-const CARD_SIZE = Math.min((W - 60) / 3, 140);
-
 const rc = StyleSheet.create({
   card: {
-    width: CARD_SIZE,
-    height: CARD_SIZE * 1.25,
-    borderRadius: 28,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 4,
     borderWidth: 1.5,
     borderColor: "rgba(255,255,255,0.6)",
     overflow: "hidden",
@@ -149,18 +158,15 @@ const rc = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 16,
     elevation: 6,
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
   },
   glowRing: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 28,
+    borderRadius: 24,
     borderWidth: 2.5,
   },
-  iconWrap: { position: "relative", marginBottom: 2 },
+  iconWrap: { position: "relative", marginBottom: 4 },
   iconCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -171,58 +177,64 @@ const rc = StyleSheet.create({
   },
   iconGlow: {
     position: "absolute",
-    width: 68,
-    height: 68,
-    borderRadius: 20,
     opacity: 0.25,
     top: 4,
     left: 2,
     zIndex: -1,
   },
   label: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "800",
     color: "#111827",
     letterSpacing: 0.1,
     textAlign: "center",
   },
   sublabel: {
-    fontSize: 10,
+    fontSize: 10.5,
     color: "#6B7280",
     fontWeight: "500",
     textAlign: "center",
-    lineHeight: 13,
+    lineHeight: 14,
+    paddingHorizontal: 4,
   },
-  lockBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    backgroundColor: "rgba(0,0,0,0.06)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 20,
-    marginTop: 2,
-  },
-  lockText: { fontSize: 9, color: "#6B7280", fontWeight: "600" },
   activeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    marginTop: 2,
   },
 });
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function RolePickerScreen({ onRolePicked }) {
   const { user, enabledRoles, setActiveRole, logout } = useAuthStore();
+  const { width: winWidth, height: winHeight } = useWindowDimensions();
 
-  const [logoutModal, setLogoutModal]   = useState(false);
+  const [logoutModal, setLogoutModal] = useState(false);
+
+  // ── Dynamic calculations
+  const isSmallMobile = winWidth < 380;
+  const isMobile = winWidth < 640;
+
+  // Compute card dimensions dynamically for 3-across on mobile, side-by-side or capped on larger screens
+  let cardWidth;
+  if (winWidth >= 768) {
+    cardWidth = 160;
+  } else if (winWidth >= 480) {
+    cardWidth = 135;
+  } else {
+    // Mobile: 3 columns with padding
+    const horizontalPadding = 32;
+    const gapTotal = 24; // 12px gap * 2
+    cardWidth = Math.floor((winWidth - horizontalPadding - gapTotal) / 3);
+  }
+  const cardHeight = Math.floor(cardWidth * 1.32);
 
   // ── Entry animations
-  const bgAnim     = useRef(new Animated.Value(0)).current;
-  const titleAnim  = useRef(new Animated.Value(-30)).current;
+  const bgAnim = useRef(new Animated.Value(0)).current;
+  const titleAnim = useRef(new Animated.Value(-30)).current;
   const titleOpacity = useRef(new Animated.Value(0)).current;
-  const taglineAnim  = useRef(new Animated.Value(0)).current;
+  const taglineAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -264,51 +276,62 @@ export default function RolePickerScreen({ onRolePicked }) {
       <Animated.View style={[s.blob2, { opacity: bgAnim }]} />
 
       <SafeAreaView style={s.safe}>
-        {/* ── Top bar */}
-        <View style={s.topBar}>
-          <View style={s.topRight}>
-            <Text style={s.topName}>{user?.name || "Welcome"}</Text>
-            <Text style={s.topPhone}>{user?.phone ? `+91 ${user.phone}` : ""}</Text>
-          </View>
-          <TouchableOpacity style={s.logoutBtn} onPress={() => setLogoutModal(true)}>
-            <Feather name="log-out" size={18} color="rgba(255,255,255,0.5)" />
-          </TouchableOpacity>
-        </View>
-
-        {/* ── Title section */}
-        <Animated.View
-          style={[s.titleWrap, { opacity: titleOpacity, transform: [{ translateY: titleAnim }] }]}
+        <ScrollView
+          contentContainerStyle={s.scrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={true}
         >
-          <Text style={s.whoIs}>Who's using DesiDukaan?</Text>
-          <Animated.Text style={[s.sub, { opacity: taglineAnim }]}>
-            Choose your role to continue
-          </Animated.Text>
-        </Animated.View>
+          {/* ── Top bar */}
+          <View style={s.topBar}>
+            <View style={s.topRight}>
+              <Text style={s.topName}>{user?.name || "Welcome"}</Text>
+              <Text style={s.topPhone}>{user?.phone ? `+91 ${user.phone}` : ""}</Text>
+            </View>
+            <TouchableOpacity style={s.logoutBtn} onPress={() => setLogoutModal(true)}>
+              <Feather name="log-out" size={18} color="rgba(255,255,255,0.5)" />
+            </TouchableOpacity>
+          </View>
 
-        {/* ── Role Cards */}
-        <View style={s.cardsRow}>
-          {ROLES.map((role, idx) => (
-            <RoleCard
-              key={role.key}
-              role={role}
-              enabled={enabledRoles.includes(role.key)}
-              onPress={() => handleRoleTap(role)}
-              index={idx}
-            />
-          ))}
-        </View>
+          {/* ── Title section */}
+          <Animated.View
+            style={[s.titleWrap, { opacity: titleOpacity, transform: [{ translateY: titleAnim }] }]}
+          >
+            <Text style={[s.whoIs, isSmallMobile && { fontSize: 22, lineHeight: 28 }]}>
+              Who's using DesiDukaan?
+            </Text>
+            <Animated.Text style={[s.sub, { opacity: taglineAnim }]}>
+              Choose your role to continue
+            </Animated.Text>
+          </Animated.View>
 
-        {/* ── Hint */}
-        <Animated.View style={[s.hintWrap, { opacity: taglineAnim }]}>
-          <Feather name="info" size={12} color="rgba(255,255,255,0.3)" />
-          <Text style={s.hint}>Locked roles can be enabled with one tap</Text>
-        </Animated.View>
+          {/* ── Role Cards */}
+          <View style={[s.cardsRow, { gap: isSmallMobile ? 8 : 12 }]}>
+            {ROLES.map((role, idx) => (
+              <RoleCard
+                key={role.key}
+                role={role}
+                enabled={enabledRoles.includes(role.key)}
+                onPress={() => handleRoleTap(role)}
+                index={idx}
+                cardWidth={cardWidth}
+                cardHeight={cardHeight}
+                isCompact={isSmallMobile}
+              />
+            ))}
+          </View>
+
+          {/* ── Hint */}
+          <Animated.View style={[s.hintWrap, { opacity: taglineAnim }]}>
+            <Feather name="info" size={12} color="rgba(255,255,255,0.3)" />
+            <Text style={s.hint}>Locked roles can be enabled with one tap</Text>
+          </Animated.View>
+        </ScrollView>
       </SafeAreaView>
 
       {/* ── Logout confirm modal */}
       <Modal visible={logoutModal} transparent animationType="fade" onRequestClose={() => setLogoutModal(false)}>
         <Pressable style={lm.backdrop} onPress={() => setLogoutModal(false)}>
-          <Pressable style={lm.card} onPress={() => {}}>
+          <Pressable style={[lm.card, { width: Math.min(winWidth * 0.85, 340) }]} onPress={() => {}}>
             <View style={lm.iconWrap}>
               <Feather name="log-out" size={26} color="#EF4444" />
             </View>
@@ -331,57 +354,88 @@ export default function RolePickerScreen({ onRolePicked }) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root:  { flex: 1 },
-  safe:  { flex: 1, alignItems: "center" },
+  root: { flex: 1 },
+  safe: { flex: 1 },
+  scrollContent: {
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingBottom: 24,
+  },
 
   // Decorative blobs
   blob1: {
-    position: "absolute", width: 300, height: 300, borderRadius: 150,
-    backgroundColor: "#10B981", opacity: 0.06, top: -60, right: -80,
+    position: "absolute",
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: "#10B981",
+    opacity: 0.06,
+    top: -60,
+    right: -80,
   },
   blob2: {
-    position: "absolute", width: 250, height: 250, borderRadius: 125,
-    backgroundColor: "#F97316", opacity: 0.05, bottom: 100, left: -70,
+    position: "absolute",
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: "#F97316",
+    opacity: 0.05,
+    bottom: 100,
+    left: -70,
   },
 
   // Top bar
   topBar: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    paddingHorizontal: 24, paddingTop: Platform.OS === "android" ? 48 : 16,
-    paddingBottom: 8, width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === "android" ? 44 : 16,
+    paddingBottom: 8,
+    width: "100%",
+    maxWidth: 600,
   },
-  avatar: { width: 44, height: 44, borderRadius: 14, overflow: "hidden" },
-  avatarGrad: { flex: 1, alignItems: "center", justifyContent: "center" },
-  avatarText: { fontSize: 17, fontWeight: "900", color: "#fff" },
   topRight: { flex: 1 },
-  topName:  { fontSize: 15, fontWeight: "800", color: "#fff", letterSpacing: -0.2 },
+  topName: { fontSize: 15, fontWeight: "800", color: "#fff", letterSpacing: -0.2 },
   topPhone: { fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 1 },
   logoutBtn: { padding: 8 },
 
   // Title
-  titleWrap: { alignItems: "center", marginTop: H * 0.06, marginBottom: H * 0.06, paddingHorizontal: 20 },
+  titleWrap: {
+    alignItems: "center",
+    marginVertical: 20,
+    paddingHorizontal: 20,
+  },
   whoIs: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "900",
     color: "#fff",
     textAlign: "center",
     letterSpacing: -0.8,
-    lineHeight: 34,
+    lineHeight: 32,
   },
-  sub: { fontSize: 14, color: "rgba(255,255,255,0.45)", marginTop: 8, textAlign: "center" },
+  sub: { fontSize: 13, color: "rgba(255,255,255,0.45)", marginTop: 6, textAlign: "center" },
 
   // Cards row
   cardsRow: {
     flexDirection: "row",
-    gap: 14,
+    flexWrap: "wrap",
     justifyContent: "center",
-    paddingHorizontal: 16,
+    alignItems: "center",
+    paddingHorizontal: 12,
+    width: "100%",
+    maxWidth: 600,
+    marginVertical: 12,
   },
 
   // Hint
   hintWrap: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    marginTop: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 20,
+    marginBottom: 12,
   },
   hint: { fontSize: 11, color: "rgba(255,255,255,0.28)", fontWeight: "500" },
 });
@@ -389,13 +443,13 @@ const s = StyleSheet.create({
 // Logout modal styles
 const lm = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center" },
-  card: { backgroundColor: "#fff", borderRadius: 24, padding: 28, width: W * 0.82, alignItems: "center", gap: 8 },
-  iconWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: "#FEF2F2", alignItems: "center", justifyContent: "center", marginBottom: 4 },
-  title: { fontSize: 20, fontWeight: "900", color: "#111827" },
-  sub:   { fontSize: 13, color: "#9CA3AF", textAlign: "center", lineHeight: 20 },
-  btns:  { flexDirection: "row", gap: 10, marginTop: 12, width: "100%" },
-  cancel: { flex: 1, paddingVertical: 14, borderRadius: 13, backgroundColor: "#F3F4F6", alignItems: "center" },
-  cancelText: { fontSize: 15, fontWeight: "700", color: "#374151" },
-  confirm: { flex: 1, paddingVertical: 14, borderRadius: 13, backgroundColor: "#EF4444", alignItems: "center" },
-  confirmText: { fontSize: 15, fontWeight: "700", color: "#fff" },
+  card: { backgroundColor: "#fff", borderRadius: 24, padding: 24, alignItems: "center", gap: 8 },
+  iconWrap: { width: 56, height: 56, borderRadius: 18, backgroundColor: "#FEF2F2", alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  title: { fontSize: 19, fontWeight: "900", color: "#111827" },
+  sub: { fontSize: 13, color: "#9CA3AF", textAlign: "center", lineHeight: 19 },
+  btns: { flexDirection: "row", gap: 10, marginTop: 12, width: "100%" },
+  cancel: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: "#F3F4F6", alignItems: "center" },
+  cancelText: { fontSize: 14, fontWeight: "700", color: "#374151" },
+  confirm: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: "#EF4444", alignItems: "center" },
+  confirmText: { fontSize: 14, fontWeight: "700", color: "#fff" },
 });

@@ -216,11 +216,12 @@ function AddressPicker({
   // map to it, and close the dropdown.
   const selectSuggestion = React.useCallback((s) => {
     suggestionSelectRef.current = true;
-    setInputText(s.display_name);
+    const text = s.label || s.display_name || "";
+    setInputText(text);
     setInputErr("");
     setPickLat(s.lat);
     setPickLng(s.lng);
-    setFocusPoint({ key: ++focusSeqRef.current, lat: s.lat, lng: s.lng, displayName: s.display_name });
+    setFocusPoint({ key: ++focusSeqRef.current, lat: s.lat, lng: s.lng, label: text, displayName: text });
     setSuggestions([]);
   }, []);
 
@@ -275,25 +276,27 @@ function AddressPicker({
   }, [t]);
 
   const handleSaveAdd = () => {
-    if (inputText.trim().length < 5) {
+    const text = (inputText || "").trim();
+    if (text.length < 5) {
       setInputErr(t("home.addressError"));
       return;
     }
-    onSaveNew(inputText.trim(), { lat: pickLat, lng: pickLng });
+    onSaveNew(text, { lat: pickLat, lng: pickLng });
     setMode("list");
     setInputText("");
     setInputErr("");
   };
 
   const handleSaveEdit = async () => {
-    if (inputText.trim().length < 5) {
+    const text = (inputText || "").trim();
+    if (text.length < 5) {
       setInputErr(t("home.addressError"));
       return;
     }
     setSaving(true);
     const patch = {
-      address_line: inputText.trim(),
-      label: inputLabel.trim() || editingAddr.label || t("home.labelPlaceholder"),
+      address_line: text,
+      label: (inputLabel || "").trim() || editingAddr?.label || t("home.labelPlaceholder"),
     };
     if (pickLat && pickLng) {
       patch.latitude = pickLat;
@@ -325,7 +328,7 @@ function AddressPicker({
       onRequestClose={onClose}
     >
       <Pressable style={ap.backdrop} onPress={onClose}>
-        <Pressable style={ap.sheet} onPress={() => { }}>
+        <Pressable style={ap.sheet} onPress={(e) => e.stopPropagation?.()}>
           {/* Handle */}
           <View style={ap.handle} />
 
@@ -416,7 +419,7 @@ function AddressPicker({
                   onChangeText={(text) => {
                     setInputText(text);
                     setInputErr("");
-                    if (text.trim().length < 3) setSuggestions([]);
+                    if ((text || "").trim().length < 3) setSuggestions([]);
                   }}
                   onKeyPress={(e) => {
                     if (e.nativeEvent?.key === "Escape") setSuggestions([]);
@@ -454,13 +457,13 @@ function AddressPicker({
                           (pressed || hovered) && ap.suggestRowActive,
                           i === suggestions.length - 1 && ap.suggestRowLast,
                         ]}
-                        onPressIn={() => selectSuggestion(s)}
+                        onPress={() => selectSuggestion(s)}
                       >
                         <View style={ap.suggestIconWrap}>
                           <MaterialIcons name="location-on" size={16} color={C.green} />
                         </View>
                         <Text style={ap.suggestText} numberOfLines={2}>
-                          {s.display_name}
+                          {s.label || s.display_name}
                         </Text>
                       </Pressable>
                     ))}
@@ -470,11 +473,11 @@ function AddressPicker({
               <TouchableOpacity
                 style={[
                   ap.saveBtn,
-                  (inputText.trim().length < 5 || saving) && ap.saveBtnDisabled,
+                  ((inputText || "").trim().length < 5 || saving) && ap.saveBtnDisabled,
                 ]}
                 onPress={mode === "edit" ? handleSaveEdit : handleSaveAdd}
                 activeOpacity={0.85}
-                disabled={inputText.trim().length < 5 || saving}
+                disabled={(inputText || "").trim().length < 5 || saving}
               >
                 {saving ? (
                   <ActivityIndicator size="small" color={C.white} />
