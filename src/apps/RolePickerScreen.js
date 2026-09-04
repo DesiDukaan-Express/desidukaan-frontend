@@ -62,7 +62,7 @@ function RoleIcon({ role, size = 28, color = "#fff" }) {
 // ─── Role Card ────────────────────────────────────────────────────────────────
 function RoleCard({ role, enabled, onPress, index, cardWidth, cardHeight, isCompact }) {
   const scaleAnim = useRef(new Animated.Value(0)).current;
-  const glowAnim  = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.sequence([
@@ -297,7 +297,7 @@ export default function RolePickerScreen({ onRolePicked }) {
             style={[s.titleWrap, { opacity: titleOpacity, transform: [{ translateY: titleAnim }] }]}
           >
             <Text style={[s.whoIs, isSmallMobile && { fontSize: 22, lineHeight: 28 }]}>
-              Who's using DesiDukaan?
+              Who's using KwikPik?
             </Text>
             <Animated.Text style={[s.sub, { opacity: taglineAnim }]}>
               Choose your role to continue
@@ -331,7 +331,7 @@ export default function RolePickerScreen({ onRolePicked }) {
       {/* ── Logout confirm modal */}
       <Modal visible={logoutModal} transparent animationType="fade" onRequestClose={() => setLogoutModal(false)}>
         <Pressable style={lm.backdrop} onPress={() => setLogoutModal(false)}>
-          <Pressable style={[lm.card, { width: Math.min(winWidth * 0.85, 340) }]} onPress={() => {}}>
+          <Pressable style={[lm.card, { width: Math.min(winWidth * 0.85, 340) }]} onPress={() => { }}>
             <View style={lm.iconWrap}>
               <Feather name="log-out" size={26} color="#EF4444" />
             </View>

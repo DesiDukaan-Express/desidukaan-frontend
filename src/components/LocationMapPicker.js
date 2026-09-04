@@ -139,9 +139,11 @@ export default function LocationMapPicker({
         style={StyleSheet.absoluteFill}
         initialRegion={center}
         onRegionChangeComplete={handleRegionChangeComplete}
-      >
-        <Marker coordinate={markerPos} title="Delivery Location" />
-      </MapView>
+      />
+      {/* Center fixed pin so dragging the map smoothly changes location */}
+      <View style={styles.centerPinWrap} pointerEvents="none">
+        <MaterialIcons name="location-on" size={36} color="#16A34A" />
+      </View>
 
       <View style={styles.badge} pointerEvents="none">
         <MaterialIcons name="place" size={14} color="#16A34A" />
@@ -189,5 +191,15 @@ const styles = StyleSheet.create({
     color: "#1E293B",
     marginLeft: 4,
     flex: 1,
+  },
+  centerPinWrap: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    marginTop: -32,
+    marginLeft: -18,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
   },
 });
