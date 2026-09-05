@@ -21,15 +21,17 @@ import {
   Dimensions,
   StatusBar,
   Pressable,
+  KeyboardAvoidingView,
 } from "react-native";
 import { MaterialIcons, Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, CommonActions } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import { vendorsAPI, ordersAPI, categoriesAPI } from "../../services/api";
+import { io } from "socket.io-client";
 import ChatWidget from "./ChatWidget";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
@@ -39,6 +41,9 @@ import UseCurrentLocationButton from "../../components/UseCurrentLocationButton"
 // Use env var works on device, emulator, and web
 // In your .env: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+const SOCKET_URL =
+  process.env.EXPO_PUBLIC_SOCKET_URL ||
+  (BASE_URL.includes("/api") ? BASE_URL.split("/api")[0] : "http://localhost:3000");
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -137,6 +142,9 @@ function AddressPicker({
   const [mode, setMode] = React.useState("list");
   const [editingAddr, setEditingAddr] = React.useState(null);
   const [inputText, setInputText] = React.useState("");
+  const [inputPincode, setInputPincode] = React.useState("");
+  const [inputLandmark, setInputLandmark] = React.useState("");
+  const [inputHouseNo, setInputHouseNo] = React.useState("");
   const [inputLabel, setInputLabel] = React.useState("");
   const [inputErr, setInputErr] = React.useState("");
   const [saving, setSaving] = React.useState(false);
@@ -145,6 +153,7 @@ function AddressPicker({
   const [pickLng, setPickLng] = React.useState(null);
   // Autocomplete suggestions + point to fly the map to on selection
   const [suggestions, setSuggestions] = React.useState([]);
+  const [isInputFocused, setIsInputFocused] = React.useState(false);
   const [focusPoint, setFocusPoint] = React.useState(null);
   const suggestionSelectRef = React.useRef(false);
   const focusSeqRef = React.useRef(0);
@@ -156,12 +165,16 @@ function AddressPicker({
       setMode("list");
       setEditingAddr(null);
       setInputText("");
+      setInputPincode("");
+      setInputLandmark("");
+      setInputHouseNo("");
       setInputLabel("");
       setInputErr("");
       setSaving(false);
       setPickLat(null);
       setPickLng(null);
       setSuggestions([]);
+      setIsInputFocused(false);
       setFocusPoint(null);
       suggestionSelectRef.current = false;
       setLocating(false);
@@ -172,6 +185,9 @@ function AddressPicker({
   const openAdd = () => {
     setEditingAddr(null);
     setInputText("");
+    setInputPincode("");
+    setInputLandmark("");
+    setInputHouseNo("");
     setInputLabel("");
     setInputErr("");
     setPickLat(null);
@@ -187,6 +203,9 @@ function AddressPicker({
   const openEdit = (addr) => {
     setEditingAddr(addr);
     setInputText(addr.address_line || addr.address || "");
+    setInputPincode(addr.pincode || "");
+    setInputLandmark(addr.landmark || "");
+    setInputHouseNo(addr.house_no || "");
     setInputLabel(addr.label || t("home.labelPlaceholder"));
     setInputErr("");
     setPickLat(addr.lat || null);
@@ -212,11 +231,12 @@ function AddressPicker({
   // map to it, and close the dropdown.
   const selectSuggestion = React.useCallback((s) => {
     suggestionSelectRef.current = true;
-    setInputText(s.display_name);
+    const text = s.label || s.display_name || "";
+    setInputText(text);
     setInputErr("");
     setPickLat(s.lat);
     setPickLng(s.lng);
-    setFocusPoint({ key: ++focusSeqRef.current, lat: s.lat, lng: s.lng, displayName: s.display_name });
+    setFocusPoint({ key: ++focusSeqRef.current, lat: s.lat, lng: s.lng, label: text, displayName: text });
     setSuggestions([]);
   }, []);
 
@@ -225,42 +245,72 @@ function AddressPicker({
   const handleUseCurrentLocation = React.useCallback(async () => {
     setLocating(true);
     setLocError("");
-    if (!navigator?.geolocation) {
+
+    let lat = null;
+    let lng = null;
+
+    if (Platform.OS === "web") {
+      if (!navigator?.geolocation) {
+        setLocError(t("home.locErrorUnavailable"));
+        setLocating(false);
+        return;
+      }
+      try {
+        const pos = await new Promise((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 12000,
+            maximumAge: 0,
+          })
+        );
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      } catch (e) {
+        setLocError(e?.code === 1 ? t("home.locErrorDenied") : t("home.locErrorUnavailable"));
+        setLocating(false);
+        return;
+      }
+    } else {
+      try {
+        const Location = require("expo-location");
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          setLocError(t("home.locErrorDenied"));
+          setLocating(false);
+          return;
+        }
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      } catch (e) {
+        setLocError(t("home.locErrorUnavailable"));
+        setLocating(false);
+        return;
+      }
+    }
+
+    if (!lat || !lng) {
       setLocError(t("home.locErrorUnavailable"));
       setLocating(false);
       return;
     }
-    let pos;
-    try {
-      pos = await new Promise((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 12000,
-          maximumAge: 0,
-        })
-      );
-    } catch (e) {
-      setLocError(e?.code === 1 ? t("home.locErrorDenied") : t("home.locErrorUnavailable"));
-      setLocating(false);
-      return;
-    }
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
+
     let displayName = "";
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        { headers: { "User-Agent": "KwikPik/1.0 (desidukaan-express; location-picker)" } }
       );
       const data = await res.json();
       displayName = data?.display_name || "";
     } catch (err) {
       displayName = "";
     }
+
     if (!displayName) {
-      setLocError(t("home.locErrorUnavailable"));
-      setLocating(false);
-      return;
+      displayName = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     }
+
     setPickLat(lat);
     setPickLng(lng);
     setInputText(displayName);
@@ -271,25 +321,54 @@ function AddressPicker({
   }, [t]);
 
   const handleSaveAdd = () => {
-    if (inputText.trim().length < 5) {
-      setInputErr(t("home.addressError"));
+    if (!pickLat || !pickLng) {
+      setInputErr("Please select your location on the map above.");
       return;
     }
-    onSaveNew(inputText.trim(), { lat: pickLat, lng: pickLng });
+    const fullAddr = (inputText || "").trim();
+    const house = (inputHouseNo || "").trim();
+    const landmark = (inputLandmark || "").trim();
+    const pin = (inputPincode || "").trim();
+
+    if (!house || !landmark || !pin || fullAddr.length < 5) {
+      setInputErr("All address fields (House/Flat No., Landmark, Pincode & Address) are compulsory.");
+      return;
+    }
+
+    const combinedAddress = `${house ? house + ", " : ""}${fullAddr}${landmark ? " (Landmark: " + landmark + ")" : ""}${pin ? " - " + pin : ""}`;
+
+    onSaveNew(combinedAddress, { lat: pickLat, lng: pickLng, house_no: house, landmark, pincode: pin, address_line: fullAddr });
     setMode("list");
     setInputText("");
+    setInputPincode("");
+    setInputLandmark("");
+    setInputHouseNo("");
     setInputErr("");
   };
 
   const handleSaveEdit = async () => {
-    if (inputText.trim().length < 5) {
-      setInputErr(t("home.addressError"));
+    if (!pickLat || !pickLng) {
+      setInputErr("Please select your location on the map above.");
       return;
     }
+    const fullAddr = (inputText || "").trim();
+    const house = (inputHouseNo || "").trim();
+    const landmark = (inputLandmark || "").trim();
+    const pin = (inputPincode || "").trim();
+
+    if (!house || !landmark || !pin || fullAddr.length < 5) {
+      setInputErr("All address fields (House/Flat No., Landmark, Pincode & Address) are compulsory.");
+      return;
+    }
+
+    const combinedAddress = `${house ? house + ", " : ""}${fullAddr}${landmark ? " (Landmark: " + landmark + ")" : ""}${pin ? " - " + pin : ""}`;
+
     setSaving(true);
     const patch = {
-      address_line: inputText.trim(),
-      label: inputLabel.trim() || editingAddr.label || t("home.labelPlaceholder"),
+      address_line: combinedAddress,
+      pincode: pin,
+      landmark: landmark,
+      label: (inputLabel || "").trim() || editingAddr?.label || t("home.labelPlaceholder"),
     };
     if (pickLat && pickLng) {
       patch.latitude = pickLat;
@@ -300,6 +379,9 @@ function AddressPicker({
     setMode("list");
     setEditingAddr(null);
     setInputText("");
+    setInputPincode("");
+    setInputLandmark("");
+    setInputHouseNo("");
     setInputLabel("");
   };
 
@@ -321,7 +403,7 @@ function AddressPicker({
       onRequestClose={onClose}
     >
       <Pressable style={ap.backdrop} onPress={onClose}>
-        <Pressable style={ap.sheet} onPress={() => { }}>
+        <Pressable style={ap.sheet} onPress={(e) => e.stopPropagation?.()}>
           {/* Handle */}
           <View style={ap.handle} />
 
@@ -348,142 +430,221 @@ function AddressPicker({
 
           {isFormMode ? (
             /* ── Add / Edit Form ── */
-            <View style={ap.formWrap}>
-              {/* Label field (only shown in edit) */}
-              {mode === "edit" && (
-                <>
-                  <Text style={ap.formLabel}>{t("home.labelHint")}</Text>
-                  <View style={[ap.inputBoxSingle, inputErr ? ap.inputBoxError : null]}>
-                    <MaterialIcons
-                      name="label"
-                      size={15}
-                      color={C.green}
-                      style={{ marginLeft: 14 }}
-                    />
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              style={{ flexShrink: 1 }}
+            >
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingBottom: 20 }}
+              >
+                <View style={ap.formWrap}>
+                  {/* Label field (only shown in edit) */}
+                  {mode === "edit" && (
+                    <>
+                      <Text style={ap.formLabel}>{t("home.labelHint")}</Text>
+                      <View style={[ap.inputBoxSingle, inputErr ? ap.inputBoxError : null]}>
+                        <MaterialIcons
+                          name="label"
+                          size={15}
+                          color={C.green}
+                          style={{ marginLeft: 14 }}
+                        />
+                        <TextInput
+                          style={ap.input}
+                          placeholder={t("home.labelPlaceholder")}
+                          placeholderTextColor={C.gray400}
+                          value={inputLabel}
+                          onChangeText={(t) => setInputLabel(t)}
+                          underlineColorAndroid="transparent"
+                        />
+                      </View>
+                      <View style={{ height: 12 }} />
+                    </>
+                  )}
+
+                  {/* ── Section 1: Location Map & Auto-detected Address (Mandatory) ── */}
+                  <View style={ap.sectionHeaderRow}>
+                    <Text style={ap.sectionStepBadge}>1</Text>
+                    <Text style={ap.sectionTitle}>Pin Location on Map (Compulsory)</Text>
+                  </View>
+                  <UseCurrentLocationButton
+                    onPress={handleUseCurrentLocation}
+                    loading={locating}
+                    style={ap.locBtn}
+                  />
+                  {locError ? <Text style={ap.locErrorText}>{locError}</Text> : null}
+                  <LocationMapPicker
+                    initialCoords={
+                      mode === "edit"
+                        ? editingAddr?.lat && editingAddr?.lng
+                          ? { lat: editingAddr.lat, lng: editingAddr.lng }
+                          : null
+                        : initialCoords
+                    }
+                    addressText={inputText}
+                    focusPoint={focusPoint}
+                    autoReverseOnReady={mode === "add"}
+                    onPick={handleMapPick}
+                    onSuggestions={setSuggestions}
+                  />
+                  <View style={{ height: 10 }} />
+
+                  {/* Fetched Location input & floating suggestions dropdown */}
+                  <View style={{ zIndex: 100, position: "relative" }}>
+                    <Text style={ap.formLabel}>Fetched Location</Text>
+                    <View style={[ap.inputBoxSingle, inputErr ? ap.inputBoxError : null]}>
+                      <MaterialIcons
+                        name="my-location"
+                        size={15}
+                        color={C.green}
+                        style={{ marginLeft: 14 }}
+                      />
+                      <TextInput
+                        style={ap.input}
+                        placeholder="Selected map location will appear here..."
+                        placeholderTextColor={C.gray400}
+                        value={inputText}
+                        onFocus={() => setIsInputFocused(true)}
+                        onChangeText={(text) => {
+                          setInputText(text);
+                          setInputErr("");
+                          if ((text || "").trim().length < 3) setSuggestions([]);
+                        }}
+                        onKeyPress={(e) => {
+                          if (e.nativeEvent?.key === "Escape") setSuggestions([]);
+                        }}
+                        onBlur={() => {
+                          setTimeout(() => {
+                            if (!suggestionSelectRef.current) {
+                              setIsInputFocused(false);
+                            }
+                            suggestionSelectRef.current = false;
+                          }, 150);
+                        }}
+                        underlineColorAndroid="transparent"
+                      />
+                    </View>
+
+                    {/* Autocomplete suggestions dropdown (Only shown when input is focused & gives Option to Close/Hide) */}
+                    {isInputFocused && suggestions.length > 0 && (
+                      <View style={ap.suggestWrap}>
+                        <View style={ap.suggestHeader}>
+                          <Text style={ap.suggestHeaderText}>{t("home.suggestions")}</Text>
+                          <TouchableOpacity
+                            onPress={() => setSuggestions([])}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            style={{ padding: 2 }}
+                          >
+                            <MaterialIcons name="close" size={16} color={C.gray500} />
+                          </TouchableOpacity>
+                        </View>
+                        <ScrollView
+                          showsVerticalScrollIndicator={false}
+                          style={{ maxHeight: 180 }}
+                          keyboardShouldPersistTaps="handled"
+                        >
+                          {suggestions.map((s, i) => (
+                            <Pressable
+                              key={`${s.lat}-${s.lng}-${i}`}
+                              style={({ pressed, hovered }) => [
+                                ap.suggestRow,
+                                (pressed || hovered) && ap.suggestRowActive,
+                                i === suggestions.length - 1 && ap.suggestRowLast,
+                              ]}
+                              onPress={() => selectSuggestion(s)}
+                            >
+                              <View style={ap.suggestIconWrap}>
+                                <MaterialIcons name="location-on" size={16} color={C.green} />
+                              </View>
+                              <Text style={ap.suggestText} numberOfLines={2}>
+                                {s.label || s.display_name}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* ── Section 2: Manual Address Details (Compulsory) ── */}
+                  <View style={[ap.sectionHeaderRow, { marginTop: 16 }]}>
+                    <Text style={ap.sectionStepBadge}>2</Text>
+                    <Text style={ap.sectionTitle}>Manual Details (Compulsory)</Text>
+                  </View>
+
+                  <View style={ap.gridRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={ap.formLabel}>House / Flat No.</Text>
+                      <View style={[ap.inputBoxSingle, inputErr && !inputHouseNo ? ap.inputBoxError : null]}>
+                        <MaterialIcons name="home" size={15} color={C.green} style={{ marginLeft: 14 }} />
+                        <TextInput
+                          style={ap.input}
+                          placeholder="e.g. 102, Block A"
+                          placeholderTextColor={C.gray400}
+                          value={inputHouseNo}
+                          onChangeText={(t) => { setInputHouseNo(t); setInputErr(""); }}
+                          underlineColorAndroid="transparent"
+                        />
+                      </View>
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={ap.formLabel}>Pincode</Text>
+                      <View style={[ap.inputBoxSingle, inputErr && !inputPincode ? ap.inputBoxError : null]}>
+                        <MaterialIcons name="pin-drop" size={15} color={C.green} style={{ marginLeft: 14 }} />
+                        <TextInput
+                          style={ap.input}
+                          placeholder="e.g. 201301"
+                          placeholderTextColor={C.gray400}
+                          keyboardType="numeric"
+                          value={inputPincode}
+                          onChangeText={(t) => { setInputPincode(t); setInputErr(""); }}
+                          underlineColorAndroid="transparent"
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  <Text style={ap.formLabel}>Landmark</Text>
+                  <View style={[ap.inputBoxSingle, inputErr && !inputLandmark ? ap.inputBoxError : null]}>
+                    <MaterialIcons name="store" size={15} color={C.green} style={{ marginLeft: 14 }} />
                     <TextInput
                       style={ap.input}
-                      placeholder={t("home.labelPlaceholder")}
+                      placeholder="e.g. Near Metro Station / City Hospital"
                       placeholderTextColor={C.gray400}
-                      value={inputLabel}
-                      onChangeText={(t) => setInputLabel(t)}
+                      value={inputLandmark}
+                      onChangeText={(t) => { setInputLandmark(t); setInputErr(""); }}
                       underlineColorAndroid="transparent"
                     />
                   </View>
-                  <View style={{ height: 12 }} />
-                </>
-              )}
 
-              {/* Map location picker (web) — pin stays centred, map pans below */}
-              <UseCurrentLocationButton
-                onPress={handleUseCurrentLocation}
-                loading={locating}
-                style={ap.locBtn}
-              />
-              {locError ? <Text style={ap.locErrorText}>{locError}</Text> : null}
-              <LocationMapPicker
-                initialCoords={
-                  mode === "edit"
-                    ? editingAddr?.lat && editingAddr?.lng
-                      ? { lat: editingAddr.lat, lng: editingAddr.lng }
-                      : null
-                    : initialCoords
-                }
-                addressText={inputText}
-                focusPoint={focusPoint}
-                autoReverseOnReady={mode === "add"}
-                onPick={handleMapPick}
-                onSuggestions={setSuggestions}
-              />
-              <View style={{ height: 14 }} />
+                  {inputErr ? <Text style={ap.inputErr}>{inputErr}</Text> : null}
 
-              <Text style={ap.formLabel}>{t("home.fullAddress")}</Text>
-              <View style={[ap.inputBox, inputErr ? ap.inputBoxError : null]}>
-                <MaterialIcons
-                  name="location-on"
-                  size={15}
-                  color={inputErr ? C.red : C.green}
-                  style={{ marginLeft: 14 }}
-                />
-                <TextInput
-                  style={ap.input}
-                  placeholder={t("home.addressPlaceholder")}
-                  placeholderTextColor={C.gray400}
-                  value={inputText}
-                  onChangeText={(text) => {
-                    setInputText(text);
-                    setInputErr("");
-                    if (text.trim().length < 3) setSuggestions([]);
-                  }}
-                  onKeyPress={(e) => {
-                    if (e.nativeEvent?.key === "Escape") setSuggestions([]);
-                  }}
-                  onBlur={() => {
-                    setTimeout(() => {
-                      if (!suggestionSelectRef.current) setSuggestions([]);
-                      suggestionSelectRef.current = false;
-                    }, 120);
-                  }}
-                  multiline
-                  numberOfLines={3}
-                  autoFocus
-                  underlineColorAndroid="transparent"
-                />
-              </View>
-              {inputErr ? <Text style={ap.inputErr}>{inputErr}</Text> : null}
-
-              {/* Autocomplete suggestions dropdown (web) */}
-              {suggestions.length > 0 && (
-                <View style={ap.suggestWrap}>
-                  <View style={ap.suggestHeader}>
-                    <Text style={ap.suggestHeaderText}>{t("home.suggestions")}</Text>
-                  </View>
-                  <ScrollView
-                    showsVerticalScrollIndicator={false}
-                    style={{ maxHeight: 176 }}
-                    keyboardShouldPersistTaps="handled"
+                  <TouchableOpacity
+                    style={[
+                      ap.saveBtn,
+                      (!pickLat || !pickLng || !inputHouseNo || !inputLandmark || !inputPincode || (inputText || "").trim().length < 5 || saving) && ap.saveBtnDisabled,
+                    ]}
+                    onPress={mode === "edit" ? handleSaveEdit : handleSaveAdd}
+                    activeOpacity={0.85}
+                    disabled={!pickLat || !pickLng || !inputHouseNo || !inputLandmark || !inputPincode || (inputText || "").trim().length < 5 || saving}
                   >
-                    {suggestions.map((s, i) => (
-                      <Pressable
-                        key={`${s.lat}-${s.lng}-${i}`}
-                        style={({ pressed, hovered }) => [
-                          ap.suggestRow,
-                          (pressed || hovered) && ap.suggestRowActive,
-                          i === suggestions.length - 1 && ap.suggestRowLast,
-                        ]}
-                        onPressIn={() => selectSuggestion(s)}
-                      >
-                        <View style={ap.suggestIconWrap}>
-                          <MaterialIcons name="location-on" size={16} color={C.green} />
-                        </View>
-                        <Text style={ap.suggestText} numberOfLines={2}>
-                          {s.display_name}
+                    {saving ? (
+                      <ActivityIndicator size="small" color={C.white} />
+                    ) : (
+                      <>
+                        <MaterialIcons name="check" size={16} color={C.white} />
+                        <Text style={ap.saveBtnText}>
+                          {mode === "edit" ? t("home.updateAddress") : t("home.saveAddress")}
                         </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+                      </>
+                    )}
+                  </TouchableOpacity>
                 </View>
-              )}
-              <TouchableOpacity
-                style={[
-                  ap.saveBtn,
-                  (inputText.trim().length < 5 || saving) && ap.saveBtnDisabled,
-                ]}
-                onPress={mode === "edit" ? handleSaveEdit : handleSaveAdd}
-                activeOpacity={0.85}
-                disabled={inputText.trim().length < 5 || saving}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color={C.white} />
-                ) : (
-                  <>
-                    <MaterialIcons name="check" size={16} color={C.white} />
-                    <Text style={ap.saveBtnText}>
-                      {mode === "edit" ? t("home.updateAddress") : t("home.saveAddress")}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
           ) : (
             /* ── Address List ── */
             <>
@@ -579,7 +740,9 @@ const ap = StyleSheet.create({
     borderTopRightRadius: 32,
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 40,
+    paddingBottom: 24,
+    maxHeight: "88%",
+    flexShrink: 1,
   },
   handle: {
     width: 48,
@@ -724,18 +887,22 @@ const ap = StyleSheet.create({
     ...Platform.select({ web: { outlineStyle: "none" } }),
   },
   inputErr: { fontSize: 12, color: C.red, marginTop: 6, fontWeight: "500" },
-  // Autocomplete suggestions dropdown
+  // Autocomplete suggestions dropdown (Floating overlay above subsequent fields)
   suggestWrap: {
-    marginTop: 8,
+    position: "absolute",
+    top: 50,
+    left: 0,
+    right: 0,
+    zIndex: 9999,
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: C.gray200,
     backgroundColor: C.white,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.15,
     shadowRadius: 14,
-    elevation: 6,
+    elevation: 10,
     overflow: "hidden",
   },
   suggestHeader: {
@@ -744,6 +911,9 @@ const ap = StyleSheet.create({
     backgroundColor: C.gray100,
     borderBottomWidth: 1,
     borderBottomColor: C.gray200,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   suggestHeaderText: { fontSize: 11, fontWeight: "700", color: C.gray500, letterSpacing: 0.3 },
   suggestRow: {
@@ -789,6 +959,33 @@ const ap = StyleSheet.create({
     paddingVertical: 12,
     paddingRight: 14,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  sectionStepBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: C.green,
+    color: C.white,
+    fontSize: 12,
+    fontWeight: "800",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: C.gray900,
+  },
+  gridRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 4,
+  },
 });
 
 // ─── Store Picker Modal ────────────────────────────────────────────────────────
@@ -796,10 +993,19 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
   const { t } = useTranslation();
   if (!item) return null;
 
+  const itemNormName = item.name ? item.name.trim().toLowerCase() : "";
+
   const vendorsWithItem = vendors.filter((v) =>
-    v._inventory?.some(
-      (inv) => inv.product?.id === item.id && (inv.is_active ?? true),
-    ),
+    v._inventory?.some((inv) => {
+      if (!inv.product) return false;
+      const invActive = inv.is_active ?? true;
+      const prodActive = inv.product.is_active ?? true;
+      if (!invActive || !prodActive) return false;
+
+      const matchId = item.id && Number(inv.product.id || inv.product_id) === Number(item.id);
+      const matchName = itemNormName && inv.product.name?.trim()?.toLowerCase() === itemNormName;
+      return matchId || matchName;
+    }),
   );
 
   return (
@@ -829,9 +1035,12 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
               </View>
             ) : (
               vendorsWithItem.map((v) => {
-                const invItem = v._inventory?.find(
-                  (inv) => inv.product?.id === item.id,
-                );
+                const invItem = v._inventory?.find((inv) => {
+                  if (!inv.product) return false;
+                  const matchId = item.id && Number(inv.product.id || inv.product_id) === Number(item.id);
+                  const matchName = itemNormName && inv.product.name?.trim()?.toLowerCase() === itemNormName;
+                  return matchId || matchName;
+                });
                 const price = invItem?.product?.price ?? item.price;
                 return (
                   <TouchableOpacity
@@ -1089,7 +1298,7 @@ function buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCate
 function CategoryBrowseSheet({
   visible, category, hierarchy, onClose,
   onAdd, onRemove, getCartQty, onOpenWeightPicker, vendors,
-  onStoreSelect, apiCategories, onItemDetail,
+  onStoreSelect, apiCategories, onItemDetail, allInventoryItems,
 }) {
   const { t } = useTranslation();
   const [subCatPath, setSubCatPath] = React.useState([]);
@@ -1108,8 +1317,9 @@ function CategoryBrowseSheet({
 
   const findCategoryNode = (nodes, targetName) => {
     if (!nodes || !targetName) return null;
+    const targetLower = targetName.trim().toLowerCase();
     for (const node of nodes) {
-      if (node.name === targetName) return node;
+      if (node.name?.trim()?.toLowerCase() === targetLower) return node;
       if (node.children && node.children.length > 0) {
         const found = findCategoryNode(node.children, targetName);
         if (found) return found;
@@ -1118,40 +1328,120 @@ function CategoryBrowseSheet({
     return null;
   };
 
-  // Direct child subcategories at current level ONLY
+  // Direct child subcategories at current level (from API tree or hierarchy)
   const currentChildSubCats = React.useMemo(() => {
     const targetCat = activeSubCat || category;
+    const subCatsSet = new Set();
+
     const node = findCategoryNode(apiCategories, targetCat);
     if (node && node.children && node.children.length > 0) {
-      return node.children.map(c => c.name);
+      node.children.forEach(c => { if (c.name) subCatsSet.add(c.name); });
     }
-    return [];
-  }, [activeSubCat, category, apiCategories]);
 
-  // Determine items for current active subcategory
-  const subCatItems = React.useMemo(() => {
-    if (!category || !hierarchy) return [];
-    const targetCat = activeSubCat || category;
-
-    let items = [];
-    if (hierarchy[targetCat]) {
+    if (hierarchy && hierarchy[targetCat]) {
       Object.keys(hierarchy[targetCat]).forEach(k => {
-        items.push(...(hierarchy[targetCat][k] || []));
+        if (k !== "All") subCatsSet.add(k);
       });
     }
 
-    if (hierarchy[category] && hierarchy[category][targetCat]) {
-      items.push(...(hierarchy[category][targetCat] || []));
+    return Array.from(subCatsSet);
+  }, [activeSubCat, category, apiCategories, hierarchy]);
+
+  // Determine items for current active subcategory or category
+  const subCatItems = React.useMemo(() => {
+    if (!category) return [];
+    const targetCat = activeSubCat || category;
+    const targetLower = targetCat.trim().toLowerCase();
+
+    // Map variant names (singular/plural)
+    const SYNONYMS = {
+      grocery: "groceries", groceries: "grocery",
+      snack: "snacks", snacks: "snack",
+      beverage: "beverages", beverages: "beverage",
+      fruit: "fruits", fruits: "fruit",
+      medicine: "medicines", medicines: "medicine",
+    };
+
+    const allowedNames = new Set([targetLower]);
+    if (SYNONYMS[targetLower]) allowedNames.add(SYNONYMS[targetLower]);
+
+    // Add descendant subcategories from apiCategories tree
+    const collectDescendants = (nodes) => {
+      for (const node of nodes || []) {
+        const nodeLower = node.name?.trim()?.toLowerCase();
+        if (nodeLower && allowedNames.has(nodeLower)) {
+          const addChildren = (children) => {
+            for (const child of children || []) {
+              if (child.name) {
+                const cLower = child.name.trim().toLowerCase();
+                allowedNames.add(cLower);
+                if (SYNONYMS[cLower]) allowedNames.add(SYNONYMS[cLower]);
+              }
+              if (child.children?.length) addChildren(child.children);
+            }
+          };
+          if (node.children) addChildren(node.children);
+        } else if (node.children?.length) {
+          collectDescendants(node.children);
+        }
+      }
+    };
+    collectDescendants(apiCategories);
+
+    let items = [];
+
+    // 1. Collect from hierarchy
+    if (hierarchy) {
+      Object.keys(hierarchy).forEach(topKey => {
+        const topLower = topKey.trim().toLowerCase();
+        // If we are looking for a top category or specific subcategory
+        if (allowedNames.has(topLower)) {
+          Object.keys(hierarchy[topKey]).forEach(subKey => {
+            if (!activeSubCat || subKey.trim().toLowerCase() === targetLower || allowedNames.has(subKey.trim().toLowerCase())) {
+              items.push(...(hierarchy[topKey][subKey] || []));
+            }
+          });
+        } else {
+          // Check subcategories inside other top-level keys
+          Object.keys(hierarchy[topKey]).forEach(subKey => {
+            if (subKey.trim().toLowerCase() === targetLower || allowedNames.has(subKey.trim().toLowerCase())) {
+              items.push(...(hierarchy[topKey][subKey] || []));
+            }
+          });
+        }
+      });
     }
 
+    // 2. Collect from allInventoryItems
+    if (allInventoryItems && allInventoryItems.length > 0) {
+      allInventoryItems.forEach((inv) => {
+        if (!inv.product) return;
+        const catObj = inv.product.category;
+        let rawCat = "";
+        if (typeof catObj === "object" && catObj?.name) rawCat = catObj.name;
+        else if (typeof catObj === "string") rawCat = catObj;
+        else if (inv.product.category_id && apiCategories) {
+          const foundNode = apiCategories.find(c => Number(c.id) === Number(inv.product.category_id));
+          if (foundNode) rawCat = foundNode.name;
+        }
+
+        const catLower = rawCat ? rawCat.trim().toLowerCase() : "";
+        if (catLower && allowedNames.has(catLower)) {
+          items.push(inv);
+        }
+      });
+    }
+
+    // 3. Deduplicate by unique inventory item / product id
     const seen = new Set();
     return items.filter(inv => {
-      if (!inv?.id) return false;
-      if (seen.has(inv.id)) return false;
-      seen.add(inv.id);
+      if (!inv?.id && !inv?.product?.id) return false;
+      const key = inv.product?.id || inv.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
-  }, [category, activeSubCat, hierarchy]);
+  }, [category, activeSubCat, hierarchy, apiCategories, allInventoryItems]);
 
   if (!visible || !category) return null;
 
@@ -1215,54 +1505,58 @@ function CategoryBrowseSheet({
             </View>
           )}
 
-          {/* ── Subcategory Grid View ── */}
-          {showSubCatGrid ? (
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={cbs.subCatGridContainer}
-            >
-              <Text style={cbs.subCatGridTitle}>
-                {subCatPath.length === 0 ? t("home.selectSubCategory") : `Subcategories of ${activeSubCat}`}
-              </Text>
-              <View style={cbs.subCatGrid}>
-                {currentChildSubCats.map(sc => {
-                  const subCatNode = findCategoryNode(apiCategories, sc);
-                  const subItems = hierarchy[category]?.[sc] || hierarchy[sc]?.["All"] || (hierarchy[sc] ? Object.values(hierarchy[sc]).flat() : []);
-                  const count = subItems.length;
-                  const firstItemImg = subItems[0]?.product?.image_url;
-                  const displayImg = subCatNode?.image_url || subCatNode?.image || firstItemImg;
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+            {/* ── Section 1: Subcategories (if any) ── */}
+            {showSubCatGrid && (
+              <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 }}>
+                <Text style={cbs.subCatGridTitle}>
+                  {subCatPath.length === 0 ? t("home.selectSubCategory") : `Subcategories of ${activeSubCat}`}
+                </Text>
+                <View style={cbs.subCatGrid}>
+                  {currentChildSubCats.map(sc => {
+                    const subCatNode = findCategoryNode(apiCategories, sc);
+                    const subItems = hierarchy[category]?.[sc] || hierarchy[sc]?.["All"] || (hierarchy[sc] ? Object.values(hierarchy[sc]).flat() : []);
+                    const count = subItems.length;
+                    const firstItemImg = subItems[0]?.product?.image_url;
+                    const displayImg = subCatNode?.image_url || subCatNode?.image || firstItemImg;
 
-                  return (
-                    <TouchableOpacity
-                      key={sc}
-                      style={[cbs.subCatCard, { borderColor: catAccent.bg }]}
-                      onPress={() => handlePushPath(sc)}
-                      activeOpacity={0.85}
-                    >
-                      <View style={[cbs.subCatCardIconWrap, { backgroundColor: catAccent.bg }]}>
-                        {displayImg ? (
-                          <Image source={{ uri: displayImg }} style={cbs.subCatCardImg} resizeMode="cover" />
-                        ) : (
-                          <Text style={cbs.subCatCardEmoji}>{catAccent.icon || "📂"}</Text>
-                        )}
-                      </View>
-                      <View style={cbs.subCatCardInfo}>
-                        <Text style={cbs.subCatCardName} numberOfLines={2}>{sc}</Text>
-                        {count > 0 && (
-                          <Text style={cbs.subCatCardCount}>{t("home.itemsCount", { count })}</Text>
-                        )}
-                      </View>
-                      <MaterialIcons name="chevron-right" size={20} color={catAccent.accent} />
-                    </TouchableOpacity>
-                  );
-                })}
+                    return (
+                      <TouchableOpacity
+                        key={sc}
+                        style={[cbs.subCatCard, { borderColor: catAccent.bg }]}
+                        onPress={() => handlePushPath(sc)}
+                        activeOpacity={0.85}
+                      >
+                        <View style={[cbs.subCatCardIconWrap, { backgroundColor: catAccent.bg }]}>
+                          {displayImg ? (
+                            <Image source={{ uri: displayImg }} style={cbs.subCatCardImg} resizeMode="cover" />
+                          ) : (
+                            <Text style={cbs.subCatCardEmoji}>{catAccent.icon || "📂"}</Text>
+                          )}
+                        </View>
+                        <View style={cbs.subCatCardInfo}>
+                          <Text style={cbs.subCatCardName} numberOfLines={2}>{sc}</Text>
+                          {count > 0 && (
+                            <Text style={cbs.subCatCardCount}>{t("home.itemsCount", { count })}</Text>
+                          )}
+                        </View>
+                        <MaterialIcons name="chevron-right" size={20} color={catAccent.accent} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
-            </ScrollView>
-          ) : (
-            <>
-              {/* Note: Upper gray pills bar removed as requested to keep UI clean & strictly hierarchical */}
+            )}
 
-              {/* ── Column Headers ── */}
+            {/* ── Section 2: Items in Category ── */}
+            <View style={{ borderTopWidth: showSubCatGrid ? 1 : 0, borderTopColor: "#E2E8F0", paddingTop: showSubCatGrid ? 12 : 4 }}>
+              {showSubCatGrid && (
+                <Text style={[cbs.subCatGridTitle, { paddingHorizontal: 16, marginBottom: 8 }]}>
+                  Items in {activeSubCat || category}
+                </Text>
+              )}
+
+              {/* Column Headers */}
               <View style={cbs.tableHeader}>
                 <Text style={[cbs.thCell, { flex: 2 }]}>{t("home.colProduct")}</Text>
                 <Text style={[cbs.thCell, { flex: 1, textAlign: "center" }]}>{t("home.brand")}</Text>
@@ -1270,121 +1564,116 @@ function CategoryBrowseSheet({
                 <Text style={[cbs.thCell, { width: 80, textAlign: "right" }]}>{t("home.price")}</Text>
               </View>
 
-              {/* ── Product Rows ── */}
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                style={{ flex: 1 }}
-              >
-                {subCatItems.length === 0 ? (
-                  <View style={cbs.emptyWrap}>
-                    <MaterialIcons name="inventory" size={32} color={C.gray300} />
-                    <Text style={cbs.emptyText}>{t("home.noSubCatItems")}</Text>
-                  </View>
-                ) : (
-                  subCatItems.map((inv, idx) => {
-                    const p = inv.product;
-                    if (!p) return null;
-                    const qty = getCartQty(p.id);
-                    const loose = isLooseItem(p);
-                    const hasMrp = p.mrp && p.mrp > p.price;
-                    const discPct = hasMrp ? Math.round((1 - p.price / p.mrp) * 100) : 0;
-                    const vendorName = inv._vendorName || "";
+              {/* Product Rows */}
+              {subCatItems.length === 0 ? (
+                <View style={cbs.emptyWrap}>
+                  <MaterialIcons name="inventory" size={32} color={C.gray300} />
+                  <Text style={cbs.emptyText}>{t("home.noSubCatItems")}</Text>
+                </View>
+              ) : (
+                subCatItems.map((inv, idx) => {
+                  const p = inv.product;
+                  if (!p) return null;
+                  const qty = getCartQty(p.id);
+                  const loose = isLooseItem(p);
+                  const hasMrp = p.mrp && p.mrp > p.price;
+                  const discPct = hasMrp ? Math.round((1 - p.price / p.mrp) * 100) : 0;
+                  const vendorName = inv._vendorName || "";
 
-                    const item = {
-                      id: p.id, name: p.name, price: p.price,
-                      img: p.image_url || null, unit: p.unit || "1 pc",
-                      orig: hasMrp ? p.mrp : null, category,
-                      item_type: p.item_type, weight_options: p.weight_options,
-                    };
+                  const item = {
+                    id: p.id, name: p.name, price: p.price,
+                    img: p.image_url || null, unit: p.unit || "1 pc",
+                    orig: hasMrp ? p.mrp : null, category,
+                    item_type: p.item_type, weight_options: p.weight_options,
+                  };
 
-                    return (
-                      <View key={`${p.id}-${idx}`} style={[
-                        cbs.productRow,
-                        idx % 2 === 0 && cbs.productRowAlt,
-                      ]}>
-                        {/* Image + Name */}
-                        <View style={[cbs.productCell, { flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }]}>
-                          <View style={cbs.productImgWrap}>
-                            <Image
-                              source={{
-                                uri: p.image_url ||
-                                  CAT_FALLBACK_IMGS[category] ||
-                                  CAT_FALLBACK_IMGS._default
-                              }}
-                              style={cbs.productImg}
-                              resizeMode="cover"
-                            />
-                            {hasMrp && (
-                              <View style={cbs.discPill}>
-                                <Text style={cbs.discPillText}>{discPct}%</Text>
-                              </View>
-                            )}
-                            {loose && (
-                              <View style={[cbs.discPill, { backgroundColor: "#0891B2" }]}>
-                                <Text style={cbs.discPillText}>{t("home.loose")}</Text>
-                              </View>
-                            )}
-                            <TouchableOpacity
-                              style={cbs.eyeBtn}
-                              activeOpacity={0.7}
-                              onPress={() => onItemDetail && onItemDetail(item, p)}
-                            >
-                              <MaterialIcons name="visibility" size={11} color={C.white} />
-                            </TouchableOpacity>
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={cbs.productName} numberOfLines={2}>{p.name}</Text>
-                            {p.description ? (
-                              <Text style={cbs.productDesc} numberOfLines={1}>{p.description}</Text>
-                            ) : null}
-                          </View>
-                        </View>
-
-                        {/* Brand (vendor) */}
-                        <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
-                          <Text style={cbs.brandText} numberOfLines={2}>{vendorName}</Text>
-                        </View>
-
-                        {/* Qty / Unit (Particulars) */}
-                        <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
-                          <Text style={cbs.unitText}>{p.unit || "1 pc"}</Text>
-                        </View>
-
-                        {/* Price + ADD */}
-                        <View style={[cbs.productCell, { width: 80, alignItems: "flex-end" }]}>
-                          <Text style={cbs.priceText}>₹{p.price}</Text>
-                          {hasMrp && <Text style={cbs.mrpText}>₹{p.mrp}</Text>}
-                          {qty === 0 ? (
-                            <TouchableOpacity
-                              style={[cbs.addBtn, loose && { backgroundColor: "#0891B2" }]}
-                              activeOpacity={0.8}
-                              onPress={() => {
-                                if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
-                                else onAdd(item);
-                              }}
-                            >
-                              <Text style={cbs.addBtnText}>{loose ? t("home.select") : t("common.add")}</Text>
-                            </TouchableOpacity>
-                          ) : (
-                            <View style={cbs.qtyRow}>
-                              <TouchableOpacity style={cbs.qtyBtn} onPress={() => onRemove(item)}>
-                                <MaterialIcons name="remove" size={10} color={C.white} />
-                              </TouchableOpacity>
-                              <Text style={cbs.qtyNum}>{qty}</Text>
-                              <TouchableOpacity style={cbs.qtyBtn} onPress={() => onAdd(item)}>
-                                <MaterialIcons name="add" size={10} color={C.white} />
-                              </TouchableOpacity>
+                  return (
+                    <View key={`${p.id}-${idx}`} style={[
+                      cbs.productRow,
+                      idx % 2 === 0 && cbs.productRowAlt,
+                    ]}>
+                      {/* Image + Name */}
+                      <View style={[cbs.productCell, { flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }]}>
+                        <View style={cbs.productImgWrap}>
+                          <Image
+                            source={{
+                              uri: p.image_url ||
+                                CAT_FALLBACK_IMGS[category] ||
+                                CAT_FALLBACK_IMGS._default
+                            }}
+                            style={cbs.productImg}
+                            resizeMode="cover"
+                          />
+                          {hasMrp && (
+                            <View style={cbs.discPill}>
+                              <Text style={cbs.discPillText}>{discPct}%</Text>
                             </View>
                           )}
+                          {loose && (
+                            <View style={[cbs.discPill, { backgroundColor: "#0891B2" }]}>
+                              <Text style={cbs.discPillText}>{t("home.loose")}</Text>
+                            </View>
+                          )}
+                          <TouchableOpacity
+                            style={cbs.eyeBtn}
+                            activeOpacity={0.7}
+                            onPress={() => onItemDetail && onItemDetail(item, p)}
+                          >
+                            <MaterialIcons name="visibility" size={11} color={C.white} />
+                          </TouchableOpacity>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={cbs.productName} numberOfLines={2}>{p.name}</Text>
+                          {p.description ? (
+                            <Text style={cbs.productDesc} numberOfLines={1}>{p.description}</Text>
+                          ) : null}
                         </View>
                       </View>
-                    );
-                  })
-                )}
-                <View style={{ height: 24 }} />
-              </ScrollView>
-            </>
-          )}
+
+                      {/* Brand (vendor) */}
+                      <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
+                        <Text style={cbs.brandText} numberOfLines={2}>{vendorName}</Text>
+                      </View>
+
+                      {/* Qty / Unit (Particulars) */}
+                      <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
+                        <Text style={cbs.unitText}>{p.unit || "1 pc"}</Text>
+                      </View>
+
+                      {/* Price + ADD */}
+                      <View style={[cbs.productCell, { width: 80, alignItems: "flex-end" }]}>
+                        <Text style={cbs.priceText}>₹{p.price}</Text>
+                        {hasMrp && <Text style={cbs.mrpText}>₹{p.mrp}</Text>}
+                        {qty === 0 ? (
+                          <TouchableOpacity
+                            style={[cbs.addBtn, loose && { backgroundColor: "#0891B2" }]}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                              if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
+                              else onAdd(item);
+                            }}
+                          >
+                            <Text style={cbs.addBtnText}>{loose ? t("home.select") : t("common.add")}</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={cbs.qtyRow}>
+                            <TouchableOpacity style={cbs.qtyBtn} onPress={() => onRemove(item)}>
+                              <MaterialIcons name="remove" size={10} color={C.white} />
+                            </TouchableOpacity>
+                            <Text style={cbs.qtyNum}>{qty}</Text>
+                            <TouchableOpacity style={cbs.qtyBtn} onPress={() => onAdd(item)}>
+                              <MaterialIcons name="add" size={10} color={C.white} />
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+              <View style={{ height: 24 }} />
+            </View>
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -2344,8 +2633,12 @@ export default function HomeScreen() {
   const goToSearch = (focusField) => {
     const validFields = ["stores", "categories", "items"];
     const field = validFields.includes(focusField) ? focusField : null;
-    const root = navigation.getParent?.() || navigation;
-    root.navigate('Search', field ? { focusField: field } : undefined);
+    navigation.dispatch(
+      CommonActions.navigate({
+        name: 'Search',
+        params: field ? { focusField: field } : undefined,
+      })
+    );
   };
   const addressStore = useAddressStore();
   const cart = useCartStore();
@@ -2387,7 +2680,13 @@ export default function HomeScreen() {
   const locationLoading = currentLocation.loading;
 
   const [vendors, setVendors] = useState([]);
+  const vendorsRef = useRef(vendors);
+  vendorsRef.current = vendors;
   const [recentOrders, setRecentOrders] = useState([]);
+  // Kept for backward-compat (fetchPopularProducts still writes to it) but no
+  // longer used in the popularItems derivation — popular items are now derived
+  // entirely from live inventory, which the backend keeps current via global
+  // product:updated socket broadcasts.
   const [popularFromAPI, setPopularFromAPI] = useState([]);
   const [loadingVendors, setLoadingVendors] = useState(false);
   const [loadingInventory, setLoadingInventory] = useState(false);
@@ -2437,18 +2736,29 @@ export default function HomeScreen() {
     [cartItems],
   );
 
-  // Sync with addressStore
+  // Sync with addressStore & auto-popup add address screen if no addresses exist
   useEffect(() => {
     if (addressStore.selectedId) {
       setSelectedAddrId(addressStore.selectedId);
     }
   }, [addressStore.selectedId]);
 
+  useEffect(() => {
+    // If addresses list is loaded and empty, show address screen automatically
+    const validAddresses = (addressStore?.addresses || []).filter(a => a.label !== "Current Location");
+    if (validAddresses.length === 0) {
+      setAddrPickerVisible(true);
+    }
+  }, [addressStore?.addresses]);
+
   // ── Animations ───────────────────────────────────────────────────────────────
   const headerOpacity = useRef(new Animated.Value(0)).current;
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const contentY = useRef(new Animated.Value(16)).current;
   const floatingY = useRef(new Animated.Value(120)).current;
+  const vendorListAnim = useRef(new Animated.Value(0)).current;
+  const vendorListY = useRef(new Animated.Value(12)).current;
+  const prevLoadingVendors = useRef(true);
 
   useEffect(() => {
     Animated.stagger(100, [
@@ -2482,6 +2792,27 @@ export default function HomeScreen() {
       useNativeDriver: true,
     }).start();
   }, [cartCount, wide]);
+
+  useEffect(() => {
+    if (prevLoadingVendors.current && !loadingVendors && vendors.length > 0) {
+      vendorListAnim.setValue(0);
+      vendorListY.setValue(12);
+      Animated.parallel([
+        Animated.timing(vendorListAnim, {
+          toValue: 1,
+          duration: 350,
+          useNativeDriver: true,
+        }),
+        Animated.spring(vendorListY, {
+          toValue: 0,
+          tension: 60,
+          friction: 9,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+    prevLoadingVendors.current = loadingVendors;
+  }, [loadingVendors, vendors.length]);
 
   useEffect(() => {
     if (locationCoords) {
@@ -2531,6 +2862,138 @@ export default function HomeScreen() {
     }, 60000);
     return () => clearInterval(interval);
   }, [refreshVendorStatus]);
+
+  // ── Real-time store open/close updates ──────────────────────────────────────
+  // The backend broadcasts 'shop:statusChanged' (with is_open) whenever a vendor
+  // toggles their Store Status — for BOTH open and close directions. Update the
+  // matching vendor in local state immediately so no manual refresh is needed.
+  useEffect(() => {
+    let socket;
+    try {
+      socket = io(SOCKET_URL, {
+        auth: token ? { token } : {},
+        transports: ["websocket"],
+      });
+      socket.on("shop:statusChanged", ({ vendorId, is_open }) => {
+        if (vendorId == null || is_open === undefined) return;
+        setVendors((prev) =>
+          prev.map((v) =>
+            v.id === Number(vendorId) || String(v.id) === String(vendorId)
+              ? { ...v, is_open, is_currently_open: is_open }
+              : v,
+          ),
+        );
+      });
+    } catch {
+      // socket best-effort — the 60s status poll still covers sync
+    }
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [token]);
+
+  // ── Real-time product updates for Popular Items / Home screen ──────────────────
+  // The backend emits product:updated to ALL connected clients (global broadcast),
+  // so we receive events for ANY vendor without needing store:join rooms.
+  // We also join store:{vendorId} rooms as a belt-and-suspenders fallback.
+  // Uses vendorsRef to avoid stale closures — the ref always holds the latest
+  // vendors state without triggering effect re-runs on every state change.
+  useEffect(() => {
+    if (!token) return;
+    let socket;
+    const joinedRooms = new Set();
+
+    const setupSocket = () => {
+      try {
+        socket = io(SOCKET_URL, {
+          auth: { token },
+          transports: ["websocket"],
+        });
+
+        socket.on("connect", () => {
+          // Join store rooms for all vendors that currently have inventory
+          const cur = vendorsRef.current;
+          cur.forEach((v) => {
+            if (v._inventory?.length && v.id && !joinedRooms.has(v.id)) {
+              socket.emit("store:join", { storeId: v.id });
+              joinedRooms.add(v.id);
+            }
+          });
+        });
+
+        socket.on("product:updated", ({ productId, available, vendorId, ...changed }) => {
+          if (productId == null || vendorId == null) return;
+          const pid = Number(productId);
+          const vid = Number(vendorId);
+
+          setVendors((prev) =>
+            prev.map((vendor) => {
+              if (vendor.id !== vid) return vendor;
+              const inv = vendor._inventory || [];
+              return {
+                ...vendor,
+                _inventory: inv.map((item) => {
+                  const itemPid = Number(item.product_id || item.product?.id);
+                  if (itemPid !== pid) return item;
+                  const nextProduct = item.product ? { ...item.product } : { id: pid };
+                  Object.keys(changed).forEach((k) => {
+                    if (changed[k] !== undefined) nextProduct[k] = changed[k];
+                  });
+                  if (available !== undefined) {
+                    nextProduct.is_active = available;
+                    return { ...item, is_active: available, product: nextProduct };
+                  }
+                  return { ...item, product: nextProduct };
+                }),
+              };
+            }),
+          );
+        });
+
+        socket.on("product:deleted", ({ productId, vendorId }) => {
+          if (productId == null || vendorId == null) return;
+          const pid = Number(productId);
+          const vid = Number(vendorId);
+
+          setVendors((prev) =>
+            prev.map((vendor) => {
+              if (vendor.id !== vid) return vendor;
+              const inv = vendor._inventory || [];
+              return {
+                ...vendor,
+                _inventory: inv.filter(
+                  (item) =>
+                    Number(item.product_id || item.product?.id) !== pid,
+                ),
+              };
+            }),
+          );
+        });
+      } catch {
+        // socket best-effort — page load still fetches fresh inventory
+      }
+    };
+
+    setupSocket();
+
+    // Periodically join rooms for newly-loaded vendors (ref always has latest list)
+    const rejoinInterval = setInterval(() => {
+      if (socket?.connected) {
+        const cur = vendorsRef.current;
+        cur.forEach((v) => {
+          if (v._inventory?.length && v.id && !joinedRooms.has(v.id)) {
+            socket.emit("store:join", { storeId: v.id });
+            joinedRooms.add(v.id);
+          }
+        });
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(rejoinInterval);
+      if (socket) socket.disconnect();
+    };
+  }, [token]);
 
   useEffect(() => {
     if (token) fetchRecentOrders();
@@ -2588,13 +3051,13 @@ export default function HomeScreen() {
     try {
       const res = await vendorsAPI.getNearby(lat, lng, 10, storeCategory);
       const list = res.data || [];
-      // ── TEMP DEBUG — remove after checking terminal ──
+
       setVendors(list);
-      // Pass list directly — state update is async, list is synchronous
+      setLoadingVendors(false);
+
       await fetchInventoryForVendors(list);
     } catch {
       setVendors([]);
-    } finally {
       setLoadingVendors(false);
     }
   };
@@ -2606,7 +3069,7 @@ export default function HomeScreen() {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const results = await Promise.all(
         vendorList.map((v) =>
-          fetch(`${BASE_URL}/inventory/vendor/${v.id}`, { headers })
+          fetch(`${BASE_URL}/inventory/vendor/${v.id}?active_only=true`, { headers })
             .then((r) => r.json())
             .then((d) => {
               // Handle both array and wrapped response shapes
@@ -2642,7 +3105,7 @@ export default function HomeScreen() {
     const items = [];
     vendors.forEach((v) => {
       (v._inventory || []).forEach((inv) => {
-        if ((inv.is_active ?? true) && inv.product) {
+        if ((inv.product?.is_active ?? true) && inv.product) {
           items.push({ ...inv, _vendorId: v.id, _vendorName: v.shop_name });
         }
       });
@@ -2652,7 +3115,6 @@ export default function HomeScreen() {
 
   // ── Address Handlers ────────────────────────────────────────────────────────
 
-  // In normalizeCatName — add Personal Care to the exclusion list
   const normalizeCatName = (name) => {
     if (!name) return null;
     const EXCLUDE = new Set(["Personal Care", "personal care", "PersonalCare"]);
@@ -2701,7 +3163,9 @@ export default function HomeScreen() {
         });
       }
     });
-    return cats.sort((a, b) => a.label.localeCompare(b.label));
+    // Preserve the backend order (display_order ASC from /products/categories),
+    // NOT alphabetical — admin drag-and-drop reorder must show up here.
+    return cats;
   }, [apiCategories]);
 
   // ── 3-level hierarchy for CategoryBrowseSheet ─────────────────────────────
@@ -2710,17 +3174,43 @@ export default function HomeScreen() {
     [allInventoryItems, getCategoryName, apiCategories],
   );
 
-  // ── Popular items — show all items & check nearby store availability ──────
+  // ── Popular items — derived from live inventory only ────────────────────────
+  // Backend broadcasts product:updated globally, so _inventory is always current.
+  // No need for a separate popularFromAPI — it was stale after mount.
   const popularItems = useMemo(() => {
-    const seen = new Set();
+    const seenNames = new Set();
     const items = [];
+
+    // Helper: Check if product has stock & active status in any nearby vendor
+    const isStockAvailable = (productName, productId) => {
+      return vendors.some((v) => {
+        return (v._inventory || []).some((inv) => {
+          if (!inv.product) return false;
+          const matchId = productId && Number(inv.product_id || inv.product.id) === Number(productId);
+          const matchName = productName && inv.product.name?.trim().toLowerCase() === productName.trim().toLowerCase();
+          if (!matchId && !matchName) return false;
+
+          const invActive = inv.is_active ?? true;
+          const prodActive = inv.product.is_active ?? true;
+          if (!invActive || !prodActive) return false;
+
+          if (inv.stock_qty !== undefined && inv.stock_qty !== null && Number(inv.stock_qty) <= 0) return false;
+
+          return true;
+        });
+      });
+    };
 
     // First add all inventory items
     allInventoryItems.forEach((inv) => {
       const p = inv.product;
-      if (!p?.id || seen.has(p.id)) return;
-      seen.add(p.id);
+      if (!p?.id || !p?.name) return;
+      const normName = p.name.trim().toLowerCase();
+      if (seenNames.has(normName)) return;
+      seenNames.add(normName);
+
       const catName = getCategoryName(inv) || "Other";
+      const available = isStockAvailable(p.name, p.id);
 
       items.push({
         id: p.id,
@@ -2732,27 +3222,28 @@ export default function HomeScreen() {
         category: catName,
         item_type: p.item_type,
         weight_options: p.weight_options,
-        isAvailableNearby: true,
+        isAvailableNearby: available,
       });
     });
 
     // Next add API products if available, marking whether available in nearby inventory
     if (popularFromAPI.length > 0) {
       popularFromAPI.forEach((p) => {
-        if (!p?.id || seen.has(p.id)) return;
-        seen.add(p.id);
-        const hasNearby = allInventoryItems.some(
-          (inv) => Number(inv.product_id || inv.product?.id) === Number(p.id)
-        );
+        if (!p?.id || !p?.name) return;
+        const normName = p.name.trim().toLowerCase();
+        if (seenNames.has(normName)) return;
+        seenNames.add(normName);
+
+        const available = isStockAvailable(p.name, p.id);
         items.push({
           ...p,
-          isAvailableNearby: hasNearby,
+          isAvailableNearby: available,
         });
       });
     }
 
     return items;
-  }, [popularFromAPI, allInventoryItems, getCategoryName]);
+  }, [popularFromAPI, allInventoryItems, vendors, getCategoryName]);
 
   // ── Address Handlers ────────────────────────────────────────────────────────
   const openAddressPicker = () => {
@@ -2777,6 +3268,7 @@ export default function HomeScreen() {
   // In handleAdd — check if THIS item is in cart, not just whether vendorId exists
   const handleAdd = useCallback(
     (item, selectedWeight = null) => {
+      if (item.isAvailableNearby === false || item.product?.is_active === false) return;
       if (isLooseItem(item) && !selectedWeight) {
         setLoosePickerItem(item);
         return;
@@ -3323,6 +3815,7 @@ export default function HomeScreen() {
             <Text style={s.emptySub}>{t("home.tryUpdatingLocation")}</Text>
           </View>
         ) : (
+          <Animated.View style={{ opacity: vendorListAnim, transform: [{ translateY: vendorListY }] }}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -3459,6 +3952,7 @@ export default function HomeScreen() {
               );
             })}
           </ScrollView>
+          </Animated.View>
         )}
 
         {/* 4. SHOP BY CATEGORY */}
@@ -3725,6 +4219,7 @@ export default function HomeScreen() {
         visible={catSheetVisible}
         category={catSheetCategory}
         hierarchy={categoryHierarchy}
+        allInventoryItems={allInventoryItems}
         onClose={() => setCatSheetVisible(false)}
         onAdd={handleAdd}
         onRemove={handleRemove}

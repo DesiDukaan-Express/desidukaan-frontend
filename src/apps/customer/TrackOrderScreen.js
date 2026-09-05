@@ -203,6 +203,15 @@ export default function TrackOrderScreen() {
       refreshOrder();
     });
 
+    // Listen for delivery partner declining — order will be reassigned
+    socket.on("delivery:declined", (data) => {
+      console.log("[WS] delivery:declined received", data);
+      const oid = data.order_id || data.orderId;
+      if (oid && String(oid) !== String(orderId)) return;
+
+      refreshOrder();
+    });
+
     // Poll partner location every 15s as fallback
     const locationPoll = setInterval(async () => {
       try {
@@ -267,7 +276,7 @@ export default function TrackOrderScreen() {
     }
     if (s === "picked_up") return { icon: "truck", label: "OUT FOR DELIVERY", title: etaStr };
     if (s === "delivered") return { icon: "check-circle", label: "DELIVERED", title: "Order delivered successfully!" };
-    if (["cancelled", "rejected"].includes(s)) return { icon: "x-circle", label: s.toUpperCase(), title: `This order was ${s}` };
+    if (["cancelled", "rejected"].includes(s)) return { icon: "x-circle", label: s.toUpperCase(), title: order?.cancellation_reason ? `Decline Note: ${order.cancellation_reason}` : `This order was ${s}` };
     return { icon: "clock", label: s.replace("_", " ").toUpperCase(), title: "Processing…" };
   };
   const statusH = getStatusHeader();
@@ -359,55 +368,59 @@ export default function TrackOrderScreen() {
           </View>
         </View>
 
-        {/* ETA CARD — moved above map, uses live driver coords when available */}
-        {isActive && (
-          <View style={s.etaCard}>
-            <View style={s.etaCardHeader}>
-              <View style={s.etaIconBg}>
-                <Feather name="clock" size={20} color={C.orange} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.etaTitleText}>Estimated Arrival</Text>
-                <Text style={s.etaValueText}>
-                  {(() => {
-                    if (liveEtaMins < 60) return `~${liveEtaMins} mins`;
-                    const h = Math.floor(liveEtaMins / 60);
-                    const m = liveEtaMins % 60;
-                    return m > 0 ? `~${h}h ${m}m` : `~${h}h`;
-                  })()}
-                </Text>
-              </View>
-              {currentDistKm != null && (
-                <View style={s.etaBadge}>
-                  <Feather name="map-pin" size={12} color={C.gray500} />
-                  <Text style={s.etaBadgeText}>
-                    {partnerPos?.lat ? `${currentDistKm.toFixed(1)} km away` : `${currentDistKm} km away`}
-                  </Text>
+        {/* MAP — only show when delivery partner is assigned */}
+        {partner && (
+          <>
+            {/* ETA CARD — live driver distance/ETA, only when partner assigned */}
+            {isActive && (
+              <View style={s.etaCard}>
+                <View style={s.etaCardHeader}>
+                  <View style={s.etaIconBg}>
+                    <Feather name="clock" size={20} color={C.orange} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.etaTitleText}>Estimated Arrival</Text>
+                    <Text style={s.etaValueText}>
+                      {(() => {
+                        if (liveEtaMins < 60) return `~${liveEtaMins} mins`;
+                        const h = Math.floor(liveEtaMins / 60);
+                        const m = liveEtaMins % 60;
+                        return m > 0 ? `~${h}h ${m}m` : `~${h}h`;
+                      })()}
+                    </Text>
+                  </View>
+                  {currentDistKm != null && (
+                    <View style={s.etaBadge}>
+                      <Feather name="map-pin" size={12} color={C.gray500} />
+                      <Text style={s.etaBadgeText}>
+                        {partnerPos?.lat ? `${currentDistKm.toFixed(1)} km away` : `${currentDistKm} km away`}
+                      </Text>
+                    </View>
+                  )}
                 </View>
+              </View>
+            )}
+
+            <CustomerMapView
+              partnerPos={partnerPos}
+              destLat={destLat}
+              destLng={destLng}
+            />
+
+            {/* Connection status */}
+            <View style={s.connectionRow}>
+              <View style={[s.connDot, { backgroundColor: connected ? C.green : C.gray300 }]} />
+              <Text style={s.connText}>
+                {connected ? t('orders.connectedLive', 'Connected — live updates active') : t('orders.reconnecting', 'Reconnecting…')}
+              </Text>
+              {lastUpdate && (
+                <Text style={s.lastUpdate}>
+                  {t('orders.lastUpdate', 'Last')}: {lastUpdate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </Text>
               )}
             </View>
-          </View>
+          </>
         )}
-
-        {/* MAP — uses CustomerMapView for smooth Leaflet markers on web, react-native-maps on native */}
-        <CustomerMapView
-          partnerPos={partnerPos}
-          destLat={destLat}
-          destLng={destLng}
-        />
-
-        {/* Connection status */}
-        <View style={s.connectionRow}>
-          <View style={[s.connDot, { backgroundColor: connected ? C.green : C.gray300 }]} />
-          <Text style={s.connText}>
-            {connected ? t('orders.connectedLive', 'Connected — live updates active') : t('orders.reconnecting', 'Reconnecting…')}
-          </Text>
-          {lastUpdate && (
-            <Text style={s.lastUpdate}>
-              {t('orders.lastUpdate', 'Last')}: {lastUpdate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-            </Text>
-          )}
-        </View>
 
         {/* ETA CARD */}
         {isActive && (

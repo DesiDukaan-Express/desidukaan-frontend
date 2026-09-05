@@ -36,7 +36,7 @@ function matchesMagicBytes(bytes, mimeType) {
  * @param {string} token     - current access token (passed explicitly by callers)
  * @param {boolean} _isRetry - internal flag to prevent infinite retry loops
  */
-const request = async (method, endpoint, body = null, token = null, _isRetry = false) => {
+export const request = async (method, endpoint, body = null, token = null, _isRetry = false) => {
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -154,12 +154,11 @@ export const uploadAPI = {
 
     console.log("📤 Uploading file to:", `${BASE_URL}/upload`, "Platform:", Platform.OS);
 
-    // XMLHttpRequest is used so we can report upload progress (fetch cannot).
-    return new Promise((resolve, reject) => {
+    const _doUpload = (uploadToken) => new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", `${BASE_URL}/upload`);
-      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-      xhr.timeout = 60000; // 60s hard timeout
+      xhr.setRequestHeader("Authorization", `Bearer ${uploadToken}`);
+      xhr.timeout = 60000;
 
       xhr.upload.onprogress = (e) => {
         if (onProgress && e.lengthComputable && e.total > 0) {
@@ -178,7 +177,9 @@ export const uploadAPI = {
         }
         if (xhr.status >= 200 && xhr.status < 300 && data.url) {
           if (onProgress) onProgress(100);
-          resolve(data); // { success, url, public_id, mime }
+          resolve(data);
+        } else if (xhr.status === 401 && data.error === "TOKEN_EXPIRED") {
+          reject({ _tokenExpired: true });
         } else {
           reject(new Error(data.message || data.msg || "Upload failed"));
         }
@@ -186,6 +187,27 @@ export const uploadAPI = {
 
       xhr.send(formData);
     });
+
+    try {
+      return await _doUpload(token);
+    } catch (err) {
+      if (err?._tokenExpired) {
+        const { tryRefreshToken, default: useAuthStore } = await import('../store/authStore');
+        const refreshResult = await tryRefreshToken();
+        const newAccessToken = refreshResult?.token;
+        if (newAccessToken) {
+          useAuthStore.getState()._setAccessToken(newAccessToken);
+          return await _doUpload(newAccessToken);
+        } else if (refreshResult?.error === "ACCOUNT_DEACTIVATED") {
+          useAuthStore.getState().flagDeactivated();
+          throw new Error("Your account has been deactivated.");
+        } else {
+          useAuthStore.getState().logout();
+          throw new Error("Session expired. Please log in again.");
+        }
+      }
+      throw err;
+    }
   },
 
   /**
@@ -216,6 +238,11 @@ export const productsAPI = {
     request("GET", `/products/popular?lat=${lat}&lng=${lng}&radius_km=${radius_km}&limit=${limit}`, null, token),
   getVendors: (productId, token) =>
     request("GET", `/products/${productId}/vendors`, null, token),
+  getTrending: (lat = null, lng = null, limit = 12) => {
+    let url = `/products/trending?limit=${limit}`;
+    if (lat != null && lng != null) url += `&lat=${lat}&lng=${lng}`;
+    return request("GET", url);
+  },
 };
 
 // ─── Inventory ────────────────────────────────────────────────────────────────
@@ -247,13 +274,7 @@ export const categoriesAPI = {
 };
 
 // ─── Products (extended) ──────────────────────────────────────────────────────
-export const productsExtendedAPI = {
-  getTrending: (lat = null, lng = null, limit = 12) => {
-    let url = `/products/trending?limit=${limit}`;
-    if (lat != null && lng != null) url += `&lat=${lat}&lng=${lng}`;
-    return request("GET", url);
-  },
-};
+export const productsExtendedAPI = productsAPI;
 
 // ─── Admin Categories ─────────────────────────────────────────────────────────
 export const adminCategoriesAPI = {

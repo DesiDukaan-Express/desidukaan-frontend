@@ -630,22 +630,15 @@ function StepContent({ step, activeOrder, myLocation }) {
 
   const getMarkers = () => {
     if (!myLocation) return [];
-    const me = { coordinate: myLocation, title: 'You' };
-    if (step === 0 || step === 1) {
-      const markers = [me];
-      if (vendorLoc?.latitude) markers.push({ coordinate: vendorLoc, title: activeOrder.pickup });
-      return markers;
-    }
-    if (step === 2 || step === 3) {
-      const markers = [me];
-      if (dropLoc?.latitude) markers.push({ coordinate: dropLoc, title: activeOrder.drop });
-      return markers;
-    }
-    return [me];
+    return [{ coordinate: myLocation, title: 'You' }];
   };
 
+  // Show vendor location during pickup phase (steps 0-1), customer/drop location during drop phase (steps 2-3)
   const targetLoc = step <= 1 ? vendorLoc : dropLoc;
-  const mapRegion = targetLoc?.latitude != null ? targetLoc : null;
+  const destLat = targetLoc?.latitude ?? null;
+  const destLng = targetLoc?.longitude ?? null;
+  const destTitle = step <= 1 ? activeOrder?.pickup : activeOrder?.drop;
+  const mapRegion = destLat != null ? targetLoc : null;
 
   const openMap = (loc, fallbackAddress) => {
     let url = null;
@@ -674,7 +667,13 @@ function StepContent({ step, activeOrder, myLocation }) {
     <View>
       {/* Map */}
       <View style={styles.stepMap}>
-        <DeliveryMapView currentRegion={mapRegion || myLocation} markers={getMarkers()} />
+        <DeliveryMapView
+          currentRegion={mapRegion || myLocation}
+          markers={getMarkers()}
+          destLat={destLat}
+          destLng={destLng}
+          destTitle={destTitle}
+        />
       </View>
 
       {/* Drag handle pill */}
@@ -1210,14 +1209,12 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
             </View>
           </View>
         ) : (
-          <>
-            <View style={styles.mapBox}>
-              <DeliveryMapView
-                currentRegion={myLocation}
-                markers={myLocation ? [{ coordinate: myLocation, title: 'You' }] : []}
-              />
-            </View>
-          </>
+          <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+            <MaterialIcons name="local-shipping" size={48} color={C.textSecond} />
+            <Text style={{ color: C.textSecond, marginTop: 12, fontSize: 15 }}>
+              {t('delivery.noActiveDelivery', 'No active delivery')}
+            </Text>
+          </View>
         )}
       </ScrollView>
     </>

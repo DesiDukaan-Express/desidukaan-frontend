@@ -7,6 +7,7 @@ import {
 import Svg, { G, Path, Rect, Circle, Ellipse, Polygon } from 'react-native-svg';
 import { io } from 'socket.io-client';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Location from 'expo-location';
 import {
   useFonts,
   PlusJakartaSans_500Medium,
@@ -301,14 +302,61 @@ export default function DeliveryHomeScreen({ navigation, route }) {
     socket.on('new_delivery_request', fetchStats);
     socket.on('order:incoming', (data) => {
       if (processedOrderIds.current.has(data.orderId)) return;
+      // Defensive: only show incoming order if partner is online/available
+      // stats.isAvailable reflects the partner's self-declared availability state
+      if (!stats?.isAvailable) return;
       setIncomingOrder(data);
     });
     socket.on('order:removed', (data) => {
       setIncomingOrder(prev => prev?.orderId === data.orderId ? null : prev);
     });
+    // Self-sync: reflect availability changes on this partner's other
+    // devices/sessions without a refresh.
+    socket.on('partner:statusChanged', (data) => {
+      if (data && data.is_available !== undefined) {
+        setStats(s => (s ? { ...s, isAvailable: data.is_available } : s));
+      }
+    });
+    // On (re)connect, if we're already available, announce presence so
+    // admin/vendor maps see us immediately (covers cold starts).
+    socket.on('connect', () => {
+      if (stats?.isAvailable) {
+        sendLocationOnce().then(() => {
+          socket.emit('partner:online', {});
+        });
+      }
+    });
     socketRef.current = socket;
     return () => { socket.disconnect(); socketRef.current = null; };
-  }, [token]);
+  }, [token, stats?.isAvailable]);
+
+  // ── Location heartbeat ──────────────────────────────────────────────────────
+  // While online, re-emit driver_location every 10s so the Assign Rider map
+  // (partner:location) and DB stay current. Also covers reconnects.
+  const sendLocationOnce = useCallback(async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      let latitude = 28.6139; // Delhi / NCR default fallback
+      let longitude = 77.2090;
+      if (status === 'granted') {
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        latitude = pos.coords.latitude;
+        longitude = pos.coords.longitude;
+      }
+      socketRef.current?.emit('driver_location', { latitude, longitude });
+    } catch {
+      // best-effort — next heartbeat retries
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!stats?.isAvailable) return undefined;
+    sendLocationOnce();
+    const hb = setInterval(sendLocationOnce, 10000);
+    return () => clearInterval(hb);
+  }, [stats?.isAvailable, sendLocationOnce]);
 
   const toggleAvailability = async () => {
     if (toggling || !stats) return;
@@ -326,6 +374,30 @@ export default function DeliveryHomeScreen({ navigation, route }) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ is_available: next }),
       });
+      // Tell the live map immediately — online joins delivery:online and the
+      // first heartbeat follows right away; offline removes the rider marker.
+      if (next) {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          let latitude = 28.6139;
+          let longitude = 77.2090;
+          if (status === 'granted') {
+            const pos = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            latitude = pos.coords.latitude;
+            longitude = pos.coords.longitude;
+          }
+          console.log('[DeliveryHomeScreen] Emitting partner:online', { latitude, longitude });
+          socketRef.current?.emit('partner:online', { latitude, longitude });
+        } catch {
+          console.log('[DeliveryHomeScreen] Emitting partner:online (no coords)');
+          socketRef.current?.emit('partner:online', {});
+        }
+      } else {
+        console.log('[DeliveryHomeScreen] Emitting partner:offline');
+        socketRef.current?.emit('partner:offline');
+      }
       if (next) {
         // Send default/current location if online so nearby query picks rider up
         const lat = 28.6139; // Delhi / NCR default fallback or navigator geolocation

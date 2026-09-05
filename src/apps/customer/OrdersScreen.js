@@ -736,7 +736,17 @@ function OrderDetailModal({ order, onClose }) {
   const [tipSending, setTipSending] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSending, setFeedbackSending] = useState(false);
-  const showMap = MAP_ACTIVE_STATUSES.includes(order?.status);
+
+  // Use fullOrder if available for more details, otherwise fallback to order
+  const displayOrder = fullOrder || order;
+
+  const hasDriver = !!(
+    displayOrder?.delivery_partner_id ||
+    displayOrder?.delivery_partner ||
+    displayOrder?.delivery?.partner_id ||
+    displayOrder?.delivery?.partner
+  );
+  const deliveryStatus = displayOrder?.delivery?.status;
 
   useEffect(() => {
     if (order?.id) {
@@ -815,12 +825,6 @@ function OrderDetailModal({ order, onClose }) {
   };
 
   // ── Live driver location & ETA — MUST be before early return (hooks rule) ──
-  const hasDriver = !!(
-    order?.delivery_partner_id ||
-    order?.delivery_partner ||
-    order?.delivery?.partner_id ||
-    order?.delivery?.partner
-  );
   const initialLocation =
     order?.delivery?.partner?.current_lat &&
     order?.delivery?.partner?.current_lng
@@ -857,15 +861,13 @@ function OrderDetailModal({ order, onClose }) {
   })();
 
   const isActive = order && !["delivered", "cancelled", "rejected"].includes(order.status);
+  const showMap = hasDriver && order?.status === "picked_up";
   const headerStatusText = getHeaderText(order?.status);
   const partnerName = order?.delivery?.partner?.user?.name || order?.delivery_partner?.user?.name || "Delivery Partner";
   const partnerPhone = order?.delivery?.partner?.user?.phone || order?.delivery_partner?.user?.phone;
   const partnerMsg = getPartnerMsg(order?.status);
 
   if (!order) return null;
-
-  // Use fullOrder if available for more details, otherwise fallback to order
-  const displayOrder = fullOrder || order;
 
   const st = getStatus(order.status);
   const stepIdx = stepIndex(order.status);
@@ -886,10 +888,12 @@ function OrderDetailModal({ order, onClose }) {
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* ── Order number row (compact) — first ── */}
             <View style={od.orderNumRow}>
-              <Feather name="package" size={14} color={C.gray400} />
-              <Text style={od.orderNumCompact}>
-                {order.order_number || `#${order.id?.toString().slice(-6).toUpperCase()}`}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Feather name="package" size={14} color={C.gray400} />
+                <Text style={od.orderNumCompact}>
+                  {order.order_number || `#${order.id?.toString().slice(-6).toUpperCase()}`}
+                </Text>
+              </View>
               <Text style={od.orderDateCompact}>{formatDate(order.created_at)}</Text>
             </View>
 
@@ -1473,7 +1477,8 @@ const od = StyleSheet.create({
   orderNumRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    justifyContent: "space-between",
+    paddingHorizontal: 8,
     marginBottom: 16,
     paddingBottom: 14,
     borderBottomWidth: 1,
@@ -1483,11 +1488,14 @@ const od = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: C.gray600,
+    paddingVertical: 4,
+    paddingLeft: 4,
   },
   orderDateCompact: {
     fontSize: 11,
     color: C.gray400,
-    marginLeft: "auto",
+    paddingVertical: 4,
+    paddingRight: 4,
   },
   // Partner info card
   partnerInfoCard: {
