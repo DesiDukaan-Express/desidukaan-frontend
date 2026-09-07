@@ -3620,12 +3620,20 @@ export default function HomeScreen() {
               </Text>
             </View>
           </View>
-          <View style={[s.heroBanner, { minHeight: wide ? 260 : 250 }]}>
+          <View style={[s.heroBanner, { minHeight: wide ? 260 : 250, position: "relative" }]}>
             <Image
               source={{
                 uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&q=85&sig=banner",
               }}
-              style={StyleSheet.absoluteFillObject}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: "100%",
+                height: "100%",
+              }}
               resizeMode="cover"
             />
             <LinearGradient
@@ -3637,7 +3645,15 @@ export default function HomeScreen() {
               ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={StyleSheet.absoluteFillObject}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: "100%",
+                height: "100%",
+              }}
             />
             <View style={[s.heroLeft, { width: wide ? "62%" : "100%" }]}>
               <View style={s.heroBadge}>
@@ -3816,142 +3832,142 @@ export default function HomeScreen() {
           </View>
         ) : (
           <Animated.View style={{ opacity: vendorListAnim, transform: [{ translateY: vendorListY }] }}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingLeft: hPad,
-              paddingRight: 8,
-              paddingBottom: 6,
-            }}
-          >
-            {vendors.map((vendor) => {
-              const isOpen = isStoreCurrentlyOpen(vendor);
-              return (
-                <TouchableOpacity
-                  key={vendor.id}
-                  style={[s.storeCard, wide && s.storeCardWide]}
-                  disabled={!isOpen}
-                  onPress={isOpen ? () =>
-                    navigation.navigate("VendorStore", {
-                      vendorId: vendor.id,
-                      vendorName: vendor.shop_name,
-                    })
-                    : undefined}
-                  activeOpacity={isOpen ? 0.88 : 1}
-                >
-                  {/* Everything except the CLOSED badge — dimmed when closed */}
-                  <View
-                    style={[
-                      s.cardContent,
-                      !isStoreCurrentlyOpen(vendor) && s.cardContentClosed,
-                    ]}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingLeft: hPad,
+                paddingRight: 8,
+                paddingBottom: 6,
+              }}
+            >
+              {vendors.map((vendor) => {
+                const isOpen = isStoreCurrentlyOpen(vendor);
+                return (
+                  <TouchableOpacity
+                    key={vendor.id}
+                    style={[s.storeCard, wide && s.storeCardWide]}
+                    disabled={!isOpen}
+                    onPress={isOpen ? () =>
+                      navigation.navigate("VendorStore", {
+                        vendorId: vendor.id,
+                        vendorName: vendor.shop_name,
+                      })
+                      : undefined}
+                    activeOpacity={isOpen ? 0.88 : 1}
                   >
-                    <View style={s.storeImgWrap}>
-                      <Image
-                        source={{
-                          uri:
-                            vendor.shop_image_url ||
-                            `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${vendor.id}`,
-                        }}
-                        style={s.storeImg}
-                      />
-                      <LinearGradient
-                        colors={["transparent", "rgba(0,0,0,0.5)"]}
-                        style={s.storeImgOverlay}
-                      />
-                      <View style={s.ratingBadge}>
-                        <MaterialIcons name="star" size={10} color="#FBBF24" />
-                        <Text style={s.ratingText}>
-                          {vendor.avg_rating
-                            ? parseFloat(vendor.avg_rating).toFixed(1)
-                            : t("home.new")}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={s.storeInfo}>
-                      <Text style={s.storeName} numberOfLines={1}>
-                        {vendor.shop_name}
-                      </Text>
-                      <View style={s.storeMetaRow}>
-                        <MaterialIcons name="location-on" size={10} color={C.green} />
-                        <Text style={s.storeMeta}>
-                          {vendor.distance_km
-                            ? t("home.kmDistance", { count: parseFloat(vendor.distance_km).toFixed(1) })
-                            : t("home.nearby")}
-                        </Text>
-                        <View style={s.metaDot} />
-                        <MaterialIcons name="access-time" size={10} color={C.gray400} />
-                        <Text style={s.storeMeta}>{t("home.deliveryTime")}</Text>
-                      </View>
-                      <View style={s.storeTagRow}>
-                        {/* Min order — orange pill */}
-                        <View style={[s.storeTag, { backgroundColor: C.orangeLight, borderColor: "#FED7AA" }]}>
-                          <Text style={[s.storeTagText, { color: C.orangeDark }]}>
-                            {t("home.minOrder", { min: vendor.min_order || 99 })}
+                    {/* Everything except the CLOSED badge — dimmed when closed */}
+                    <View
+                      style={[
+                        s.cardContent,
+                        !isStoreCurrentlyOpen(vendor) && s.cardContentClosed,
+                      ]}
+                    >
+                      <View style={s.storeImgWrap}>
+                        <Image
+                          source={{
+                            uri:
+                              vendor.shop_image_url ||
+                              `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${vendor.id}`,
+                          }}
+                          style={s.storeImg}
+                        />
+                        <LinearGradient
+                          colors={["transparent", "rgba(0,0,0,0.5)"]}
+                          style={s.storeImgOverlay}
+                        />
+                        <View style={s.ratingBadge}>
+                          <MaterialIcons name="star" size={10} color="#FBBF24" />
+                          <Text style={s.ratingText}>
+                            {vendor.avg_rating
+                              ? parseFloat(vendor.avg_rating).toFixed(1)
+                              : t("home.new")}
                           </Text>
                         </View>
-                        {isStoreCurrentlyOpen(vendor) && (
-                          <View
-                            style={[
-                              s.storeTag,
-                              {
-                                backgroundColor: C.greenLight,
-                                borderColor: C.greenBorder,
-                              },
-                            ]}
-                          >
-                            <Text style={[s.storeTagText, { color: C.green }]}>
-                              {t("home.acceptingOrders")}
+                      </View>
+                      <View style={s.storeInfo}>
+                        <Text style={s.storeName} numberOfLines={1}>
+                          {vendor.shop_name}
+                        </Text>
+                        <View style={s.storeMetaRow}>
+                          <MaterialIcons name="location-on" size={10} color={C.green} />
+                          <Text style={s.storeMeta}>
+                            {vendor.distance_km
+                              ? t("home.kmDistance", { count: parseFloat(vendor.distance_km).toFixed(1) })
+                              : t("home.nearby")}
+                          </Text>
+                          <View style={s.metaDot} />
+                          <MaterialIcons name="access-time" size={10} color={C.gray400} />
+                          <Text style={s.storeMeta}>{t("home.deliveryTime")}</Text>
+                        </View>
+                        <View style={s.storeTagRow}>
+                          {/* Min order — orange pill */}
+                          <View style={[s.storeTag, { backgroundColor: C.orangeLight, borderColor: "#FED7AA" }]}>
+                            <Text style={[s.storeTagText, { color: C.orangeDark }]}>
+                              {t("home.minOrder", { min: vendor.min_order || 99 })}
                             </Text>
                           </View>
-                        )}
-                        {vendor.vendor_type && vendor.vendor_type !== "all" &&
-                          VENDOR_TYPE_META[vendor.vendor_type] && (
+                          {isStoreCurrentlyOpen(vendor) && (
                             <View
                               style={[
                                 s.storeTag,
                                 {
-                                  backgroundColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
-                                  borderColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
+                                  backgroundColor: C.greenLight,
+                                  borderColor: C.greenBorder,
                                 },
                               ]}
                             >
-                              <Text
-                                style={[
-                                  s.storeTagText,
-                                  { color: VENDOR_TYPE_META[vendor.vendor_type].color },
-                                ]}
-                              >
-                                {VENDOR_TYPE_META[vendor.vendor_type].label}
+                              <Text style={[s.storeTagText, { color: C.green }]}>
+                                {t("home.acceptingOrders")}
                               </Text>
                             </View>
                           )}
+                          {vendor.vendor_type && vendor.vendor_type !== "all" &&
+                            VENDOR_TYPE_META[vendor.vendor_type] && (
+                              <View
+                                style={[
+                                  s.storeTag,
+                                  {
+                                    backgroundColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
+                                    borderColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    s.storeTagText,
+                                    { color: VENDOR_TYPE_META[vendor.vendor_type].color },
+                                  ]}
+                                >
+                                  {VENDOR_TYPE_META[vendor.vendor_type].label}
+                                </Text>
+                              </View>
+                            )}
+                        </View>
                       </View>
                     </View>
-                  </View>
 
-                  {/* OPEN/CLOSED pill — solid, no dot. Kept OUTSIDE the dimmed
+                    {/* OPEN/CLOSED pill — solid, no dot. Kept OUTSIDE the dimmed
                     wrapper so it always renders at full opacity and stays
                     clearly legible even on a CLOSED (dimmed) card. */}
-                  <View
-                    style={[
-                      s.statusBadge,
-                      {
-                        backgroundColor: isStoreCurrentlyOpen(vendor)
-                          ? C.green
-                          : "rgba(0,0,0,0.72)",
-                      },
-                    ]}
-                  >
-                    <Text style={s.statusText}>
-                      {isStoreCurrentlyOpen(vendor) ? t("home.open") : t("home.closed")}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+                    <View
+                      style={[
+                        s.statusBadge,
+                        {
+                          backgroundColor: isStoreCurrentlyOpen(vendor)
+                            ? C.green
+                            : "rgba(0,0,0,0.72)",
+                        },
+                      ]}
+                    >
+                      <Text style={s.statusText}>
+                        {isStoreCurrentlyOpen(vendor) ? t("home.open") : t("home.closed")}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </Animated.View>
         )}
 
