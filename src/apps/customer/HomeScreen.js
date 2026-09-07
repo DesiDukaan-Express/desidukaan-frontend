@@ -3620,12 +3620,20 @@ export default function HomeScreen() {
               </Text>
             </View>
           </View>
-          <View style={[s.heroBanner, { minHeight: wide ? 260 : 250 }]}>
+          <View style={[s.heroBanner, { minHeight: wide ? 260 : 250, position: "relative" }]}>
             <Image
               source={{
                 uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&q=85&sig=banner",
               }}
-              style={StyleSheet.absoluteFillObject}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: "100%",
+                height: "100%",
+              }}
               resizeMode="cover"
             />
             <LinearGradient
@@ -3637,7 +3645,15 @@ export default function HomeScreen() {
               ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={StyleSheet.absoluteFillObject}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: "100%",
+                height: "100%",
+              }}
             />
             <View style={[s.heroLeft, { width: wide ? "62%" : "100%" }]}>
               <View style={s.heroBadge}>

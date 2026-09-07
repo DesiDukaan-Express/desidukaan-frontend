@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { Audio } from 'expo-av';
 
 const SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
 
@@ -10,6 +9,8 @@ export default function useOrderSound() {
     // Load sound on mount
     const load = async () => {
       try {
+        const { Audio } = require('expo-av');
+        if (!Audio || !Audio.setAudioModeAsync) return;
         await Audio.setAudioModeAsync({
           playsInSilentModeIOS: true,
           staysActiveInBackground: false,
