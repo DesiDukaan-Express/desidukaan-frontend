@@ -2331,16 +2331,27 @@ export default function MyOrdersScreen() {
   const [viewRatingOrder, setViewRatingOrder] = useState(null);
   const [viewRatingLoading, setViewRatingLoading] = useState(false);
   const [fetchedRating, setFetchedRating] = useState(null);
-  const [reviewRating, setReviewRating] = useState(0);
-  const [reviewComment, setReviewComment] = useState("");
+  const [storeRating, setStoreRating] = useState(0);
+  const [storeComment, setStoreComment] = useState("");
+  const [deliveryRating, setDeliveryRating] = useState(0);
+  const [deliveryComment, setDeliveryComment] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
 
   const handleOpenViewRating = async (order) => {
     setViewRatingOrder(order);
     setViewRatingLoading(true);
-    const initialRating = order.user_rating || order.rating || (order.reviews?.[0]?.vendor_rating) || 5;
-    const initialComment = order.review_comment || (order.reviews?.[0]?.comment) || "";
-    setFetchedRating({ rating: initialRating, comment: initialComment });
+    const rev = order.reviews?.[0] || {};
+    const initialStoreRating = order.user_rating || order.rating || rev.vendor_rating || null;
+    const initialStoreComment = order.review_comment || rev.comment || "";
+    const initialDeliveryRating = rev.partner_rating || null;
+    const initialDeliveryComment = rev.partner_comment || "";
+    
+    setFetchedRating({ 
+      storeRating: initialStoreRating, 
+      storeComment: initialStoreComment,
+      deliveryRating: initialDeliveryRating,
+      deliveryComment: initialDeliveryComment
+    });
 
     try {
       const res = await fetch(`${BASE_URL}/orders/${order.id}`, {
@@ -2349,9 +2360,12 @@ export default function MyOrdersScreen() {
       const data = await res.json();
       const o = data.data?.order || data.order;
       if (o) {
+        const oRev = o.reviews?.[0] || {};
         setFetchedRating({
-          rating: o.user_rating ?? o.reviews?.[0]?.vendor_rating ?? initialRating,
-          comment: o.review_comment ?? o.reviews?.[0]?.comment ?? initialComment,
+          storeRating: o.user_rating ?? oRev.vendor_rating ?? initialStoreRating,
+          storeComment: o.review_comment ?? oRev.comment ?? initialStoreComment,
+          deliveryRating: oRev.partner_rating ?? initialDeliveryRating,
+          deliveryComment: oRev.partner_comment ?? initialDeliveryComment,
         });
       }
     } catch (e) {
@@ -2362,8 +2376,8 @@ export default function MyOrdersScreen() {
   };
 
   const submitReview = async () => {
-    if (reviewRating === 0) {
-      Alert.alert("Please select a rating");
+    if (storeRating === 0) {
+      Alert.alert("Please select a store rating");
       return;
     }
     setReviewLoading(true);
@@ -2375,24 +2389,27 @@ export default function MyOrdersScreen() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          vendor_rating: reviewRating,
-          comment: reviewComment,
+          vendor_rating: storeRating,
+          comment: storeComment,
+          partner_rating: deliveryRating > 0 ? deliveryRating : null,
+          partner_comment: deliveryComment,
         }),
       });
       const data = await res.json();
       if (data.success) {
-        const submittedRating = reviewRating;
         const currentOrderId = reviewOrder.id;
         setOrders((prev) =>
           prev.map((o) =>
             o.id === currentOrderId
-              ? { ...o, has_reviewed: true, user_rating: submittedRating }
+              ? { ...o, has_reviewed: true, user_rating: storeRating }
               : o
           )
         );
         setReviewOrder(null);
-        setReviewRating(0);
-        setReviewComment("");
+        setStoreRating(0);
+        setStoreComment("");
+        setDeliveryRating(0);
+        setDeliveryComment("");
         fetchOrders(true);
         Alert.alert("Thank you!", "Your review has been submitted.");
       }
@@ -2728,8 +2745,10 @@ export default function MyOrdersScreen() {
               onPress={() => setDetailOrder(order)}
               onRate={() => {
                 setReviewOrder(order);
-                setReviewRating(0);
-                setReviewComment("");
+                setStoreRating(0);
+                setStoreComment("");
+                setDeliveryRating(0);
+                setDeliveryComment("");
               }}
               onViewRating={(o) => handleOpenViewRating(o)}
               alreadyRated={!!order.has_reviewed}
@@ -2770,6 +2789,7 @@ export default function MyOrdersScreen() {
               borderTopRightRadius: 24,
               padding: 24,
               paddingBottom: 40,
+              maxHeight: "85%",
             }}
             onPress={() => {}}
           >
@@ -2797,52 +2817,73 @@ export default function MyOrdersScreen() {
               {reviewOrder?.vendor?.shop_name || "Your order"}
             </Text>
 
-            {/* Star picker */}
-            <View
-              style={{
-                flexDirection: "row",
-                gap: 10,
-                marginBottom: 20,
-                justifyContent: "center",
-              }}
-            >
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity
-                  key={star}
-                  onPress={() => setReviewRating(star)}
-                >
-                  <Text
-                    style={{
-                      fontSize: 36,
-                      opacity: star <= reviewRating ? 1 : 0.25,
-                    }}
-                  >
-                    ⭐
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+              {/* Delivery Rating */}
+              {(reviewOrder?.delivery_partner_id || reviewOrder?.delivery_partner || reviewOrder?.delivery?.partner_id) && (
+                <View style={{ marginBottom: 24 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: C.gray800, marginBottom: 12 }}>
+                    Rate delivery
                   </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                  <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <TouchableOpacity key={star} onPress={() => setDeliveryRating(star)}>
+                        <Text style={{ fontSize: 32, opacity: star <= deliveryRating ? 1 : 0.25 }}>⭐</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <TextInput
+                    style={{
+                      backgroundColor: C.gray100,
+                      borderRadius: 12,
+                      padding: 14,
+                      fontSize: 14,
+                      color: C.gray900,
+                      minHeight: 80,
+                      textAlignVertical: "top",
+                      borderWidth: 1,
+                      borderColor: C.gray200,
+                    }}
+                    placeholder="How was the delivery experience? (optional)"
+                    placeholderTextColor={C.gray400}
+                    multiline
+                    value={deliveryComment}
+                    onChangeText={setDeliveryComment}
+                  />
+                </View>
+              )}
 
-            {/* Comment input */}
-            <TextInput
-              style={{
-                backgroundColor: C.gray100,
-                borderRadius: 12,
-                padding: 14,
-                fontSize: 14,
-                color: C.gray900,
-                minHeight: 80,
-                textAlignVertical: "top",
-                marginBottom: 20,
-                borderWidth: 1,
-                borderColor: C.gray200,
-              }}
-              placeholder="Tell us about your experience (optional)"
-              placeholderTextColor={C.gray400}
-              multiline
-              value={reviewComment}
-              onChangeText={setReviewComment}
-            />
+              {/* Store Rating */}
+              <View style={{ marginBottom: 20 }}>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: C.gray800, marginBottom: 12 }}>
+                  Rate store
+                </Text>
+                <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity key={star} onPress={() => setStoreRating(star)}>
+                      <Text style={{ fontSize: 32, opacity: star <= storeRating ? 1 : 0.25 }}>⭐</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <TextInput
+                  style={{
+                    backgroundColor: C.gray100,
+                    borderRadius: 12,
+                    padding: 14,
+                    fontSize: 14,
+                    color: C.gray900,
+                    minHeight: 80,
+                    textAlignVertical: "top",
+                    borderWidth: 1,
+                    borderColor: C.gray200,
+                  }}
+                  placeholder="How was the store experience? (optional)"
+                  placeholderTextColor={C.gray400}
+                  multiline
+                  value={storeComment}
+                  onChangeText={setStoreComment}
+                />
+              </View>
+            </ScrollView>
 
             <TouchableOpacity
               onPress={submitReview}
@@ -2907,15 +2948,15 @@ export default function MyOrdersScreen() {
             />
 
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-              <Text style={{ fontSize: 18, fontWeight: "900", color: C.gray900 }}>
-                Your Submitted Rating
+              <Text style={{ fontSize: 18, fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray900 }}>
+                Your Submitted Ratings
               </Text>
               <TouchableOpacity onPress={() => setViewRatingOrder(null)} style={{ padding: 4 }}>
                 <Feather name="x" size={20} color={C.gray500} />
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 13, color: C.gray400, marginBottom: 20 }}>
+            <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, marginBottom: 20 }}>
               {viewRatingOrder?.vendor?.shop_name || "Your order"} · {formatCardDate(viewRatingOrder?.created_at)}
             </Text>
 
@@ -2926,61 +2967,98 @@ export default function MyOrdersScreen() {
                 <Text style={{ fontSize: 13, color: C.gray400, marginTop: 10 }}>Fetching your review…</Text>
               </View>
             ) : (() => {
-              const ratingVal = fetchedRating?.rating || viewRatingOrder?.user_rating || 5;
-              const num = typeof ratingVal === "number" ? ratingVal : parseInt(ratingVal, 10) || 5;
-              const comment = fetchedRating?.comment || viewRatingOrder?.review_comment || "";
+              const sRatingVal = fetchedRating?.storeRating ?? viewRatingOrder?.user_rating ?? null;
+              const sNum = sRatingVal != null ? (typeof sRatingVal === "number" ? sRatingVal : parseInt(sRatingVal, 10)) : null;
+              const sComment = fetchedRating?.storeComment || viewRatingOrder?.review_comment || "";
+
+              const dRatingVal = fetchedRating?.deliveryRating;
+              const dNum = dRatingVal != null ? (typeof dRatingVal === "number" ? dRatingVal : parseInt(dRatingVal, 10)) : null;
+              const dComment = fetchedRating?.deliveryComment || "";
 
               return (
-                <View
-                  style={{
-                    backgroundColor: C.gray100,
-                    borderWidth: 1,
-                    borderColor: C.gray200,
-                    borderRadius: 16,
-                    padding: 20,
-                    alignItems: "center",
-                    marginBottom: 20,
-                  }}
-                >
-                  <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Text
-                        key={star}
-                        style={{
-                          fontSize: 36,
-                          opacity: star <= num ? 1 : 0.25,
-                        }}
-                      >
-                        ⭐
-                      </Text>
-                    ))}
-                  </View>
-
-                  <Text style={{ fontSize: 15, fontWeight: "800", color: C.gray900, marginBottom: comment ? 12 : 0 }}>
-                    {num} out of 5 stars
-                  </Text>
-
-                  {comment ? (
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
+                  {/* Store Rating */}
+                  <View style={{ marginBottom: 20 }}>
+                    <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_700Bold", color: C.gray900, marginBottom: 8, marginLeft: 4 }}>
+                      Store: {viewRatingOrder?.vendor?.shop_name || "Store"}
+                    </Text>
                     <View
                       style={{
-                        backgroundColor: C.white,
-                        borderRadius: 12,
-                        padding: 14,
+                        backgroundColor: C.gray100,
                         borderWidth: 1,
                         borderColor: C.gray200,
-                        width: "100%",
+                        borderRadius: 16,
+                        padding: 20,
+                        alignItems: "center",
                       }}
                     >
-                      <Text style={{ fontSize: 14, color: C.gray800, lineHeight: 20 }}>
-                        {comment}
-                      </Text>
+                      {sNum !== null ? (
+                        <>
+                          <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Text key={star} style={{ fontSize: 36, opacity: star <= sNum ? 1 : 0.25 }}>⭐</Text>
+                            ))}
+                          </View>
+                          <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray900, marginBottom: sComment ? 12 : 0 }}>
+                            {sNum} out of 5 stars
+                          </Text>
+                          {sComment ? (
+                            <View style={{ backgroundColor: C.white, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: C.gray200, width: "100%" }}>
+                              <Text style={{ fontSize: 14, fontFamily: "PlusJakartaSans_500Medium", color: C.gray800, lineHeight: 20 }}>{sComment}</Text>
+                            </View>
+                          ) : (
+                            <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, fontStyle: "italic", marginTop: 4 }}>No written comment provided</Text>
+                          )}
+                        </>
+                      ) : (
+                        <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray400 }}>
+                          Not Rated
+                        </Text>
+                      )}
                     </View>
-                  ) : (
-                    <Text style={{ fontSize: 13, color: C.gray400, fontStyle: "italic", marginTop: 4 }}>
-                      No written comment provided
+                  </View>
+
+                  {/* Delivery Rating */}
+                  <View style={{ marginBottom: 20 }}>
+                    <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_700Bold", color: C.gray900, marginBottom: 8, marginLeft: 4 }}>
+                      Delivery: {viewRatingOrder?.delivery?.partner?.user?.name || viewRatingOrder?.delivery_partner?.user?.name || "Partner"}
                     </Text>
-                  )}
-                </View>
+                    <View
+                      style={{
+                        backgroundColor: C.gray100,
+                        borderWidth: 1,
+                        borderColor: C.gray200,
+                        borderRadius: 16,
+                        padding: 20,
+                        alignItems: "center",
+                      }}
+                    >
+                      {dNum !== null ? (
+                        <>
+                          <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Text key={star} style={{ fontSize: 36, opacity: star <= dNum ? 1 : 0.25 }}>⭐</Text>
+                            ))}
+                          </View>
+                          <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray900, marginBottom: dComment ? 12 : 0 }}>
+                            {dNum} out of 5 stars
+                          </Text>
+                          {dComment ? (
+                            <View style={{ backgroundColor: C.white, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: C.gray200, width: "100%" }}>
+                              <Text style={{ fontSize: 14, fontFamily: "PlusJakartaSans_500Medium", color: C.gray800, lineHeight: 20 }}>{dComment}</Text>
+                            </View>
+                          ) : (
+                            <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, fontStyle: "italic", marginTop: 4 }}>No written comment provided</Text>
+                          )}
+                        </>
+                      ) : (
+                        <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray400 }}>
+                          Not Rated
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                </ScrollView>
               );
             })()}
 
@@ -2994,7 +3072,7 @@ export default function MyOrdersScreen() {
                 justifyContent: "center",
               }}
             >
-              <Text style={{ fontSize: 15, fontWeight: "800", color: C.white }}>
+              <Text style={{ fontSize: 16, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.white }}>
                 Close
               </Text>
             </TouchableOpacity>
