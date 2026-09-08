@@ -2,11 +2,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, RefreshControl, Switch, Animated,
-  StatusBar, Platform, Alert,
+  StatusBar, Platform, Alert, Modal, Pressable, TextInput
 } from 'react-native';
 import Svg, { G, Path, Rect, Circle, Ellipse, Polygon } from 'react-native-svg';
 import { io } from 'socket.io-client';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Location from 'expo-location';
 import {
   useFonts,
   PlusJakartaSans_500Medium,
@@ -198,6 +199,23 @@ export default function DeliveryHomeScreen({ navigation, route }) {
   const { token, user } = useAuthStore();
   const { t } = useTranslation();
 
+  const [partnerReviewOrder, setPartnerReviewOrder] = useState(null);
+  const [partnerReviewRating, setPartnerReviewRating] = useState(0);
+  const [partnerReviewComment, setPartnerReviewComment] = useState("");
+  const [partnerStoreRating, setPartnerStoreRating] = useState(0);
+  const [partnerStoreComment, setPartnerStoreComment] = useState("");
+  const [partnerReviewLoading, setPartnerReviewLoading] = useState(false);
+
+  useEffect(() => {
+    if (route?.params?.reviewOrder) {
+      setPartnerReviewOrder(route.params.reviewOrder);
+      setPartnerReviewRating(0);
+      setPartnerReviewComment("");
+      setPartnerStoreRating(0);
+      setPartnerStoreComment("");
+      navigation.setParams({ reviewOrder: null });
+    }
+  }, [route?.params?.reviewOrder]);
 
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_500Medium,
@@ -284,14 +302,61 @@ export default function DeliveryHomeScreen({ navigation, route }) {
     socket.on('new_delivery_request', fetchStats);
     socket.on('order:incoming', (data) => {
       if (processedOrderIds.current.has(data.orderId)) return;
+      // Defensive: only show incoming order if partner is online/available
+      // stats.isAvailable reflects the partner's self-declared availability state
+      if (!stats?.isAvailable) return;
       setIncomingOrder(data);
     });
     socket.on('order:removed', (data) => {
       setIncomingOrder(prev => prev?.orderId === data.orderId ? null : prev);
     });
+    // Self-sync: reflect availability changes on this partner's other
+    // devices/sessions without a refresh.
+    socket.on('partner:statusChanged', (data) => {
+      if (data && data.is_available !== undefined) {
+        setStats(s => (s ? { ...s, isAvailable: data.is_available } : s));
+      }
+    });
+    // On (re)connect, if we're already available, announce presence so
+    // admin/vendor maps see us immediately (covers cold starts).
+    socket.on('connect', () => {
+      if (stats?.isAvailable) {
+        sendLocationOnce().then(() => {
+          socket.emit('partner:online', {});
+        });
+      }
+    });
     socketRef.current = socket;
     return () => { socket.disconnect(); socketRef.current = null; };
-  }, [token]);
+  }, [token, stats?.isAvailable]);
+
+  // ── Location heartbeat ──────────────────────────────────────────────────────
+  // While online, re-emit driver_location every 10s so the Assign Rider map
+  // (partner:location) and DB stay current. Also covers reconnects.
+  const sendLocationOnce = useCallback(async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      let latitude = 28.6139; // Delhi / NCR default fallback
+      let longitude = 77.2090;
+      if (status === 'granted') {
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        latitude = pos.coords.latitude;
+        longitude = pos.coords.longitude;
+      }
+      socketRef.current?.emit('driver_location', { latitude, longitude });
+    } catch {
+      // best-effort — next heartbeat retries
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!stats?.isAvailable) return undefined;
+    sendLocationOnce();
+    const hb = setInterval(sendLocationOnce, 10000);
+    return () => clearInterval(hb);
+  }, [stats?.isAvailable, sendLocationOnce]);
 
   const toggleAvailability = async () => {
     if (toggling || !stats) return;
@@ -309,6 +374,30 @@ export default function DeliveryHomeScreen({ navigation, route }) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ is_available: next }),
       });
+      // Tell the live map immediately — online joins delivery:online and the
+      // first heartbeat follows right away; offline removes the rider marker.
+      if (next) {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          let latitude = 28.6139;
+          let longitude = 77.2090;
+          if (status === 'granted') {
+            const pos = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            latitude = pos.coords.latitude;
+            longitude = pos.coords.longitude;
+          }
+          console.log('[DeliveryHomeScreen] Emitting partner:online', { latitude, longitude });
+          socketRef.current?.emit('partner:online', { latitude, longitude });
+        } catch {
+          console.log('[DeliveryHomeScreen] Emitting partner:online (no coords)');
+          socketRef.current?.emit('partner:online', {});
+        }
+      } else {
+        console.log('[DeliveryHomeScreen] Emitting partner:offline');
+        socketRef.current?.emit('partner:offline');
+      }
       if (next) {
         // Send default/current location if online so nearby query picks rider up
         const lat = 28.6139; // Delhi / NCR default fallback or navigator geolocation
@@ -580,6 +669,190 @@ export default function DeliveryHomeScreen({ navigation, route }) {
         </Animated.View>
         <View style={{ height: 110 }} />
       </ScrollView>
+
+      {/* ── PARTNER REVIEW CUSTOMER MODAL ── */}
+      <Modal
+        visible={!!partnerReviewOrder}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPartnerReviewOrder(null)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "flex-end",
+          }}
+          onPress={() => setPartnerReviewOrder(null)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: "#fff",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 24,
+              paddingBottom: 40,
+              maxHeight: '90%',
+            }}
+            onPress={() => {}}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 4,
+                backgroundColor: "#E5E7EB",
+                borderRadius: 2,
+                alignSelf: "center",
+                marginBottom: 20,
+              }}
+            />
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 16 }}>
+              {/* ── Rate Customer ── */}
+              <View style={{ marginBottom: 24, backgroundColor: "#F9FAFB", padding: 16, borderRadius: 16, borderWidth: 1, borderColor: "#E5E7EB" }}>
+                <Text style={{ fontSize: 18, fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#111827", marginBottom: 4 }}>
+                  Rate Customer
+                </Text>
+                <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: "#9CA3AF", marginBottom: 16 }}>
+                  {partnerReviewOrder?.order?.customer?.name || partnerReviewOrder?.order?.order_number || partnerReviewOrder?.customer?.name || partnerReviewOrder?.order_number || "Customer"}
+                </Text>
+
+                <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity key={star} onPress={() => setPartnerReviewRating(star)}>
+                      <Text style={{ fontSize: 36, opacity: star <= partnerReviewRating ? 1 : 0.25 }}>⭐</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <TextInput
+                  style={{
+                    backgroundColor: "#fff",
+                    borderRadius: 12,
+                    padding: 14,
+                    fontSize: 14,
+                    fontFamily: "PlusJakartaSans_500Medium",
+                    color: "#111827",
+                    minHeight: 80,
+                    textAlignVertical: "top",
+                    borderWidth: 1,
+                    borderColor: "#E5E7EB",
+                  }}
+                  placeholder="Tell us about the customer (optional)"
+                  placeholderTextColor="#9CA3AF"
+                  multiline
+                  value={partnerReviewComment}
+                  onChangeText={setPartnerReviewComment}
+                />
+              </View>
+
+              {/* ── Rate Store ── */}
+              <View style={{ marginBottom: 24, backgroundColor: "#F9FAFB", padding: 16, borderRadius: 16, borderWidth: 1, borderColor: "#E5E7EB" }}>
+                <Text style={{ fontSize: 18, fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#111827", marginBottom: 4 }}>
+                  Rate Store
+                </Text>
+                <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: "#9CA3AF", marginBottom: 16 }}>
+                  {partnerReviewOrder?.order?.vendor?.shop_name || partnerReviewOrder?.vendor?.shop_name || "Store"}
+                </Text>
+
+                <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity key={star} onPress={() => setPartnerStoreRating(star)}>
+                      <Text style={{ fontSize: 36, opacity: star <= partnerStoreRating ? 1 : 0.25 }}>⭐</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <TextInput
+                  style={{
+                    backgroundColor: "#fff",
+                    borderRadius: 12,
+                    padding: 14,
+                    fontSize: 14,
+                    fontFamily: "PlusJakartaSans_500Medium",
+                    color: "#111827",
+                    minHeight: 80,
+                    textAlignVertical: "top",
+                    borderWidth: 1,
+                    borderColor: "#E5E7EB",
+                  }}
+                  placeholder="Tell us about the pickup experience (optional)"
+                  placeholderTextColor="#9CA3AF"
+                  multiline
+                  value={partnerStoreComment}
+                  onChangeText={setPartnerStoreComment}
+                />
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={async () => {
+                if (partnerReviewRating === 0 && partnerStoreRating === 0) {
+                  Alert.alert("Please provide at least one rating");
+                  return;
+                }
+                setPartnerReviewLoading(true);
+                try {
+                  const res = await fetch(
+                    `${API_BASE}/orders/${partnerReviewOrder.orderIdRaw || partnerReviewOrder.id || partnerReviewOrder.order?.id}/partner-review`,
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify({
+                        partner_review_rating: partnerReviewRating,
+                        partner_review_comment: partnerReviewComment,
+                        partner_to_vendor_rating: partnerStoreRating,
+                        partner_to_vendor_comment: partnerStoreComment,
+                      }),
+                    }
+                  );
+                  const data = await res.json();
+                  if (data.success) {
+                    setPartnerReviewOrder(null);
+                    setPartnerReviewRating(0);
+                    setPartnerReviewComment("");
+                    setPartnerStoreRating(0);
+                    setPartnerStoreComment("");
+                  }
+                } catch (e) {
+                  console.log("Partner review error", e);
+                } finally {
+                  setPartnerReviewLoading(false);
+                }
+              }}
+              disabled={partnerReviewLoading}
+              style={{
+                backgroundColor: partnerReviewLoading ? "#E5E7EB" : "#2E7D32",
+                borderRadius: 14,
+                padding: 16,
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: "#fff", fontSize: 16, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold" }}>
+                {partnerReviewLoading ? "Submitting..." : "Submit Review"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                setPartnerReviewOrder(null);
+              }}
+              style={{
+                alignItems: "center",
+                paddingVertical: 12,
+                marginTop: 8,
+              }}
+            >
+              <Text style={{ color: "#6B7280", fontSize: 14, fontWeight: "600" }}>
+                Skip
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
