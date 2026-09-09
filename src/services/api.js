@@ -238,10 +238,10 @@ export const productsAPI = {
     request("GET", `/products/popular?lat=${lat}&lng=${lng}&radius_km=${radius_km}&limit=${limit}`, null, token),
   getVendors: (productId, token) =>
     request("GET", `/products/${productId}/vendors`, null, token),
-  getTrending: (lat = null, lng = null, limit = 12) => {
+  getTrending: (lat = null, lng = null, limit = 12, token = null) => {
     let url = `/products/trending?limit=${limit}`;
     if (lat != null && lng != null) url += `&lat=${lat}&lng=${lng}`;
-    return request("GET", url);
+    return request("GET", url, null, token);
   },
 };
 
