@@ -17,6 +17,7 @@ import OrdersScreen from '../apps/customer/OrdersScreen';
 import ProfileScreen from '../apps/customer/ProfileScreen';
 import VendorStoreScreen from '../apps/customer/VendorStoreScreen';
 import TrackOrderScreen from '../apps/customer/TrackOrderScreen';
+import WishlistScreen from '../apps/customer/WishlistScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -488,6 +489,7 @@ export default function CustomerTabs() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="CustomerTabNavigator" component={CustomerTabNavigator} />
         <Stack.Screen name="VendorStore" component={VendorStoreScreen} />
+        <Stack.Screen name="Wishlist"    component={WishlistScreen}    />
         <Stack.Screen name="TrackOrder"  component={TrackOrderScreen}  />
         <Stack.Screen name="Search"      component={SearchScreen}      />
       </Stack.Navigator>

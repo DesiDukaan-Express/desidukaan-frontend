@@ -37,6 +37,7 @@ import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
 import LocationMapPicker from "../../components/LocationMapPicker";
 import UseCurrentLocationButton from "../../components/UseCurrentLocationButton";
+import WishlistHeart from "../../components/WishlistHeart";
 
 // Use env var works on device, emulator, and web
 // In your .env: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api
@@ -1171,6 +1172,8 @@ const sp = StyleSheet.create({
   cancelText: { fontSize: 15, fontWeight: "700", color: C.gray600 },
 });
 
+const NEARBY_RADIUS_KM = 10;
+
 const CAT_FALLBACK_IMGS = {
   "Dairy, Bread & Eggs": "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80",
   "Fruits & Vegetables": "https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=400&q=80",
@@ -1432,13 +1435,17 @@ function CategoryBrowseSheet({
       });
     }
 
-    // 3. Deduplicate by unique inventory item / product id
-    const seen = new Set();
+    // 3. Deduplicate by normalized name + brand + unit (same product from different vendors = 1 row)
+    const seen = new Map();
     return items.filter(inv => {
       if (!inv?.id && !inv?.product?.id) return false;
-      const key = inv.product?.id || inv.id;
+      const p = inv.product;
+      const name = (p.name || "").trim().toLowerCase();
+      const brand = (p.brand || "").trim().toLowerCase();
+      const unit = (p.unit || "").trim().toLowerCase();
+      const key = `${name}|${brand}|${unit}`;
       if (seen.has(key)) return false;
-      seen.add(key);
+      seen.set(key, inv);
       return true;
     });
   }, [category, activeSubCat, hierarchy, apiCategories, allInventoryItems]);
@@ -1579,6 +1586,7 @@ function CategoryBrowseSheet({
                   const hasMrp = p.mrp && p.mrp > p.price;
                   const discPct = hasMrp ? Math.round((1 - p.price / p.mrp) * 100) : 0;
                   const vendorName = inv._vendorName || "";
+                  const isActive = p.is_active !== false;
 
                   const item = {
                     id: p.id, name: p.name, price: p.price,
@@ -1591,6 +1599,7 @@ function CategoryBrowseSheet({
                     <View key={`${p.id}-${idx}`} style={[
                       cbs.productRow,
                       idx % 2 === 0 && cbs.productRowAlt,
+                      !isActive && cbs.productRowUnavailable,
                     ]}>
                       {/* Image + Name */}
                       <View style={[cbs.productCell, { flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }]}>
@@ -1601,17 +1610,22 @@ function CategoryBrowseSheet({
                                 CAT_FALLBACK_IMGS[category] ||
                                 CAT_FALLBACK_IMGS._default
                             }}
-                            style={cbs.productImg}
+                            style={[cbs.productImg, !isActive && { opacity: 0.4 }]}
                             resizeMode="cover"
                           />
-                          {hasMrp && (
+                          {hasMrp && isActive && (
                             <View style={cbs.discPill}>
                               <Text style={cbs.discPillText}>{discPct}%</Text>
                             </View>
                           )}
-                          {loose && (
+                          {loose && isActive && (
                             <View style={[cbs.discPill, { backgroundColor: "#0891B2" }]}>
                               <Text style={cbs.discPillText}>{t("home.loose")}</Text>
+                            </View>
+                          )}
+                          {!isActive && (
+                            <View style={[cbs.discPill, { backgroundColor: C.red }]}>
+                              <Text style={cbs.discPillText}>N/A</Text>
                             </View>
                           )}
                           <TouchableOpacity
@@ -1623,48 +1637,57 @@ function CategoryBrowseSheet({
                           </TouchableOpacity>
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={cbs.productName} numberOfLines={2}>{p.name}</Text>
+                          <Text style={[cbs.productName, !isActive && { color: C.gray400 }]} numberOfLines={2}>{p.name}</Text>
                           {p.description ? (
-                            <Text style={cbs.productDesc} numberOfLines={1}>{p.description}</Text>
+                            <Text style={[cbs.productDesc, !isActive && { color: C.gray300 }]} numberOfLines={1}>{p.description}</Text>
                           ) : null}
                         </View>
                       </View>
 
                       {/* Brand (vendor) */}
                       <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
-                        <Text style={cbs.brandText} numberOfLines={2}>{vendorName}</Text>
+                        <Text style={[cbs.brandText, !isActive && { color: C.gray300 }]} numberOfLines={2}>{vendorName}</Text>
                       </View>
 
                       {/* Qty / Unit (Particulars) */}
                       <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
-                        <Text style={cbs.unitText}>{p.unit || "1 pc"}</Text>
+                        <Text style={[cbs.unitText, !isActive && { color: C.gray300 }]}>{p.unit || "1 pc"}</Text>
                       </View>
 
-                      {/* Price + ADD */}
+                      {/* Price + ADD / Unavailable badge */}
                       <View style={[cbs.productCell, { width: 80, alignItems: "flex-end" }]}>
-                        <Text style={cbs.priceText}>₹{p.price}</Text>
-                        {hasMrp && <Text style={cbs.mrpText}>₹{p.mrp}</Text>}
-                        {qty === 0 ? (
-                          <TouchableOpacity
-                            style={[cbs.addBtn, loose && { backgroundColor: "#0891B2" }]}
-                            activeOpacity={0.8}
-                            onPress={() => {
-                              if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
-                              else onAdd(item);
-                            }}
-                          >
-                            <Text style={cbs.addBtnText}>{loose ? t("home.select") : t("common.add")}</Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={cbs.qtyRow}>
-                            <TouchableOpacity style={cbs.qtyBtn} onPress={() => onRemove(item)}>
-                              <MaterialIcons name="remove" size={10} color={C.white} />
-                            </TouchableOpacity>
-                            <Text style={cbs.qtyNum}>{qty}</Text>
-                            <TouchableOpacity style={cbs.qtyBtn} onPress={() => onAdd(item)}>
-                              <MaterialIcons name="add" size={10} color={C.white} />
-                            </TouchableOpacity>
+                        {!isActive ? (
+                          <View style={cbs.unavailableBadge}>
+                            <MaterialIcons name="block" size={10} color={C.red} />
+                            <Text style={cbs.unavailableText}>Unavailable</Text>
                           </View>
+                        ) : (
+                          <>
+                            <Text style={cbs.priceText}>₹{p.price}</Text>
+                            {hasMrp && <Text style={cbs.mrpText}>₹{p.mrp}</Text>}
+                            {qty === 0 ? (
+                              <TouchableOpacity
+                                style={[cbs.addBtn, loose && { backgroundColor: "#0891B2" }]}
+                                activeOpacity={0.8}
+                                onPress={() => {
+                                  if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
+                                  else onAdd(item);
+                                }}
+                              >
+                                <Text style={cbs.addBtnText}>{loose ? t("home.select") : t("common.add")}</Text>
+                              </TouchableOpacity>
+                            ) : (
+                              <View style={cbs.qtyRow}>
+                                <TouchableOpacity style={cbs.qtyBtn} onPress={() => onRemove(item)}>
+                                  <MaterialIcons name="remove" size={10} color={C.white} />
+                                </TouchableOpacity>
+                                <Text style={cbs.qtyNum}>{qty}</Text>
+                                <TouchableOpacity style={cbs.qtyBtn} onPress={() => onAdd(item)}>
+                                  <MaterialIcons name="add" size={10} color={C.white} />
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </>
                         )}
                       </View>
                     </View>
@@ -1795,6 +1818,14 @@ const cbs = StyleSheet.create({
   },
   qtyBtn: { paddingHorizontal: 7, paddingVertical: 5 },
   qtyNum: { fontSize: 11, fontWeight: "800", color: C.white, minWidth: 18, textAlign: "center" },
+  productRowUnavailable: { backgroundColor: "#FEF2F2" },
+  unavailableBadge: {
+    flexDirection: "row", alignItems: "center", gap: 3,
+    backgroundColor: C.redLight, borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 3,
+    borderWidth: 1, borderColor: "#FECACA",
+  },
+  unavailableText: { fontSize: 9, fontWeight: "700", color: C.red },
   emptyWrap: { alignItems: "center", paddingVertical: 40, gap: 12 },
   emptyText: { fontSize: 14, color: C.gray400 },
 
@@ -1889,6 +1920,7 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
             <Text style={ic.badgeText}>{t("home.discountOff", { count: discPct })}</Text>
           </View>
         )}
+        <WishlistHeart productId={item.id} size={18} style={{ position: "absolute", top: 6, right: 6 }} />
         <Image
           source={{ uri: imgUri }}
           style={[ic.img, { width: size - 16, height: size - 16 }]}
@@ -1978,6 +2010,7 @@ function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPre
             <Text style={pic.discBadgeText}>{t("home.loose")}</Text>
           </View>
         )}
+        <WishlistHeart productId={item.id} size={16} style={{ position: "absolute", bottom: 6, left: 6 }} />
         <TouchableOpacity
           style={pic.eyeBtn}
           onPress={(e) => { e.stopPropagation?.(); onPress?.(); }}
@@ -3104,6 +3137,8 @@ export default function HomeScreen() {
   const allInventoryItems = useMemo(() => {
     const items = [];
     vendors.forEach((v) => {
+      const dist = parseFloat(v.distance_km);
+      if (!Number.isNaN(dist) && dist > NEARBY_RADIUS_KM) return;
       (v._inventory || []).forEach((inv) => {
         if ((inv.product?.is_active ?? true) && inv.product) {
           items.push({ ...inv, _vendorId: v.id, _vendorName: v.shop_name });
@@ -3312,6 +3347,7 @@ export default function HomeScreen() {
   const handleStoreSelect = useCallback(
     (vendor, item) => {
       setPickerVisible(false);
+      setCatSheetVisible(false);
       cart?.addItem?.(
         {
           id: item.id,
@@ -3487,6 +3523,16 @@ export default function HomeScreen() {
               <MaterialIcons name="expand-more" size={13} color={C.gray500} />
             </TouchableOpacity>
             <TouchableOpacity
+              style={s.accountBtn}
+              onPress={() => navigation.navigate("Wishlist")}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="favorite-border" size={16} color={C.red} />
+              {winW >= 900 && (
+                <Text style={s.accountBtnText}>Wishlist</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[s.cartBtn, cartCount > 0 && s.cartBtnActive]}
               onPress={() => navigation.navigate("Cart")}
               activeOpacity={0.8}
@@ -3563,6 +3609,13 @@ export default function HomeScreen() {
                 >
                   <MaterialIcons name="storefront" size={18} color={C.white} />
                 </LinearGradient>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.mobileWishBtn}
+                onPress={() => navigation.navigate("Wishlist")}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="favorite-border" size={28} color={C.red} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.mobileProfileBtn}
@@ -4438,6 +4491,7 @@ const s = StyleSheet.create({
   },
   mobileLocBtn: { flex: 1, marginRight: 8 },
   mobileLocBottom: { fontSize: 18, fontWeight: "700", color: C.gray900, flexShrink: 1 },
+  mobileWishBtn: { padding: 4 },
   mobileProfileBtn: {
     alignItems: "center",
     justifyContent: "center",
