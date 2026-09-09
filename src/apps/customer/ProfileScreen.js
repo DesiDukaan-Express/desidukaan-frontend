@@ -699,6 +699,12 @@ export default function ProfileScreen() {
             onPress={() => setShowPayments(true)}
           />
           <MenuItem
+            icon="help-circle"
+            label={t('profile.helpSupport')}
+            sub={t('profile.helpSupportSub')}
+            onPress={() => navigation.navigate("Support")}
+          />
+          <MenuItem
             icon="shield"
             label={t('auth.privacyPolicy')}
             onPress={() => navigation.navigate("Privacy")}

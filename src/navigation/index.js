@@ -17,6 +17,7 @@ import DeliveryTabs from "./DeliveryTabs";
 import CheckoutScreen from "../apps/customer/Checkout";
 import OrderPlaced from "../apps/customer/OrderPlaced";
 import PaymentScreen from "../apps/customer/PaymentScreen";
+import SupportScreen from "../apps/customer/SupportScreen";
 import VendorOnboardingScreen from "../apps/vendor/VendorOnboardingScreen";
 import DashboardScreen from "../apps/vendor/DashboardScreen";
 import DeliveryOnboardingScreen from "../apps/delivery/DeliveryOnboardingScreen";
@@ -338,6 +339,7 @@ export default function Navigation() {
             {/* ── Shared screens accessible from any role app ─── */}
             <Stack.Screen name="Checkout" component={CheckoutScreen} />
             <Stack.Screen name="Payment" component={PaymentScreen} />
+            <Stack.Screen name="Support" component={SupportScreen} />
             <Stack.Screen name="OrderPlaced" component={OrderPlaced} />
           </>
         )}

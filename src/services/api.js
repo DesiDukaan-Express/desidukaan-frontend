@@ -362,3 +362,10 @@ export const searchAPI = {
   },
 };
 
+export const supportAPI = {
+  createTicket: (data, token) => request("POST", "/support/tickets", data, token),
+  getMyTickets: (token, page = 1) => request("GET", `/support/tickets?page=${page}`, null, token),
+  getTicket: (id, token) => request("GET", `/support/tickets/${id}`, null, token),
+  addMessage: (id, message, token) => request("POST", `/support/tickets/${id}/messages`, { message }, token),
+};
+

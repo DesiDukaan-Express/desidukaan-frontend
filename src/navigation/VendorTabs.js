@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { View, Text, StyleSheet, Platform, Animated, TouchableOpacity } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
@@ -12,11 +13,22 @@ import InventoryScreen from "../apps/vendor/InventoryScreen";
 import VendorOrdersScreen from "../apps/vendor/VendorOrdersScreen";
 import EarningsScreen from "../apps/vendor/EarningsScreen";
 import VendorProfileScreen from "../apps/vendor/VendorProfileScreen";
+import SupportScreen from "../apps/customer/SupportScreen";
 
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
 
 export default function VendorTabs() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="VendorHome" component={VendorTabNavigator} />
+      <Stack.Screen name="Support" component={SupportScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function VendorTabNavigator() {
   const { t } = useTranslation();
   const { token } = useAuthStore();
   const insets = useSafeAreaInsets();
