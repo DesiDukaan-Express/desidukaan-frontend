@@ -127,6 +127,12 @@ export default function VendorProfileScreen() {
           setVendor((prev) => (prev ? { ...prev, ...changed } : prev));
         }
       });
+      // Broadcast open/close event — covers this screen's own toggle too, so
+      // the status reflects immediately even if the API response is delayed.
+      socket.on("shop:statusChanged", (data) => {
+        if (!data || Number(data.vendorId) !== Number(vendor.id)) return;
+        if (data.is_open !== undefined) setStoreOpen(data.is_open);
+      });
     } catch {
       // socket best-effort — polling/refresh still covers sync
     }
@@ -182,7 +188,11 @@ export default function VendorProfileScreen() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (!data.success) setStoreOpen(prev);
+      if (data.success) {
+        // Reconcile with server truth (covers races between optimistic
+        // update, the socket broadcast and the actual DB value).
+        if (data.data?.is_open !== undefined) setStoreOpen(data.data.is_open);
+      } else setStoreOpen(prev);
     } catch {
       setStoreOpen(prev);
     }

@@ -22,6 +22,7 @@ import { useNavigation } from "@react-navigation/native";
 import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
+import { productReviewsAPI } from "../../services/productReviews";
 import { TextInput, Alert } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -139,22 +140,22 @@ const haversineKm = (lat1, lng1, lat2, lng2) => {
 
 // ─── Status → header message mapping ─────────────────────────────────────────
 const STATUS_HEADER_TEXTS = {
-  pending:   "Order Placed",
-  accepted:  "Order Accepted",
+  pending: "Order Placed",
+  accepted: "Order Accepted",
   preparing: "Order is being prepared",
-  ready:     "Ready for pickup",
+  ready: "Ready for pickup",
   picked_up: "Order is on the way",
   delivered: "Delivered!",
   cancelled: "Order Cancelled",
-  rejected:  "Order Rejected",
+  rejected: "Order Rejected",
 };
 const getHeaderText = (s) => STATUS_HEADER_TEXTS[s] || "Order Placed";
 
 // ─── Status → partner message mapping ────────────────────────────────────────
 const PARTNER_STATUS_MSGS = {
-  accepted:  "I have accepted your order and am heading to the store",
+  accepted: "I have accepted your order and am heading to the store",
   preparing: "I am at the store preparing your order",
-  ready:     "I have your order and am ready to head your way",
+  ready: "I have your order and am ready to head your way",
   picked_up: "I have picked up your order and am on the way to your location",
 };
 const getPartnerMsg = (s) => PARTNER_STATUS_MSGS[s] || "Your delivery partner is on the way";
@@ -198,7 +199,7 @@ const getETALabel = (status, mins) => {
   if (mins == null) return null;
   const t = formatETA(mins);
   if (status === "picked_up") return `Arriving in ~${t}`;
-  if (status === "ready")     return `Pickup ready · ~${t} away`;
+  if (status === "ready") return `Pickup ready · ~${t} away`;
   return `Est. delivery in ~${t}`;
 };
 
@@ -212,17 +213,17 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
 
   const initialLocation =
     order?.delivery?.partner?.current_lat &&
-    order?.delivery?.partner?.current_lng
+      order?.delivery?.partner?.current_lng
       ? {
-          lat: order.delivery.partner.current_lat,
-          lng: order.delivery.partner.current_lng,
-        }
+        lat: order.delivery.partner.current_lat,
+        lng: order.delivery.partner.current_lng,
+      }
       : order?.delivery_partner?.current_lat &&
-          order?.delivery_partner?.current_lng
+        order?.delivery_partner?.current_lng
         ? {
-            lat: order.delivery_partner.current_lat,
-            lng: order.delivery_partner.current_lng,
-          }
+          lat: order.delivery_partner.current_lat,
+          lng: order.delivery_partner.current_lng,
+        }
         : null;
 
   const hookData = useDriverLocation(
@@ -233,9 +234,9 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
     initialLocation,
   );
 
-  const partnerPos  = externalPos  ?? hookData.partnerPos;
-  const connected   = externalConnected ?? hookData.connected;
-  const lastUpdate  = externalLastUpdate ?? hookData.lastUpdate;
+  const partnerPos = externalPos ?? hookData.partnerPos;
+  const connected = externalConnected ?? hookData.connected;
+  const lastUpdate = externalLastUpdate ?? hookData.lastUpdate;
 
   // Pulsing "LIVE" badge animation
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -280,163 +281,78 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
 
   return (
     <>
-    <View style={dlm.card}>
-      {/* Card header */}
-      <View style={dlm.header}>
-        <View style={dlm.headerLeft}>
-          <View style={dlm.mapIconBg}>
-            <Feather name="map" size={14} color={C.green} />
-          </View>
-          <Text style={dlm.headerTitle}>Driver Location</Text>
-        </View>
-        <View style={dlm.headerRight}>
-          <TouchableOpacity
-            style={dlm.viewBtn}
-            onPress={() => setShowFullMap(true)}
-            activeOpacity={0.7}
-          >
-            <Feather name="maximize-2" size={13} color={C.green} />
-            <Text style={dlm.viewBtnText}>View</Text>
-          </TouchableOpacity>
-          <View style={dlm.liveBadge}>
-            <Animated.View style={[dlm.liveDot, { opacity: pulseAnim }]} />
-            <Text style={dlm.liveText}>LIVE</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Map */}
-      <View style={dlm.mapWrap}>
-        <CustomerMapView
-          partnerPos={partnerPos}
-          destLat={destLat}
-          destLng={destLng}
-        />
-
-        {/* Arriving banner on map */}
-        {partnerPos && etaMins != null && (
-          <View style={dlm.mapArriveBanner}>
-            <Feather name="navigation" size={14} color={C.green} />
-            <Text style={dlm.mapArriveText}>
-              Arriving in{" "}
-              <Text style={dlm.mapArriveBold}>
-                ~{etaMins} {etaMins === 1 ? "min" : "mins"}
-              </Text>
-            </Text>
-          </View>
-        )}
-
-        {/* Locating overlay — shown until first position arrives */}
-        {isLocating && (
-          <View style={dlm.locatingOverlay}>
-            <ActivityIndicator size="small" color={C.green} />
-            <Text style={dlm.locatingText}>
-              {hasDriver
-                ? "Locating driver…"
-                : "Waiting for driver assignment…"}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Status row */}
-      <View style={dlm.statusRow}>
-        <View
-          style={[
-            dlm.connDot,
-            { backgroundColor: connected ? C.green : C.gray300 },
-          ]}
-        />
-        <Text style={dlm.connText}>
-          {connected ? "Connected — live updates" : "Reconnecting…"}
-        </Text>
-        {lastUpdate && (
-          <Text style={dlm.lastUpdate}>
-            {lastUpdate.toLocaleTimeString("en-IN", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            })}
-          </Text>
-        )}
-      </View>
-    </View>
-
-    {/* ── Full-Screen Map Modal ── */}
-    <Modal
-      visible={showFullMap}
-      animationType="slide"
-      onRequestClose={() => setShowFullMap(false)}
-    >
-      <View style={dlm.fullScreenWrap}>
-        {/* Header row */}
-        <View style={dlm.fullMapHeader}>
-          <View style={dlm.fullMapHeaderLeft}>
+      <View style={dlm.card}>
+        {/* Card header */}
+        <View style={dlm.header}>
+          <View style={dlm.headerLeft}>
             <View style={dlm.mapIconBg}>
               <Feather name="map" size={14} color={C.green} />
             </View>
-            <Text style={dlm.fullMapTitle}>Live Tracking</Text>
+            <Text style={dlm.headerTitle}>Driver Location</Text>
           </View>
-          <View style={dlm.fullMapHeaderRight}>
-            {partnerPos && (
-              <View style={dlm.fullMapLiveBadge}>
-                <Animated.View style={[dlm.liveDot, { opacity: pulseAnim }]} />
-                <Text style={dlm.liveText}>LIVE</Text>
-              </View>
-            )}
+          <View style={dlm.headerRight}>
             <TouchableOpacity
-              style={dlm.fullMapCloseBtn}
-              onPress={() => setShowFullMap(false)}
+              style={dlm.viewBtn}
+              onPress={() => setShowFullMap(true)}
               activeOpacity={0.7}
             >
-              <Feather name="x" size={18} color={C.white} />
+              <Feather name="maximize-2" size={13} color={C.green} />
+              <Text style={dlm.viewBtnText}>View</Text>
             </TouchableOpacity>
+            <View style={dlm.liveBadge}>
+              <Animated.View style={[dlm.liveDot, { opacity: pulseAnim }]} />
+              <Text style={dlm.liveText}>LIVE</Text>
+            </View>
           </View>
         </View>
 
-        {/* Arriving banner on full map */}
-        {partnerPos && etaMins != null && (
-          <View style={dlm.fullMapArriveBanner}>
-            <Feather name="navigation" size={15} color={C.green} />
-            <Text style={dlm.fullMapArriveText}>
-              Arriving in{" "}
-              <Text style={dlm.fullMapArriveBold}>
-                ~{etaMins} {etaMins === 1 ? "min" : "mins"}
+        {/* Map */}
+        <View style={dlm.mapWrap}>
+          <CustomerMapView
+            partnerPos={partnerPos}
+            destLat={destLat}
+            destLng={destLng}
+          />
+
+          {/* Arriving banner on map */}
+          {partnerPos && etaMins != null && (
+            <View style={dlm.mapArriveBanner}>
+              <Feather name="navigation" size={14} color={C.green} />
+              <Text style={dlm.mapArriveText}>
+                Arriving in{" "}
+                <Text style={dlm.mapArriveBold}>
+                  ~{etaMins} {etaMins === 1 ? "min" : "mins"}
+                </Text>
               </Text>
-            </Text>
-          </View>
-        )}
+            </View>
+          )}
 
-        {/* Full map — fills remaining space */}
-          <View style={dlm.fullMapContainer}>
-            <CustomerMapView
-              partnerPos={partnerPos}
-              destLat={destLat}
-              destLng={destLng}
-              style={{ height: "100%", borderRadius: 0 }}
-            />
-
-          {/* Locating overlay */}
+          {/* Locating overlay — shown until first position arrives */}
           {isLocating && (
-            <View style={dlm.locatingOverlayFull}>
+            <View style={dlm.locatingOverlay}>
               <ActivityIndicator size="small" color={C.green} />
               <Text style={dlm.locatingText}>
-                {hasDriver ? "Locating driver…" : "Waiting for driver assignment…"}
+                {hasDriver
+                  ? "Locating driver…"
+                  : "Waiting for driver assignment…"}
               </Text>
             </View>
           )}
         </View>
 
-        {/* Bottom info bar */}
-        <View style={dlm.fullMapInfoBar}>
-          <View style={dlm.fullMapInfoLeft}>
-            <View style={[dlm.connDot, { backgroundColor: connected ? C.green : C.gray300 }]} />
-            <Text style={dlm.fullMapInfoText}>
-              {connected ? "Connected — live updates" : "Reconnecting…"}
-            </Text>
-          </View>
+        {/* Status row */}
+        <View style={dlm.statusRow}>
+          <View
+            style={[
+              dlm.connDot,
+              { backgroundColor: connected ? C.green : C.gray300 },
+            ]}
+          />
+          <Text style={dlm.connText}>
+            {connected ? "Connected — live updates" : "Reconnecting…"}
+          </Text>
           {lastUpdate && (
-            <Text style={dlm.fullMapInfoTime}>
+            <Text style={dlm.lastUpdate}>
               {lastUpdate.toLocaleTimeString("en-IN", {
                 hour: "2-digit",
                 minute: "2-digit",
@@ -446,7 +362,92 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
           )}
         </View>
       </View>
-    </Modal>
+
+      {/* ── Full-Screen Map Modal ── */}
+      <Modal
+        visible={showFullMap}
+        animationType="slide"
+        onRequestClose={() => setShowFullMap(false)}
+      >
+        <View style={dlm.fullScreenWrap}>
+          {/* Header row */}
+          <View style={dlm.fullMapHeader}>
+            <View style={dlm.fullMapHeaderLeft}>
+              <View style={dlm.mapIconBg}>
+                <Feather name="map" size={14} color={C.green} />
+              </View>
+              <Text style={dlm.fullMapTitle}>Live Tracking</Text>
+            </View>
+            <View style={dlm.fullMapHeaderRight}>
+              {partnerPos && (
+                <View style={dlm.fullMapLiveBadge}>
+                  <Animated.View style={[dlm.liveDot, { opacity: pulseAnim }]} />
+                  <Text style={dlm.liveText}>LIVE</Text>
+                </View>
+              )}
+              <TouchableOpacity
+                style={dlm.fullMapCloseBtn}
+                onPress={() => setShowFullMap(false)}
+                activeOpacity={0.7}
+              >
+                <Feather name="x" size={18} color={C.white} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Arriving banner on full map */}
+          {partnerPos && etaMins != null && (
+            <View style={dlm.fullMapArriveBanner}>
+              <Feather name="navigation" size={15} color={C.green} />
+              <Text style={dlm.fullMapArriveText}>
+                Arriving in{" "}
+                <Text style={dlm.fullMapArriveBold}>
+                  ~{etaMins} {etaMins === 1 ? "min" : "mins"}
+                </Text>
+              </Text>
+            </View>
+          )}
+
+          {/* Full map — fills remaining space */}
+          <View style={dlm.fullMapContainer}>
+            <CustomerMapView
+              partnerPos={partnerPos}
+              destLat={destLat}
+              destLng={destLng}
+              style={{ height: "100%", borderRadius: 0 }}
+            />
+
+            {/* Locating overlay */}
+            {isLocating && (
+              <View style={dlm.locatingOverlayFull}>
+                <ActivityIndicator size="small" color={C.green} />
+                <Text style={dlm.locatingText}>
+                  {hasDriver ? "Locating driver…" : "Waiting for driver assignment…"}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Bottom info bar */}
+          <View style={dlm.fullMapInfoBar}>
+            <View style={dlm.fullMapInfoLeft}>
+              <View style={[dlm.connDot, { backgroundColor: connected ? C.green : C.gray300 }]} />
+              <Text style={dlm.fullMapInfoText}>
+                {connected ? "Connected — live updates" : "Reconnecting…"}
+              </Text>
+            </View>
+            {lastUpdate && (
+              <Text style={dlm.fullMapInfoTime}>
+                {lastUpdate.toLocaleTimeString("en-IN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })}
+              </Text>
+            )}
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -730,12 +731,13 @@ function OrderDetailModal({ order, onClose }) {
   const [fetching, setFetching] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [tipSent, setTipSent] = useState(false);
-  const [feedbackSent, setFeedbackSent] = useState(false);
   const [selectedTip, setSelectedTip] = useState(null);
   const [customTip, setCustomTip] = useState("");
   const [tipSending, setTipSending] = useState(false);
-  const [feedbackText, setFeedbackText] = useState("");
-  const [feedbackSending, setFeedbackSending] = useState(false);
+
+  // Per-item product reviews (read-only display for delivered orders)
+  const [itemRatingsMap, setItemRatingsMap] = useState({});
+  const [itemRatingsLoading, setItemRatingsLoading] = useState(false);
 
   // Use fullOrder if available for more details, otherwise fallback to order
   const displayOrder = fullOrder || order;
@@ -783,51 +785,44 @@ function OrderDetailModal({ order, onClose }) {
     }
   };
 
-  // Reset tip/feedback state whenever a different order is opened
+  // Reset tip state whenever a different order is opened
   useEffect(() => {
     setTipSent(false);
-    setFeedbackSent(false);
     setSelectedTip(null);
     setCustomTip("");
-    setFeedbackText("");
   }, [order?.id]);
+
+  // Fetch per-item product reviews for read-only display in delivered orders
+  useEffect(() => {
+    if (!order || order.status !== "delivered") return;
+    const items = order.order_items || order.items || [];
+    const productIds = items.map(i => i.product_id).filter(Boolean);
+    if (productIds.length === 0) return;
+
+    setItemRatingsLoading(true);
+    productReviewsAPI.getBulk(productIds, token, order.id)
+      .then(res => {
+        if (res.success) {
+          const map = {};
+          Object.entries(res.data).forEach(([pid, info]) => {
+            map[pid] = info;
+          });
+          setItemRatingsMap(map);
+        }
+      })
+      .catch(() => { })
+      .finally(() => setItemRatingsLoading(false));
+  }, [order?.id, order?.status, token]);
 
   const handleSendTip = () => {
     if (!(selectedTip || customTip)) return;
     Alert.alert("Tipping coming soon", "Tips aren't available yet. Hang tight!");
   };
 
-  const handleSendFeedback = async () => {
-    const text = feedbackText.trim();
-    if (!text) return;
-    setFeedbackSending(true);
-    try {
-      const res = await fetch(`${BASE_URL}/orders/${order.id}/review`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ comment: text }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setFeedbackSent(true);
-      } else {
-        Alert.alert("Error", data.message || "Failed to submit feedback.");
-      }
-    } catch (e) {
-      console.error("Feedback error:", e);
-      Alert.alert("Error", "Failed to submit feedback.");
-    } finally {
-      setFeedbackSending(false);
-    }
-  };
-
   // ── Live driver location & ETA — MUST be before early return (hooks rule) ──
   const initialLocation =
     order?.delivery?.partner?.current_lat &&
-    order?.delivery?.partner?.current_lng
+      order?.delivery?.partner?.current_lng
       ? { lat: order.delivery.partner.current_lat, lng: order.delivery.partner.current_lng }
       : order?.delivery_partner?.current_lat && order?.delivery_partner?.current_lng
         ? { lat: order.delivery_partner.current_lat, lng: order.delivery_partner.current_lng }
@@ -882,7 +877,7 @@ function OrderDetailModal({ order, onClose }) {
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={od.backdrop} onPress={onClose}>
-        <Pressable style={od.sheet} onPress={() => {}}>
+        <Pressable style={od.sheet} onPress={() => { }}>
           <View style={od.handle} />
 
           <ScrollView showsVerticalScrollIndicator={false}>
@@ -898,14 +893,16 @@ function OrderDetailModal({ order, onClose }) {
             </View>
 
             {/* ── Colored status banner ── */}
-            <View style={[od.statusCard, { backgroundColor: (() => {
-              const s = order?.status;
-              if (["accepted", "preparing", "ready", "delivered"].includes(s)) return C.green;
-              if (s === "picked_up") return "#0E7490";
-              if (s === "pending") return "#D97706";
-              if (["cancelled", "rejected"].includes(s)) return C.gray500;
-              return C.green;
-            })() }]}>
+            <View style={[od.statusCard, {
+              backgroundColor: (() => {
+                const s = order?.status;
+                if (["accepted", "preparing", "ready", "delivered"].includes(s)) return C.green;
+                if (s === "picked_up") return "#0E7490";
+                if (s === "pending") return "#D97706";
+                if (["cancelled", "rejected"].includes(s)) return C.gray500;
+                return C.green;
+              })()
+            }]}>
               <View style={od.statusRow}>
                 <View style={od.statusIconBg}>
                   <Feather name={order?.status === "picked_up" ? "truck" : order?.status === "delivered" ? "check-circle" : isFailed ? "x-circle" : "package"} size={26} color={C.white} />
@@ -914,11 +911,11 @@ function OrderDetailModal({ order, onClose }) {
                   <Text style={od.statusLabel}>
                     {order?.status === "delivered" ? "DELIVERED"
                       : isFailed ? (order?.status || "").toUpperCase()
-                      : order?.status === "picked_up" ? "OUT FOR DELIVERY"
-                      : order?.status === "ready" ? "READY FOR PICKUP"
-                      : order?.status === "preparing" ? "PREPARING"
-                      : order?.status === "accepted" ? "ACCEPTED"
-                      : "ORDER PLACED"}
+                        : order?.status === "picked_up" ? "OUT FOR DELIVERY"
+                          : order?.status === "ready" ? "READY FOR PICKUP"
+                            : order?.status === "preparing" ? "PREPARING"
+                              : order?.status === "accepted" ? "ACCEPTED"
+                                : "ORDER PLACED"}
                   </Text>
                   <Text style={od.statusTitle}>
                     {isActive
@@ -963,7 +960,7 @@ function OrderDetailModal({ order, onClose }) {
                   partnerPos={partnerPos}
                   connected={connected}
                   lastUpdate={lastUpdate}
-/>
+                />
               )}
 
               {/* ── TIP & FEEDBACK SECTION ── */}
@@ -1030,53 +1027,6 @@ function OrderDetailModal({ order, onClose }) {
                       <Text style={od.tipSuccessText}>{t('orders.tipThanks', 'Thank you for tipping!')}</Text>
                     </View>
                   )}
-
-                  {/* ── Divider ── */}
-                  <View style={od.tfDivider} />
-
-                  {/* ── Feedback — only after delivery ── */}
-                  {isDelivered ? (
-                    !feedbackSent ? (
-                      <>
-                        <View style={od.tfHeader}>
-                          <View style={od.tfIconBg}>
-                            <Feather name="message-circle" size={18} color={C.orange} />
-                          </View>
-                          <View>
-                            <Text style={od.tfTitle}>{t('orders.feedbackTitle', 'Leave Feedback')}</Text>
-                            <Text style={od.tfSubtitle}>{t('orders.feedbackSubtitle', 'How was your delivery?')}</Text>
-                          </View>
-                        </View>
-                        <View style={od.feedbackRow}>
-                          <TextInput
-                            style={od.feedbackInput}
-                            placeholder={t('orders.feedbackPlaceholder', 'Great delivery, polite partner…')}
-                            placeholderTextColor={C.gray400}
-                            value={feedbackText}
-                            onChangeText={setFeedbackText}
-                            maxLength={200}
-                          />
-                          <TouchableOpacity
-                            style={[od.feedbackSendBtn, (!feedbackText.trim() || feedbackSending) && { opacity: 0.5 }]}
-                            onPress={handleSendFeedback}
-                            disabled={!feedbackText.trim() || feedbackSending}
-                            activeOpacity={0.7}
-                          >
-                            {feedbackSending ? (
-                              <ActivityIndicator size="small" color={C.white} />
-                            ) : (
-                              <Feather name="send" size={16} color={C.white} />
-                            )}
-                          </TouchableOpacity>
-                        </View>
-                      </>
-                    ) : (
-                      <View style={od.tipSuccess}>
-                        <Feather name="check-circle" size={24} color={C.green} />
-                        <Text style={od.tipSuccessText}>{t('orders.feedbackThanks', 'Feedback sent!')}</Text>
-                      </View>
-                    )
-                  ) : null}
                 </View>
               )}
 
@@ -1209,29 +1159,61 @@ function OrderDetailModal({ order, onClose }) {
                 const name = item.product_name || p.name || "Item";
                 const price = item.product_price || p.price || item.price || 0;
                 const qty = item.quantity || 1;
+                const pid = item.product_id;
+                const alreadyRated = pid && itemRatingsMap[pid]?.ratedInOrder;
                 return (
-                  <View key={i} style={od.itemRow}>
-                    <Image
-                      source={{
-                        uri:
-                          p.image_url ||
-                          "https://images.unsplash.com/photo-1542838132-92c53300491e?w=200",
-                      }}
-                      style={od.itemImg}
-                      resizeMode="cover"
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={od.itemName} numberOfLines={2}>
-                        {name}
-                      </Text>
-                      <Text style={od.itemUnit}>
-                        {p.unit || item.unit || "1 pc"}
-                      </Text>
+                  <View key={i}>
+                    <View style={od.itemRow}>
+                      <Image
+                        source={{
+                          uri:
+                            p.image_url ||
+                            "https://images.unsplash.com/photo-1542838132-92c53300491e?w=200",
+                        }}
+                        style={od.itemImg}
+                        resizeMode="cover"
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={od.itemName} numberOfLines={2}>
+                          {name}
+                        </Text>
+                        <Text style={od.itemUnit}>
+                          {p.unit || item.unit || "1 pc"}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: "flex-end" }}>
+                        <Text style={od.itemQty}>×{qty}</Text>
+                        <Text style={od.itemPrice}>₹{price * qty}</Text>
+                      </View>
                     </View>
-                    <View style={{ alignItems: "flex-end" }}>
-                      <Text style={od.itemQty}>×{qty}</Text>
-                      <Text style={od.itemPrice}>₹{price * qty}</Text>
-                    </View>
+                    {/* Per-item review display (delivered orders only) */}
+                    {isDelivered && pid && itemRatingsLoading && (
+                      <View style={od.itemRatingRow}>
+                        <ActivityIndicator size="small" color={C.yellow} />
+                      </View>
+                    )}
+                    {isDelivered && pid && !itemRatingsLoading && alreadyRated && (
+                      <View style={od.itemRatingRow}>
+                        <View>
+                          <View style={od.itemRatingDone}>
+                            <Text style={od.itemRatingDoneText}>Rated </Text>
+                            {[1, 2, 3, 4, 5].map(s => (
+                              <MaterialIcons
+                                key={s}
+                                name={s <= (itemRatingsMap[pid]?.myRatingInOrder || 0) ? "star" : "star-outline"}
+                                size={14}
+                                color={s <= (itemRatingsMap[pid]?.myRatingInOrder || 0) ? "#F59E0B" : "#D1D5DB"}
+                              />
+                            ))}
+                          </View>
+                          {itemRatingsMap[pid]?.myComment && (
+                            <Text style={{ fontSize: 11, color: "#6B7280", fontStyle: "italic", marginLeft: 4, marginTop: 2 }}>
+                              {itemRatingsMap[pid].myComment}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    )}
                   </View>
                 );
               })}
@@ -1641,6 +1623,45 @@ const od = StyleSheet.create({
     color: C.gray900,
     marginTop: 2,
   },
+  itemRatingRow: {
+    paddingLeft: 60,
+    paddingBottom: 8,
+  },
+  itemRatingDone: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  itemRatingDoneText: {
+    fontSize: 12,
+    color: C.green,
+    fontWeight: "600",
+    marginRight: 2,
+  },
+  itemRatingInteractive: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  itemRatingLabel: {
+    fontSize: 12,
+    color: C.gray500,
+    fontWeight: "600",
+    marginRight: 2,
+  },
+  submitRatingsBtn: {
+    backgroundColor: C.green,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  submitRatingsBtnText: {
+    color: C.white,
+    fontSize: 14,
+    fontWeight: "700",
+  },
 
   // Bill
   billBox: {
@@ -1819,7 +1840,7 @@ const od = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  
+
   tfTitle: {
     fontSize: 16,
     fontWeight: "800",
@@ -1955,14 +1976,14 @@ const formatCardDate = (iso) => {
     day: "numeric",
     month: "short",
   });
-  
+
   let hours = d.getHours();
   const minutes = d.getMinutes();
   const ampm = hours >= 12 ? 'pm' : 'am';
   hours = hours % 12;
   hours = hours ? hours : 12;
-  const minutesStr = minutes < 10 ? '0'+minutes : minutes;
-  
+  const minutesStr = minutes < 10 ? '0' + minutes : minutes;
+
   return `${datePart}, ${hours}:${minutesStr} ${ampm}`;
 };
 
@@ -2046,9 +2067,9 @@ function OrderCard({ order, onPress, onRate, onViewRating, alreadyRated, onReord
       else etaMins = 30;
     }
   }
-  const showETA  = etaMins != null;
+  const showETA = etaMins != null;
   const etaLabel = showETA ? getETALabel(order.status, etaMins) : null;
-  const distKm   = order.delivery_distance_km ?? null;
+  const distKm = order.delivery_distance_km ?? null;
 
 
   return (
@@ -2131,7 +2152,7 @@ function OrderCard({ order, onPress, onRate, onViewRating, alreadyRated, onReord
                 <Text style={oc.actionBtnText}>{t('orders.reorder', 'Reorder')}</Text>
               </TouchableOpacity>
             )}
-            
+
             <View style={oc.actionDivider} />
 
             {(() => {
@@ -2139,9 +2160,9 @@ function OrderCard({ order, onPress, onRate, onViewRating, alreadyRated, onReord
               const num = ratingVal ? parseInt(ratingVal, 10) || 5 : 5;
               const starsText = "★".repeat(Math.max(1, Math.min(5, num)));
               return (
-                <TouchableOpacity 
-                  style={oc.actionBtn} 
-                  onPress={alreadyRated ? () => onViewRating(order) : onRate} 
+                <TouchableOpacity
+                  style={oc.actionBtn}
+                  onPress={alreadyRated ? () => onViewRating(order) : onRate}
                   activeOpacity={0.7}
                 >
                   {alreadyRated ? (
@@ -2160,7 +2181,7 @@ function OrderCard({ order, onPress, onRate, onViewRating, alreadyRated, onReord
         ) : (
           <>
             {["accepted", "preparing", "ready", "picked_up"].includes(order.status) &&
-            (order.delivery_partner_id || order.delivery_partner) ? (
+              (order.delivery_partner_id || order.delivery_partner) ? (
               <TouchableOpacity style={oc.actionBtn} onPress={onPress} activeOpacity={0.7}>
                 <Text style={oc.actionBtnText}>{t('orders.trackOrder', 'Track Order')}</Text>
               </TouchableOpacity>
@@ -2169,7 +2190,7 @@ function OrderCard({ order, onPress, onRate, onViewRating, alreadyRated, onReord
                 <Text style={oc.actionBtnText}>{t('orders.viewDetails', 'View Details')}</Text>
               </TouchableOpacity>
             )}
-            
+
             <View style={oc.actionDivider} />
 
             <TouchableOpacity style={oc.actionBtn} onPress={onPress} activeOpacity={0.7}>
@@ -2328,19 +2349,35 @@ export default function MyOrdersScreen() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [reviewOrder, setReviewOrder] = useState(null);
+  const [reviewMode, setReviewMode] = useState(null); // null | "select" | "product" | "shop"
   const [viewRatingOrder, setViewRatingOrder] = useState(null);
   const [viewRatingLoading, setViewRatingLoading] = useState(false);
   const [fetchedRating, setFetchedRating] = useState(null);
-  const [reviewRating, setReviewRating] = useState(0);
-  const [reviewComment, setReviewComment] = useState("");
+  const [storeRating, setStoreRating] = useState(0);
+  const [storeComment, setStoreComment] = useState("");
+  const [deliveryRating, setDeliveryRating] = useState(0);
+  const [deliveryComment, setDeliveryComment] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [shopFeedback, setShopFeedback] = useState("");
+  const [productRatings, setProductRatings] = useState({});
+  const [productComments, setProductComments] = useState({});
+  const [productRatingsSubmitting, setProductRatingsSubmitting] = useState(false);
 
   const handleOpenViewRating = async (order) => {
     setViewRatingOrder(order);
     setViewRatingLoading(true);
-    const initialRating = order.user_rating || order.rating || (order.reviews?.[0]?.vendor_rating) || 5;
-    const initialComment = order.review_comment || (order.reviews?.[0]?.comment) || "";
-    setFetchedRating({ rating: initialRating, comment: initialComment });
+    const rev = order.reviews?.[0] || {};
+    const initialStoreRating = order.user_rating || order.rating || rev.vendor_rating || null;
+    const initialStoreComment = order.review_comment || rev.comment || "";
+    const initialDeliveryRating = rev.partner_rating || null;
+    const initialDeliveryComment = rev.partner_comment || "";
+
+    setFetchedRating({
+      storeRating: initialStoreRating,
+      storeComment: initialStoreComment,
+      deliveryRating: initialDeliveryRating,
+      deliveryComment: initialDeliveryComment
+    });
 
     try {
       const res = await fetch(`${BASE_URL}/orders/${order.id}`, {
@@ -2349,9 +2386,12 @@ export default function MyOrdersScreen() {
       const data = await res.json();
       const o = data.data?.order || data.order;
       if (o) {
+        const oRev = o.reviews?.[0] || {};
         setFetchedRating({
-          rating: o.user_rating ?? o.reviews?.[0]?.vendor_rating ?? initialRating,
-          comment: o.review_comment ?? o.reviews?.[0]?.comment ?? initialComment,
+          storeRating: o.user_rating ?? oRev.vendor_rating ?? initialStoreRating,
+          storeComment: o.review_comment ?? oRev.comment ?? initialStoreComment,
+          deliveryRating: oRev.partner_rating ?? initialDeliveryRating,
+          deliveryComment: oRev.partner_comment ?? initialDeliveryComment,
         });
       }
     } catch (e) {
@@ -2362,8 +2402,8 @@ export default function MyOrdersScreen() {
   };
 
   const submitReview = async () => {
-    if (reviewRating === 0) {
-      Alert.alert("Please select a rating");
+    if (storeRating === 0) {
+      Alert.alert("Please select a store rating");
       return;
     }
     setReviewLoading(true);
@@ -2375,31 +2415,85 @@ export default function MyOrdersScreen() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          vendor_rating: reviewRating,
-          comment: reviewComment,
+          vendor_rating: storeRating,
+          comment: storeComment,
+          partner_rating: deliveryRating > 0 ? deliveryRating : null,
+          partner_comment: deliveryComment,
         }),
       });
       const data = await res.json();
       if (data.success) {
-        const submittedRating = reviewRating;
         const currentOrderId = reviewOrder.id;
         setOrders((prev) =>
           prev.map((o) =>
             o.id === currentOrderId
-              ? { ...o, has_reviewed: true, user_rating: submittedRating }
+              ? { ...o, has_reviewed: true, user_rating: storeRating }
               : o
           )
         );
         setReviewOrder(null);
-        setReviewRating(0);
-        setReviewComment("");
+        setStoreRating(0);
+        setStoreComment("");
+        setDeliveryRating(0);
+        setDeliveryComment("");
         fetchOrders(true);
-        Alert.alert("Thank you!", "Your review has been submitted.");
+        Alert.alert("Thank you!", "Shop review submitted.");
+      } else {
+        Alert.alert("Error", data.message || "Failed to submit review.");
       }
     } catch (e) {
       Alert.alert("Error", "Failed to submit review.");
     } finally {
       setReviewLoading(false);
+    }
+  };
+
+  const submitProductReviews = async () => {
+    const items = reviewOrder.order_items || reviewOrder.items || [];
+    const orderId = reviewOrder.id;
+    const toSubmit = items
+      .map((item) => {
+        const pid = item.product_id;
+        if (!pid) return null;
+        const r = productRatings[pid];
+        if (!r) return null;
+        return {
+          product_id: pid,
+          rating: r,
+          order_id: orderId,
+          ...(productComments[pid]?.trim() ? { comment: productComments[pid].trim() } : {}),
+        };
+      })
+      .filter(Boolean);
+
+    if (toSubmit.length === 0) {
+      Alert.alert("Please rate at least one product");
+      return;
+    }
+    setProductRatingsSubmitting(true);
+    try {
+      const res = await productReviewsAPI.submitBulk(toSubmit, token);
+      if (res.success) {
+        const currentOrderId = reviewOrder.id;
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === currentOrderId
+              ? { ...o, has_reviewed: true }
+              : o
+          )
+        );
+        setReviewOrder(null);
+        setReviewMode(null);
+        setProductRatings({});
+        setProductComments({});
+        Alert.alert("Thank you!", "Product ratings submitted.");
+      } else {
+        Alert.alert("Error", res.message || "Failed to submit ratings.");
+      }
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to submit ratings.");
+    } finally {
+      setProductRatingsSubmitting(false);
     }
   };
 
@@ -2482,12 +2576,12 @@ export default function MyOrdersScreen() {
       Alert.alert("Error", "No items found in this order to reorder.");
       return;
     }
-    
+
     const vendorId = order.vendor_id || order.vendor?.id;
-    
+
     // Clear cart first so we can fill it with the reordered items cleanly
     clearCart();
-    
+
     // Add each item
     items.forEach(item => {
       const p = item.product || {};
@@ -2501,13 +2595,13 @@ export default function MyOrdersScreen() {
         image: p.image_url,
         unit: p.unit || item.unit || "1 pc"
       };
-      
+
       addItem(prod, vendorId);
       if (qty > 1) {
         updateQty(prod.id, qty);
       }
     });
-    
+
     Alert.alert(
       "Reordered!",
       "All items have been added to your cart.",
@@ -2527,24 +2621,24 @@ export default function MyOrdersScreen() {
   const filtered = orders.filter((o) => {
     if (activeTab === "active" && !ACTIVE_STATUSES.includes(o.status)) return false;
     if (activeTab === "past" && !PAST_STATUSES.includes(o.status)) return false;
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       const shopName = (o.vendor?.shop_name || o.vendor_name || "").toLowerCase();
       const orderNum = (o.order_number || o.id?.toString() || "").toLowerCase();
-      
+
       const matchesShop = shopName.includes(query);
       const matchesOrderNum = orderNum.includes(query);
-      
+
       const items = o.order_items || o.items || [];
       const matchesItems = items.some(item => {
         const name = (item.product_name || item.product?.name || "").toLowerCase();
         return name.includes(query);
       });
-      
+
       return matchesShop || matchesOrderNum || matchesItems;
     }
-    
+
     return true;
   });
 
@@ -2728,8 +2822,10 @@ export default function MyOrdersScreen() {
               onPress={() => setDetailOrder(order)}
               onRate={() => {
                 setReviewOrder(order);
-                setReviewRating(0);
-                setReviewComment("");
+                setStoreRating(0);
+                setStoreComment("");
+                setDeliveryRating(0);
+                setDeliveryComment("");
               }}
               onViewRating={(o) => handleOpenViewRating(o)}
               alreadyRated={!!order.has_reviewed}
@@ -2753,7 +2849,7 @@ export default function MyOrdersScreen() {
         visible={!!reviewOrder}
         animationType="slide"
         transparent
-        onRequestClose={() => setReviewOrder(null)}
+        onRequestClose={() => { setReviewOrder(null); setReviewMode(null); }}
       >
         <Pressable
           style={{
@@ -2761,7 +2857,7 @@ export default function MyOrdersScreen() {
             backgroundColor: "rgba(0,0,0,0.5)",
             justifyContent: "flex-end",
           }}
-          onPress={() => setReviewOrder(null)}
+          onPress={() => { setReviewOrder(null); setReviewMode(null); }}
         >
           <Pressable
             style={{
@@ -2770,101 +2866,108 @@ export default function MyOrdersScreen() {
               borderTopRightRadius: 24,
               padding: 24,
               paddingBottom: 40,
+              maxHeight: "85%",
             }}
-            onPress={() => {}}
+            onTouchStart={(e) => e.stopPropagation()}
           >
-            <View
-              style={{
-                width: 40,
-                height: 4,
-                backgroundColor: C.gray200,
-                borderRadius: 2,
-                alignSelf: "center",
-                marginBottom: 20,
-              }}
-            />
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "900",
-                color: C.gray900,
-                marginBottom: 4,
-              }}
-            >
-              Rate your order
-            </Text>
-            <Text style={{ fontSize: 13, color: C.gray400, marginBottom: 20 }}>
-              {reviewOrder?.vendor?.shop_name || "Your order"}
-            </Text>
+            <View style={{ width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 }} />
 
-            {/* Star picker */}
-            <View
-              style={{
-                flexDirection: "row",
-                gap: 10,
-                marginBottom: 20,
-                justifyContent: "center",
-              }}
-            >
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity
-                  key={star}
-                  onPress={() => setReviewRating(star)}
-                >
-                  <Text
-                    style={{
-                      fontSize: 36,
-                      opacity: star <= reviewRating ? 1 : 0.25,
-                    }}
-                  >
-                    ⭐
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Comment input */}
-            <TextInput
-              style={{
-                backgroundColor: C.gray100,
-                borderRadius: 12,
-                padding: 14,
-                fontSize: 14,
-                color: C.gray900,
-                minHeight: 80,
-                textAlignVertical: "top",
-                marginBottom: 20,
-                borderWidth: 1,
-                borderColor: C.gray200,
-              }}
-              placeholder="Tell us about your experience (optional)"
-              placeholderTextColor={C.gray400}
-              multiline
-              value={reviewComment}
-              onChangeText={setReviewComment}
-            />
-
-            <TouchableOpacity
-              onPress={submitReview}
-              disabled={reviewLoading}
-              style={{
-                backgroundColor: reviewLoading ? C.gray200 : C.green,
-                borderRadius: 14,
-                padding: 16,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {reviewLoading ? (
-                <ActivityIndicator color={C.white} />
-              ) : (
-                <Text
-                  style={{ fontSize: 16, fontWeight: "800", color: C.white }}
-                >
-                  Submit Review
+            {/* ═══════ SELECT VIEW ═══════ */}
+            {reviewMode === "select" && (
+              <>
+                <Text style={{ fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 4 }}>
+                  Rate Your Order
                 </Text>
-              )}
-            </TouchableOpacity>
+                <Text style={{ fontSize: 13, color: C.gray400, marginBottom: 20 }}>
+                  {reviewOrder?.vendor?.shop_name || "Your order"}
+                </Text>
+
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+                  {/* Delivery Rating */}
+                  {(reviewOrder?.delivery_partner_id || reviewOrder?.delivery_partner || reviewOrder?.delivery?.partner_id) && (
+                    <View style={{ marginBottom: 24 }}>
+                      <Text style={{ fontSize: 15, fontWeight: "700", color: C.gray800, marginBottom: 12 }}>
+                        Rate delivery
+                      </Text>
+                      <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <TouchableOpacity key={star} onPress={() => setDeliveryRating(star)}>
+                            <Text style={{ fontSize: 32, opacity: star <= deliveryRating ? 1 : 0.25 }}>⭐</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <TextInput
+                        style={{
+                          backgroundColor: C.gray100,
+                          borderRadius: 12,
+                          padding: 14,
+                          fontSize: 14,
+                          color: C.gray900,
+                          minHeight: 80,
+                          textAlignVertical: "top",
+                          borderWidth: 1,
+                          borderColor: C.gray200,
+                        }}
+                        placeholder="How was the delivery experience? (optional)"
+                        placeholderTextColor={C.gray400}
+                        multiline
+                        value={deliveryComment}
+                        onChangeText={setDeliveryComment}
+                      />
+                    </View>
+                  )}
+
+                  {/* Store Rating */}
+                  <View style={{ marginBottom: 20 }}>
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: C.gray800, marginBottom: 12 }}>
+                      Rate store
+                    </Text>
+                    <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <TouchableOpacity key={star} onPress={() => setStoreRating(star)}>
+                          <Text style={{ fontSize: 32, opacity: star <= storeRating ? 1 : 0.25 }}>⭐</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <TextInput
+                      style={{
+                        backgroundColor: C.gray100,
+                        borderRadius: 12,
+                        padding: 14,
+                        fontSize: 14,
+                        color: C.gray900,
+                        minHeight: 80,
+                        textAlignVertical: "top",
+                        borderWidth: 1,
+                        borderColor: C.gray200,
+                      }}
+                      placeholder="How was the store experience? (optional)"
+                      placeholderTextColor={C.gray400}
+                      multiline
+                      value={storeComment}
+                      onChangeText={setStoreComment}
+                    />
+                  </View>
+                </ScrollView>
+
+                <TouchableOpacity
+                  onPress={submitShopReview}
+                  disabled={reviewLoading || reviewRating === 0}
+                  style={{
+                    backgroundColor: reviewLoading || reviewRating === 0 ? C.gray200 : C.green,
+                    borderRadius: 14,
+                    padding: 16,
+                    alignItems: "center",
+                  }}
+                >
+                  {reviewLoading ? (
+                    <ActivityIndicator color={C.white} />
+                  ) : (
+                    <Text style={{ fontSize: 16, fontWeight: "800", color: C.white }}>Submit Review</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
@@ -2892,7 +2995,7 @@ export default function MyOrdersScreen() {
               padding: 24,
               paddingBottom: 40,
             }}
-            onPress={() => {}}
+            onPress={() => { }}
           >
             {/* Handle */}
             <View
@@ -2907,15 +3010,15 @@ export default function MyOrdersScreen() {
             />
 
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-              <Text style={{ fontSize: 18, fontWeight: "900", color: C.gray900 }}>
-                Your Submitted Rating
+              <Text style={{ fontSize: 18, fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray900 }}>
+                Your Submitted Ratings
               </Text>
               <TouchableOpacity onPress={() => setViewRatingOrder(null)} style={{ padding: 4 }}>
                 <Feather name="x" size={20} color={C.gray500} />
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 13, color: C.gray400, marginBottom: 20 }}>
+            <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, marginBottom: 20 }}>
               {viewRatingOrder?.vendor?.shop_name || "Your order"} · {formatCardDate(viewRatingOrder?.created_at)}
             </Text>
 
@@ -2926,61 +3029,98 @@ export default function MyOrdersScreen() {
                 <Text style={{ fontSize: 13, color: C.gray400, marginTop: 10 }}>Fetching your review…</Text>
               </View>
             ) : (() => {
-              const ratingVal = fetchedRating?.rating || viewRatingOrder?.user_rating || 5;
-              const num = typeof ratingVal === "number" ? ratingVal : parseInt(ratingVal, 10) || 5;
-              const comment = fetchedRating?.comment || viewRatingOrder?.review_comment || "";
+              const sRatingVal = fetchedRating?.storeRating ?? viewRatingOrder?.user_rating ?? null;
+              const sNum = sRatingVal != null ? (typeof sRatingVal === "number" ? sRatingVal : parseInt(sRatingVal, 10)) : null;
+              const sComment = fetchedRating?.storeComment || viewRatingOrder?.review_comment || "";
+
+              const dRatingVal = fetchedRating?.deliveryRating;
+              const dNum = dRatingVal != null ? (typeof dRatingVal === "number" ? dRatingVal : parseInt(dRatingVal, 10)) : null;
+              const dComment = fetchedRating?.deliveryComment || "";
 
               return (
-                <View
-                  style={{
-                    backgroundColor: C.gray100,
-                    borderWidth: 1,
-                    borderColor: C.gray200,
-                    borderRadius: 16,
-                    padding: 20,
-                    alignItems: "center",
-                    marginBottom: 20,
-                  }}
-                >
-                  <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Text
-                        key={star}
-                        style={{
-                          fontSize: 36,
-                          opacity: star <= num ? 1 : 0.25,
-                        }}
-                      >
-                        ⭐
-                      </Text>
-                    ))}
-                  </View>
-
-                  <Text style={{ fontSize: 15, fontWeight: "800", color: C.gray900, marginBottom: comment ? 12 : 0 }}>
-                    {num} out of 5 stars
-                  </Text>
-
-                  {comment ? (
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
+                  {/* Store Rating */}
+                  <View style={{ marginBottom: 20 }}>
+                    <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_700Bold", color: C.gray900, marginBottom: 8, marginLeft: 4 }}>
+                      Store: {viewRatingOrder?.vendor?.shop_name || "Store"}
+                    </Text>
                     <View
                       style={{
-                        backgroundColor: C.white,
-                        borderRadius: 12,
-                        padding: 14,
+                        backgroundColor: C.gray100,
                         borderWidth: 1,
                         borderColor: C.gray200,
-                        width: "100%",
+                        borderRadius: 16,
+                        padding: 20,
+                        alignItems: "center",
                       }}
                     >
-                      <Text style={{ fontSize: 14, color: C.gray800, lineHeight: 20 }}>
-                        {comment}
-                      </Text>
+                      {sNum !== null ? (
+                        <>
+                          <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Text key={star} style={{ fontSize: 36, opacity: star <= sNum ? 1 : 0.25 }}>⭐</Text>
+                            ))}
+                          </View>
+                          <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray900, marginBottom: sComment ? 12 : 0 }}>
+                            {sNum} out of 5 stars
+                          </Text>
+                          {sComment ? (
+                            <View style={{ backgroundColor: C.white, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: C.gray200, width: "100%" }}>
+                              <Text style={{ fontSize: 14, fontFamily: "PlusJakartaSans_500Medium", color: C.gray800, lineHeight: 20 }}>{sComment}</Text>
+                            </View>
+                          ) : (
+                            <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, fontStyle: "italic", marginTop: 4 }}>No written comment provided</Text>
+                          )}
+                        </>
+                      ) : (
+                        <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray400 }}>
+                          Not Rated
+                        </Text>
+                      )}
                     </View>
-                  ) : (
-                    <Text style={{ fontSize: 13, color: C.gray400, fontStyle: "italic", marginTop: 4 }}>
-                      No written comment provided
+                  </View>
+
+                  {/* Delivery Rating */}
+                  <View style={{ marginBottom: 20 }}>
+                    <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_700Bold", color: C.gray900, marginBottom: 8, marginLeft: 4 }}>
+                      Delivery: {viewRatingOrder?.delivery?.partner?.user?.name || viewRatingOrder?.delivery_partner?.user?.name || "Partner"}
                     </Text>
-                  )}
-                </View>
+                    <View
+                      style={{
+                        backgroundColor: C.gray100,
+                        borderWidth: 1,
+                        borderColor: C.gray200,
+                        borderRadius: 16,
+                        padding: 20,
+                        alignItems: "center",
+                      }}
+                    >
+                      {dNum !== null ? (
+                        <>
+                          <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Text key={star} style={{ fontSize: 36, opacity: star <= dNum ? 1 : 0.25 }}>⭐</Text>
+                            ))}
+                          </View>
+                          <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray900, marginBottom: dComment ? 12 : 0 }}>
+                            {dNum} out of 5 stars
+                          </Text>
+                          {dComment ? (
+                            <View style={{ backgroundColor: C.white, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: C.gray200, width: "100%" }}>
+                              <Text style={{ fontSize: 14, fontFamily: "PlusJakartaSans_500Medium", color: C.gray800, lineHeight: 20 }}>{dComment}</Text>
+                            </View>
+                          ) : (
+                            <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, fontStyle: "italic", marginTop: 4 }}>No written comment provided</Text>
+                          )}
+                        </>
+                      ) : (
+                        <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray400 }}>
+                          Not Rated
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                </ScrollView>
               );
             })()}
 
@@ -2994,7 +3134,7 @@ export default function MyOrdersScreen() {
                 justifyContent: "center",
               }}
             >
-              <Text style={{ fontSize: 15, fontWeight: "800", color: C.white }}>
+              <Text style={{ fontSize: 16, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.white }}>
                 Close
               </Text>
             </TouchableOpacity>
@@ -3032,10 +3172,10 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  headerTitle: { 
-    fontSize: 20, 
-    fontWeight: "800", 
-    color: C.gray900, 
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: C.gray900,
     flex: 1,
     letterSpacing: -0.5,
   },
