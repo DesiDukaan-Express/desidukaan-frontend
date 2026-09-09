@@ -327,18 +327,19 @@ export default function CustomerMapView({ partnerPos, destLat, destLng, style: s
 
 const styles = StyleSheet.create({
   outer: {
-    height: 280,
-    borderRadius: 18,
+    height: 240,
+    maxHeight: "100%",
+    borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#F1F5F9",
     position: "relative",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.04)",
+    borderColor: "rgba(0,0,0,0.06)",
   },
   loaderWrap: {
     ...StyleSheet.absoluteFillObject,

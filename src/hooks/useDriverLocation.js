@@ -19,27 +19,27 @@ const BASE_URL   = process.env.EXPO_PUBLIC_API_URL    || "http://localhost:3000/
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL ||
   (BASE_URL.includes("/api") ? BASE_URL.split("/api")[0] : "http://localhost:3000");
 
-// Statuses where a driver can actually be en-route
-const ACTIVE_DELIVERY_STATUSES = ["accepted", "preparing", "ready", "picked_up"];
+// Statuses where a driver location tracking is active for customer
+const ACTIVE_DELIVERY_STATUSES = ["picked_up"];
 
 const POLL_INTERVAL_MS = 15_000; // 15 seconds
 
 export default function useDriverLocation(orderId, token, orderStatus, hasDriver, initialLocation, onOrderUpdate) {
   const [partnerPos,  setPartnerPos]  = useState(initialLocation || null);   // { lat, lng }
   const [connected,   setConnected]   = useState(false);
-  const [lastUpdate,  setLastUpdate]  = useState(null);   // Date
+  const [lastUpdate,  setLastUpdate]  = useState(initialLocation ? new Date() : null);   // Date
 
   const socketRef     = useRef(null);
   const pollTimerRef  = useRef(null);
   const onUpdateRef   = useRef(onOrderUpdate);
   onUpdateRef.current = onOrderUpdate;
 
-  // Sync initial location if it arrives after mounting
+  // Sync initial location if it arrives or changes
   useEffect(() => {
-    if (initialLocation && !partnerPos) {
+    if (initialLocation?.lat && initialLocation?.lng) {
       setPartnerPos(initialLocation);
     }
-  }, [initialLocation, partnerPos]);
+  }, [initialLocation?.lat, initialLocation?.lng]);
 
   // ── Helper: fetch location from REST ──────────────────────────────────────
   const fetchLocation = useCallback(async () => {

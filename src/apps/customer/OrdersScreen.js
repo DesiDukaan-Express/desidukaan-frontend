@@ -307,38 +307,36 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
         </View>
 
         {/* Map */}
-        <View style={dlm.mapWrap}>
-          <CustomerMapView
-            partnerPos={partnerPos}
-            destLat={destLat}
-            destLng={destLng}
-          />
+        {partnerPos?.lat && partnerPos?.lng ? (
+          <View style={dlm.mapWrap}>
+            <CustomerMapView
+              partnerPos={partnerPos}
+              destLat={destLat}
+              destLng={destLng}
+            />
 
-          {/* Arriving banner on map */}
-          {partnerPos && etaMins != null && (
-            <View style={dlm.mapArriveBanner}>
-              <Feather name="navigation" size={14} color={C.green} />
-              <Text style={dlm.mapArriveText}>
-                Arriving in{" "}
-                <Text style={dlm.mapArriveBold}>
-                  ~{etaMins} {etaMins === 1 ? "min" : "mins"}
+            {/* Arriving banner on map */}
+            {etaMins != null && (
+              <View style={dlm.mapArriveBanner}>
+                <Feather name="navigation" size={14} color={C.green} />
+                <Text style={dlm.mapArriveText}>
+                  Arriving in{" "}
+                  <Text style={dlm.mapArriveBold}>
+                    ~{etaMins} {etaMins === 1 ? "min" : "mins"}
+                  </Text>
                 </Text>
-              </Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={dlm.noLocationFallback}>
+            <Feather name="truck" size={24} color={C.green} />
+            <View style={{ flex: 1 }}>
+              <Text style={dlm.noLocationTitle}>Out for Delivery</Text>
+              <Text style={dlm.noLocationSub}>Partner is on the way to your address</Text>
             </View>
-          )}
-
-          {/* Locating overlay — shown until first position arrives */}
-          {isLocating && (
-            <View style={dlm.locatingOverlay}>
-              <ActivityIndicator size="small" color={C.green} />
-              <Text style={dlm.locatingText}>
-                {hasDriver
-                  ? "Locating driver…"
-                  : "Waiting for driver assignment…"}
-              </Text>
-            </View>
-          )}
-        </View>
+          </View>
+        )}
 
         {/* Status row */}
         <View style={dlm.statusRow}>
@@ -417,15 +415,7 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
               style={{ height: "100%", borderRadius: 0 }}
             />
 
-            {/* Locating overlay */}
-            {isLocating && (
-              <View style={dlm.locatingOverlayFull}>
-                <ActivityIndicator size="small" color={C.green} />
-                <Text style={dlm.locatingText}>
-                  {hasDriver ? "Locating driver…" : "Waiting for driver assignment…"}
-                </Text>
-              </View>
-            )}
+            {/* Locating overlay — removed */}
           </View>
 
           {/* Bottom info bar */}
@@ -518,29 +508,23 @@ const dlm = StyleSheet.create({
   mapWrap: {
     position: "relative",
   },
-  locatingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(248,250,252,0.88)",
-    alignItems: "center",
-    justifyContent: "center",
+  noLocationFallback: {
+    padding: 20,
     flexDirection: "row",
-    gap: 8,
-    zIndex: 10,
-    minHeight: 280,
-  },
-  locatingOverlayFull: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(248,250,252,0.88)",
     alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
-    zIndex: 10,
+    gap: 12,
+    backgroundColor: C.gray50,
+    minHeight: 100,
   },
-  locatingText: {
-    fontSize: 13,
+  noLocationTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: C.gray900,
+  },
+  noLocationSub: {
+    fontSize: 12,
     color: C.gray500,
-    fontWeight: "600",
+    marginTop: 2,
   },
   statusRow: {
     flexDirection: "row",
@@ -928,13 +912,15 @@ function OrderDetailModal({ order, onClose }) {
                             </Text>
                           </>
                         )
-                        : hasDriver
-                          ? "Locating driver…"
-                          : order?.status === "ready"
-                            ? "Waiting for partner assignment…"
-                            : order?.status === "pending"
-                              ? "Waiting for vendor to confirm…"
-                              : "Preparing your order…"
+                        : order?.status === "picked_up"
+                          ? "Delivery partner is on the way"
+                          : hasDriver
+                            ? "Partner assigned to order"
+                            : order?.status === "ready"
+                              ? "Waiting for partner assignment…"
+                              : order?.status === "pending"
+                                ? "Waiting for vendor to confirm…"
+                                : "Preparing your order…"
                       : order?.status === "delivered"
                         ? "Order delivered successfully!"
                         : order?.status === "cancelled" || order?.status === "rejected"

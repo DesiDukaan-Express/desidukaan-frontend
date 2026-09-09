@@ -368,8 +368,8 @@ export default function TrackOrderScreen() {
           </View>
         </View>
 
-        {/* MAP — only show when delivery partner is assigned */}
-        {partner && (
+        {/* MAP — only show when product is out for delivery */}
+        {partner && order?.status === "picked_up" && (
           <>
             {/* ETA CARD — live driver distance/ETA, only when partner assigned */}
             {isActive && (
