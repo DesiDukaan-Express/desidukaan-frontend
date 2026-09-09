@@ -8,6 +8,7 @@ import './src/i18n';
 
 import useAuthStore from './src/store/authStore';
 import useAddressStore from './src/store/addressStore';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 export default function App() {
   const hydrate = useAuthStore((state) => state.hydrate);
@@ -33,5 +34,11 @@ export default function App() {
     );
   }
 
-  return <Navigation />;
+  return (
+    <SafeAreaProvider style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }}>
+        <Navigation />
+      </SafeAreaView>
+    </SafeAreaProvider>
+  );
 }

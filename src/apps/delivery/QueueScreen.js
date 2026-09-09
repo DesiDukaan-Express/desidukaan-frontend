@@ -3,7 +3,6 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, Vibration, Animated, StatusBar, Platform,
 } from 'react-native';
-import { Audio } from 'expo-av';
 import { io } from 'socket.io-client';
 import {
   useFonts,
@@ -15,38 +14,39 @@ import {
 import useAuthStore from '../../store/authStore';
 import { useTranslation } from 'react-i18next';
 
-const API_BASE   = process.env.EXPO_PUBLIC_API_URL    || 'http://localhost:3000/api';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3000';
 
 const C = {
-  bg:           '#F2F2F7',
-  white:        '#FFFFFF',
-  green:        '#50C878',
-  greenDark:    '#2EA85A',
-  greenLight:   '#E8F8EE',
-  greenText:    '#1A6B38',
-  gray100:      '#F3F4F6',
-  gray200:      '#E5E7EB',
-  gray300:      '#D1D5DB',
-  gray400:      '#9CA3AF',
-  gray500:      '#6B7280',
-  gray700:      '#374151',
-  gray800:      '#1F2937',
-  gray900:      '#111827',
-  red:          '#FF3B30',
-  redLight:     '#FFEAEA',
-  redText:      '#B91C1C',
-  blue:         '#3B82F6',
-  blueLight:    '#EFF6FF',
-  blueText:     '#1D4ED8',
-  amber:        '#F59E0B',
-  amberLight:   '#FFFBEB',
-  amberText:    '#92400E',
+  bg: '#F2F2F7',
+  white: '#FFFFFF',
+  green: '#50C878',
+  greenDark: '#2EA85A',
+  greenLight: '#E8F8EE',
+  greenText: '#1A6B38',
+  gray100: '#F3F4F6',
+  gray200: '#E5E7EB',
+  gray300: '#D1D5DB',
+  gray400: '#9CA3AF',
+  gray500: '#6B7280',
+  gray700: '#374151',
+  gray800: '#1F2937',
+  gray900: '#111827',
+  red: '#FF3B30',
+  redLight: '#FFEAEA',
+  redText: '#B91C1C',
+  blue: '#3B82F6',
+  blueLight: '#EFF6FF',
+  blueText: '#1D4ED8',
+  amber: '#F59E0B',
+  amberLight: '#FFFBEB',
+  amberText: '#92400E',
 };
-
 // ── Sound helper ──────────────────────────────────────────────────────────────
 async function playOrderSound() {
   try {
+    const { Audio } = require('expo-av');
+    if (!Audio || !Audio.Sound) return;
     const { sound } = await Audio.Sound.createAsync(
       require('../../../assets/sounds/new_order.mp3'),
       { shouldPlay: true, volume: 1.0 }
@@ -54,7 +54,7 @@ async function playOrderSound() {
     sound.setOnPlaybackStatusUpdate((s) => {
       if (s.didJustFinish) sound.unloadAsync();
     });
-  } catch (_) {}
+  } catch (_) { }
 }
 
 // ── Timer bar ─────────────────────────────────────────────────────────────────
@@ -85,9 +85,9 @@ function TimerBar({ seconds, onComplete }) {
 }
 
 const tb = StyleSheet.create({
-  row:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
   track: { flex: 1, height: 5, backgroundColor: C.gray200, borderRadius: 3, overflow: 'hidden' },
-  fill:  { height: 5, borderRadius: 3 },
+  fill: { height: 5, borderRadius: 3 },
   label: { fontSize: 12, minWidth: 32, textAlign: 'right' },
 });
 
@@ -102,7 +102,7 @@ function StatPill({ label, value, valueColor }) {
 }
 
 const sp = StyleSheet.create({
-  pill:  {
+  pill: {
     flex: 1, backgroundColor: C.white, borderRadius: 16, paddingVertical: 14,
     alignItems: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
@@ -120,7 +120,7 @@ function QueueCard({ order, onAccept, onDecline, onIgnore, isAccepting }) {
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim,  { toValue: 1, duration: 280, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
       Animated.spring(slideAnim, { toValue: 0, tension: 60, friction: 10, useNativeDriver: true }),
     ]).start();
   }, []);
@@ -215,32 +215,32 @@ const qc = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07, shadowRadius: 10, elevation: 3,
   },
-  header:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
-  orderNum:      { fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray900 },
-  orderSub:      { fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: C.gray400, marginTop: 2 },
-  newPill:       { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.greenLight, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
-  newDot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green },
-  newPillText:   { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.greenText, letterSpacing: 0.8 },
-  divider:       { height: 1, backgroundColor: C.gray200, marginBottom: 14 },
-  routeWrap:     { marginBottom: 14 },
-  routeStop:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  routeDot:      { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
-  routeStopLabel:{ fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray400, letterSpacing: 0.8 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
+  orderNum: { fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray900 },
+  orderSub: { fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: C.gray400, marginTop: 2 },
+  newPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.greenLight, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  newDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green },
+  newPillText: { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.greenText, letterSpacing: 0.8 },
+  divider: { height: 1, backgroundColor: C.gray200, marginBottom: 14 },
+  routeWrap: { marginBottom: 14 },
+  routeStop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  routeDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  routeStopLabel: { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray400, letterSpacing: 0.8 },
   routeStopName: { fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: C.gray900, marginTop: 1 },
   routeLineWrap: { paddingLeft: 4, paddingVertical: 4 },
   routeVertLine: { width: 1.5, height: 14, backgroundColor: C.gray200, marginLeft: 3 },
-  earningRow:    { flexDirection: 'row', marginBottom: 14 },
-  earningBox:    { flex: 1, paddingVertical: 4 },
-  earningLabel:  { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray400, letterSpacing: 0.8, marginBottom: 4, paddingLeft: 2 },
-  earningValue:  { fontSize: 22, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.green, paddingLeft: 2 },
-  btnRow:        { flexDirection: 'row', gap: 10 },
-  btnDecline:    {
+  earningRow: { flexDirection: 'row', marginBottom: 14 },
+  earningBox: { flex: 1, paddingVertical: 4 },
+  earningLabel: { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray400, letterSpacing: 0.8, marginBottom: 4, paddingLeft: 2 },
+  earningValue: { fontSize: 22, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.green, paddingLeft: 2 },
+  btnRow: { flexDirection: 'row', gap: 10 },
+  btnDecline: {
     flex: 1, paddingVertical: 13, borderRadius: 14,
     borderWidth: 1.5, borderColor: C.gray200,
     alignItems: 'center', backgroundColor: C.white,
   },
-  btnDeclineText:{ fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: C.red },
-  btnAccept:     {
+  btnDeclineText: { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: C.red },
+  btnAccept: {
     flex: 2, paddingVertical: 13, borderRadius: 14,
     backgroundColor: C.green, alignItems: 'center',
   },
@@ -256,7 +256,7 @@ function EmptyState() {
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.15, duration: 900, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,    duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
       ])
     ).start();
   }, []);
@@ -278,7 +278,7 @@ function EmptyState() {
 }
 
 const es = StyleSheet.create({
-  wrap:      { alignItems: 'center', paddingVertical: 56, paddingHorizontal: 24 },
+  wrap: { alignItems: 'center', paddingVertical: 56, paddingHorizontal: 24 },
   ring: {
     position: 'absolute',
     width: 80, height: 80, borderRadius: 40,
@@ -291,11 +291,11 @@ const es = StyleSheet.create({
     marginBottom: 20,
   },
   dot: { width: 20, height: 20, borderRadius: 10, backgroundColor: C.green },
-  title:     { fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray900, marginBottom: 8 },
-  sub:       { fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: C.gray400, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  title: { fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray900, marginBottom: 8 },
+  sub: { fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: C.gray400, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
   liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.greenLight, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
-  liveDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green },
-  liveText:  { fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.greenText, letterSpacing: 1 },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green },
+  liveText: { fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.greenText, letterSpacing: 1 },
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -320,13 +320,13 @@ export default function QueueScreen({ navigation }) {
   const [sessionStats, setSessionStats] = useState({ accepted: 0, declined: 0 });
 
   // Fade-in animation
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(18)).current;
 
   useEffect(() => {
     if (fontsLoaded) {
       Animated.parallel([
-        Animated.timing(fadeAnim,  { toValue: 1, duration: 380, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 1, duration: 380, useNativeDriver: true }),
         Animated.spring(slideAnim, { toValue: 0, tension: 50, friction: 9, useNativeDriver: true }),
       ]).start();
     }
@@ -414,7 +414,7 @@ export default function QueueScreen({ navigation }) {
   const handleAccept = async (orderId) => {
     setAcceptingId(orderId);
     try {
-      const res  = await fetch(`${API_BASE}/delivery/accept/${orderId}`, {
+      const res = await fetch(`${API_BASE}/delivery/accept/${orderId}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -548,7 +548,7 @@ export default function QueueScreen({ navigation }) {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: C.bg },
+  root: { flex: 1, backgroundColor: C.bg },
   scroll: { flex: 1 },
   content: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 100 },
 

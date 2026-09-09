@@ -85,13 +85,13 @@ const C = {
 
 // ──────────────────────────────────────────────────────────────────────────────────────────────────
 const getSteps = (t) => [
-  { key: 'reach_pickup', label: t('delivery.reachPickup', 'Reach Pickup'),  api: 'at_pickup', btnLabel: t('delivery.reachedPickupLocation', 'REACHED PICKUP LOCATION') },
+  { key: 'reach_pickup', label: t('delivery.reachPickup', 'Reach Pickup'),  api: null,        btnLabel: t('delivery.reachedPickupLocation', 'REACHED PICKUP LOCATION') },
   { key: 'pick_order',   label: t('delivery.pickOrder', 'Pick Order'),    api: 'picked_up', btnLabel: t('delivery.pickedOrder', 'PICKED ORDER')            },
   { key: 'reach_drop',   label: t('delivery.reachDrop', 'Reach Drop'),    api: null,        btnLabel: t('delivery.reachedDropLocation', 'REACHED DROP LOCATION')   },
   { key: 'drop_order',   label: t('delivery.dropOrder', 'Drop Order'),    api: 'delivered', btnLabel: t('delivery.orderDelivered', 'ORDER DELIVERED')         },
 ];
 const STEPS = [
-  { key: 'reach_pickup', label: 'Reach Pickup',  api: 'at_pickup', btnLabel: 'Reached Pickup Location' },
+  { key: 'reach_pickup', label: 'Reach Pickup',  api: null,        btnLabel: 'Reached Pickup Location' },
   { key: 'pick_order',   label: 'Pick Order',    api: 'picked_up', btnLabel: 'Picked Order'            },
   { key: 'reach_drop',   label: 'Reach Drop',    api: null,        btnLabel: 'Reached Drop Location'   },
   { key: 'drop_order',   label: 'Drop Order',    api: 'delivered', btnLabel: 'Order Delivered'         },

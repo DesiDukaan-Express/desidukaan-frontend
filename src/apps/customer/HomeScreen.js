@@ -21,6 +21,7 @@ import {
   Dimensions,
   StatusBar,
   Pressable,
+  KeyboardAvoidingView,
 } from "react-native";
 import { MaterialIcons, Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -36,6 +37,7 @@ import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
 import LocationMapPicker from "../../components/LocationMapPicker";
 import UseCurrentLocationButton from "../../components/UseCurrentLocationButton";
+import WishlistHeart from "../../components/WishlistHeart";
 
 // Use env var works on device, emulator, and web
 // In your .env: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api
@@ -141,6 +143,9 @@ function AddressPicker({
   const [mode, setMode] = React.useState("list");
   const [editingAddr, setEditingAddr] = React.useState(null);
   const [inputText, setInputText] = React.useState("");
+  const [inputPincode, setInputPincode] = React.useState("");
+  const [inputLandmark, setInputLandmark] = React.useState("");
+  const [inputHouseNo, setInputHouseNo] = React.useState("");
   const [inputLabel, setInputLabel] = React.useState("");
   const [inputErr, setInputErr] = React.useState("");
   const [saving, setSaving] = React.useState(false);
@@ -149,6 +154,7 @@ function AddressPicker({
   const [pickLng, setPickLng] = React.useState(null);
   // Autocomplete suggestions + point to fly the map to on selection
   const [suggestions, setSuggestions] = React.useState([]);
+  const [isInputFocused, setIsInputFocused] = React.useState(false);
   const [focusPoint, setFocusPoint] = React.useState(null);
   const suggestionSelectRef = React.useRef(false);
   const focusSeqRef = React.useRef(0);
@@ -160,12 +166,16 @@ function AddressPicker({
       setMode("list");
       setEditingAddr(null);
       setInputText("");
+      setInputPincode("");
+      setInputLandmark("");
+      setInputHouseNo("");
       setInputLabel("");
       setInputErr("");
       setSaving(false);
       setPickLat(null);
       setPickLng(null);
       setSuggestions([]);
+      setIsInputFocused(false);
       setFocusPoint(null);
       suggestionSelectRef.current = false;
       setLocating(false);
@@ -176,6 +186,9 @@ function AddressPicker({
   const openAdd = () => {
     setEditingAddr(null);
     setInputText("");
+    setInputPincode("");
+    setInputLandmark("");
+    setInputHouseNo("");
     setInputLabel("");
     setInputErr("");
     setPickLat(null);
@@ -191,6 +204,9 @@ function AddressPicker({
   const openEdit = (addr) => {
     setEditingAddr(addr);
     setInputText(addr.address_line || addr.address || "");
+    setInputPincode(addr.pincode || "");
+    setInputLandmark(addr.landmark || "");
+    setInputHouseNo(addr.house_no || "");
     setInputLabel(addr.label || t("home.labelPlaceholder"));
     setInputErr("");
     setPickLat(addr.lat || null);
@@ -216,11 +232,12 @@ function AddressPicker({
   // map to it, and close the dropdown.
   const selectSuggestion = React.useCallback((s) => {
     suggestionSelectRef.current = true;
-    setInputText(s.display_name);
+    const text = s.label || s.display_name || "";
+    setInputText(text);
     setInputErr("");
     setPickLat(s.lat);
     setPickLng(s.lng);
-    setFocusPoint({ key: ++focusSeqRef.current, lat: s.lat, lng: s.lng, displayName: s.display_name });
+    setFocusPoint({ key: ++focusSeqRef.current, lat: s.lat, lng: s.lng, label: text, displayName: text });
     setSuggestions([]);
   }, []);
 
@@ -229,42 +246,72 @@ function AddressPicker({
   const handleUseCurrentLocation = React.useCallback(async () => {
     setLocating(true);
     setLocError("");
-    if (!navigator?.geolocation) {
+
+    let lat = null;
+    let lng = null;
+
+    if (Platform.OS === "web") {
+      if (!navigator?.geolocation) {
+        setLocError(t("home.locErrorUnavailable"));
+        setLocating(false);
+        return;
+      }
+      try {
+        const pos = await new Promise((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 12000,
+            maximumAge: 0,
+          })
+        );
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      } catch (e) {
+        setLocError(e?.code === 1 ? t("home.locErrorDenied") : t("home.locErrorUnavailable"));
+        setLocating(false);
+        return;
+      }
+    } else {
+      try {
+        const Location = require("expo-location");
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          setLocError(t("home.locErrorDenied"));
+          setLocating(false);
+          return;
+        }
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      } catch (e) {
+        setLocError(t("home.locErrorUnavailable"));
+        setLocating(false);
+        return;
+      }
+    }
+
+    if (!lat || !lng) {
       setLocError(t("home.locErrorUnavailable"));
       setLocating(false);
       return;
     }
-    let pos;
-    try {
-      pos = await new Promise((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 12000,
-          maximumAge: 0,
-        })
-      );
-    } catch (e) {
-      setLocError(e?.code === 1 ? t("home.locErrorDenied") : t("home.locErrorUnavailable"));
-      setLocating(false);
-      return;
-    }
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
+
     let displayName = "";
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        { headers: { "User-Agent": "KwikPik/1.0 (desidukaan-express; location-picker)" } }
       );
       const data = await res.json();
       displayName = data?.display_name || "";
     } catch (err) {
       displayName = "";
     }
+
     if (!displayName) {
-      setLocError(t("home.locErrorUnavailable"));
-      setLocating(false);
-      return;
+      displayName = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     }
+
     setPickLat(lat);
     setPickLng(lng);
     setInputText(displayName);
@@ -275,25 +322,54 @@ function AddressPicker({
   }, [t]);
 
   const handleSaveAdd = () => {
-    if (inputText.trim().length < 5) {
-      setInputErr(t("home.addressError"));
+    if (!pickLat || !pickLng) {
+      setInputErr("Please select your location on the map above.");
       return;
     }
-    onSaveNew(inputText.trim(), { lat: pickLat, lng: pickLng });
+    const fullAddr = (inputText || "").trim();
+    const house = (inputHouseNo || "").trim();
+    const landmark = (inputLandmark || "").trim();
+    const pin = (inputPincode || "").trim();
+
+    if (!house || !landmark || !pin || fullAddr.length < 5) {
+      setInputErr("All address fields (House/Flat No., Landmark, Pincode & Address) are compulsory.");
+      return;
+    }
+
+    const combinedAddress = `${house ? house + ", " : ""}${fullAddr}${landmark ? " (Landmark: " + landmark + ")" : ""}${pin ? " - " + pin : ""}`;
+
+    onSaveNew(combinedAddress, { lat: pickLat, lng: pickLng, house_no: house, landmark, pincode: pin, address_line: fullAddr });
     setMode("list");
     setInputText("");
+    setInputPincode("");
+    setInputLandmark("");
+    setInputHouseNo("");
     setInputErr("");
   };
 
   const handleSaveEdit = async () => {
-    if (inputText.trim().length < 5) {
-      setInputErr(t("home.addressError"));
+    if (!pickLat || !pickLng) {
+      setInputErr("Please select your location on the map above.");
       return;
     }
+    const fullAddr = (inputText || "").trim();
+    const house = (inputHouseNo || "").trim();
+    const landmark = (inputLandmark || "").trim();
+    const pin = (inputPincode || "").trim();
+
+    if (!house || !landmark || !pin || fullAddr.length < 5) {
+      setInputErr("All address fields (House/Flat No., Landmark, Pincode & Address) are compulsory.");
+      return;
+    }
+
+    const combinedAddress = `${house ? house + ", " : ""}${fullAddr}${landmark ? " (Landmark: " + landmark + ")" : ""}${pin ? " - " + pin : ""}`;
+
     setSaving(true);
     const patch = {
-      address_line: inputText.trim(),
-      label: inputLabel.trim() || editingAddr.label || t("home.labelPlaceholder"),
+      address_line: combinedAddress,
+      pincode: pin,
+      landmark: landmark,
+      label: (inputLabel || "").trim() || editingAddr?.label || t("home.labelPlaceholder"),
     };
     if (pickLat && pickLng) {
       patch.latitude = pickLat;
@@ -304,6 +380,9 @@ function AddressPicker({
     setMode("list");
     setEditingAddr(null);
     setInputText("");
+    setInputPincode("");
+    setInputLandmark("");
+    setInputHouseNo("");
     setInputLabel("");
   };
 
@@ -325,7 +404,7 @@ function AddressPicker({
       onRequestClose={onClose}
     >
       <Pressable style={ap.backdrop} onPress={onClose}>
-        <Pressable style={ap.sheet} onPress={() => { }}>
+        <Pressable style={ap.sheet} onPress={(e) => e.stopPropagation?.()}>
           {/* Handle */}
           <View style={ap.handle} />
 
@@ -352,142 +431,221 @@ function AddressPicker({
 
           {isFormMode ? (
             /* ── Add / Edit Form ── */
-            <View style={ap.formWrap}>
-              {/* Label field (only shown in edit) */}
-              {mode === "edit" && (
-                <>
-                  <Text style={ap.formLabel}>{t("home.labelHint")}</Text>
-                  <View style={[ap.inputBoxSingle, inputErr ? ap.inputBoxError : null]}>
-                    <MaterialIcons
-                      name="label"
-                      size={15}
-                      color={C.green}
-                      style={{ marginLeft: 14 }}
-                    />
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              style={{ flexShrink: 1 }}
+            >
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingBottom: 20 }}
+              >
+                <View style={ap.formWrap}>
+                  {/* Label field (only shown in edit) */}
+                  {mode === "edit" && (
+                    <>
+                      <Text style={ap.formLabel}>{t("home.labelHint")}</Text>
+                      <View style={[ap.inputBoxSingle, inputErr ? ap.inputBoxError : null]}>
+                        <MaterialIcons
+                          name="label"
+                          size={15}
+                          color={C.green}
+                          style={{ marginLeft: 14 }}
+                        />
+                        <TextInput
+                          style={ap.input}
+                          placeholder={t("home.labelPlaceholder")}
+                          placeholderTextColor={C.gray400}
+                          value={inputLabel}
+                          onChangeText={(t) => setInputLabel(t)}
+                          underlineColorAndroid="transparent"
+                        />
+                      </View>
+                      <View style={{ height: 12 }} />
+                    </>
+                  )}
+
+                  {/* ── Section 1: Location Map & Auto-detected Address (Mandatory) ── */}
+                  <View style={ap.sectionHeaderRow}>
+                    <Text style={ap.sectionStepBadge}>1</Text>
+                    <Text style={ap.sectionTitle}>Pin Location on Map (Compulsory)</Text>
+                  </View>
+                  <UseCurrentLocationButton
+                    onPress={handleUseCurrentLocation}
+                    loading={locating}
+                    style={ap.locBtn}
+                  />
+                  {locError ? <Text style={ap.locErrorText}>{locError}</Text> : null}
+                  <LocationMapPicker
+                    initialCoords={
+                      mode === "edit"
+                        ? editingAddr?.lat && editingAddr?.lng
+                          ? { lat: editingAddr.lat, lng: editingAddr.lng }
+                          : null
+                        : initialCoords
+                    }
+                    addressText={inputText}
+                    focusPoint={focusPoint}
+                    autoReverseOnReady={mode === "add"}
+                    onPick={handleMapPick}
+                    onSuggestions={setSuggestions}
+                  />
+                  <View style={{ height: 10 }} />
+
+                  {/* Fetched Location input & floating suggestions dropdown */}
+                  <View style={{ zIndex: 100, position: "relative" }}>
+                    <Text style={ap.formLabel}>Fetched Location</Text>
+                    <View style={[ap.inputBoxSingle, inputErr ? ap.inputBoxError : null]}>
+                      <MaterialIcons
+                        name="my-location"
+                        size={15}
+                        color={C.green}
+                        style={{ marginLeft: 14 }}
+                      />
+                      <TextInput
+                        style={ap.input}
+                        placeholder="Selected map location will appear here..."
+                        placeholderTextColor={C.gray400}
+                        value={inputText}
+                        onFocus={() => setIsInputFocused(true)}
+                        onChangeText={(text) => {
+                          setInputText(text);
+                          setInputErr("");
+                          if ((text || "").trim().length < 3) setSuggestions([]);
+                        }}
+                        onKeyPress={(e) => {
+                          if (e.nativeEvent?.key === "Escape") setSuggestions([]);
+                        }}
+                        onBlur={() => {
+                          setTimeout(() => {
+                            if (!suggestionSelectRef.current) {
+                              setIsInputFocused(false);
+                            }
+                            suggestionSelectRef.current = false;
+                          }, 150);
+                        }}
+                        underlineColorAndroid="transparent"
+                      />
+                    </View>
+
+                    {/* Autocomplete suggestions dropdown (Only shown when input is focused & gives Option to Close/Hide) */}
+                    {isInputFocused && suggestions.length > 0 && (
+                      <View style={ap.suggestWrap}>
+                        <View style={ap.suggestHeader}>
+                          <Text style={ap.suggestHeaderText}>{t("home.suggestions")}</Text>
+                          <TouchableOpacity
+                            onPress={() => setSuggestions([])}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            style={{ padding: 2 }}
+                          >
+                            <MaterialIcons name="close" size={16} color={C.gray500} />
+                          </TouchableOpacity>
+                        </View>
+                        <ScrollView
+                          showsVerticalScrollIndicator={false}
+                          style={{ maxHeight: 180 }}
+                          keyboardShouldPersistTaps="handled"
+                        >
+                          {suggestions.map((s, i) => (
+                            <Pressable
+                              key={`${s.lat}-${s.lng}-${i}`}
+                              style={({ pressed, hovered }) => [
+                                ap.suggestRow,
+                                (pressed || hovered) && ap.suggestRowActive,
+                                i === suggestions.length - 1 && ap.suggestRowLast,
+                              ]}
+                              onPress={() => selectSuggestion(s)}
+                            >
+                              <View style={ap.suggestIconWrap}>
+                                <MaterialIcons name="location-on" size={16} color={C.green} />
+                              </View>
+                              <Text style={ap.suggestText} numberOfLines={2}>
+                                {s.label || s.display_name}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* ── Section 2: Manual Address Details (Compulsory) ── */}
+                  <View style={[ap.sectionHeaderRow, { marginTop: 16 }]}>
+                    <Text style={ap.sectionStepBadge}>2</Text>
+                    <Text style={ap.sectionTitle}>Manual Details (Compulsory)</Text>
+                  </View>
+
+                  <View style={ap.gridRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={ap.formLabel}>House / Flat No.</Text>
+                      <View style={[ap.inputBoxSingle, inputErr && !inputHouseNo ? ap.inputBoxError : null]}>
+                        <MaterialIcons name="home" size={15} color={C.green} style={{ marginLeft: 14 }} />
+                        <TextInput
+                          style={ap.input}
+                          placeholder="e.g. 102, Block A"
+                          placeholderTextColor={C.gray400}
+                          value={inputHouseNo}
+                          onChangeText={(t) => { setInputHouseNo(t); setInputErr(""); }}
+                          underlineColorAndroid="transparent"
+                        />
+                      </View>
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={ap.formLabel}>Pincode</Text>
+                      <View style={[ap.inputBoxSingle, inputErr && !inputPincode ? ap.inputBoxError : null]}>
+                        <MaterialIcons name="pin-drop" size={15} color={C.green} style={{ marginLeft: 14 }} />
+                        <TextInput
+                          style={ap.input}
+                          placeholder="e.g. 201301"
+                          placeholderTextColor={C.gray400}
+                          keyboardType="numeric"
+                          value={inputPincode}
+                          onChangeText={(t) => { setInputPincode(t); setInputErr(""); }}
+                          underlineColorAndroid="transparent"
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  <Text style={ap.formLabel}>Landmark</Text>
+                  <View style={[ap.inputBoxSingle, inputErr && !inputLandmark ? ap.inputBoxError : null]}>
+                    <MaterialIcons name="store" size={15} color={C.green} style={{ marginLeft: 14 }} />
                     <TextInput
                       style={ap.input}
-                      placeholder={t("home.labelPlaceholder")}
+                      placeholder="e.g. Near Metro Station / City Hospital"
                       placeholderTextColor={C.gray400}
-                      value={inputLabel}
-                      onChangeText={(t) => setInputLabel(t)}
+                      value={inputLandmark}
+                      onChangeText={(t) => { setInputLandmark(t); setInputErr(""); }}
                       underlineColorAndroid="transparent"
                     />
                   </View>
-                  <View style={{ height: 12 }} />
-                </>
-              )}
 
-              {/* Map location picker (web) — pin stays centred, map pans below */}
-              <UseCurrentLocationButton
-                onPress={handleUseCurrentLocation}
-                loading={locating}
-                style={ap.locBtn}
-              />
-              {locError ? <Text style={ap.locErrorText}>{locError}</Text> : null}
-              <LocationMapPicker
-                initialCoords={
-                  mode === "edit"
-                    ? editingAddr?.lat && editingAddr?.lng
-                      ? { lat: editingAddr.lat, lng: editingAddr.lng }
-                      : null
-                    : initialCoords
-                }
-                addressText={inputText}
-                focusPoint={focusPoint}
-                autoReverseOnReady={mode === "add"}
-                onPick={handleMapPick}
-                onSuggestions={setSuggestions}
-              />
-              <View style={{ height: 14 }} />
+                  {inputErr ? <Text style={ap.inputErr}>{inputErr}</Text> : null}
 
-              <Text style={ap.formLabel}>{t("home.fullAddress")}</Text>
-              <View style={[ap.inputBox, inputErr ? ap.inputBoxError : null]}>
-                <MaterialIcons
-                  name="location-on"
-                  size={15}
-                  color={inputErr ? C.red : C.green}
-                  style={{ marginLeft: 14 }}
-                />
-                <TextInput
-                  style={ap.input}
-                  placeholder={t("home.addressPlaceholder")}
-                  placeholderTextColor={C.gray400}
-                  value={inputText}
-                  onChangeText={(text) => {
-                    setInputText(text);
-                    setInputErr("");
-                    if (text.trim().length < 3) setSuggestions([]);
-                  }}
-                  onKeyPress={(e) => {
-                    if (e.nativeEvent?.key === "Escape") setSuggestions([]);
-                  }}
-                  onBlur={() => {
-                    setTimeout(() => {
-                      if (!suggestionSelectRef.current) setSuggestions([]);
-                      suggestionSelectRef.current = false;
-                    }, 120);
-                  }}
-                  multiline
-                  numberOfLines={3}
-                  autoFocus
-                  underlineColorAndroid="transparent"
-                />
-              </View>
-              {inputErr ? <Text style={ap.inputErr}>{inputErr}</Text> : null}
-
-              {/* Autocomplete suggestions dropdown (web) */}
-              {suggestions.length > 0 && (
-                <View style={ap.suggestWrap}>
-                  <View style={ap.suggestHeader}>
-                    <Text style={ap.suggestHeaderText}>{t("home.suggestions")}</Text>
-                  </View>
-                  <ScrollView
-                    showsVerticalScrollIndicator={false}
-                    style={{ maxHeight: 176 }}
-                    keyboardShouldPersistTaps="handled"
+                  <TouchableOpacity
+                    style={[
+                      ap.saveBtn,
+                      (!pickLat || !pickLng || !inputHouseNo || !inputLandmark || !inputPincode || (inputText || "").trim().length < 5 || saving) && ap.saveBtnDisabled,
+                    ]}
+                    onPress={mode === "edit" ? handleSaveEdit : handleSaveAdd}
+                    activeOpacity={0.85}
+                    disabled={!pickLat || !pickLng || !inputHouseNo || !inputLandmark || !inputPincode || (inputText || "").trim().length < 5 || saving}
                   >
-                    {suggestions.map((s, i) => (
-                      <Pressable
-                        key={`${s.lat}-${s.lng}-${i}`}
-                        style={({ pressed, hovered }) => [
-                          ap.suggestRow,
-                          (pressed || hovered) && ap.suggestRowActive,
-                          i === suggestions.length - 1 && ap.suggestRowLast,
-                        ]}
-                        onPressIn={() => selectSuggestion(s)}
-                      >
-                        <View style={ap.suggestIconWrap}>
-                          <MaterialIcons name="location-on" size={16} color={C.green} />
-                        </View>
-                        <Text style={ap.suggestText} numberOfLines={2}>
-                          {s.display_name}
+                    {saving ? (
+                      <ActivityIndicator size="small" color={C.white} />
+                    ) : (
+                      <>
+                        <MaterialIcons name="check" size={16} color={C.white} />
+                        <Text style={ap.saveBtnText}>
+                          {mode === "edit" ? t("home.updateAddress") : t("home.saveAddress")}
                         </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+                      </>
+                    )}
+                  </TouchableOpacity>
                 </View>
-              )}
-              <TouchableOpacity
-                style={[
-                  ap.saveBtn,
-                  (inputText.trim().length < 5 || saving) && ap.saveBtnDisabled,
-                ]}
-                onPress={mode === "edit" ? handleSaveEdit : handleSaveAdd}
-                activeOpacity={0.85}
-                disabled={inputText.trim().length < 5 || saving}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color={C.white} />
-                ) : (
-                  <>
-                    <MaterialIcons name="check" size={16} color={C.white} />
-                    <Text style={ap.saveBtnText}>
-                      {mode === "edit" ? t("home.updateAddress") : t("home.saveAddress")}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
           ) : (
             /* ── Address List ── */
             <>
@@ -583,7 +741,9 @@ const ap = StyleSheet.create({
     borderTopRightRadius: 32,
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 40,
+    paddingBottom: 24,
+    maxHeight: "88%",
+    flexShrink: 1,
   },
   handle: {
     width: 48,
@@ -728,18 +888,22 @@ const ap = StyleSheet.create({
     ...Platform.select({ web: { outlineStyle: "none" } }),
   },
   inputErr: { fontSize: 12, color: C.red, marginTop: 6, fontWeight: "500" },
-  // Autocomplete suggestions dropdown
+  // Autocomplete suggestions dropdown (Floating overlay above subsequent fields)
   suggestWrap: {
-    marginTop: 8,
+    position: "absolute",
+    top: 50,
+    left: 0,
+    right: 0,
+    zIndex: 9999,
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: C.gray200,
     backgroundColor: C.white,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.15,
     shadowRadius: 14,
-    elevation: 6,
+    elevation: 10,
     overflow: "hidden",
   },
   suggestHeader: {
@@ -748,6 +912,9 @@ const ap = StyleSheet.create({
     backgroundColor: C.gray100,
     borderBottomWidth: 1,
     borderBottomColor: C.gray200,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   suggestHeaderText: { fontSize: 11, fontWeight: "700", color: C.gray500, letterSpacing: 0.3 },
   suggestRow: {
@@ -792,6 +959,33 @@ const ap = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 12,
     paddingRight: 14,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  sectionStepBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: C.green,
+    color: C.white,
+    fontSize: 12,
+    fontWeight: "800",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: C.gray900,
+  },
+  gridRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 4,
   },
 });
 
@@ -977,6 +1171,8 @@ const sp = StyleSheet.create({
   },
   cancelText: { fontSize: 15, fontWeight: "700", color: C.gray600 },
 });
+
+const NEARBY_RADIUS_KM = 10;
 
 const CAT_FALLBACK_IMGS = {
   "Dairy, Bread & Eggs": "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80",
@@ -1239,13 +1435,17 @@ function CategoryBrowseSheet({
       });
     }
 
-    // 3. Deduplicate by unique inventory item / product id
-    const seen = new Set();
+    // 3. Deduplicate by normalized name + brand + unit (same product from different vendors = 1 row)
+    const seen = new Map();
     return items.filter(inv => {
       if (!inv?.id && !inv?.product?.id) return false;
-      const key = inv.product?.id || inv.id;
+      const p = inv.product;
+      const name = (p.name || "").trim().toLowerCase();
+      const brand = (p.brand || "").trim().toLowerCase();
+      const unit = (p.unit || "").trim().toLowerCase();
+      const key = `${name}|${brand}|${unit}`;
       if (seen.has(key)) return false;
-      seen.add(key);
+      seen.set(key, inv);
       return true;
     });
   }, [category, activeSubCat, hierarchy, apiCategories, allInventoryItems]);
@@ -1386,6 +1586,7 @@ function CategoryBrowseSheet({
                   const hasMrp = p.mrp && p.mrp > p.price;
                   const discPct = hasMrp ? Math.round((1 - p.price / p.mrp) * 100) : 0;
                   const vendorName = inv._vendorName || "";
+                  const isActive = p.is_active !== false;
 
                   const item = {
                     id: p.id, name: p.name, price: p.price,
@@ -1398,6 +1599,7 @@ function CategoryBrowseSheet({
                     <View key={`${p.id}-${idx}`} style={[
                       cbs.productRow,
                       idx % 2 === 0 && cbs.productRowAlt,
+                      !isActive && cbs.productRowUnavailable,
                     ]}>
                       {/* Image + Name */}
                       <View style={[cbs.productCell, { flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }]}>
@@ -1408,17 +1610,22 @@ function CategoryBrowseSheet({
                                 CAT_FALLBACK_IMGS[category] ||
                                 CAT_FALLBACK_IMGS._default
                             }}
-                            style={cbs.productImg}
+                            style={[cbs.productImg, !isActive && { opacity: 0.4 }]}
                             resizeMode="cover"
                           />
-                          {hasMrp && (
+                          {hasMrp && isActive && (
                             <View style={cbs.discPill}>
                               <Text style={cbs.discPillText}>{discPct}%</Text>
                             </View>
                           )}
-                          {loose && (
+                          {loose && isActive && (
                             <View style={[cbs.discPill, { backgroundColor: "#0891B2" }]}>
                               <Text style={cbs.discPillText}>{t("home.loose")}</Text>
+                            </View>
+                          )}
+                          {!isActive && (
+                            <View style={[cbs.discPill, { backgroundColor: C.red }]}>
+                              <Text style={cbs.discPillText}>N/A</Text>
                             </View>
                           )}
                           <TouchableOpacity
@@ -1430,48 +1637,57 @@ function CategoryBrowseSheet({
                           </TouchableOpacity>
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={cbs.productName} numberOfLines={2}>{p.name}</Text>
+                          <Text style={[cbs.productName, !isActive && { color: C.gray400 }]} numberOfLines={2}>{p.name}</Text>
                           {p.description ? (
-                            <Text style={cbs.productDesc} numberOfLines={1}>{p.description}</Text>
+                            <Text style={[cbs.productDesc, !isActive && { color: C.gray300 }]} numberOfLines={1}>{p.description}</Text>
                           ) : null}
                         </View>
                       </View>
 
                       {/* Brand (vendor) */}
                       <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
-                        <Text style={cbs.brandText} numberOfLines={2}>{vendorName}</Text>
+                        <Text style={[cbs.brandText, !isActive && { color: C.gray300 }]} numberOfLines={2}>{vendorName}</Text>
                       </View>
 
                       {/* Qty / Unit (Particulars) */}
                       <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
-                        <Text style={cbs.unitText}>{p.unit || "1 pc"}</Text>
+                        <Text style={[cbs.unitText, !isActive && { color: C.gray300 }]}>{p.unit || "1 pc"}</Text>
                       </View>
 
-                      {/* Price + ADD */}
+                      {/* Price + ADD / Unavailable badge */}
                       <View style={[cbs.productCell, { width: 80, alignItems: "flex-end" }]}>
-                        <Text style={cbs.priceText}>₹{p.price}</Text>
-                        {hasMrp && <Text style={cbs.mrpText}>₹{p.mrp}</Text>}
-                        {qty === 0 ? (
-                          <TouchableOpacity
-                            style={[cbs.addBtn, loose && { backgroundColor: "#0891B2" }]}
-                            activeOpacity={0.8}
-                            onPress={() => {
-                              if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
-                              else onAdd(item);
-                            }}
-                          >
-                            <Text style={cbs.addBtnText}>{loose ? t("home.select") : t("common.add")}</Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={cbs.qtyRow}>
-                            <TouchableOpacity style={cbs.qtyBtn} onPress={() => onRemove(item)}>
-                              <MaterialIcons name="remove" size={10} color={C.white} />
-                            </TouchableOpacity>
-                            <Text style={cbs.qtyNum}>{qty}</Text>
-                            <TouchableOpacity style={cbs.qtyBtn} onPress={() => onAdd(item)}>
-                              <MaterialIcons name="add" size={10} color={C.white} />
-                            </TouchableOpacity>
+                        {!isActive ? (
+                          <View style={cbs.unavailableBadge}>
+                            <MaterialIcons name="block" size={10} color={C.red} />
+                            <Text style={cbs.unavailableText}>Unavailable</Text>
                           </View>
+                        ) : (
+                          <>
+                            <Text style={cbs.priceText}>₹{p.price}</Text>
+                            {hasMrp && <Text style={cbs.mrpText}>₹{p.mrp}</Text>}
+                            {qty === 0 ? (
+                              <TouchableOpacity
+                                style={[cbs.addBtn, loose && { backgroundColor: "#0891B2" }]}
+                                activeOpacity={0.8}
+                                onPress={() => {
+                                  if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
+                                  else onAdd(item);
+                                }}
+                              >
+                                <Text style={cbs.addBtnText}>{loose ? t("home.select") : t("common.add")}</Text>
+                              </TouchableOpacity>
+                            ) : (
+                              <View style={cbs.qtyRow}>
+                                <TouchableOpacity style={cbs.qtyBtn} onPress={() => onRemove(item)}>
+                                  <MaterialIcons name="remove" size={10} color={C.white} />
+                                </TouchableOpacity>
+                                <Text style={cbs.qtyNum}>{qty}</Text>
+                                <TouchableOpacity style={cbs.qtyBtn} onPress={() => onAdd(item)}>
+                                  <MaterialIcons name="add" size={10} color={C.white} />
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </>
                         )}
                       </View>
                     </View>
@@ -1602,6 +1818,14 @@ const cbs = StyleSheet.create({
   },
   qtyBtn: { paddingHorizontal: 7, paddingVertical: 5 },
   qtyNum: { fontSize: 11, fontWeight: "800", color: C.white, minWidth: 18, textAlign: "center" },
+  productRowUnavailable: { backgroundColor: "#FEF2F2" },
+  unavailableBadge: {
+    flexDirection: "row", alignItems: "center", gap: 3,
+    backgroundColor: C.redLight, borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 3,
+    borderWidth: 1, borderColor: "#FECACA",
+  },
+  unavailableText: { fontSize: 9, fontWeight: "700", color: C.red },
   emptyWrap: { alignItems: "center", paddingVertical: 40, gap: 12 },
   emptyText: { fontSize: 14, color: C.gray400 },
 
@@ -1696,6 +1920,7 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
             <Text style={ic.badgeText}>{t("home.discountOff", { count: discPct })}</Text>
           </View>
         )}
+        <WishlistHeart productId={item.id} size={18} style={{ position: "absolute", top: 6, right: 6 }} />
         <Image
           source={{ uri: imgUri }}
           style={[ic.img, { width: size - 16, height: size - 16 }]}
@@ -1785,6 +2010,7 @@ function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPre
             <Text style={pic.discBadgeText}>{t("home.loose")}</Text>
           </View>
         )}
+        <WishlistHeart productId={item.id} size={16} style={{ position: "absolute", bottom: 6, left: 6 }} />
         <TouchableOpacity
           style={pic.eyeBtn}
           onPress={(e) => { e.stopPropagation?.(); onPress?.(); }}
@@ -2543,12 +2769,20 @@ export default function HomeScreen() {
     [cartItems],
   );
 
-  // Sync with addressStore
+  // Sync with addressStore & auto-popup add address screen if no addresses exist
   useEffect(() => {
     if (addressStore.selectedId) {
       setSelectedAddrId(addressStore.selectedId);
     }
   }, [addressStore.selectedId]);
+
+  useEffect(() => {
+    // If addresses list is loaded and empty, show address screen automatically
+    const validAddresses = (addressStore?.addresses || []).filter(a => a.label !== "Current Location");
+    if (validAddresses.length === 0) {
+      setAddrPickerVisible(true);
+    }
+  }, [addressStore?.addresses]);
 
   // ── Animations ───────────────────────────────────────────────────────────────
   const headerOpacity = useRef(new Animated.Value(0)).current;
@@ -2903,6 +3137,8 @@ export default function HomeScreen() {
   const allInventoryItems = useMemo(() => {
     const items = [];
     vendors.forEach((v) => {
+      const dist = parseFloat(v.distance_km);
+      if (!Number.isNaN(dist) && dist > NEARBY_RADIUS_KM) return;
       (v._inventory || []).forEach((inv) => {
         if ((inv.product?.is_active ?? true) && inv.product) {
           items.push({ ...inv, _vendorId: v.id, _vendorName: v.shop_name });
@@ -3112,6 +3348,7 @@ export default function HomeScreen() {
   const handleStoreSelect = useCallback(
     (vendor, item) => {
       setPickerVisible(false);
+      setCatSheetVisible(false);
       cart?.addItem?.(
         {
           id: item.id,
@@ -3287,6 +3524,16 @@ export default function HomeScreen() {
               <MaterialIcons name="expand-more" size={13} color={C.gray500} />
             </TouchableOpacity>
             <TouchableOpacity
+              style={s.accountBtn}
+              onPress={() => navigation.navigate("Wishlist")}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="favorite-border" size={16} color={C.red} />
+              {winW >= 900 && (
+                <Text style={s.accountBtnText}>Wishlist</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[s.cartBtn, cartCount > 0 && s.cartBtnActive]}
               onPress={() => navigation.navigate("Cart")}
               activeOpacity={0.8}
@@ -3365,6 +3612,13 @@ export default function HomeScreen() {
                 </LinearGradient>
               </TouchableOpacity>
               <TouchableOpacity
+                style={s.mobileWishBtn}
+                onPress={() => navigation.navigate("Wishlist")}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="favorite-border" size={28} color={C.red} />
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={s.mobileProfileBtn}
                 onPress={() => navigation.navigate("Profile")}
                 activeOpacity={0.8}
@@ -3420,12 +3674,20 @@ export default function HomeScreen() {
               </Text>
             </View>
           </View>
-          <View style={[s.heroBanner, { minHeight: wide ? 260 : 250 }]}>
+          <View style={[s.heroBanner, { minHeight: wide ? 260 : 250, position: "relative" }]}>
             <Image
               source={{
                 uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&q=85&sig=banner",
               }}
-              style={StyleSheet.absoluteFillObject}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: "100%",
+                height: "100%",
+              }}
               resizeMode="cover"
             />
             <LinearGradient
@@ -3437,7 +3699,15 @@ export default function HomeScreen() {
               ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={StyleSheet.absoluteFillObject}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: "100%",
+                height: "100%",
+              }}
             />
             <View style={[s.heroLeft, { width: wide ? "62%" : "100%" }]}>
               <View style={s.heroBadge}>
@@ -3616,142 +3886,142 @@ export default function HomeScreen() {
           </View>
         ) : (
           <Animated.View style={{ opacity: vendorListAnim, transform: [{ translateY: vendorListY }] }}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingLeft: hPad,
-              paddingRight: 8,
-              paddingBottom: 6,
-            }}
-          >
-            {vendors.map((vendor) => {
-              const isOpen = isStoreCurrentlyOpen(vendor);
-              return (
-                <TouchableOpacity
-                  key={vendor.id}
-                  style={[s.storeCard, wide && s.storeCardWide]}
-                  disabled={!isOpen}
-                  onPress={isOpen ? () =>
-                    navigation.navigate("VendorStore", {
-                      vendorId: vendor.id,
-                      vendorName: vendor.shop_name,
-                    })
-                    : undefined}
-                  activeOpacity={isOpen ? 0.88 : 1}
-                >
-                  {/* Everything except the CLOSED badge — dimmed when closed */}
-                  <View
-                    style={[
-                      s.cardContent,
-                      !isStoreCurrentlyOpen(vendor) && s.cardContentClosed,
-                    ]}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingLeft: hPad,
+                paddingRight: 8,
+                paddingBottom: 6,
+              }}
+            >
+              {vendors.map((vendor) => {
+                const isOpen = isStoreCurrentlyOpen(vendor);
+                return (
+                  <TouchableOpacity
+                    key={vendor.id}
+                    style={[s.storeCard, wide && s.storeCardWide]}
+                    disabled={!isOpen}
+                    onPress={isOpen ? () =>
+                      navigation.navigate("VendorStore", {
+                        vendorId: vendor.id,
+                        vendorName: vendor.shop_name,
+                      })
+                      : undefined}
+                    activeOpacity={isOpen ? 0.88 : 1}
                   >
-                    <View style={s.storeImgWrap}>
-                      <Image
-                        source={{
-                          uri:
-                            vendor.shop_image_url ||
-                            `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${vendor.id}`,
-                        }}
-                        style={s.storeImg}
-                      />
-                      <LinearGradient
-                        colors={["transparent", "rgba(0,0,0,0.5)"]}
-                        style={s.storeImgOverlay}
-                      />
-                      <View style={s.ratingBadge}>
-                        <MaterialIcons name="star" size={10} color="#FBBF24" />
-                        <Text style={s.ratingText}>
-                          {vendor.avg_rating
-                            ? parseFloat(vendor.avg_rating).toFixed(1)
-                            : t("home.new")}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={s.storeInfo}>
-                      <Text style={s.storeName} numberOfLines={1}>
-                        {vendor.shop_name}
-                      </Text>
-                      <View style={s.storeMetaRow}>
-                        <MaterialIcons name="location-on" size={10} color={C.green} />
-                        <Text style={s.storeMeta}>
-                          {vendor.distance_km
-                            ? t("home.kmDistance", { count: parseFloat(vendor.distance_km).toFixed(1) })
-                            : t("home.nearby")}
-                        </Text>
-                        <View style={s.metaDot} />
-                        <MaterialIcons name="access-time" size={10} color={C.gray400} />
-                        <Text style={s.storeMeta}>{t("home.deliveryTime")}</Text>
-                      </View>
-                      <View style={s.storeTagRow}>
-                        {/* Min order — orange pill */}
-                        <View style={[s.storeTag, { backgroundColor: C.orangeLight, borderColor: "#FED7AA" }]}>
-                          <Text style={[s.storeTagText, { color: C.orangeDark }]}>
-                            {t("home.minOrder", { min: vendor.min_order || 99 })}
+                    {/* Everything except the CLOSED badge — dimmed when closed */}
+                    <View
+                      style={[
+                        s.cardContent,
+                        !isStoreCurrentlyOpen(vendor) && s.cardContentClosed,
+                      ]}
+                    >
+                      <View style={s.storeImgWrap}>
+                        <Image
+                          source={{
+                            uri:
+                              vendor.shop_image_url ||
+                              `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${vendor.id}`,
+                          }}
+                          style={s.storeImg}
+                        />
+                        <LinearGradient
+                          colors={["transparent", "rgba(0,0,0,0.5)"]}
+                          style={s.storeImgOverlay}
+                        />
+                        <View style={s.ratingBadge}>
+                          <MaterialIcons name="star" size={10} color="#FBBF24" />
+                          <Text style={s.ratingText}>
+                            {vendor.avg_rating
+                              ? parseFloat(vendor.avg_rating).toFixed(1)
+                              : t("home.new")}
                           </Text>
                         </View>
-                        {isStoreCurrentlyOpen(vendor) && (
-                          <View
-                            style={[
-                              s.storeTag,
-                              {
-                                backgroundColor: C.greenLight,
-                                borderColor: C.greenBorder,
-                              },
-                            ]}
-                          >
-                            <Text style={[s.storeTagText, { color: C.green }]}>
-                              {t("home.acceptingOrders")}
+                      </View>
+                      <View style={s.storeInfo}>
+                        <Text style={s.storeName} numberOfLines={1}>
+                          {vendor.shop_name}
+                        </Text>
+                        <View style={s.storeMetaRow}>
+                          <MaterialIcons name="location-on" size={10} color={C.green} />
+                          <Text style={s.storeMeta}>
+                            {vendor.distance_km
+                              ? t("home.kmDistance", { count: parseFloat(vendor.distance_km).toFixed(1) })
+                              : t("home.nearby")}
+                          </Text>
+                          <View style={s.metaDot} />
+                          <MaterialIcons name="access-time" size={10} color={C.gray400} />
+                          <Text style={s.storeMeta}>{t("home.deliveryTime")}</Text>
+                        </View>
+                        <View style={s.storeTagRow}>
+                          {/* Min order — orange pill */}
+                          <View style={[s.storeTag, { backgroundColor: C.orangeLight, borderColor: "#FED7AA" }]}>
+                            <Text style={[s.storeTagText, { color: C.orangeDark }]}>
+                              {t("home.minOrder", { min: vendor.min_order || 99 })}
                             </Text>
                           </View>
-                        )}
-                        {vendor.vendor_type && vendor.vendor_type !== "all" &&
-                          VENDOR_TYPE_META[vendor.vendor_type] && (
+                          {isStoreCurrentlyOpen(vendor) && (
                             <View
                               style={[
                                 s.storeTag,
                                 {
-                                  backgroundColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
-                                  borderColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
+                                  backgroundColor: C.greenLight,
+                                  borderColor: C.greenBorder,
                                 },
                               ]}
                             >
-                              <Text
-                                style={[
-                                  s.storeTagText,
-                                  { color: VENDOR_TYPE_META[vendor.vendor_type].color },
-                                ]}
-                              >
-                                {VENDOR_TYPE_META[vendor.vendor_type].label}
+                              <Text style={[s.storeTagText, { color: C.green }]}>
+                                {t("home.acceptingOrders")}
                               </Text>
                             </View>
                           )}
+                          {vendor.vendor_type && vendor.vendor_type !== "all" &&
+                            VENDOR_TYPE_META[vendor.vendor_type] && (
+                              <View
+                                style={[
+                                  s.storeTag,
+                                  {
+                                    backgroundColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
+                                    borderColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    s.storeTagText,
+                                    { color: VENDOR_TYPE_META[vendor.vendor_type].color },
+                                  ]}
+                                >
+                                  {VENDOR_TYPE_META[vendor.vendor_type].label}
+                                </Text>
+                              </View>
+                            )}
+                        </View>
                       </View>
                     </View>
-                  </View>
 
-                  {/* OPEN/CLOSED pill — solid, no dot. Kept OUTSIDE the dimmed
+                    {/* OPEN/CLOSED pill — solid, no dot. Kept OUTSIDE the dimmed
                     wrapper so it always renders at full opacity and stays
                     clearly legible even on a CLOSED (dimmed) card. */}
-                  <View
-                    style={[
-                      s.statusBadge,
-                      {
-                        backgroundColor: isStoreCurrentlyOpen(vendor)
-                          ? C.green
-                          : "rgba(0,0,0,0.72)",
-                      },
-                    ]}
-                  >
-                    <Text style={s.statusText}>
-                      {isStoreCurrentlyOpen(vendor) ? t("home.open") : t("home.closed")}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+                    <View
+                      style={[
+                        s.statusBadge,
+                        {
+                          backgroundColor: isStoreCurrentlyOpen(vendor)
+                            ? C.green
+                            : "rgba(0,0,0,0.72)",
+                        },
+                      ]}
+                    >
+                      <Text style={s.statusText}>
+                        {isStoreCurrentlyOpen(vendor) ? t("home.open") : t("home.closed")}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </Animated.View>
         )}
 
@@ -4222,6 +4492,7 @@ const s = StyleSheet.create({
   },
   mobileLocBtn: { flex: 1, marginRight: 8 },
   mobileLocBottom: { fontSize: 18, fontWeight: "700", color: C.gray900, flexShrink: 1 },
+  mobileWishBtn: { padding: 4 },
   mobileProfileBtn: {
     alignItems: "center",
     justifyContent: "center",
