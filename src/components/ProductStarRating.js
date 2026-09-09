@@ -47,6 +47,7 @@ export default function ProductStarRating({
   const [myComment, setMyComment] = useState(propMyComment ?? null);
   const [canRate, setCanRate] = useState(propCanRate ?? false);
   const [comments, setComments] = useState(propComments ?? []);
+  const [commentText, setCommentText] = useState("");
   const [loading, setLoading] = useState(!hasProps);
   const [submitting, setSubmitting] = useState(false);
 
@@ -99,9 +100,10 @@ export default function ProductStarRating({
 
     try {
       setSubmitting(true);
-      const res = await productReviewsAPI.submitReview(productId, rating, token);
+      const res = await productReviewsAPI.submitReview(productId, rating, token, commentText);
       if (res.success) {
         setMyRating(rating);
+        if (commentText) setMyComment(commentText);
         setAvgRating(res.data.avgRating);
         setTotalReviews(res.data.totalReviews);
         // Re-fetch to get accurate data (updated avg, other comments)
