@@ -14,6 +14,7 @@ import UseCurrentLocationButton from "../../components/UseCurrentLocationButton"
 import UnitDropdownMenu from '../../components/UnitDropdownMenu';
 import { uploadAPI } from '../../services/api';
 import { MaterialIcons } from '@expo/vector-icons';
+import BANK_BRANCH_DATA from '../../data/bankBranches.json';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 // ─── Premium palette — DesiDukaan emerald on soft cloud-white ──────────────────
@@ -284,7 +285,7 @@ function ProductCategoryDropdown({ topCategories = [], loading, value, subvalue,
         </View>
       )}
 
-      {value && (
+      {!!value && (
         <View style={{ marginTop: 6 }}>
           <TouchableOpacity
             style={styles.dropdownBox}
@@ -322,6 +323,133 @@ function ProductCategoryDropdown({ topCategories = [], loading, value, subvalue,
               )}
             </View>
           )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const BANK_OPTIONS = [
+  'State Bank of India', 'HDFC Bank', 'ICICI Bank', 'Axis Bank',
+  'Punjab National Bank', 'Bank of Baroda', 'Kotak Mahindra Bank', 'Canara Bank', 'Other',
+];
+
+// ─── Bank name dropdown (same visual pattern as ProductCategoryDropdown) ──────
+function BankNameDropdown({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View>
+      <TouchableOpacity style={styles.dropdownBox} activeOpacity={0.8} onPress={() => setOpen(o => !o)}>
+        <Text style={[styles.dropdownValue, !value && styles.dropdownPlaceholder]}>
+          {value || 'Select Bank...'}
+        </Text>
+        <MaterialIcons name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#666" />
+      </TouchableOpacity>
+      {open && (
+        <View style={styles.dropdownList}>
+          <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+            {BANK_OPTIONS.map(opt => (
+              <TouchableOpacity
+                key={opt}
+                style={[styles.dropdownItem, value === opt && styles.dropdownItemActive]}
+                onPress={() => { onChange(opt); setOpen(false); }}
+              >
+                <Text style={[styles.dropdownItemText, value === opt && styles.dropdownItemTextActive]}>{opt}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ─── Branch picker ──────────────────────────────────────────────────────────
+// Searches a dataset bundled with the app (src/data/bankBranches.json,
+// ~49,800 real branches across the 8 banks above, sourced from public IFSC
+// records) — fully offline, no network dependency. Pick a bank, then type a
+// city or branch name to filter; selecting a branch auto-fills the IFSC code.
+function BranchPicker({ bankName, value, onSelectBranch }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const allBranches = BANK_BRANCH_DATA[bankName]; // [branch, city, state, ifsc][]
+
+  const results = useMemo(() => {
+    if (!allBranches) return [];
+    const q = query.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const matches = [];
+    for (const row of allBranches) {
+      const [branch, city] = row;
+      if (branch.toLowerCase().includes(q) || city.toLowerCase().includes(q)) {
+        matches.push(row);
+        if (matches.length >= 40) break; // cap render count for a snappy list
+      }
+    }
+    return matches;
+  }, [allBranches, query]);
+
+  if (!allBranches) {
+    return (
+      <View style={[styles.dropdownBox, styles.dropdownBoxDisabled]}>
+        <Text style={styles.dropdownPlaceholder}>Select your bank above first</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <TouchableOpacity
+        style={styles.dropdownBox}
+        activeOpacity={0.8}
+        onPress={() => setOpen(o => !o)}
+      >
+        <Text style={[styles.dropdownValue, !value && styles.dropdownPlaceholder]} numberOfLines={1}>
+          {value || 'Select your branch'}
+        </Text>
+        <MaterialIcons name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#666" />
+      </TouchableOpacity>
+      {open && (
+        <View style={styles.dropdownList}>
+          <View style={styles.branchSearchRow}>
+            <MaterialIcons name="search" size={16} color="#999" />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Type city or branch name"
+              placeholderTextColor="#aaa"
+              style={styles.branchSearchInput}
+              autoCapitalize="words"
+              autoFocus
+            />
+          </View>
+          <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+            {query.trim().length < 2 ? (
+              <View style={styles.dropdownEmpty}>
+                <Text style={styles.dropdownEmptyText}>Type at least 2 letters — e.g. your city or branch name</Text>
+              </View>
+            ) : results.length === 0 ? (
+              <View style={styles.dropdownEmpty}>
+                <Text style={styles.dropdownEmptyText}>No matches — try a different spelling, or enter your IFSC code below.</Text>
+              </View>
+            ) : (
+              results.map(([branch, city, state, ifscCode]) => (
+                <TouchableOpacity
+                  key={ifscCode}
+                  style={[styles.dropdownItem, branch === value && styles.dropdownItemActive]}
+                  onPress={() => { onSelectBranch({ branch, city, state, ifsc: ifscCode }); setOpen(false); }}
+                >
+                  <Text style={[styles.dropdownItemText, branch === value && styles.dropdownItemTextActive]} numberOfLines={1}>
+                    {branch}
+                  </Text>
+                  <Text style={styles.branchOptionSub} numberOfLines={1}>
+                    {city}{state ? `, ${state}` : ''} · {ifscCode}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
         </View>
       )}
     </View>
@@ -477,11 +605,11 @@ export default function VendorOnboardingScreen({ onComplete }) {
   const geoRequestId = useRef(0);
 
   const runGeocode = async () => {
-    if (city.length < 3 || pincode.length !== 6) return;
+    if (shopLoc.city.length < 3 || shopLoc.pincode.length !== 6) return;
     const requestId = ++geoRequestId.current;
     setGeocoding(true);
     setGeoError(null);
-    const coords = await geocodeAddress(city, pincode);
+    const coords = await geocodeAddress(shopLoc.city, shopLoc.pincode);
     if (requestId !== geoRequestId.current) return; // a newer request already resolved
     if (coords.latitude && coords.longitude) {
       setResolvedLat(coords.latitude);
@@ -744,8 +872,11 @@ export default function VendorOnboardingScreen({ onComplete }) {
   // Step 3 — Bank
   const [upiId, setUpiId] = useState('');
   const [accountName, setAccountName] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [branch, setBranch] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [ifsc, setIfsc] = useState('');
+  const [ifscStatus, setIfscStatus] = useState(null); // { status: 'loading'|'found'|'notfound'|'error', bank, city }
 
   // Step 4 — Catalog
   const [addMode, setAddMode] = useState('generic');
@@ -772,6 +903,37 @@ export default function VendorOnboardingScreen({ onComplete }) {
       fetchAdminCategories();
     }
   }, [currentStep]);
+
+  // ── Live IFSC verification ────────────────────────────────────────────────
+  // Once an 11-char, correctly-formatted IFSC is present (typed directly, or
+  // auto-filled by picking a branch above), verify it against Razorpay's
+  // free, public, CORS-enabled single-code lookup — confirms the code is real
+  // and shows the bank/city as reassurance.
+  useEffect(() => {
+    const code = ifsc.trim().toUpperCase();
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(code)) {
+      setIfscStatus(null);
+      return;
+    }
+    let cancelled = false;
+    setIfscStatus({ status: 'loading' });
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`https://ifsc.razorpay.com/${code}`);
+        if (cancelled) return;
+        if (!res.ok) {
+          setIfscStatus({ status: 'notfound' });
+          return;
+        }
+        const data = await res.json();
+        if (cancelled) return;
+        setIfscStatus({ status: 'found', bank: data.BANK, city: data.CITY });
+      } catch (e) {
+        if (!cancelled) setIfscStatus({ status: 'error' });
+      }
+    }, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [ifsc]);
 
   // Fetch top categories from the same endpoint the admin Add Product form uses
   const fetchAdminCategories = async () => {
@@ -1001,26 +1163,6 @@ export default function VendorOnboardingScreen({ onComplete }) {
     if (currentStep < STEPS.length) {
       setCurrentStep(prev => prev + 1);
       return;
-    }
-
-    let latitude = resolvedLat;
-    let longitude = resolvedLng;
-
-    // Safety net: if the debounced geocode never resolved (e.g. user submitted
-    // fast, or the earlier attempt failed), try once more before submitting
-    // rather than silently sending null coordinates to the backend.
-    if (!latitude || !longitude) {
-      setGeocoding(true);
-      const coords = await geocodeAddress(city, pincode);
-      setGeocoding(false);
-      if (coords.latitude && coords.longitude) {
-        latitude = coords.latitude;
-        longitude = coords.longitude;
-        setResolvedLat(latitude);
-        setResolvedLng(longitude);
-      } else {
-        setGeoError(coords.error || 'Could not detect location');
-      }
     }
 
     // ── Final submit ──────────────────────────────────────────────────────────
@@ -1625,7 +1767,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
              
               {/* Map Preview — marker is draggable; dragging reverse-geocodes the fields */}
               
-              {(shopLoc.formattedAddress || shopLoc.city || shopLoc.pincode) && (
+              {!!(shopLoc.formattedAddress || shopLoc.city || shopLoc.pincode) && (
                 <View style={styles.mapWrapper}>
                   <AddressMapView
                     latitude={shopLoc.lat}
@@ -1641,7 +1783,7 @@ export default function VendorOnboardingScreen({ onComplete }) {
                 </View>
               )}
             
-              {!geocoding && geoError && city.length >= 3 && pincode.length === 6 && (
+              {!geocoding && geoError && shopLoc.city.length >= 3 && shopLoc.pincode.length === 6 && (
                 <View style={[styles.infoBox, { marginTop: 8, backgroundColor: '#FEF2F2' }]}>
                   <Text style={[styles.infoText, { color: '#B91C1C' }]}>
                     {geoError}. We couldn't pin your shop on the map — double-check the city/pincode, or{' '}
@@ -1772,10 +1914,47 @@ export default function VendorOnboardingScreen({ onComplete }) {
               </View>
               <Text style={styles.label}>Account Holder Name</Text>
               <TextInput style={styles.input} placeholder="As per bank records" value={accountName} onChangeText={setAccountName} />
+              <Text style={styles.label}>Bank Name</Text>
+              <BankNameDropdown
+                value={bankName}
+                onChange={(v) => { setBankName(v); setBranch(''); }}
+              />
+              <Text style={styles.label}>Bank Branch</Text>
+              <BranchPicker
+                bankName={bankName}
+                value={branch}
+                onSelectBranch={({ branch: b, ifsc: code }) => {
+                  setBranch(b);
+                  setIfsc(code.toUpperCase());
+                }}
+              />
               <Text style={styles.label}>Account Number</Text>
               <TextInput style={styles.input} placeholder="Enter account number" keyboardType="numeric" secureTextEntry value={accountNumber} onChangeText={setAccountNumber} />
               <Text style={styles.label}>IFSC Code</Text>
-              <TextInput style={styles.input} placeholder="e.g. SBIN0001234" autoCapitalize="characters" value={ifsc} onChangeText={v => setIfsc(v.toUpperCase())} />
+              <TextInput style={styles.input} placeholder="e.g. SBIN0001234" autoCapitalize="characters" maxLength={11} value={ifsc} onChangeText={v => setIfsc(v.toUpperCase())} />
+              {ifscStatus?.status === 'loading' ? (
+                <View style={styles.ifscStatusRow}>
+                  <ActivityIndicator size="small" color="#999" />
+                  <Text style={styles.ifscStatusTextMuted}>Verifying IFSC…</Text>
+                </View>
+              ) : ifscStatus?.status === 'found' ? (
+                <View style={styles.ifscStatusRow}>
+                  <MaterialIcons name="check-circle" size={15} color={PRIMARY} />
+                  <Text style={styles.ifscStatusTextOk} numberOfLines={2}>
+                    {ifscStatus.bank}{ifscStatus.city ? `, ${ifscStatus.city}` : ''}
+                  </Text>
+                </View>
+              ) : ifscStatus?.status === 'notfound' ? (
+                <View style={styles.ifscStatusRow}>
+                  <MaterialIcons name="cancel" size={15} color="#DC2626" />
+                  <Text style={styles.ifscStatusTextErr}>IFSC not found — double-check the code</Text>
+                </View>
+              ) : ifscStatus?.status === 'error' ? (
+                <View style={styles.ifscStatusRow}>
+                  <MaterialIcons name="error-outline" size={15} color="#B8860B" />
+                  <Text style={styles.ifscStatusTextMuted}>Couldn't verify right now — you can still continue</Text>
+                </View>
+              ) : null}
             </View>
           )}
 
@@ -2578,6 +2757,14 @@ const styles = StyleSheet.create({
   dropdownItemTextActive: { color: PRIMARY, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" },
   dropdownEmpty: { padding: 14, backgroundColor: '#fafafa' },
   dropdownEmptyText: { fontSize: 12, color: '#999' },
+  dropdownBoxDisabled: { backgroundColor: '#f5f5f5' },
+  branchSearchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  branchSearchInput: { flex: 1, fontSize: 13, color: '#333', paddingVertical: 2, fontFamily: "PlusJakartaSans_500Medium" },
+  branchOptionSub: { fontSize: 11, color: '#999', marginTop: 2 },
+  ifscStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  ifscStatusTextOk: { fontSize: 12, fontWeight: '700', color: PRIMARY, flex: 1, fontFamily: "PlusJakartaSans_600SemiBold" },
+  ifscStatusTextErr: { fontSize: 12, fontWeight: '600', color: '#DC2626', flex: 1, fontFamily: "PlusJakartaSans_500Medium" },
+  ifscStatusTextMuted: { fontSize: 12, fontWeight: '600', color: '#999', flex: 1, fontFamily: "PlusJakartaSans_500Medium" },
 
   // Vendor type — 2x2 grid
   segmentGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },

@@ -20,7 +20,6 @@ import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     TextInput, Image, Alert, Platform, StatusBar,
     KeyboardAvoidingView, ActivityIndicator, useWindowDimensions,
-    Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -39,6 +38,7 @@ import PdfViewerModal from '../../components/onboarding/PdfViewerModal';
 import RemovalConfirmDialog from '../../components/onboarding/RemovalConfirmDialog';
 import ToastBanner from '../../components/common/ToastBanner';
 import { C } from '../../components/onboarding/onboardingTheme';
+import BANK_BRANCH_DATA from '../../data/bankBranches.json';
 import { compressImage, revokeObjectUrl } from '../../utils/imageEditor';
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -79,7 +79,7 @@ const INITIAL_FORM = {
     },
     bank: {
         accountHolderName: '', bankName: '', accountNumber: '',
-        ifsc: '',
+        ifsc: '', branch: '',
     },
     education: { level: '', institution: '', passingYear: '', trainings: [] },
 };
@@ -227,6 +227,11 @@ const BANK_OPTIONS = [
     'State Bank of India', 'HDFC Bank', 'ICICI Bank', 'Axis Bank',
     'Punjab National Bank', 'Bank of Baroda', 'Kotak Mahindra Bank', 'Canara Bank', 'Other',
 ];
+// Offline branch dataset for the banks above (~49,800 real branches, sourced
+// from public IFSC records — see src/data/bankBranches.json). Keyed by the
+// same bank names used in BANK_OPTIONS; each entry is a
+// [branchName, city, state, ifsc] tuple. Bundled with the app so branch
+// search works with no network call and no backend dependency.
 const EDU_LEVELS = ['10th Pass', '12th Pass', 'Diploma', 'Graduate', 'Post Graduate', 'Other'];
 const TRAINING_OPTS = [
     'Food Delivery Training', 'Road Safety Course',
@@ -260,7 +265,7 @@ function SectionCard({ title, subtitle, stepIndex, completed, children, infoBadg
     );
 }
 
-function Input({ value, onChangeText, placeholder, keyboardType, maxLength, secureTextEntry, autoCapitalize = 'none', onBlur }) {
+function Input({ value, onChangeText, placeholder, keyboardType, maxLength, secureTextEntry, autoCapitalize = 'none', onBlur, editable = true, style }) {
     const [focused, setFocused] = useState(false);
     return (
         <TextInput
@@ -272,9 +277,10 @@ function Input({ value, onChangeText, placeholder, keyboardType, maxLength, secu
             maxLength={maxLength}
             secureTextEntry={secureTextEntry}
             autoCapitalize={autoCapitalize}
+            editable={editable}
             onFocus={() => setFocused(true)}
             onBlur={() => { setFocused(false); onBlur?.(); }}
-            style={[s.input, focused && s.inputFocused]}
+            style={[s.input, focused && s.inputFocused, style]}
             accessibilityLabel={placeholder}
         />
     );
@@ -374,7 +380,112 @@ function SelectInput({ value, onSelect, options, placeholder = 'Select', onBlur 
     );
 }
 
-// 4-across icon grid for vehicle type (Motorcycle / Scooter / Car / Other)
+// Branch picker — same "Select ___" dropdown look as SelectInput above. The
+// branch list comes from a dataset bundled with the app (src/data/bankBranches.json,
+// ~49,800 real branches across the 8 banks below, sourced from public IFSC
+// records), so this works fully offline with no dependency on any external
+// API. Pick a bank, then type your city or branch name to filter; selecting a
+// branch auto-fills the IFSC code.
+function BranchPicker({ bankName, value, onSelectBranch, onBlur }) {
+    const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState('');
+
+    const allBranches = BANK_BRANCH_DATA[bankName]; // [branch, city, state, ifsc][]
+
+    const results = useMemo(() => {
+        if (!allBranches) return [];
+        const q = query.trim().toLowerCase();
+        if (q.length < 2) return [];
+        const matches = [];
+        for (const row of allBranches) {
+            const [branch, city] = row;
+            if (branch.toLowerCase().includes(q) || city.toLowerCase().includes(q)) {
+                matches.push(row);
+                if (matches.length >= 40) break; // cap render count for a snappy list
+            }
+        }
+        return matches;
+    }, [allBranches, query]);
+
+    if (!allBranches) {
+        return (
+            <View style={[s.input, s.selectInput, s.selectDisabled]}>
+                <Text style={s.selectPlaceholderTxt} numberOfLines={1}>Select your bank above first</Text>
+            </View>
+        );
+    }
+
+    return (
+        <View>
+            <TouchableOpacity
+                style={[s.input, s.selectInput, open && s.inputFocused]}
+                activeOpacity={0.8}
+                onPress={() => setOpen((o) => {
+                    const next = !o;
+                    if (!next) onBlur?.();
+                    return next;
+                })}
+                accessibilityRole="button"
+            >
+                <Text style={value ? s.selectValueTxt : s.selectPlaceholderTxt} numberOfLines={1}>
+                    {value || 'Select your branch'}
+                </Text>
+                <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={C.textLight} style={s.selectChevron} />
+            </TouchableOpacity>
+            {open ? (
+                <View style={s.selectDropdown}>
+                    <View style={s.branchSearchRow}>
+                        <Ionicons name="search" size={14} color={C.textLight} />
+                        <TextInput
+                            value={query}
+                            onChangeText={setQuery}
+                            placeholder="Type city or branch name"
+                            placeholderTextColor={C.textXLight}
+                            style={s.branchSearchInput}
+                            autoCapitalize="words"
+                            autoFocus
+                        />
+                    </View>
+                    <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled showsVerticalScrollIndicator keyboardShouldPersistTaps="handled">
+                        {query.trim().length < 2 ? (
+                            <View style={s.branchStatusBox}>
+                                <Ionicons name="information-circle" size={15} color={C.textLight} />
+                                <Text style={s.ifscStatusTextMuted}>Type at least 2 letters — e.g. your city or branch name</Text>
+                            </View>
+                        ) : results.length === 0 ? (
+                            <View style={s.branchStatusBox}>
+                                <Ionicons name="alert-circle" size={15} color="#B8860B" />
+                                <Text style={s.ifscStatusTextMuted}>No matches — try a different spelling, or enter your IFSC code below.</Text>
+                            </View>
+                        ) : (
+                            results.map(([branch, city, state, ifsc]) => (
+                                <TouchableOpacity
+                                    key={ifsc}
+                                    style={s.selectOption}
+                                    onPress={() => {
+                                        onSelectBranch({ BANK: bankName, BRANCH: branch, CITY: city, STATE: state, IFSC: ifsc });
+                                        setOpen(false);
+                                        onBlur?.();
+                                    }}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={[s.selectOptionTxt, branch === value && s.selectOptionTxtActive]} numberOfLines={1}>
+                                        {branch}
+                                    </Text>
+                                    <Text style={s.branchOptionSub} numberOfLines={1}>
+                                        {city}{state ? `, ${state}` : ''} · {ifsc}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))
+                        )}
+                    </ScrollView>
+                </View>
+            ) : null}
+        </View>
+    );
+}
+
+
 function VehicleTypeGrid({ options, selected, onSelect }) {
     return (
         <View style={s.vehicleGrid}>
@@ -635,6 +746,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
     const [cropState, setCropState] = useState(null);          // { visible, sourceUri, title, mode, target, name }
     const [removeConfirm, setRemoveConfirm] = useState(null);  // { target, fileName } | null
     const [pdfViewer, setPdfViewer] = useState(null);          // { visible, uri, localUri, fileName }
+    const [ifscLookup, setIfscLookup] = useState(null);        // { status: 'loading'|'found'|'notfound'|'error', bank, branch, city }
 
     const markTouched = (key) => setTouched((t) => (t[key] ? t : { ...t, [key]: true }));
 
@@ -647,6 +759,44 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
         const t = setTimeout(() => setToast(null), 4200);
         return () => clearTimeout(t);
     }, [toast]);
+
+    // ── Live IFSC verification (in-screen only — no external site) ──────────
+    // Once an 11-char, correctly-formatted IFSC is typed, we verify it against
+    // Razorpay's free, public, CORS-enabled IFSC directory
+    // (https://ifsc.razorpay.com/{code}) directly from the app — no backend
+    // changes needed, and nothing ever opens outside this screen. On success,
+    // both Bank Name and Bank Branch are auto-filled from the record.
+    useEffect(() => {
+        const code = form.bank.ifsc.trim().toUpperCase();
+        if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(code)) {
+            setIfscLookup(null);
+            setForm((prev) => (prev.bank.branch ? { ...prev, bank: { ...prev.bank, branch: '' } } : prev));
+            return;
+        }
+        let cancelled = false;
+        setIfscLookup({ status: 'loading' });
+        const t = setTimeout(async () => {
+            try {
+                const res = await fetch(`https://ifsc.razorpay.com/${code}`);
+                if (cancelled) return;
+                if (!res.ok) {
+                    setIfscLookup({ status: 'notfound' });
+                    setForm((prev) => ({ ...prev, bank: { ...prev.bank, branch: '' } }));
+                    return;
+                }
+                const data = await res.json();
+                if (cancelled) return;
+                setIfscLookup({ status: 'found', bank: data.BANK, branch: data.BRANCH, city: data.CITY });
+                setForm((prev) => ({
+                    ...prev,
+                    bank: { ...prev.bank, bankName: data.BANK || prev.bank.bankName, branch: data.BRANCH || '' },
+                }));
+            } catch (e) {
+                if (!cancelled) setIfscLookup({ status: 'error' });
+            }
+        }, 400); // small debounce so it doesn't fire on every keystroke
+        return () => { cancelled = true; clearTimeout(t); };
+    }, [form.bank.ifsc]);
 
     // ── Derived validation ─────────────────────────────────────────────────
     const allErrors = useMemo(() => validateAll(form), [form]);
@@ -1297,6 +1447,31 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
 
                     <FieldRow>
                         <View style={s.fieldRowItem}>
+                            <OnboardingField label="Bank Branch" errorKey="bank.branch" errors={visibleErrors}>
+                                <BranchPicker
+                                    bankName={form.bank.bankName}
+                                    value={form.bank.branch}
+                                    onBlur={() => markTouched('bank.branch')}
+                                    onSelectBranch={(r) => {
+                                        setForm((prev) => ({
+                                            ...prev,
+                                            bank: {
+                                                ...prev.bank,
+                                                branch: r.BRANCH || '',
+                                                ifsc: (r.IFSC || '').toUpperCase(),
+                                                bankName: prev.bank.bankName || r.BANK || prev.bank.bankName,
+                                            },
+                                        }));
+                                        setIfscLookup({ status: 'found', bank: r.BANK, branch: r.BRANCH, city: r.CITY });
+                                    }}
+                                />
+                            </OnboardingField>
+                        </View>
+                        <View style={s.fieldRowItem} />
+                    </FieldRow>
+
+                    <FieldRow>
+                        <View style={s.fieldRowItem}>
                             <OnboardingField label="Account Number" required errorKey="bank.accountNumber" errors={visibleErrors}>
                                 <Input
                                     value={form.bank.accountNumber}
@@ -1310,12 +1485,6 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                             </OnboardingField>
                         </View>
                         <View style={s.fieldRowItem}>
-                            <View style={s.ifscLabelRow}>
-                                <Text style={s.ifscLabelSpacer} />
-                                <TouchableOpacity onPress={() => Linking.openURL('https://www.bankifsccode.com')} accessibilityRole="link">
-                                    <Text style={s.findIfscLink}>Find IFSC</Text>
-                                </TouchableOpacity>
-                            </View>
                             <OnboardingField label="IFSC Code" required errorKey="bank.ifsc" errors={visibleErrors}>
                                 <Input
                                     value={form.bank.ifsc}
@@ -1326,6 +1495,29 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                                     onBlur={() => markTouched('bank.ifsc')}
                                 />
                             </OnboardingField>
+                            {ifscLookup?.status === 'loading' ? (
+                                <View style={s.ifscStatusRow}>
+                                    <ActivityIndicator size="small" color={C.textLight} />
+                                    <Text style={s.ifscStatusTextMuted}>Finding your bank branch…</Text>
+                                </View>
+                            ) : ifscLookup?.status === 'found' ? (
+                                <View style={s.ifscStatusRow}>
+                                    <Ionicons name="checkmark-circle" size={15} color={C.green} />
+                                    <Text style={s.ifscStatusTextOk} numberOfLines={2}>
+                                        {ifscLookup.bank}{ifscLookup.city ? `, ${ifscLookup.city}` : ''}
+                                    </Text>
+                                </View>
+                            ) : ifscLookup?.status === 'notfound' ? (
+                                <View style={s.ifscStatusRow}>
+                                    <Ionicons name="close-circle" size={15} color="#DC2626" />
+                                    <Text style={s.ifscStatusTextErr}>IFSC not found — double-check the code</Text>
+                                </View>
+                            ) : ifscLookup?.status === 'error' ? (
+                                <View style={s.ifscStatusRow}>
+                                    <Ionicons name="alert-circle" size={15} color="#B8860B" />
+                                    <Text style={s.ifscStatusTextMuted}>Couldn't verify right now — you can still continue</Text>
+                                </View>
+                            ) : null}
                         </View>
                     </FieldRow>
 
@@ -1677,6 +1869,11 @@ const s = StyleSheet.create({
 
     // ── Select dropdown (RTO / Year / Bank) ──
     selectInput: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    selectDisabled: { backgroundColor: '#F3F4F1' },
+    branchSearchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F0F1EF' },
+    branchSearchInput: { flex: 1, fontSize: 13, color: C.text, paddingVertical: 2 },
+    branchStatusBox: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 14 },
+    branchOptionSub: { fontSize: 11, color: C.textLight, marginTop: 2 },
     selectValueTxt: { fontSize: 14, color: C.text, fontWeight: '500', flex: 1 },
     selectPlaceholderTxt: { fontSize: 14, color: C.textXLight, fontWeight: '500', flex: 1 },
     selectChevron: { fontSize: 10, color: C.textLight, marginLeft: 8 },
@@ -1694,9 +1891,10 @@ const s = StyleSheet.create({
     vehicleGridLabelActive: { color: C.greenDeep, fontWeight: '800' },
 
     // ── Find IFSC link ──
-    ifscLabelRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: -4 },
-    ifscLabelSpacer: { flex: 1 },
-    findIfscLink: { fontSize: 11, fontWeight: '800', color: C.blue },
+    ifscStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+    ifscStatusTextOk: { fontSize: 12, fontWeight: '700', color: C.greenDeep, flex: 1 },
+    ifscStatusTextErr: { fontSize: 12, fontWeight: '600', color: '#DC2626', flex: 1 },
+    ifscStatusTextMuted: { fontSize: 12, fontWeight: '600', color: C.textLight, flex: 1 },
 
     // ── Onboarding Summary: circular progress + In Progress status ──
     summaryHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
