@@ -11,6 +11,7 @@ import useCartStore    from "../../store/cartStore";
 import useAuthStore    from "../../store/authStore";
 import useAddressStore from "../../store/addressStore";
 import { useTranslation } from "react-i18next";
+import AnimatedPressable from "../../components/common/AnimatedPressable";
 
 const BASE_URL   = process.env.EXPO_PUBLIC_API_URL    || "http://localhost:3000/api";
 
@@ -373,10 +374,9 @@ export default function CartScreen() {
                 <Text style={[s.proceedSub, { fontSize: Math.round(11 * fs) }]}>{t('cart.total')}</Text>
               </View>
 
-              <TouchableOpacity 
+              <AnimatedPressable 
                 onPress={() => navigation.navigate("Checkout")} 
-                activeOpacity={0.88} 
-                style={[s.proceedBtn, { flex: 1 }]}
+                style={{ flex: 1 }}
               >
                 <LinearGradient
                   colors={[C.green, C.greenDark]}
@@ -386,7 +386,7 @@ export default function CartScreen() {
                   <Text style={[s.proceedText, { fontSize: Math.round(15 * fs) }]}>{t('cart.proceedToCheckout') || 'Proceed to checkout'}</Text>
                   <Feather name="arrow-right" size={16} color={C.white} />
                 </LinearGradient>
-              </TouchableOpacity>
+              </AnimatedPressable>
             </View>
           )}
         </View>{/* /mainCol */}

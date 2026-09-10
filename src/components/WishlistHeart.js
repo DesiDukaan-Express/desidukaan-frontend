@@ -21,8 +21,8 @@ export default function WishlistHeart({ productId, size = 22, style }) {
     lastTap.current = now;
 
     Animated.sequence([
-      Animated.timing(scale, { toValue: 1.3, duration: 120, useNativeDriver: true }),
-      Animated.timing(scale, { toValue: 1, duration: 120, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1.4, speed: 60, bounciness: 12, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, speed: 40, bounciness: 6, useNativeDriver: true }),
     ]).start();
     toggle(productId, token);
   };

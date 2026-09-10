@@ -17,6 +17,7 @@ import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
 import { useTranslation } from "react-i18next";
 import ProductStarRating from "../../components/ProductStarRating";
 import WishlistHeart from "../../components/WishlistHeart";
+import AnimatedPressable from "../../components/common/AnimatedPressable";
 import { io } from "socket.io-client";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
@@ -600,10 +601,10 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW, rating }) {
   const [wishlisted, setWishlisted] = useState(false);
 
   return (
-    <TouchableOpacity
+    <AnimatedPressable
       style={[pc.card, { width: cardW }, !inStock && { opacity: 0.5 }]}
       onPress={onPress}
-      activeOpacity={0.88}
+      scaleTo={0.97}
       disabled={!inStock}
     >
       {/* Image */}
@@ -697,7 +698,7 @@ function ProductCard({ item, onPress, onAdd, onRemove, qty, cardW, rating }) {
           <View style={pc.oosBtn}><Text style={pc.oosBtnText}>{t('vendorStore.outOfStock')}</Text></View>
         )}
       </View>
-    </TouchableOpacity>
+    </AnimatedPressable>
   );
 }
 const pc = StyleSheet.create({

@@ -52,8 +52,21 @@ const TAB_ICONS = {
 // ─── Tab icon component ────────────────────────────────────────────────────────
 const TabIcon = ({ iconName, label, focused, cartCount }) => {
   const isCart = label === 'Cart';
+  const scale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (focused) {
+      Animated.sequence([
+        Animated.spring(scale, { toValue: 1.18, speed: 50, bounciness: 10, useNativeDriver: true }),
+        Animated.spring(scale, { toValue: 1, speed: 40, bounciness: 6, useNativeDriver: true }),
+      ]).start();
+    } else {
+      scale.setValue(1);
+    }
+  }, [focused, scale]);
+
   return (
-    <View
+    <Animated.View
       style={{
         alignItems: 'center',
         justifyContent: 'center',
@@ -62,6 +75,7 @@ const TabIcon = ({ iconName, label, focused, cartCount }) => {
         borderRadius: 20,
         minWidth: 56,
         backgroundColor: focused ? C.greenLight : 'transparent',
+        transform: [{ scale }],
       }}
     >
       <View style={{ position: 'relative' }}>
@@ -100,7 +114,7 @@ const TabIcon = ({ iconName, label, focused, cartCount }) => {
       >
         {label}
       </Text>
-    </View>
+    </Animated.View>
   );
 };
 
