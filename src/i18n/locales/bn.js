@@ -45,6 +45,10 @@ export default {
     "createAccount": "অ্যাকাউন্ট তৈরি করুন",
     "termsOfService": "সেবার শর্তাবলী",
     "privacyPolicy": "গোপনীয়তা নীতি",
+    "dateOfBirth": "জন্ম তারিখ",
+    "dobPlaceholder": "দিন / মাস / বছর",
+    "mustBeAtleast16": "আপনার বয়স কমপক্ষে ১৬ বছর হতে হবে",
+    "invalidDob": "একটি বৈধ জন্ম তারিখ লিখুন",
     "invalidOtp": "অবৈধ OTP",
     "failedToSendOtp": "OTP পাঠাতে ব্যর্থ"
   },

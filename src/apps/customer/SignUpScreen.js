@@ -76,7 +76,8 @@ export default function SignupScreen({ navigation, route }) {
 
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState(prefillPhone);
-  const [age, setAge] = useState("");
+  const [dob, setDob] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [gender, setGender] = useState("");
   const [focusedField, setFocusedField] = useState(null);
   const [agreed, setAgreed] = useState(false);
@@ -164,9 +165,23 @@ export default function SignupScreen({ navigation, route }) {
     setError("");
   };
 
-  const ageNum = parseInt(age, 10);
-  const isAgeValid = age.length > 0 && !isNaN(ageNum) && ageNum >= 16 && ageNum <= 100;
-  const isAgeError = age.length > 0 && !isAgeValid;
+  // DOB validation & age calculation helper
+  const calcAgeFromDob = (dobStr) => {
+    if (!dobStr) return null;
+    const parts = dobStr.split("-");
+    if (parts.length !== 3) return null;
+    const birth = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    const m = now.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+    return age;
+  };
+
+  const calculatedAge = calcAgeFromDob(dob);
+  const isAgeTooYoung = !!dob && calculatedAge !== null && calculatedAge < 16;
+  const isDobValid = !!dob && calculatedAge !== null && calculatedAge >= 16 && calculatedAge <= 120;
+  const isDobError = !!dob && !isDobValid;
   const isMobileReady = isValidIndianMobile(mobile);
   const mobileStartError =
     mobile.length > 0 && !["6", "7", "8", "9"].includes(mobile[0])
@@ -175,13 +190,11 @@ export default function SignupScreen({ navigation, route }) {
   const isFormValid =
     name.trim().length >= 2 &&
     isMobileReady &&
-    isAgeValid &&
+    isDobValid &&
     gender !== "" &&
     agreed;
 
   // Step 1: register → account saved to DB
-  // Testing:    tokens returned directly, navigate to app (no OTP step)
-  // Production: OTP sent, navigate to OTP step
   const handleSignup = async () => {
     if (!isFormValid) return;
     setLoading(true); setError("");
@@ -191,7 +204,8 @@ export default function SignupScreen({ navigation, route }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(), phone: mobile,
-          age: ageNum,
+          age: calculatedAge,
+          dob,
           gender,
         }),
       });
@@ -367,30 +381,62 @@ export default function SignupScreen({ navigation, route }) {
 
 
 
-                      {/* Age + Gender */}
+                      {/* DOB + Gender */}
                       <View style={tablet ? s.rowFields : s.colFields}>
-                        <View style={[s.fieldGroup, tablet ? { flex: 1, marginRight: 10 } : { width: "100%" }]}>
-                          <Text style={s.fieldLabel}>Age</Text>
+                        <View style={[s.fieldGroup, tablet ? { flex: 1.2, marginRight: 10 } : { width: "100%" }]}>
+                          <Text style={s.fieldLabel}>{t("auth.dateOfBirth", { defaultValue: "Date of Birth" })}</Text>
                           <View style={[
                             s.inputBox,
-                            focusedField === "age" && s.inputBoxFocused,
-                            isAgeError && s.inputBoxError,
+                            { paddingLeft: 14 },
+                            focusedField === "dob" && s.inputBoxFocused,
+                            isDobError && s.inputBoxError,
                           ]}>
-                            <IIcon name="calendar" focused={focusedField === "age"} error={isAgeError} />
-                            <TextInput
-                              placeholder="e.g. 24"
-                              placeholderTextColor={C.gray400}
-                              keyboardType="number-pad"
-                              maxLength={3}
-                              value={age}
-                              onChangeText={(t) => { setAge(t.replace(/\D/g, "")); setError(""); }}
-                              onFocus={() => setFocusedField("age")}
-                              onBlur={() => setFocusedField(null)}
-                              style={s.fieldInput}
-                              underlineColorAndroid="transparent"
-                            />
+                            {Platform.OS === "web" ? (
+                              <input
+                                type="date"
+                                value={dob}
+                                onChange={(e) => { setDob(e.target.value); setError(""); }}
+                                onFocus={() => setFocusedField("dob")}
+                                onClick={(e) => {
+                                  try {
+                                    if (e.target.showPicker) e.target.showPicker();
+                                  } catch (err) {}
+                                }}
+                                onBlur={() => setFocusedField(null)}
+                                style={{
+                                  flex: 1,
+                                  border: "none",
+                                  outline: "none",
+                                  background: "transparent",
+                                  fontSize: "14px",
+                                  fontWeight: "500",
+                                  color: dob ? C.gray900 : C.gray400,
+                                  fontFamily: "inherit",
+                                  padding: "13px 12px 13px 0",
+                                  cursor: "pointer",
+                                }}
+                              />
+                            ) : (
+                              <TextInput
+                                placeholder={t("auth.dobPlaceholder", { defaultValue: "YYYY-MM-DD" })}
+                                placeholderTextColor={C.gray400}
+                                value={dob}
+                                onChangeText={(t) => { setDob(t); setError(""); }}
+                                onFocus={() => setFocusedField("dob")}
+                                onBlur={() => setFocusedField(null)}
+                                style={s.fieldInput}
+                                underlineColorAndroid="transparent"
+                              />
+                            )}
+                            {isDobValid && <Check />}
                           </View>
-                          {isAgeError && <Text style={s.fieldError}>Must be 16–100</Text>}
+                          {isDobError && (
+                            <Text style={s.fieldError}>
+                              {isAgeTooYoung
+                                ? t("auth.mustBeAtleast16", { defaultValue: "Must be at least 16 years old" })
+                                : t("auth.invalidDob", { defaultValue: "Please enter a valid date of birth" })}
+                            </Text>
+                          )}
                         </View>
 
                         <View style={[s.fieldGroup, tablet ? { flex: 2 } : { width: "100%" }]}>
@@ -417,19 +463,27 @@ export default function SignupScreen({ navigation, route }) {
                       </View>
 
                       {/* Terms */}
-                      <TouchableOpacity
-                        style={s.checkboxRow}
-                        onPress={() => setAgreed(!agreed)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={[s.checkbox, agreed && s.checkboxActive]}>
-                          {agreed && <Feather name="check" size={10} color={C.white} />}
-                        </View>
+                      <View style={s.checkboxRow}>
+                        <TouchableOpacity
+                          onPress={() => setAgreed(!agreed)}
+                          activeOpacity={0.7}
+                          style={{ marginTop: 2 }}
+                        >
+                          <View style={[s.checkbox, agreed && s.checkboxActive]}>
+                            {agreed && <Feather name="check" size={10} color={C.white} />}
+                          </View>
+                        </TouchableOpacity>
                         <Text style={s.checkboxText}>
-                          I agree to the <Text style={s.checkboxLink}>Terms of Service</Text>
-                          {" "}and <Text style={s.checkboxLink}>Privacy Policy</Text>
+                          I agree to the{" "}
+                          <Text style={s.checkboxLink} onPress={() => navigation.navigate("Terms")}>
+                            Terms of Service
+                          </Text>
+                          {" "}and{" "}
+                          <Text style={s.checkboxLink} onPress={() => navigation.navigate("Privacy")}>
+                            Privacy Policy
+                          </Text>
                         </Text>
-                      </TouchableOpacity>
+                      </View>
 
                       {error ? <ErrorBox msg={error} /> : null}
 
@@ -533,8 +587,8 @@ export default function SignupScreen({ navigation, route }) {
               <View style={s.footer}>
                 <Text style={s.legalText}>
                   By creating an account you agree to our{" "}
-                  <Text style={s.legalLink}>Terms</Text> &{" "}
-                  <Text style={s.legalLink}>Privacy</Text>
+                  <Text style={s.legalLink} onPress={() => navigation.navigate("Terms")}>Terms</Text> &{" "}
+                  <Text style={s.legalLink} onPress={() => navigation.navigate("Privacy")}>Privacy</Text>
                 </Text>
               </View>
 

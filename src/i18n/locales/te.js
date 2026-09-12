@@ -26,7 +26,7 @@ export default {
     "selectLanguage": "భాష ఎంచుకోండి"
   },
   "auth": {
-    "welcomeBack": "తిరిగి స్వాగతం",
+    "welcomeBack": "స్వాగతం",
     "loginSubtitle": "మీ మొబైల్ నంబర్‌తో లాగిన్ అవ్వండి",
     "mobileNumber": "మొబైల్ నంబర్",
     "mobilePlaceholder": "10 అంకెల నంబర్",
@@ -45,6 +45,10 @@ export default {
     "createAccount": "ఖాతా తయారు చేయండి",
     "termsOfService": "సేవా నిబంధనలు",
     "privacyPolicy": "గోప్యతా విధానం",
+    "dateOfBirth": "పుట్టిన తేదీ",
+    "dobPlaceholder": "రోజు / నెల / సంవత్సరం",
+    "mustBeAtleast16": "మీకు కనీసం 16 సంవత్సరాలు ఉండాలి",
+    "invalidDob": "దయచేసి చెల్లుబాటు అయ్యే పుట్టిన తేదీని నమోదు చేయండి",
     "invalidOtp": "చెల్లని OTP",
     "failedToSendOtp": "OTP పంపించడంలో విఫలమైంది"
   },

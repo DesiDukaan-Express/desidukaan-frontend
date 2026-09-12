@@ -26,7 +26,7 @@ export default {
     "selectLanguage": "மொழியை தேர்ந்தெடு"
   },
   "auth": {
-    "welcomeBack": "மீண்டும் வரவேற்கிறோம்",
+    "welcomeBack": "வரவேற்கிறோம்",
     "loginSubtitle": "உங்கள் மொபைல் எண்ணால் உள்நுழைக",
     "mobileNumber": "மொபைல் எண்",
     "mobilePlaceholder": "10 இலக்க எண்",
@@ -45,6 +45,10 @@ export default {
     "createAccount": "கணக்கு உருவாக்கு",
     "termsOfService": "சேவை விதிமுறைகள்",
     "privacyPolicy": "தனியுரிமைக் கொள்கை",
+    "dateOfBirth": "பிறந்த தேதி",
+    "dobPlaceholder": "நாள் / மாதம் / வருடம்",
+    "mustBeAtleast16": "உங்களுக்கு குறைந்தபட்சம் 16 வயது இருக்க வேண்டும்",
+    "invalidDob": "செல்லுபடியாகும் பிறந்த தேதியை உள்ளிடவும்",
     "invalidOtp": "தவறான OTP",
     "failedToSendOtp": "OTP அனுப்புவதில் தோல்வி"
   },
@@ -86,7 +90,7 @@ export default {
     "goodAfternoon": "மதிய வணக்கம்",
     "goodEvening": "மாலை வணக்கம்",
     "goodNight": "இனிய இரவு",
-    "welcomeBack": "மீண்டும் வரவேற்கிறோம், {{name}}",
+    "welcomeBack": "வரவேற்கிறோம், {{name}}",
     "welcomeGuest": "KwikPik-க்கு வரவேற்கிறோம்",
     "heroSubHeader": "புதிய மளிகை மற்றும் அத்தியாவசிய பொருட்கள், வேகமான டெலிவரி.",
     "freshFromNearby": "அருகிலுள்ள கடைகளிலிருந்து புதியது",

@@ -30,7 +30,7 @@ export default {
 
   // ── Auth ──
   auth: {
-    welcomeBack: "Welcome Back",
+    welcomeBack: "Welcome",
     loginSubtitle: "Log in with your mobile number",
     mobileNumber: "Mobile Number",
     mobilePlaceholder: "10-digit number",
@@ -49,6 +49,10 @@ export default {
     createAccount: "Create Account",
     termsOfService: "Terms of Service",
     privacyPolicy: "Privacy Policy",
+    dateOfBirth: "Date of Birth",
+    dobPlaceholder: "DD / MM / YYYY",
+    mustBeAtleast16: "Must be at least 16 years old",
+    invalidDob: "Please enter a valid date of birth",
     invalidOtp: "Invalid OTP",
     failedToSendOtp: "Failed to send OTP",
   },
@@ -113,7 +117,7 @@ export default {
     goodAfternoon: "Good Afternoon",
     goodEvening: "Good Evening",
     goodNight: "Good Night",
-    welcomeBack: "Welcome back, {{name}}",
+    welcomeBack: "Welcome, {{name}}",
     welcomeGuest: "Welcome to KwikPik",
     heroSubHeader: "Fresh groceries & daily essentials, delivered fast.",
     freshFromNearby: "Fresh from nearby stores",

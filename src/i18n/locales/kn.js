@@ -26,7 +26,7 @@ export default {
     "selectLanguage": "ಭಾಷೆ ಆಯ್ಕೆ ಮಾಡಿ"
   },
   "auth": {
-    "welcomeBack": "ಮತ್ತೆ ಸ್ವಾಗತ",
+    "welcomeBack": "ಸ್ವಾಗತ",
     "loginSubtitle": "ನಿಮ್ಮ ಮೊಬೈಲ್ ಸಂಖ್ಯೆಯಿಂದ ಲಾಗಿನ್ ಮಾಡಿ",
     "mobileNumber": "ಮೊಬೈಲ್ ಸಂಖ್ಯೆ",
     "mobilePlaceholder": "10 ಅಂಕಿ ಸಂಖ್ಯೆ",
@@ -45,6 +45,10 @@ export default {
     "createAccount": "ಖಾತೆ ರಚಿಸಿ",
     "termsOfService": "ಸೇವಾ ನಿಯಮಗಳು",
     "privacyPolicy": "ಗೌಪ್ಯತಾ ನೀತಿ",
+    "dateOfBirth": "ಹುಟ್ಟಿದ ದಿನಾಂಕ",
+    "dobPlaceholder": "ದಿನ / ತಿಂಗಳು / ವರ್ಷ",
+    "mustBeAtleast16": "ನಿಮಗೆ ಕನಿಷ್ಠ 16 ವರ್ಷ ವಯಸ್ಸಾಗಿರಬೇಕು",
+    "invalidDob": "ದಯವಿಟ್ಟು ಮಾನ್ಯವಾದ ಹುಟ್ಟಿದ ದಿನಾಂಕವನ್ನು ನಮೂದಿಸಿ",
     "invalidOtp": "ಅಮಾನ್ಯ OTP",
     "failedToSendOtp": "OTP ಕಳುಹಿಸಲು ವಿಫಲವಾಗಿದೆ"
   },
@@ -86,7 +90,7 @@ export default {
     "goodAfternoon": "ಶುಭ ಮಧ್ಯಾಹ್ನ",
     "goodEvening": "ಶುಭ ಸಂಜೆ",
     "goodNight": "ಶುಭ ರಾತ್ರಿ",
-    "welcomeBack": "ಮತ್ತೆ ಸ್ವಾಗತ, {{name}}",
+    "welcomeBack": "ಸ್ವಾಗತ, {{name}}",
     "welcomeGuest": "KwikPik ಗೆ ಸ್ವಾಗತ",
     "heroSubHeader": "ತಾಜಾ ದಿನಸಿ ಮತ್ತು ದೈನಂದಿನ ಅಗತ್ಯಗಳು, ವೇಗದ ಡೆಲಿವರಿ.",
     "freshFromNearby": "ಸಮೀಪದ ಅಂಗಡಿಗಳಿಂದ ತಾಜಾ",

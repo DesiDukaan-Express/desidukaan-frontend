@@ -3649,25 +3649,10 @@ export default function HomeScreen() {
         }}
         contentContainerStyle={s.scroll}
       >
-        {/* 1. GREETING */}
-        <View style={s.legacyGreetingRow}>
-          <Text style={s.greetingLine}>
-            {getGreeting()}{firstName ? "," : "!"}
-            {firstName ? (
-              <Text style={s.greetingName}> {firstName}</Text>
-            ) : null}
-          </Text>
-          <Text style={s.greetingEmoji}>👋</Text>
-          <Text style={s.greetingSub}>
-            {t("home.heroSubHeader")}
-          </Text>
-        </View>
-
         {/* 2. HERO BANNER */}
         <View style={[s.bannerWrap, { paddingHorizontal: hPad }]}>
           <View style={[s.heroIntro, wide && s.heroIntroWide]}>
             <View style={{ flex: 1 }}>
-              <Text style={s.greetingKicker}>{getGreeting()}</Text>
               <Text style={s.heroIntroTitle}>
                 {firstName ? t("home.welcomeBack", { name: firstName }) : t("home.welcomeGuest")}
               </Text>

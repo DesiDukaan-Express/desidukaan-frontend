@@ -26,7 +26,7 @@ export default {
     "selectLanguage": "ਭਾਸ਼ਾ ਚੁਣੋ"
   },
   "auth": {
-    "welcomeBack": "ਵਾਪਸ ਜੀ ਆਇਆਂ ਨੂੰ",
+    "welcomeBack": "ਜੀ ਆਇਆਂ ਨੂੰ",
     "loginSubtitle": "ਆਪਣੇ ਮੋਬਾਈਲ ਨੰਬਰ ਨਾਲ ਲੌਗਿਨ ਕਰੋ",
     "mobileNumber": "ਮੋਬਾਈਲ ਨੰਬਰ",
     "mobilePlaceholder": "10 ਅੰਕਾਂ ਦਾ ਨੰਬਰ",
@@ -45,6 +45,10 @@ export default {
     "createAccount": "ਖਾਤਾ ਬਣਾਓ",
     "termsOfService": "ਸੇਵਾ ਦੀਆਂ ਸ਼ਰਤਾਂ",
     "privacyPolicy": "ਗੋਪਨੀਯਤਾ ਨੀਤੀ",
+    "dateOfBirth": "ਜਨਮ ਮਿਤੀ",
+    "dobPlaceholder": "ਦਿਨ / ਮਹੀਨਾ / ਸਾਲ",
+    "mustBeAtleast16": "ਤੁਹਾਡੀ ਉਮਰ ਘੱਟੋ-ਘੱਟ 16 ਸਾਲ ਹੋਣੀ ਚਾਹੀਦੀ ਹੈ",
+    "invalidDob": "ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਵੈਧ ਜਨਮ ਮਿਤੀ ਦਰਜ ਕਰੋ",
     "invalidOtp": "ਗਲਤ OTP",
     "failedToSendOtp": "OTP ਭੇਜਣ ਵਿੱਚ ਅਸਫਲ"
   },

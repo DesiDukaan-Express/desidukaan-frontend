@@ -26,7 +26,7 @@ export default {
     "selectLanguage": "ભાષા પસંદ કરો"
   },
   "auth": {
-    "welcomeBack": "પાછા સ્વાગત છે",
+    "welcomeBack": "સ્વાગત છે",
     "loginSubtitle": "તમારા મોબાઇલ નંબર વડે લૉગ ઇન કરો",
     "mobileNumber": "મોબાઇલ નંબર",
     "mobilePlaceholder": "10 અંકનો નંબર",
@@ -45,6 +45,10 @@ export default {
     "createAccount": "ખાતું બનાવો",
     "termsOfService": "સેવાની શરતો",
     "privacyPolicy": "ગોપનીયતા નીતિ",
+    "dateOfBirth": "જન્મ તારીખ",
+    "dobPlaceholder": "દિવસ / મહિનો / વર્ષ",
+    "mustBeAtleast16": "તમારી ઉંમર ઓછામાં ઓછી 16 વર્ષ હોવી જોઈએ",
+    "invalidDob": "કૃપા કરીને માન્ય જન્મ તારીખ દાખલ કરો",
     "invalidOtp": "અમાન્ય OTP",
     "failedToSendOtp": "OTP મોકલવામાં નિષ્ફળ"
   },
@@ -86,7 +90,7 @@ export default {
     "goodAfternoon": "શુભ બપોર",
     "goodEvening": "શુભ સાંજ",
     "goodNight": "શુભ રાત્રિ",
-    "welcomeBack": "પાછા સ્વાગત છે, {{name}}",
+    "welcomeBack": "સ્વાગત છે, {{name}}",
     "welcomeGuest": "KwikPik માં સ્વાગત છે",
     "heroSubHeader": "તાજા કરિયાણું અને દૈનિક જરૂરિયાતો, ઝડપી ડિલિવરી.",
     "freshFromNearby": "નજીકની દુકાનોમાંથી તાજું",

@@ -424,9 +424,13 @@ export default function LoginScreen({ navigation }) {
 
                 {/* Legal + footer */}
                 <View style={s.footerLinks}>
-                  <Text style={s.legalLink}>{t("auth.termsOfService")}</Text>
+                  <TouchableOpacity onPress={() => navigation.navigate("Terms")}>
+                    <Text style={s.legalLink}>{t("auth.termsOfService")}</Text>
+                  </TouchableOpacity>
                   <Text style={s.legalDot}>·</Text>
-                  <Text style={s.legalLink}>{t("auth.privacyPolicy")}</Text>
+                  <TouchableOpacity onPress={() => navigation.navigate("Privacy")}>
+                    <Text style={s.legalLink}>{t("auth.privacyPolicy")}</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             </Animated.View>

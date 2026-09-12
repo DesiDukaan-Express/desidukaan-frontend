@@ -26,7 +26,7 @@ export default {
     "selectLanguage": "زبان منتخب کریں"
   },
   "auth": {
-    "welcomeBack": "واپس خوش آمدید",
+    "welcomeBack": "خوش آمدید",
     "loginSubtitle": "اپنے موبائل نمبر سے لاگ ان کریں",
     "mobileNumber": "موبائل نمبر",
     "mobilePlaceholder": "10 ہندسے کا نمبر",
@@ -45,6 +45,10 @@ export default {
     "createAccount": "اکاؤنٹ بنائیں",
     "termsOfService": "سروس کی شرائط",
     "privacyPolicy": "رازداری کی پالیسی",
+    "dateOfBirth": "تاریخ پیدائش",
+    "dobPlaceholder": "دن / مہینہ / سال",
+    "mustBeAtleast16": "آپ کی عمر کم از کم 16 سال ہونی چاہیے",
+    "invalidDob": "براہ کرم صحیح تاریخ پیدائش درج کریں",
     "invalidOtp": "غلط OTP",
     "failedToSendOtp": "OTP بھیجنے میں ناکامی"
   },
@@ -86,7 +90,7 @@ export default {
     "goodAfternoon": "سہ پہر بخیر",
     "goodEvening": "شام بخیر",
     "goodNight": "شب بخیر",
-    "welcomeBack": "واپس خوش آمدید، {{name}}",
+    "welcomeBack": "خوش آمدید، {{name}}",
     "welcomeGuest": "KwikPik میں خوش آمدید",
     "heroSubHeader": "تازہ راشن اور روزمرہ کی ضروریات، تیز رفتار ڈیلیوری۔",
     "freshFromNearby": "قریبی دکانوں سے تازہ",

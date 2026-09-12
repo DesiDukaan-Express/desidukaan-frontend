@@ -26,7 +26,7 @@ export default {
     "selectLanguage": "भाषा चुनें"
   },
   "auth": {
-    "welcomeBack": "वापस स्वागत है",
+    "welcomeBack": "स्वागत है",
     "loginSubtitle": "अपने मोबाइल नंबर से लॉग इन करें",
     "mobileNumber": "मोबाइल नंबर",
     "mobilePlaceholder": "10 अंकों का नंबर",
@@ -45,6 +45,10 @@ export default {
     "createAccount": "खाता बनाएं",
     "termsOfService": "सेवा की शर्तें",
     "privacyPolicy": "गोपनीयता नीति",
+    "dateOfBirth": "जन्म तिथि",
+    "dobPlaceholder": "दिन / माह / वर्ष",
+    "mustBeAtleast16": "आपकी आयु कम से कम 16 वर्ष होनी चाहिए",
+    "invalidDob": "कृपया एक मान्य जन्म तिथि दर्ज करें",
     "invalidOtp": "अमान्य OTP",
     "failedToSendOtp": "OTP भेजने में विफल"
   },
@@ -86,7 +90,7 @@ export default {
     "goodAfternoon": "शुभ दोपहर",
     "goodEvening": "शुभ संध्या",
     "goodNight": "शुभ रात्रि",
-    "welcomeBack": "वापसी पर स्वागत है, {{name}}",
+    "welcomeBack": "स्वागत है, {{name}}",
     "welcomeGuest": "KwikPik में आपका स्वागत है",
     "heroSubHeader": "ताज़ा राशन और रोज़मर्रा का सामान, तेज़ी से डिलीवरी।",
     "freshFromNearby": "पास की दुकानों से ताज़ा",

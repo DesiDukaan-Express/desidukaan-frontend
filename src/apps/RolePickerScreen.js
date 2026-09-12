@@ -321,10 +321,7 @@ export default function RolePickerScreen({ onRolePicked }) {
           </View>
 
           {/* ── Hint */}
-          <Animated.View style={[s.hintWrap, { opacity: taglineAnim }]}>
-            <Feather name="info" size={12} color="rgba(255,255,255,0.3)" />
-            <Text style={s.hint}>Locked roles can be enabled with one tap</Text>
-          </Animated.View>
+          <Animated.View style={[s.hintWrap, { opacity: taglineAnim }]} />
         </ScrollView>
       </SafeAreaView>
 

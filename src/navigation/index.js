@@ -26,6 +26,8 @@ import RolePickerScreen from "../apps/RolePickerScreen";
 import AccountDeactivatedScreen from "../apps/AccountDeactivatedScreen";
 import AccountSuspendedScreen from "../apps/AccountSuspendedScreen";
 
+import { TermsScreen, PrivacyScreen } from "../apps/common/LegalScreens";
+
 const Stack = createNativeStackNavigator();
 
 export default function Navigation() {
@@ -348,6 +350,8 @@ export default function Navigation() {
             <Stack.Screen name="OrderPlaced" component={OrderPlaced} />
           </>
         )}
+        <Stack.Screen name="Terms" component={TermsScreen} />
+        <Stack.Screen name="Privacy" component={PrivacyScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
