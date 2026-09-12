@@ -45,8 +45,6 @@ export default function Navigation() {
   const flagVendorSuspended = useAuthStore((s) => s.flagVendorSuspended);
   const clearVendorSuspended = useAuthStore((s) => s.clearVendorSuspended);
 
-  const activeRoleRef = useRef(activeRole);
-  useEffect(() => { activeRoleRef.current = activeRole; }, [activeRole]);
   const deliverySuspended = useAuthStore((s) => s.deliverySuspended);
   const checkDeliveryStatus = useAuthStore((s) => s.checkDeliveryStatus);
   const flagDeliverySuspended = useAuthStore((s) => s.flagDeliverySuspended);

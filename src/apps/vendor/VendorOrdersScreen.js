@@ -142,10 +142,9 @@ export default function VendorOrdersScreen() {
   const [showSurchargeEdit, setShowSurchargeEdit] = useState(false);
   const [vendorId, setVendorId] = useState(null);
 
-  const ordersRef = useRef(orders);
+const ordersRef = useRef(orders);
   const selectedOrderRef = useRef(selectedOrder);
   const updateOrderStatusRef = useRef(null);
-  // Latest store coords for the live rider listeners (avoids stale closures)
   const storeLocationRef = useRef({ latitude: 28.6139, longitude: 77.209 });
 
   const toggleCustomer = (name) => {

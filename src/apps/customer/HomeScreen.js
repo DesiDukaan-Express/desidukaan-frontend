@@ -3216,7 +3216,7 @@ export default function HomeScreen() {
     const seenNames = new Set();
     const items = [];
 
-    // Helper: Check if product has stock & active status in any nearby vendor
+// Helper: Check if product has stock & active status in any nearby vendor
     const isStockAvailable = (productName, productId) => {
       return vendors.some((v) => {
         return (v._inventory || []).some((inv) => {
@@ -3236,7 +3236,7 @@ export default function HomeScreen() {
       });
     };
 
-    // First add all inventory items
+// First add all inventory items
     allInventoryItems.forEach((inv) => {
       const p = inv.product;
       if (!p?.id || !p?.name) return;
@@ -3261,6 +3261,7 @@ export default function HomeScreen() {
       });
     });
 
+// Next add API products if available, marking whether available in nearby inventory
     // Next add API products if available, marking whether available in nearby inventory
     if (popularFromAPI.length > 0) {
       popularFromAPI.forEach((p) => {
