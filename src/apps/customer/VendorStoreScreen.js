@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, Image, Modal,
+  View, Text, StyleSheet, ScrollView, FlatList, Image, Modal,
   TouchableOpacity, ActivityIndicator, Animated,
   TextInput, Platform, StatusBar, Pressable, Dimensions,
   Share, Alert,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
@@ -885,6 +886,7 @@ export default function VendorStoreScreen() {
   const cart = useCartStore();
 
   const winW = useWindowWidth();
+  const insets = useSafeAreaInsets();
   const isWide = winW >= 768;
   const [gridAreaW, setGridAreaW] = useState(0);
   const effectiveW = gridAreaW > 0 ? gridAreaW : winW;
@@ -914,6 +916,40 @@ export default function VendorStoreScreen() {
   const [loosePickerItem, setLoosePickerItem] = useState(null); // weight picker
   const [ratingsMap, setRatingsMap] = useState({});
   const [vendorReviews, setVendorReviews] = useState([]);
+
+  // ── Promo carousel (mobile only) ──
+  const promoScrollRef = useRef(null);
+  const [promoIdx, setPromoIdx] = useState(0);
+  const promoIntervalRef = useRef(null);
+  const promoCardW = winW < 600 ? winW - hPad * 2 : 0;
+  const PROMO_COUNT = 3;
+
+  const clearPromoTimer = useCallback(() => {
+    if (promoIntervalRef.current) { clearInterval(promoIntervalRef.current); promoIntervalRef.current = null; }
+  }, []);
+
+  const startPromoTimer = useCallback(() => {
+    clearPromoTimer();
+    promoIntervalRef.current = setInterval(() => {
+      setPromoIdx(prev => {
+        const next = (prev + 1) % PROMO_COUNT;
+        promoScrollRef.current?.scrollTo({ x: next * (promoCardW + 14), animated: true });
+        return next;
+      });
+    }, 4000);
+  }, [clearPromoTimer, promoCardW]);
+
+  useEffect(() => {
+    if (winW < 600) startPromoTimer();
+    return clearPromoTimer;
+  }, [winW, startPromoTimer, clearPromoTimer]);
+
+  const onPromoScrollEnd = useCallback((e) => {
+    if (winW >= 600) return;
+    const idx = Math.round(e.nativeEvent.contentOffset.x / (promoCardW + 14));
+    setPromoIdx(idx);
+    startPromoTimer();
+  }, [winW, promoCardW, startPromoTimer]);
 
   // Fetch category tree on mount
   useEffect(() => {
@@ -1260,7 +1296,7 @@ export default function VendorStoreScreen() {
     return (
       <View style={s.root}>
         <StatusBar barStyle="dark-content" backgroundColor={C.surfaceLowest} />
-        <LinearGradient colors={[C.orange, C.orangeDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.loadingHeader}>
+        <LinearGradient colors={[C.orange, C.orangeDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.loadingHeader, { paddingTop: (insets.top || 14) + 14 }]}>
           <TouchableOpacity style={s.backBtn} onPress={goBack}>
             <Feather name="arrow-left" size={18} color={C.white} />
           </TouchableOpacity>
@@ -1282,7 +1318,7 @@ export default function VendorStoreScreen() {
       <StatusBar barStyle="dark-content" backgroundColor={C.surfaceLowest} />
 
       {/* HEADER */}
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: insets.top || 14 }]}>
         <TouchableOpacity style={s.backBtn} onPress={goBack} activeOpacity={0.8}>
           <Feather name="arrow-left" size={18} color={C.gray700} />
         </TouchableOpacity>
@@ -1550,45 +1586,96 @@ export default function VendorStoreScreen() {
           onLayout={(e) => setGridAreaW(e.nativeEvent.layout.width)}
           contentContainerStyle={[s.body, { paddingHorizontal: hPad }]}
         >
-          {/* PROMO BANNERS — 3 equal cards, now inside the scroll so they move with the page */}
+          {/* PROMO BANNERS — carousel on mobile, 3-col flex on desktop */}
           {!search && (
-            <View style={s.promoRow}>
-              <View style={[s.promoCard, s.promoCardGreen]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.promoCardLabel}>Fresh Vegetables</Text>
-                  <Text style={s.promoCardValue}>Upto 20% OFF</Text>
-                  <Text style={s.promoCardSub}>Farm fresh & handpicked</Text>
-                  <TouchableOpacity style={s.promoShopBtn} onPress={() => setActiveCat("Fruits & Vegetables")} activeOpacity={0.85}>
-                    <Text style={s.promoShopBtnText}>Shop Now</Text>
-                  </TouchableOpacity>
+            winW < 600 ? (
+              <View style={s.carouselWrap}>
+                <FlatList
+                  ref={promoScrollRef}
+                  horizontal
+                  pagingEnabled={false}
+                  snapToInterval={promoCardW + 14}
+                  snapToAlignment="start"
+                  decelerationRate="fast"
+                  showsHorizontalScrollIndicator={false}
+                  data={[
+                    { key: "0", color: "green", title: "Fresh Vegetables", value: "Upto 20% OFF", sub: "Farm fresh & handpicked", icon: "eco", iconColor: C.green, cat: "Fruits & Vegetables", btnStyle: null },
+                    { key: "1", color: "orange", title: "Daily Essentials", value: "Upto 15% OFF", sub: "On all essentials", icon: "local-grocery-store", iconColor: C.orangeDark, cat: "All", btnStyle: s.promoShopBtnOrange },
+                    { key: "2", color: "green", title: "Weekend Special", value: "Extra 5% OFF", sub: "On orders above ₹499", icon: "card-giftcard", iconColor: C.green, cat: null, btnStyle: null },
+                  ]}
+                  keyExtractor={(item) => item.key}
+                  getItemLayout={(_, index) => ({ length: promoCardW + 14, offset: (promoCardW + 14) * index, index })}
+                  onMomentumScrollEnd={onPromoScrollEnd}
+                  contentContainerStyle={{ paddingHorizontal: hPad, gap: 14 }}
+                  renderItem={({ item }) => (
+                    <View style={[s.promoCard, item.color === "orange" ? s.promoCardOrange : s.promoCardGreen, { width: promoCardW }]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.promoCardLabel}>{item.title}</Text>
+                        <Text style={[s.promoCardValue, item.color === "orange" && { color: C.orangeDark }]}>{item.value}</Text>
+                        <Text style={s.promoCardSub}>{item.sub}</Text>
+                        {item.cat ? (
+                          <TouchableOpacity
+                            style={[s.promoShopBtn, item.btnStyle]}
+                            onPress={() => setActiveCat(item.cat)}
+                            activeOpacity={0.85}
+                          >
+                            <Text style={s.promoShopBtnText}>Shop Now</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={s.promoCodeBtn}>
+                            <Text style={s.promoCodeText}>Use Code: WEEKEND5</Text>
+                          </View>
+                        )}
+                      </View>
+                      <MaterialIcons name={item.icon} size={40} color={item.iconColor} style={{ opacity: 0.28 }} />
+                    </View>
+                  )}
+                />
+                <View style={s.carouselDots}>
+                  {[0, 1, 2].map(i => (
+                    <View key={i} style={[s.carouselDot, promoIdx === i && s.carouselDotActive]} />
+                  ))}
                 </View>
-                <MaterialIcons name="eco" size={40} color={C.green} style={{ opacity: 0.28 }} />
               </View>
-
-              <View style={[s.promoCard, s.promoCardOrange]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.promoCardLabel}>Daily Essentials</Text>
-                  <Text style={[s.promoCardValue, { color: C.orangeDark }]}>Upto 15% OFF</Text>
-                  <Text style={s.promoCardSub}>On all essentials</Text>
-                  <TouchableOpacity style={[s.promoShopBtn, s.promoShopBtnOrange]} onPress={() => setActiveCat("All")} activeOpacity={0.85}>
-                    <Text style={s.promoShopBtnText}>Shop Now</Text>
-                  </TouchableOpacity>
-                </View>
-                <MaterialIcons name="local-grocery-store" size={40} color={C.orangeDark} style={{ opacity: 0.28 }} />
-              </View>
-
-              <View style={[s.promoCard, s.promoCardGreen]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.promoCardLabel}>Weekend Special</Text>
-                  <Text style={s.promoCardValue}>Extra 5% OFF</Text>
-                  <Text style={s.promoCardSub}>On orders above ₹499</Text>
-                  <View style={s.promoCodeBtn}>
-                    <Text style={s.promoCodeText}>Use Code: WEEKEND5</Text>
+            ) : (
+              <View style={s.promoRow}>
+                <View style={[s.promoCard, s.promoCardGreen]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.promoCardLabel}>Fresh Vegetables</Text>
+                    <Text style={s.promoCardValue}>Upto 20% OFF</Text>
+                    <Text style={s.promoCardSub}>Farm fresh & handpicked</Text>
+                    <TouchableOpacity style={s.promoShopBtn} onPress={() => setActiveCat("Fruits & Vegetables")} activeOpacity={0.85}>
+                      <Text style={s.promoShopBtnText}>Shop Now</Text>
+                    </TouchableOpacity>
                   </View>
+                  <MaterialIcons name="eco" size={40} color={C.green} style={{ opacity: 0.28 }} />
                 </View>
-                <MaterialIcons name="card-giftcard" size={40} color={C.green} style={{ opacity: 0.28 }} />
+
+                <View style={[s.promoCard, s.promoCardOrange]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.promoCardLabel}>Daily Essentials</Text>
+                    <Text style={[s.promoCardValue, { color: C.orangeDark }]}>Upto 15% OFF</Text>
+                    <Text style={s.promoCardSub}>On all essentials</Text>
+                    <TouchableOpacity style={[s.promoShopBtn, s.promoShopBtnOrange]} onPress={() => setActiveCat("All")} activeOpacity={0.85}>
+                      <Text style={s.promoShopBtnText}>Shop Now</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <MaterialIcons name="local-grocery-store" size={40} color={C.orangeDark} style={{ opacity: 0.28 }} />
+                </View>
+
+                <View style={[s.promoCard, s.promoCardGreen]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.promoCardLabel}>Weekend Special</Text>
+                    <Text style={s.promoCardValue}>Extra 5% OFF</Text>
+                    <Text style={s.promoCardSub}>On orders above ₹499</Text>
+                    <View style={s.promoCodeBtn}>
+                      <Text style={s.promoCodeText}>Use Code: WEEKEND5</Text>
+                    </View>
+                  </View>
+                  <MaterialIcons name="card-giftcard" size={40} color={C.green} style={{ opacity: 0.28 }} />
+                </View>
               </View>
-            </View>
+            )
           )}
 
           {inStock.length === 0 && outStock.length === 0 ? (
@@ -1971,7 +2058,7 @@ const s = StyleSheet.create({
   promoCard: {
     flex: 1, borderRadius: 18, padding: 16,
     flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between",
-    minHeight: 150,
+    minHeight: 130,
   },
   promoCardGreen: { backgroundColor: C.greenLight, borderWidth: 1, borderColor: C.greenBorder },
   promoCardOrange: { backgroundColor: C.orangeMid, borderWidth: 1, borderColor: C.orangeLight },
@@ -1983,6 +2070,12 @@ const s = StyleSheet.create({
   promoShopBtnText: { fontSize: 12, fontWeight: "800", color: C.white },
   promoCodeBtn: { backgroundColor: C.greenDark, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, alignSelf: "flex-start" },
   promoCodeText: { fontSize: 11, fontWeight: "800", color: C.white },
+
+  // ── Promo carousel (mobile) ──
+  carouselWrap: { paddingTop: 12, paddingBottom: 4 },
+  carouselDots: { flexDirection: "row", justifyContent: "center", gap: 6, paddingTop: 10 },
+  carouselDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.gray300 },
+  carouselDotActive: { backgroundColor: C.green, width: 20 },
 
   // ── Category tabs ──
   catTabsWrap: { backgroundColor: C.bg, position: "relative" },

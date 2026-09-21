@@ -24,13 +24,13 @@ import {
 } from "react-native";
 import { MaterialIcons, Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { Image as ExpoImage } from "expo-image";
 import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import { useNavigation, CommonActions } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import { vendorsAPI, ordersAPI, categoriesAPI } from "../../services/api";
-import ChatWidget from "./ChatWidget";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
 import LocationMapPicker from "../../components/LocationMapPicker";
@@ -1772,7 +1772,7 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
 }
 
 // ─── Popular Item Card (horizontal scroll, HTML-reference style) ───────────────
-function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPress }) {
+const PopularItemCard = React.memo(function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPress }) {
   const { t } = useTranslation();
   const CARD_W = 160;
   const IMG_H = 100;
@@ -1882,7 +1882,7 @@ function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPre
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 const pic = StyleSheet.create({
   card: {
@@ -2559,8 +2559,8 @@ export default function HomeScreen() {
   // ── Single source of truth for cart — read directly from cartStore ──────────
   // Do NOT maintain local itemQtys — it diverges from VendorStoreScreen changes
   const cartItems = cart?.items || [];
-  const cartCount = cartItems.reduce((s, i) => s + (i.qty || 0), 0);
-  const cartTotal = cartItems.reduce((s, i) => s + i.price * (i.qty || 0), 0);
+  const cartCount = useMemo(() => cartItems.reduce((s, i) => s + (i.qty || 0), 0), [cartItems]);
+  const cartTotal = useMemo(() => cartItems.reduce((s, i) => s + i.price * (i.qty || 0), 0), [cartItems]);
   const getCartQty = useCallback(
     (itemId) => cartItems.find((i) => i.id === itemId)?.qty || 0,
     [cartItems],
@@ -2658,8 +2658,8 @@ export default function HomeScreen() {
         selectedStoreCategory,
       );
       const fresh = res.data || [];
-      setVendors((prev) =>
-        prev.map((v) => {
+      setVendors((prev) => {
+        const next = prev.map((v) => {
           const f = fresh.find((x) => x.id === v.id);
           return f
             ? {
@@ -2670,8 +2670,17 @@ export default function HomeScreen() {
               is_currently_open: f.is_currently_open,
             }
             : v;
-        }),
-      );
+        });
+        // Only return new array if status fields actually changed
+        const changed = prev.some((v, i) => {
+          const n = next[i];
+          return v.is_open !== n.is_open ||
+            v.opening_time !== n.opening_time ||
+            v.closing_time !== n.closing_time ||
+            v.is_currently_open !== n.is_currently_open;
+        });
+        return changed ? next : prev;
+      });
     } catch {
       // keep current statuses; the local time check still re-runs each minute
     }
@@ -3047,11 +3056,14 @@ export default function HomeScreen() {
 
   const showCategories = !loadingInventory && dynamicCategories.length > 0;
   const showPopular = !loadingInventory && popularItems.length > 0;
-  const openStoreCount = vendors.filter((vendor) => isStoreCurrentlyOpen(vendor)).length;
-  const nearestStoreDistance = vendors
-    .map((vendor) => Number(vendor.distance_km))
-    .filter((distance) => Number.isFinite(distance))
-    .sort((a, b) => a - b)[0];
+  const openStoreCount = useMemo(() => vendors.filter((vendor) => isStoreCurrentlyOpen(vendor)).length, [vendors]);
+  const nearestStoreDistance = useMemo(() => {
+    const dists = vendors
+      .map((vendor) => Number(vendor.distance_km))
+      .filter((distance) => Number.isFinite(distance))
+      .sort((a, b) => a - b);
+    return dists[0];
+  }, [vendors]);
   const heroTitle = locationCoords
     ? t("home.heroTitleLocation")
     : t("home.heroTitleNoLocation");
@@ -3079,6 +3091,11 @@ export default function HomeScreen() {
     { icon: "search", label: t("home.findStores"), onPress: goToSearch },
     { icon: "shopping-bag", label: t("home.openStores"), onPress: goToSearch },
   ];
+
+  const filteredAddresses = useMemo(
+    () => (addressStore?.addresses || []).filter(a => a.label !== "Current Location"),
+    [addressStore?.addresses],
+  );
 
 
   return (
@@ -3328,61 +3345,70 @@ export default function HomeScreen() {
             </View>
           </View>
           <View style={[s.heroBanner, { minHeight: wide ? 260 : 250 }]}>
-            <Image
-              source={{
-                uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&q=85&sig=banner",
-              }}
-              style={StyleSheet.absoluteFillObject}
-              resizeMode="cover"
-            />
-            <LinearGradient
-              colors={[
-                "rgba(17,24,39,0.86)",
-                "rgba(21,128,61,0.76)",
-                "rgba(249,115,22,0.38)",
-                "rgba(17,24,39,0.12)",
-              ]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <View style={[s.heroLeft, { width: wide ? "62%" : "100%" }]}>
-              <View style={s.heroBadge}>
-                <MaterialIcons name="verified" size={13} color={C.green} />
-                <Text style={s.heroBadgeText}>{t("home.freshFromNearby")}</Text>
+            {Platform.OS === "android" ? (
+              <View style={{ flex: 1 }}>
+                <ExpoImage
+                  source={{
+                    uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&q=85&sig=banner",
+                  }}
+                  style={{ width: "100%", height: "100%" }}
+                  contentFit="cover"
+                  transition={0}
+                />
+                <LinearGradient
+                  colors={[
+                    "rgba(17,24,39,0.86)",
+                    "rgba(21,128,61,0.76)",
+                    "rgba(249,115,22,0.38)",
+                    "rgba(17,24,39,0.12)",
+                  ]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
               </View>
-              <Text style={s.heroTitle}>{heroTitle}</Text>
-              <Text style={s.heroSub}>{heroSub}</Text>
-              {/* <View style={s.heroActions}>
-                <TouchableOpacity
-                  style={s.heroCTA}
-                  onPress={goToSearch}
-                  activeOpacity={0.85}
-                >
-                  <MaterialIcons name="search" size={16} color={C.white} />
-                  <Text style={s.heroCTAText}>Start Shopping</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={s.heroGhostCTA}
-                  onPress={openAddressPicker}
-                  activeOpacity={0.85}
-                >
-                  <MaterialIcons name="location-on" size={15} color={C.white} />
-                  <Text style={s.heroGhostText}>Change Address</Text>
-                </TouchableOpacity>
-              </View> */}
-              {wide && (
-                <View style={s.heroStats}>
-                  {homeStats.map((stat) => (
-                    <View key={stat.label} style={s.heroStat}>
-                      <MaterialIcons name={stat.icon} size={16} color={C.white} />
-                      <Text style={s.heroStatValue}>{stat.value}</Text>
-                      <Text style={s.heroStatLabel}>{stat.label}</Text>
+            ) : (
+              <>
+                <ExpoImage
+                  source={{
+                    uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&q=85&sig=banner",
+                  }}
+                  style={StyleSheet.absoluteFillObject}
+                  contentFit="cover"
+                  transition={0}
+                />
+                <LinearGradient
+                  colors={[
+                    "rgba(17,24,39,0.86)",
+                    "rgba(21,128,61,0.76)",
+                    "rgba(249,115,22,0.38)",
+                    "rgba(17,24,39,0.12)",
+                  ]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+                <View style={[s.heroLeft, { width: wide ? "62%" : "100%" }]}>
+                  <View style={s.heroBadge}>
+                    <MaterialIcons name="verified" size={13} color={C.green} />
+                    <Text style={s.heroBadgeText}>{t("home.freshFromNearby")}</Text>
+                  </View>
+                  <Text style={s.heroTitle}>{heroTitle}</Text>
+                  <Text style={s.heroSub}>{heroSub}</Text>
+                  {wide && (
+                    <View style={s.heroStats}>
+                      {homeStats.map((stat) => (
+                        <View key={stat.label} style={s.heroStat}>
+                          <MaterialIcons name={stat.icon} size={16} color={C.cyanLight} />
+                          <Text style={s.heroStatValue}>{stat.value}</Text>
+                          <Text style={s.heroStatLabel}>{stat.label}</Text>
+                        </View>
+                      ))}
                     </View>
-                  ))}
+                  )}
                 </View>
-              )}
-            </View>
+              </>
+            )}
           </View>
         </View>
 
@@ -3591,7 +3617,7 @@ export default function HomeScreen() {
                             {t("home.minOrder", { min: vendor.min_order || 99 })}
                           </Text>
                         </View>
-                        {isStoreCurrentlyOpen(vendor) && (
+                        {isOpen && (
                           <View
                             style={[
                               s.storeTag,
@@ -3637,14 +3663,14 @@ export default function HomeScreen() {
                     style={[
                       s.statusBadge,
                       {
-                        backgroundColor: isStoreCurrentlyOpen(vendor)
+                        backgroundColor: isOpen
                           ? C.green
                           : "rgba(0,0,0,0.72)",
                       },
                     ]}
                   >
                     <Text style={s.statusText}>
-                      {isStoreCurrentlyOpen(vendor) ? t("home.open") : t("home.closed")}
+                      {isOpen ? t("home.open") : t("home.closed")}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -3838,7 +3864,7 @@ export default function HomeScreen() {
       {/* ══ ADDRESS PICKER MODAL ═══════════════════════════════════════════ */}
       <AddressPicker
         visible={addrPickerVisible}
-        addresses={(addressStore?.addresses || []).filter(a => a.label !== "Current Location")}
+        addresses={filteredAddresses}
         selectedId={selectedAddrId}
         initialCoords={locationCoords}
         onClose={() => setAddrPickerVisible(false)}
@@ -3945,8 +3971,6 @@ export default function HomeScreen() {
           }, 300);
         }}
       />
-
-      {/* <ChatWidget /> */}
 
       {/* ══ FLOATING CART — mobile ══════════════════════════════════════════ */}
       {!wide && cartCount > 0 && (
@@ -4231,6 +4255,7 @@ const s = StyleSheet.create({
     fontWeight: "800",
   },
   heroBanner: {
+    height: 250,
     borderRadius: 18,
     overflow: "hidden",
     justifyContent: "center",

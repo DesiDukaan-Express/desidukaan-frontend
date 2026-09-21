@@ -877,7 +877,7 @@ function OrderDetailModal({ order, onClose }) {
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={od.backdrop} onPress={onClose}>
-        <Pressable style={od.sheet} onPress={() => {}}>
+        <View style={od.sheet}>
           <View style={od.handle} />
 
           <ScrollView showsVerticalScrollIndicator={false}>
@@ -1358,7 +1358,7 @@ function OrderDetailModal({ order, onClose }) {
               <View style={{ height: 24 }} />
             </View>
           </ScrollView>
-        </Pressable>
+        </View>
       </Pressable>
     </Modal>
   );

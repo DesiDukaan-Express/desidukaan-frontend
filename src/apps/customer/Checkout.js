@@ -721,7 +721,7 @@ export default function CheckoutScreen() {
     route.params?.snapshotItems || resumeOrder?.snapshotItems || null
   );
   const [snapshotSubtotal, setSnapshotSubtotal] = useState(
-    route.params?.snapsgithotSubtotal ?? resumeOrder?.snapshotSubtotal ?? null
+    route.params?.snapshotSubtotal ?? resumeOrder?.snapshotSubtotal ?? null
   );
 
   // ── Order state ────────────────────────────────────────────────────────────

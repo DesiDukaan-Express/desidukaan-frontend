@@ -12,21 +12,12 @@ const MESSAGES = [
 ];
 
 async function showWebNotification(title, body) {
-  console.log('[CartReminder] showWebNotification called');
-  if (typeof Notification === 'undefined') {
-    console.log('[CartReminder] Notification API not available');
-    return;
-  }
-  console.log('[CartReminder] Notification.permission =', Notification.permission);
+  if (typeof Notification === 'undefined') return;
   if (Notification.permission === 'default') {
-    const result = await Notification.requestPermission();
-    console.log('[CartReminder] Permission requested, result:', result);
+    await Notification.requestPermission();
   }
   if (Notification.permission === 'granted') {
-    console.log('[CartReminder] Showing notification:', title);
     new Notification(title, { body });
-  } else {
-    console.log('[CartReminder] Permission not granted, cannot show');
   }
 }
 
@@ -36,27 +27,22 @@ export default function useCartReminder() {
   const timerRef = useRef(null);
 
   useEffect(() => {
-    console.log('[CartReminder] Mounted. Platform:', Platform.OS);
     if (Platform.OS === 'web' && typeof Notification !== 'undefined') {
-      console.log('[CartReminder] Web notification permission:', Notification.permission);
       if (Notification.permission === 'default') {
-        Notification.requestPermission().then(p => console.log('[CartReminder] Permission after request:', p));
+        Notification.requestPermission();
       }
     }
   }, []);
 
   useEffect(() => {
-    console.log('[CartReminder] cartCount changed:', cartCount, 'prevCount:', prevCount.current);
     const wasEmpty = prevCount.current === 0;
     const isNowEmpty = cartCount === 0;
 
     if (wasEmpty && cartCount > 0) {
-      console.log('[CartReminder] Cart went from empty to items — starting 60s timer');
       startTimer();
     }
 
     if (isNowEmpty && !wasEmpty) {
-      console.log('[CartReminder] Cart emptied — cancelling timer');
       cancelTimer();
     }
 
@@ -69,19 +55,13 @@ export default function useCartReminder() {
 
   const startTimer = async () => {
     const notifPref = await AsyncStorage.getItem('notif_enabled');
-    console.log('[CartReminder] notif_enabled from AsyncStorage:', notifPref);
-    if (notifPref === 'false') {
-      console.log('[CartReminder] Notifications disabled by user, skipping');
-      return;
-    }
+    if (notifPref === 'false') return;
 
     cancelTimer();
 
     const msg = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
-    console.log('[CartReminder] Scheduling notification in 60s:', msg.title);
 
     timerRef.current = setTimeout(async () => {
-      console.log('[CartReminder] Timer fired! Showing notification...');
       await showWebNotification(msg.title, msg.body);
       timerRef.current = null;
     }, REMINDER_MS);
@@ -89,7 +69,6 @@ export default function useCartReminder() {
 
   const cancelTimer = () => {
     if (timerRef.current) {
-      console.log('[CartReminder] Cancelling timer');
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }

@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, Vibration, Animated, StatusBar, Platform,
 } from 'react-native';
-import { Audio } from 'expo-av';
+import { createAudioPlayer } from 'expo-audio';
 import { io } from 'socket.io-client';
 import {
   useFonts,
@@ -45,15 +45,22 @@ const C = {
 };
 
 // ── Sound helper ──────────────────────────────────────────────────────────────
+// Migrated from expo-av to expo-audio (createAudioPlayer is the imperative API
+// for on-demand sound playback outside of a React component lifecycle).
+let currentSound = null;
+
 async function playOrderSound() {
   try {
-    const { sound } = await Audio.Sound.createAsync(
-      require('../../../assets/sounds/new_order.mp3'),
-      { shouldPlay: true, volume: 1.0 }
+    if (currentSound) {
+      currentSound.remove();
+      currentSound = null;
+    }
+    const player = createAudioPlayer(
+      require('../../../assets/sounds/new_order.mp3')
     );
-    sound.setOnPlaybackStatusUpdate((s) => {
-      if (s.didJustFinish) sound.unloadAsync();
-    });
+    player.volume = 1.0;
+    player.play();
+    currentSound = player;
   } catch (_) {}
 }
 
@@ -336,7 +343,7 @@ export default function QueueScreen({ navigation }) {
   useEffect(() => {
     if (!token) return;
 
-    const socket = io(SOCKET_URL, { auth: { token }, transports: ['websocket'] });
+    const socket = io(SOCKET_URL, { auth: { token }, transports: ['websocket', 'polling'] });
     socketRef.current = socket;
 
     socket.on('order:incoming', (data) => {
@@ -381,24 +388,26 @@ export default function QueueScreen({ navigation }) {
       const data = await res.json();
       if (data.success && data.data?.orders) {
         const mapped = data.data.orders.map((d) => ({
-          orderId: d.order.id,
-          orderNumber: `#${d.order.id}`,
-          total: d.order.total,
-          deliveryFee: d.delivery_fee,
+          orderId: d.orderId,
+          orderNumber: d.orderNumber || `#${d.orderId}`,
+          total: d.total,
+          deliveryFee: d.deliveryFee,
           pickup: {
-            name: d.order.vendor?.shop_name || d.order.vendor?.user?.name || '',
-            lat: d.order.vendor?.latitude,
-            lng: d.order.vendor?.longitude,
+            name: d.pickup?.shop_name || '',
+            latitude: d.pickup?.latitude,
+            longitude: d.pickup?.longitude,
           },
           dropoff: {
-            address: d.order.customer?.address || '',
-            city: d.order.customer?.city || '',
+            address: d.dropoff?.address_line || '',
+            city: d.dropoff?.city || '',
           },
-          status: d.status,
+          items: d.items || [],
+          itemCount: d.itemCount || 0,
+          status: d.source === 'assigned' ? 'assigned' : 'available',
         }));
         setQueue((prev) => {
           const existingIds = new Set(prev.map((o) => o.orderId));
-          const newOrders = mapped.filter((o) => !existingIds.has(o.orderId));
+          const newOrders = mapped.filter((o) => o.orderId && !existingIds.has(o.orderId));
           return [...newOrders, ...prev];
         });
       }
@@ -454,7 +463,16 @@ export default function QueueScreen({ navigation }) {
     setSessionStats({ accepted: acceptedRef.current, declined: declinedRef.current });
   };
 
-  const handleIgnore = (orderId) => {
+  const handleIgnore = async (orderId) => {
+    try {
+      await fetch(`${API_BASE}/delivery/ignore/${orderId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (err) {
+      console.log('[QueueScreen] ignore error:', err);
+    }
+    setQueue(prev => prev.filter(o => o.orderId !== orderId));
   };
 
   const acceptRate = sessionStats.accepted + sessionStats.declined === 0

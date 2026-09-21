@@ -1769,12 +1769,7 @@ export default function VendorOrdersScreen() {
             </View>
           </View>
 
-          <ScrollView
-            bounces={false}
-            style={{ flex: 1 }}
-            showsVerticalScrollIndicator={false}
-          >
-            {/* ── MAP ── */}
+            {/* ── MAP (outside ScrollView for Android touch handling) ── */}
             <View style={dmStyles.mapCard}>
               <VendorMapView
                 storeLocation={storeLocation}
@@ -1797,6 +1792,11 @@ export default function VendorOrdersScreen() {
               </View>
             </View>
 
+          <ScrollView
+            bounces={false}
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+          >
             {/* ── RIDERS SECTION ── */}
             <View style={dmStyles.section}>
               <View style={dmStyles.sectionHeader}>

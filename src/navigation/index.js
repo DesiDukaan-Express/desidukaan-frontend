@@ -1,13 +1,28 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { View, ActivityIndicator, AppState } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { io } from "socket.io-client";
 import SignupScreen from "../apps/customer/SignUpScreen";
 import useAuthStore from "../store/authStore";
 import { colors } from "../styles/colors";
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http:localhost:3000/api";
+const AppTheme = {
+  ...DefaultTheme,
+  dark: false,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: colors.primary,
+    background: colors.background,
+    card: colors.surface,
+    text: colors.text,
+    border: colors.border,
+    notification: DefaultTheme.colors.notification,
+  },
+  fonts: DefaultTheme.fonts,
+};
+
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
 import LoginScreen from "../apps/customer/LoginScreen";
@@ -135,6 +150,40 @@ export default function Navigation() {
     };
   }, [isAuthenticated, accountDeactivated, activeRole, checkAccountStatus, checkVendorStatus]);
 
+  // ── Delivery partner profile check ────────────────────────────────────────
+  // FIX: wrapped in useCallback so the reference is stable across renders.
+  // Without this, the socket useEffect would re-subscribe on every render
+  // because the function reference changed each time.
+  const checkDeliveryProfile = useCallback(async () => {
+    setCheckingOnboard(true);
+    try {
+      const res = await fetch(`${API_BASE}/delivery/me/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      const profile = data.data?.profile;
+      if (profile) {
+        useAuthStore.getState().addEnabledRole("delivery");
+        if (profile.is_active === false) {
+          flagDeliverySuspended();
+        } else {
+          clearDeliverySuspended();
+        }
+      }
+      if (!profile?.onboarding_submitted) {
+        setDeliveryOnboarded('not_submitted');
+      } else if (profile?.is_certified) {
+        setDeliveryOnboarded('approved');
+      } else {
+        setDeliveryOnboarded('pending');
+      }
+    } catch (err) {
+      setDeliveryOnboarded('not_submitted');
+    } finally {
+      setCheckingOnboard(false);
+    }
+  }, [token, flagDeliverySuspended, clearDeliverySuspended]);
+
   // ── Real-time account push (Socket.io) ──────────────────────────────────
   // Uses the same connection pattern as every other socket in the app. The
   // backend auto-joins this socket to user:{id}; when an admin deactivates
@@ -168,14 +217,8 @@ export default function Navigation() {
         clearVendorSuspended();
         if (activeRoleRef.current === "vendor") checkVendorProfile();
       });
-      socket.on("delivery:suspended", () => {
-        flagDeliverySuspended();
-        if (activeRole === "delivery") checkDeliveryProfile();
-      });
-      socket.on("delivery:reactivated", () => {
-        clearDeliverySuspended();
-        if (activeRole === "delivery") checkDeliveryProfile();
-      });
+      // FIX: removed duplicate delivery:suspended / delivery:reactivated listeners
+      // that were registered twice, causing double-fire of suspension events.
       socket.on("delivery:suspended", () => {
         flagDeliverySuspended();
         if (activeRole === "delivery") checkDeliveryProfile();
@@ -191,37 +234,7 @@ export default function Navigation() {
     return () => {
       if (socket) socket.disconnect();
     };
-  }, [isAuthenticated, token, flagDeactivated, clearDeactivation, flagVendorSuspended, clearVendorSuspended, flagDeliverySuspended, clearDeliverySuspended, checkVendorProfile]);
-
-  const checkDeliveryProfile = async () => {
-    setCheckingOnboard(true);
-    try {
-      const res = await fetch(`${API_BASE}/delivery/me/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      const profile = data.data?.profile;
-      if (profile) {
-        useAuthStore.getState().addEnabledRole("delivery");
-        if (profile.is_active === false) {
-          flagDeliverySuspended();
-        } else {
-          clearDeliverySuspended();
-        }
-      }
-      if (!profile?.onboarding_submitted) {
-        setDeliveryOnboarded('not_submitted');
-      } else if (profile?.is_certified) {
-        setDeliveryOnboarded('approved');
-      } else {
-        setDeliveryOnboarded('pending');
-      }
-    } catch (err) {
-      setDeliveryOnboarded('not_submitted');
-    } finally {
-      setCheckingOnboard(false);
-    }
-  };
+  }, [isAuthenticated, token, flagDeactivated, clearDeactivation, flagVendorSuspended, clearVendorSuspended, flagDeliverySuspended, clearDeliverySuspended, checkVendorProfile, checkDeliveryProfile]);
 
   // ── Callback from RolePickerScreen once a role is chosen ──────────────────
   // Resets onboarding state so it's re-checked for the new role
@@ -269,7 +282,7 @@ export default function Navigation() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={AppTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
           <>

@@ -1,43 +1,22 @@
-import { useEffect, useRef } from 'react';
-import { Audio } from 'expo-av';
+import { useEffect } from 'react';
+import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 
 const SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
 
 export default function useOrderSound() {
-  const soundRef = useRef(null);
+  const player = useAudioPlayer({ uri: SOUND_URL });
 
   useEffect(() => {
-    // Load sound on mount
-    const load = async () => {
-      try {
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-        });
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: SOUND_URL },
-          { shouldPlay: false }
-        );
-        soundRef.current = sound;
-      } catch (e) {
-        console.log('Sound load error:', e);
-      }
-    };
-    load();
-
-    // Unload on unmount
-    return () => {
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-      }
-    };
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: false,
+    });
   }, []);
 
-  const playOrderSound = async () => {
+  const playOrderSound = () => {
     try {
-      if (soundRef.current) {
-        await soundRef.current.replayAsync();
-      }
+      player.seekTo(0);
+      player.play();
     } catch (e) {
       console.log('Sound play error:', e);
     }
