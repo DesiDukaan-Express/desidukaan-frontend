@@ -114,6 +114,39 @@ export default function Navigation() {
     }
   }, [token, flagVendorSuspended, clearVendorSuspended]);
 
+  // ── Delivery profile check (called on first render when activeRole === "delivery")
+  // Moved above the useEffect below to avoid temporal-dead-zone error:
+  //   const checkDeliveryProfile is declared here before any useEffect references it.
+  const checkDeliveryProfile = async () => {
+    setCheckingOnboard(true);
+    try {
+      const res = await fetch(`${API_BASE}/delivery/me/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      const profile = data.data?.profile;
+      if (profile) {
+        useAuthStore.getState().addEnabledRole("delivery");
+        if (profile.is_active === false) {
+          flagDeliverySuspended();
+        } else {
+          clearDeliverySuspended();
+        }
+      }
+      if (!profile?.onboarding_submitted) {
+        setDeliveryOnboarded('not_submitted');
+      } else if (profile?.is_certified) {
+        setDeliveryOnboarded('approved');
+      } else {
+        setDeliveryOnboarded('pending');
+      }
+    } catch (err) {
+      setDeliveryOnboarded('not_submitted');
+    } finally {
+      setCheckingOnboard(false);
+    }
+  };
+
   // When the active role changes, check onboarding if needed
   useEffect(() => {
     if (isAuthenticated && activeRole) {
@@ -185,13 +218,26 @@ export default function Navigation() {
   }, [token, flagDeliverySuspended, clearDeliverySuspended]);
 
   // ── Real-time account push (Socket.io) ──────────────────────────────────
-  // Uses the same connection pattern as every other socket in the app. The
-  // backend auto-joins this socket to user:{id}; when an admin deactivates
-  // the account it emits 'account:deactivated' to that room and we block the
-  // app immediately — and 'account:reactivated' returns to normal. This
-  // socket deliberately stays connected even while the block screen is shown
-  // (accountDeactivated is NOT a dependency), so reactivation is received
-  // live without a reload.
+  // Uses a single persistent socket connection per session.
+  // Callbacks are stored in refs so the effect only re-runs on auth/token change,
+  // preventing repeated disconnect/reconnect cycles.
+  const flagDeactivatedRef = React.useRef(flagDeactivated);
+  flagDeactivatedRef.current = flagDeactivated;
+  const clearDeactivationRef = React.useRef(clearDeactivation);
+  clearDeactivationRef.current = clearDeactivation;
+  const flagVendorSuspendedRef = React.useRef(flagVendorSuspended);
+  flagVendorSuspendedRef.current = flagVendorSuspended;
+  const clearVendorSuspendedRef = React.useRef(clearVendorSuspended);
+  clearVendorSuspendedRef.current = clearVendorSuspended;
+  const flagDeliverySuspendedRef = React.useRef(flagDeliverySuspended);
+  flagDeliverySuspendedRef.current = flagDeliverySuspended;
+  const clearDeliverySuspendedRef = React.useRef(clearDeliverySuspended);
+  clearDeliverySuspendedRef.current = clearDeliverySuspended;
+  const checkVendorProfileRef = React.useRef(checkVendorProfile);
+  checkVendorProfileRef.current = checkVendorProfile;
+  const checkDeliveryProfileRef = React.useRef(checkDeliveryProfile);
+  checkDeliveryProfileRef.current = checkDeliveryProfile;
+
   useEffect(() => {
     if (!isAuthenticated || !token) return;
 
@@ -199,33 +245,28 @@ export default function Navigation() {
     try {
       socket = io(SOCKET_URL, { auth: { token }, transports: ["websocket"] });
       socket.on("account:deactivated", () => {
-        flagDeactivated();
+        flagDeactivatedRef.current();
       });
       socket.on("account:reactivated", () => {
-        clearDeactivation();
+        clearDeactivationRef.current();
       });
-      // Vendor suspend/unsuspend: the backend auto-joins this socket to the
-      // vendor:{id} room. The block only applies to the vendor role, so we
-      // ignore it while the same user is using the customer/delivery role.
       socket.on("vendor:suspended", () => {
         if (activeRoleRef.current === "vendor") {
-          flagVendorSuspended();
-          checkVendorProfile();
+          flagVendorSuspendedRef.current();
+          checkVendorProfileRef.current();
         }
       });
       socket.on("vendor:reactivated", () => {
-        clearVendorSuspended();
-        if (activeRoleRef.current === "vendor") checkVendorProfile();
+        clearVendorSuspendedRef.current();
+        if (activeRoleRef.current === "vendor") checkVendorProfileRef.current();
       });
-      // FIX: removed duplicate delivery:suspended / delivery:reactivated listeners
-      // that were registered twice, causing double-fire of suspension events.
       socket.on("delivery:suspended", () => {
-        flagDeliverySuspended();
-        if (activeRole === "delivery") checkDeliveryProfile();
+        flagDeliverySuspendedRef.current();
+        if (activeRoleRef.current === "delivery") checkDeliveryProfileRef.current();
       });
       socket.on("delivery:reactivated", () => {
-        clearDeliverySuspended();
-        if (activeRole === "delivery") checkDeliveryProfile();
+        clearDeliverySuspendedRef.current();
+        if (activeRoleRef.current === "delivery") checkDeliveryProfileRef.current();
       });
     } catch (err) {
       // Socket init failed — poll + login/refresh checks still cover both directions.
@@ -234,7 +275,7 @@ export default function Navigation() {
     return () => {
       if (socket) socket.disconnect();
     };
-  }, [isAuthenticated, token, flagDeactivated, clearDeactivation, flagVendorSuspended, clearVendorSuspended, flagDeliverySuspended, clearDeliverySuspended, checkVendorProfile, checkDeliveryProfile]);
+  }, [isAuthenticated, token]);
 
   // ── Callback from RolePickerScreen once a role is chosen ──────────────────
   // Resets onboarding state so it's re-checked for the new role

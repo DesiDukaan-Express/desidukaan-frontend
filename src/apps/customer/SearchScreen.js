@@ -40,8 +40,12 @@ import {
   productsAPI,
   productsExtendedAPI,
 } from "../../services/api";
+import { io } from "socket.io-client";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+const SOCKET_URL =
+  process.env.EXPO_PUBLIC_SOCKET_URL ||
+  (BASE_URL.includes("/api") ? BASE_URL.split("/api")[0] : "http://localhost:3000");
 const NEARBY_RADIUS = 10; // km — stores within this are shown normally
 const FAR_RADIUS = 10; // km — backend validation max is 10
 const MAX_HISTORY = 8;
@@ -1088,6 +1092,46 @@ export default function SearchScreen() {
       .catch(() => setTrendingItems([]));
   }, [userCoords?.lat, userCoords?.lng]);
 
+  // ── Real-time product availability updates ──────────────────────────────────
+  // The backend broadcasts product:updated to ALL connected clients globally.
+  // Patch search results so toggled products reflect availability instantly.
+  useEffect(() => {
+    if (!token) return;
+    let socket;
+    try {
+      socket = io(SOCKET_URL, {
+        auth: { token },
+        transports: ["websocket"],
+      });
+      socket.on("product:updated", ({ productId, available, vendorId }) => {
+        if (productId == null) return;
+        const pid = Number(productId);
+        const vid = vendorId != null ? Number(vendorId) : null;
+        setProducts((prev) =>
+          prev.map((p) => {
+            if (Number(p.id) !== pid) return p;
+            // If this product is from the vendor that changed, update its stock flag
+            if (vid != null && Number(p.vendor_id) === vid) {
+              return { ...p, is_active: available, _inStock: !!available };
+            }
+            // Otherwise just update is_active (affects add-to-cart guard)
+            return { ...p, is_active: available };
+          }),
+        );
+      });
+      socket.on("product:deleted", ({ productId }) => {
+        if (productId == null) return;
+        const pid = Number(productId);
+        setProducts((prev) => prev.filter((p) => Number(p.id) !== pid));
+      });
+    } catch {
+      // socket best-effort
+    }
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [token]);
+
   // ── Handle category filter from HomeScreen ────────────────────────────────
   useEffect(() => {
     const cat = route.params?.category;
@@ -1286,7 +1330,7 @@ export default function SearchScreen() {
 
         const inventoryResults = await Promise.all(
           vendorList.map((v) =>
-            fetch(`${BASE_URL}/inventory/vendor/${v.id}`, { headers })
+            fetch(`${BASE_URL}/inventory/vendor/${v.id}?active_only=true`, { headers })
               .then((r) => r.json())
               .then((d) => {
                 const inv = Array.isArray(d) ? d : d.data || d.inventory || [];

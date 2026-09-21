@@ -1442,7 +1442,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 backgroundGradientTo: C.surface,
                 decimalPlaces: 0,
                 color: (opacity = 1) => `rgba(14, 230, 39, ${opacity})`,
-                labelColor: () => C.textLight,
+                labelColor: (opacity = 1) => C.textLight || `rgba(100, 100, 100, ${opacity})`,
                 propsForDots: {
                   r: "5",
                   strokeWidth: "2",

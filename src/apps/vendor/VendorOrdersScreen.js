@@ -36,6 +36,19 @@ const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const SOCKET_URL =
   process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
+// Great-circle distance between two points, in km (for rider list display)
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export default function VendorOrdersScreen() {
   const { t } = useTranslation();
   const { token } = useAuthStore();
@@ -80,25 +93,39 @@ export default function VendorOrdersScreen() {
   const [fetchedVendorRating, setFetchedVendorRating] = useState(null);
   const [vendorReviewRating, setVendorReviewRating] = useState(0);
   const [vendorReviewComment, setVendorReviewComment] = useState("");
+  const [customerReviewRating, setCustomerReviewRating] = useState(0);
+  const [customerReviewComment, setCustomerReviewComment] = useState("");
   const [vendorReviewLoading, setVendorReviewLoading] = useState(false);
 
   const handleOpenViewVendorRating = async (order) => {
     setViewVendorRatingOrder(order);
     setViewVendorRatingLoading(true);
-    const initialRating = order.vendor_rating || (order.reviews?.[0]?.vendor_review_rating) || 5;
-    const initialComment = order.vendor_review_comment || (order.reviews?.[0]?.vendor_review_comment) || (order.reviews?.[0]?.comment) || "";
-    setFetchedVendorRating({ rating: initialRating, comment: initialComment });
+    const initialPartnerRating = order.vendor_rating || (order.reviews?.[0]?.vendor_review_rating) || null;
+    const initialPartnerComment = order.vendor_review_comment || (order.reviews?.[0]?.vendor_review_comment) || (order.reviews?.[0]?.comment) || "";
+    
+    const initialCustomerRating = order.vendor_to_customer_rating || (order.reviews?.[0]?.vendor_to_customer_rating) || null;
+    const initialCustomerComment = order.vendor_to_customer_comment || (order.reviews?.[0]?.vendor_to_customer_comment) || "";
+
+    setFetchedVendorRating({
+      partnerRating: initialPartnerRating,
+      partnerComment: initialPartnerComment,
+      customerRating: initialCustomerRating,
+      customerComment: initialCustomerComment,
+    });
 
     try {
       const res = await fetch(`${API_BASE}/orders/${order.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      const o = data.data?.order || data.order;
-      if (o) {
+      if (data.success && data.data?.order) {
+        const o = data.data.order;
+        const review = o.reviews?.[0];
         setFetchedVendorRating({
-          rating: o.vendor_rating ?? o.reviews?.[0]?.vendor_review_rating ?? initialRating,
-          comment: o.vendor_review_comment ?? o.reviews?.[0]?.vendor_review_comment ?? o.reviews?.[0]?.comment ?? initialComment,
+          partnerRating: review?.vendor_review_rating || null,
+          partnerComment: review?.vendor_review_comment || review?.comment || "",
+          customerRating: review?.vendor_to_customer_rating || null,
+          customerComment: review?.vendor_to_customer_comment || "",
         });
       }
     } catch (e) {
@@ -108,9 +135,18 @@ export default function VendorOrdersScreen() {
     }
   };
 
+  // ── Demand Surcharge (vendor can set surge % for rain/peak hours) ─────────
+  const [demandSurcharge, setDemandSurcharge] = useState(0);   // current %
+  const [surchargeInput, setSurchargeInput] = useState('0');
+  const [surchargeLoading, setSurchargeLoading] = useState(false);
+  const [showSurchargeEdit, setShowSurchargeEdit] = useState(false);
+  const [vendorId, setVendorId] = useState(null);
+
   const ordersRef = useRef(orders);
   const selectedOrderRef = useRef(selectedOrder);
   const updateOrderStatusRef = useRef(null);
+  // Latest store coords for the live rider listeners (avoids stale closures)
+  const storeLocationRef = useRef({ latitude: 28.6139, longitude: 77.209 });
 
   const toggleCustomer = (name) => {
     setExpandedCustomers((prev) => ({ ...prev, [name]: !prev[name] }));
@@ -179,9 +215,33 @@ export default function VendorOrdersScreen() {
         10,
         token
       );
-      if (result.success) {
-        setNearbyRiders(result.data.riders || []);
+      let riders = result.success ? [...(result.data.riders || [])] : [];
+      // Merge the live presence snapshot — partners who are online but have
+      // no GPS fix in the DB yet would otherwise be invisible until they move.
+      try {
+        const res = await fetch(
+          `${API_BASE}/delivery/online?latitude=${storeLocation.latitude}&longitude=${storeLocation.longitude}&radius_km=10`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        const data = await res.json();
+        const live = data.data?.riders || [];
+        live.forEach((p) => {
+          if (!riders.some((r) => Number(r.id) === Number(p.partnerId))) {
+            riders.push({
+              id: p.partnerId,
+              name: p.name || "Partner",
+              latitude: p.latitude ?? storeLocation.latitude,
+              longitude: p.longitude ?? storeLocation.longitude,
+              is_busy: false,
+              active_deliveries: 0,
+              distance_km: p.distance_km ?? 0,
+            });
+          }
+        });
+      } catch {
+        // presence snapshot is best-effort — REST list still applies
       }
+      setNearbyRiders(riders);
     } catch (err) {
       console.log(err);
     }
@@ -191,6 +251,10 @@ export default function VendorOrdersScreen() {
     latitude: selectedOrder?.vendor?.latitude || 28.6139,
     longitude: selectedOrder?.vendor?.longitude || 77.209,
   };
+
+  useEffect(() => {
+    storeLocationRef.current = storeLocation;
+  }, [storeLocation.latitude, storeLocation.longitude]);
 
   // Dynamic riders list derived from backend + sockets instead of mocks
   const riders = selectedOrder?.delivery?.partner
@@ -209,13 +273,18 @@ export default function VendorOrdersScreen() {
           },
           distance: "Live",
           fastest: true,
+          is_available: true,
+          is_online: true,
         },
       ]
-    : nearbyRiders.map((r, i) => ({
+    : nearbyRiders
+      .filter((r) => r.is_available)
+      .map((r, i) => ({
         id: r.id,
         name: r.name || "Partner",
-        status: r.is_busy ? `On Delivery (${r.active_deliveries})` : "Available",
-        is_busy: r.is_busy,
+        status: r.is_busy ? `On Delivery (${r.active_deliveries || 0})` : "Available",
+        is_busy: !!r.is_busy,
+        is_online: r.is_available === true,
         active_deliveries: r.active_deliveries || 0,
         image: "https://cdn-icons-png.flaticon.com/512/3208/3208726.png",
         coordinate: {
@@ -229,6 +298,15 @@ export default function VendorOrdersScreen() {
   const [assignedPartnerIds, setAssignedPartnerIds] = useState(new Set());
 
   const handleAssignRider = async (partnerId) => {
+    if (!partnerId || typeof partnerId !== 'number') {
+      Alert.alert("Error", "Invalid partner selection");
+      return;
+    }
+    setDeclinedOrders(prev => {
+      const next = { ...prev };
+      delete next[String(selectedOrder.id)];
+      return next;
+    });
     try {
       const res = await fetch(
         `${API_BASE}/delivery/assign/${selectedOrder.id}`,
@@ -259,6 +337,11 @@ export default function VendorOrdersScreen() {
     if (!selectedOrder) return;
     setAutoAssigning(true);
     setBroadcastStatus(null);
+    setDeclinedOrders(prev => {
+      const next = { ...prev };
+      delete next[String(selectedOrder.id)];
+      return next;
+    });
     try {
       const res = await fetch(
         `${API_BASE}/delivery/auto-assign/${selectedOrder.id}`,
@@ -273,10 +356,17 @@ export default function VendorOrdersScreen() {
       );
       const result = await res.json();
       if (result.success) {
-        setBroadcastStatus({
-          count: result.data.broadcastCount,
-          message: `Sent to ${result.data.broadcastCount} nearby rider${result.data.broadcastCount !== 1 ? "s" : ""}. Waiting for acceptance...`,
-        });
+        if (result.data.broadcastCount === 0) {
+          setBroadcastStatus({
+            count: 0,
+            message: result.data.message || "No riders available nearby right now",
+          });
+        } else {
+          setBroadcastStatus({
+            count: result.data.broadcastCount,
+            message: `Sent to ${result.data.broadcastCount} nearby rider${result.data.broadcastCount !== 1 ? "s" : ""}. Waiting for acceptance...`,
+          });
+        }
       } else {
         Alert.alert(
           "Auto Assign Failed",
@@ -542,7 +632,7 @@ export default function VendorOrdersScreen() {
       transports: ["websocket", "polling"],
     });
 
-    socket.on("delivery:declined", (data) => {
+socket.on("delivery:declined", (data) => {
       console.log("[VendorOrdersScreen] ★★★ delivery:declined ★★★", JSON.stringify(data));
       fetchOrdersRef.current?.();
       const declinedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -559,6 +649,39 @@ export default function VendorOrdersScreen() {
             : data.message || `${data.partner_name} declined the delivery request`,
         },
       }));
+
+      // Clear the "waiting for acceptance" banner when a decline is received
+      setBroadcastStatus(null);
+
+      // Re-add the declining partner to nearbyRiders if they're still online
+      // (declining one order doesn't make them offline)
+      const decliningPartnerId = Number(data.partner_id);
+      if (decliningPartnerId > 0) {
+        setNearbyRiders((prev) => {
+          // Check if partner is already in the list
+          const alreadyExists = prev.some((r) => Number(r.id) === decliningPartnerId);
+          if (!alreadyExists) {
+            // Add partner as available (they're still online, just declined this order)
+            const newRider = {
+              id: decliningPartnerId,
+              name: data.partner_name || "Partner",
+              status: "Available",
+              is_available: true,
+              is_busy: false,
+              active_deliveries: 0,
+              distance_km: 0,
+              coordinate: {
+                latitude: 28.6139,
+                longitude: 77.209,
+              },
+              distance: "0 km",
+              fastest: prev.length === 0,
+            };
+            return [...prev, newRider];
+          }
+          return prev;
+        });
+      }
 
       let customerPhone = null;
       let customerName = "the customer";
@@ -597,12 +720,88 @@ export default function VendorOrdersScreen() {
               updateOrderStatusRef.current?.(data.order_id, "picked_up");
             }
           },
-          { text: "Dismiss", style: "cancel" }
+          {
+            text: "Dismiss",
+            style: "cancel"
+          }
         ],
         { cancelable: true }
       );
     });
     socket.on("connect", () => console.log("Vendor Socket Connected"));
+
+    // ── Live rider presence for the Assign Rider modal ──────────────────────
+    // Listen for partner online/offline status changes so the Available Riders
+    // list updates in real time without requiring a manual refresh.
+    socket.on("partner:statusChanged", (data) => {
+      const pid = Number(data.partnerId);
+      const isAvailable = data?.is_available;
+      if (pid === undefined || isAvailable === undefined) return;
+      setNearbyRiders((prev) => {
+        // Always remove offline partners from the list entirely
+        if (!isAvailable) {
+          return prev.filter((r) => Number(r.id) !== pid);
+        }
+        // Partner coming online — update or add them
+        const idx = prev.findIndex((r) => Number(r.id) === pid);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = { ...next[idx], is_available: true, status: "Available" };
+          return next;
+        }
+        const newRider = {
+          id: pid,
+          name: data.name || "Partner",
+          latitude: data.latitude || 28.6139,
+          longitude: data.longitude || 77.209,
+          is_busy: false,
+          active_deliveries: 0,
+          distance_km: 0,
+          is_available: true,
+          status: "Available",
+        };
+        return [...prev, newRider];
+      });
+    });
+    // No separate partner:online handler — partner:statusChanged covers both directions
+    socket.on("partner:location", (data) => {
+      const pid = Number(data.partnerId);
+      if (!pid || data.latitude == null) return;
+      setNearbyRiders((prev) => {
+        const idx = prev.findIndex((r) => Number(r.id) === pid);
+        const distanceKm =
+          storeLocationRef.current &&
+          typeof storeLocationRef.current.latitude === "number"
+            ? haversineKm(
+                storeLocationRef.current.latitude,
+                storeLocationRef.current.longitude,
+                data.latitude,
+                data.longitude,
+              ).toFixed(2)
+            : null;
+        const rider = {
+          id: pid,
+          name: data.name || "Partner",
+          latitude: data.latitude,
+          longitude: data.longitude,
+          is_available: true,
+          is_busy: false,
+          active_deliveries: 0,
+          distance_km: distanceKm != null ? Number(distanceKm) : 0,
+        };
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = { ...next[idx], ...rider, name: next[idx].name || rider.name };
+          return next;
+        }
+        return [...prev, rider];
+      });
+    });
+    socket.on("partner:removed", (data) => {
+      const pid = Number(data.partnerId);
+      if (!pid) return;
+      setNearbyRiders((prev) => prev.filter((r) => Number(r.id) !== pid));
+    });
 
     // Real-time order notifications
     socket.on("order:new", (data) => {
@@ -780,6 +979,11 @@ export default function VendorOrdersScreen() {
     selectedOrderRef.current = selectedOrder;
     if (selectedOrder?.delivery?.partner) {
       setBroadcastStatus(null);
+      setDeclinedOrders(prev => {
+        const next = { ...prev };
+        delete next[String(selectedOrder.id)];
+        return next;
+      });
     }
   }, [selectedOrder]);
 
@@ -1280,7 +1484,7 @@ export default function VendorOrdersScreen() {
                           }
                         }}
                       >
-                        <Text style={styles.ratePartnerBtnText}>Rate Partner</Text>
+                        <Text style={styles.ratePartnerBtnText}>Rate</Text>
                       </TouchableOpacity>
                     )}
                     {order.can_rate_partner && order.has_rated_partner && (
@@ -1931,7 +2135,7 @@ export default function VendorOrdersScreen() {
                 </View>
               )}
 
-              {broadcastStatus && broadcastStatus.type !== "declined" && (
+              {broadcastStatus && broadcastStatus.type !== "declined" && riders.length === 0 && (
                 <View
                   style={[dmStyles.broadcastBanner]}
                 >
@@ -1991,7 +2195,7 @@ export default function VendorOrdersScreen() {
                           color="#147538"
                         />
                       </TouchableOpacity>
-                      {rider.status === "Available" || rider.is_busy ? (
+                      {((rider.status === "Available" && rider.is_online) || !!rider.is_busy) ? (
                         <TouchableOpacity
                           style={[
                             dmStyles.assignBtn,
@@ -2718,107 +2922,93 @@ export default function VendorOrdersScreen() {
         </View>
       </Modal>
 
-      {/* ── VENDOR REVIEW DELIVERY PARTNER MODAL ── */}
+      {/* ── VENDOR DUAL REVIEW MODAL ── */}
       <Modal
         visible={!!vendorReviewOrder}
         animationType="slide"
         transparent
-        onRequestClose={() => setVendorReviewOrder(null)}
+        onRequestClose={() => {
+          setVendorReviewOrder(null);
+          setVendorReviewRating(0);
+          setVendorReviewComment("");
+          setCustomerReviewRating(0);
+          setCustomerReviewComment("");
+        }}
       >
         <Pressable
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            justifyContent: "flex-end",
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}
+          onPress={() => {
+            setVendorReviewOrder(null);
+            setVendorReviewRating(0);
+            setVendorReviewComment("");
+            setCustomerReviewRating(0);
+            setCustomerReviewComment("");
           }}
-          onPress={() => setVendorReviewOrder(null)}
         >
           <Pressable
-            style={{
-              backgroundColor: "#FFFFFF",
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              padding: 24,
-              paddingBottom: 40,
-            }}
+            style={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}
             onPress={() => {}}
           >
-            <View
-              style={{
-                width: 40,
-                height: 4,
-                backgroundColor: "#E2E8F0",
-                borderRadius: 2,
-                alignSelf: "center",
-                marginBottom: 20,
-              }}
-            />
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "900",
-                fontFamily: "PlusJakartaSans_800ExtraBold",
-                color: "#0F172A",
-                marginBottom: 4,
-              }}
-            >
-              Rate Delivery Partner
-            </Text>
-            <Text style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
-              {vendorReviewOrder?.delivery?.partner?.user?.name || "Delivery Partner"}
-            </Text>
+            <View style={{ width: 40, height: 4, backgroundColor: "#E2E8F0", borderRadius: 2, alignSelf: "center", marginBottom: 20 }} />
+            
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
+              {/* Partner Section */}
+              <Text style={{ fontSize: 18, fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#0F172A", marginBottom: 4 }}>
+                Rate Delivery Partner
+              </Text>
+              <Text style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
+                {vendorReviewOrder?.delivery?.partner?.user?.name || "Delivery Partner"}
+              </Text>
+              
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 20, justifyContent: "center" }}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity key={`partner-${star}`} onPress={() => setVendorReviewRating(star)}>
+                    <Text style={{ fontSize: 36, opacity: star <= vendorReviewRating ? 1 : 0.25 }}>⭐</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              
+              <TextInput
+                style={{ backgroundColor: "#F3F4F6", borderRadius: 12, padding: 14, fontSize: 14, color: "#111827", minHeight: 80, textAlignVertical: "top", marginBottom: 30, borderWidth: 1, borderColor: "#E5E7EB" }}
+                placeholder="Tell us about the delivery experience (optional)"
+                placeholderTextColor="#9CA3AF"
+                multiline
+                value={vendorReviewComment}
+                onChangeText={setVendorReviewComment}
+              />
 
-            {/* Star picker */}
-            <View
-              style={{
-                flexDirection: "row",
-                gap: 10,
-                marginBottom: 20,
-                justifyContent: "center",
-              }}
-            >
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity
-                  key={star}
-                  onPress={() => setVendorReviewRating(star)}
-                >
-                  <Text
-                    style={{
-                      fontSize: 36,
-                      opacity: star <= vendorReviewRating ? 1 : 0.25,
-                    }}
-                  >
-                    ⭐
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+              <View style={{ height: 1, backgroundColor: "#E2E8F0", marginBottom: 30 }} />
 
-            {/* Comment input */}
-            <TextInput
-              style={{
-                backgroundColor: "#F3F4F6",
-                borderRadius: 12,
-                padding: 14,
-                fontSize: 14,
-                color: "#111827",
-                minHeight: 80,
-                textAlignVertical: "top",
-                marginBottom: 20,
-                borderWidth: 1,
-                borderColor: "#E5E7EB",
-              }}
-              placeholder="Tell us about the delivery experience (optional)"
-              placeholderTextColor="#9CA3AF"
-              multiline
-              value={vendorReviewComment}
-              onChangeText={setVendorReviewComment}
-            />
+              {/* Customer Section */}
+              <Text style={{ fontSize: 18, fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#0F172A", marginBottom: 4 }}>
+                Rate Customer
+              </Text>
+              <Text style={{ fontSize: 13, color: "#64748B", marginBottom: 20 }}>
+                {vendorReviewOrder?.customer?.name || `Customer #${vendorReviewOrder?.customer_id || ''}`}
+              </Text>
+              
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 20, justifyContent: "center" }}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity key={`customer-${star}`} onPress={() => setCustomerReviewRating(star)}>
+                    <Text style={{ fontSize: 36, opacity: star <= customerReviewRating ? 1 : 0.25 }}>⭐</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              
+              <TextInput
+                style={{ backgroundColor: "#F3F4F6", borderRadius: 12, padding: 14, fontSize: 14, color: "#111827", minHeight: 80, textAlignVertical: "top", marginBottom: 20, borderWidth: 1, borderColor: "#E5E7EB" }}
+                placeholder="Tell us about the customer experience (optional)"
+                placeholderTextColor="#9CA3AF"
+                multiline
+                value={customerReviewComment}
+                onChangeText={setCustomerReviewComment}
+              />
+            </ScrollView>
 
             <TouchableOpacity
               onPress={async () => {
-                if (vendorReviewRating === 0) {
-                  Alert.alert("Please select a rating");
+                if (vendorReviewRating === 0 && customerReviewRating === 0) {
+                  Alert.alert("Please provide at least one rating");
                   return;
                 }
                 setVendorReviewLoading(true);
@@ -2832,23 +3022,25 @@ export default function VendorOrdersScreen() {
                         Authorization: `Bearer ${token}`,
                       },
                       body: JSON.stringify({
-                        vendor_review_rating: vendorReviewRating,
-                        vendor_review_comment: vendorReviewComment,
+                        vendor_review_rating: vendorReviewRating || null,
+                        vendor_review_comment: vendorReviewComment || null,
+                        vendor_to_customer_rating: customerReviewRating || null,
+                        vendor_to_customer_comment: customerReviewComment || null,
                       }),
                     }
                   );
                   const data = await res.json();
                   if (data.success) {
-                    const submittedRating = vendorReviewRating;
-                    const submittedComment = vendorReviewComment;
                     setHistory((prev) =>
                       prev.map((o) =>
                         o.id === vendorReviewOrder.id
                           ? {
                               ...o,
                               has_rated_partner: true,
-                              vendor_rating: submittedRating,
-                              vendor_review_comment: submittedComment,
+                              vendor_rating: vendorReviewRating || null,
+                              vendor_review_comment: vendorReviewComment || null,
+                              vendor_to_customer_rating: customerReviewRating || null,
+                              vendor_to_customer_comment: customerReviewComment || null,
                             }
                           : o
                       )
@@ -2856,8 +3048,12 @@ export default function VendorOrdersScreen() {
                     setVendorReviewOrder(null);
                     setVendorReviewRating(0);
                     setVendorReviewComment("");
+                    setCustomerReviewRating(0);
+                    setCustomerReviewComment("");
                     fetchHistory(1);
                     Alert.alert("Thank you!", "Your review has been submitted.");
+                  } else {
+                    Alert.alert("Error", data.message || "Failed to submit review.");
                   }
                 } catch (e) {
                   Alert.alert("Error", "Failed to submit review.");
@@ -2871,16 +3067,10 @@ export default function VendorOrdersScreen() {
                 borderRadius: 14,
                 padding: 16,
                 alignItems: "center",
+                marginTop: 10,
               }}
             >
-              <Text
-                style={{
-                  color: "#fff",
-                  fontSize: 16,
-                  fontWeight: "800",
-                  fontFamily: "PlusJakartaSans_800ExtraBold",
-                }}
-              >
+              <Text style={{ color: "#fff", fontSize: 16, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold" }}>
                 {vendorReviewLoading ? "Submitting..." : "Submit Review"}
               </Text>
             </TouchableOpacity>
@@ -2888,7 +3078,7 @@ export default function VendorOrdersScreen() {
         </Pressable>
       </Modal>
 
-      {/* ── VIEW SUBMITTED VENDOR RATING SLIDE-UP MODAL ── */}
+      {/* ── VIEW SUBMITTED VENDOR DUAL RATING SLIDE-UP MODAL ── */}
       <Modal
         visible={!!viewVendorRatingOrder}
         animationType="slide"
@@ -2913,7 +3103,6 @@ export default function VendorOrdersScreen() {
             }}
             onPress={() => {}}
           >
-            {/* Handle */}
             <View
               style={{
                 width: 40,
@@ -2933,75 +3122,103 @@ export default function VendorOrdersScreen() {
                 <Feather name="x" size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
-
+            
             <Text style={{ fontSize: 13, color: "#94A3B8", fontFamily: "PlusJakartaSans_500Medium", marginBottom: 20 }}>
-              {viewVendorRatingOrder?.delivery?.partner?.user?.name || "Delivery Partner"} · {formatOrderTime(viewVendorRatingOrder?.created_at)}
+              Order on {formatOrderTime(viewVendorRatingOrder?.created_at)}
             </Text>
 
-            {/* Rating Stars & Details Card */}
             {viewVendorRatingLoading ? (
               <View style={{ padding: 30, alignItems: "center", justifyContent: "center" }}>
                 <ActivityIndicator color="#16A34A" size="small" />
                 <Text style={{ fontSize: 13, color: "#94A3B8", marginTop: 10 }}>Fetching your review…</Text>
               </View>
-            ) : (() => {
-              const ratingVal = fetchedVendorRating?.rating || viewVendorRatingOrder?.vendor_rating || 5;
-              const num = typeof ratingVal === "number" ? ratingVal : parseInt(ratingVal, 10) || 5;
-              const comment = fetchedVendorRating?.comment || viewVendorRatingOrder?.vendor_review_comment || "";
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
+                {/* Partner Rating View */}
+                <Text style={{ fontSize: 16, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#0F172A", marginBottom: 4 }}>
+                  Delivery Partner
+                </Text>
+                <Text style={{ fontSize: 13, color: "#64748B", marginBottom: 12 }}>
+                  {viewVendorRatingOrder?.delivery?.partner?.user?.name || "Delivery Partner"}
+                </Text>
 
-              return (
-                <View
-                  style={{
-                    backgroundColor: "#F8FAFC",
-                    borderWidth: 1,
-                    borderColor: "#E2E8F0",
-                    borderRadius: 16,
-                    padding: 20,
-                    alignItems: "center",
-                    marginBottom: 20,
-                  }}
-                >
-                  <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Text
-                        key={star}
-                        style={{
-                          fontSize: 36,
-                          opacity: star <= num ? 1 : 0.25,
-                        }}
-                      >
-                        ⭐
+                {(() => {
+                  const ratingVal = fetchedVendorRating?.partnerRating || viewVendorRatingOrder?.vendor_rating;
+                  if (!ratingVal) {
+                    return (
+                      <View style={{ backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 16, padding: 20, alignItems: "center", marginBottom: 24 }}>
+                        <Text style={{ fontSize: 14, color: "#94A3B8", fontStyle: "italic" }}>Not Rated</Text>
+                      </View>
+                    );
+                  }
+
+                  const num = typeof ratingVal === "number" ? ratingVal : parseInt(ratingVal, 10) || 5;
+                  const comment = fetchedVendorRating?.partnerComment || viewVendorRatingOrder?.vendor_review_comment || "";
+
+                  return (
+                    <View style={{ backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 16, padding: 20, alignItems: "center", marginBottom: 24 }}>
+                      <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Text key={`p-star-${star}`} style={{ fontSize: 36, opacity: star <= num ? 1 : 0.25 }}>⭐</Text>
+                        ))}
+                      </View>
+                      <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#0F172A", marginBottom: comment ? 12 : 0 }}>
+                        {num} out of 5 stars
                       </Text>
-                    ))}
-                  </View>
-
-                  <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#0F172A", marginBottom: comment ? 12 : 0 }}>
-                    {num} out of 5 stars
-                  </Text>
-
-                  {comment ? (
-                    <View
-                      style={{
-                        backgroundColor: "#FFFFFF",
-                        borderRadius: 12,
-                        padding: 14,
-                        borderWidth: 1,
-                        borderColor: "#E2E8F0",
-                        width: "100%",
-                      }}
-                    >
-                      <Text style={{ fontSize: 14, color: "#1F2937", lineHeight: 20 }}>
-                        {comment}
-                      </Text>
+                      {comment ? (
+                        <View style={{ backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, borderWidth: 1, borderColor: "#E2E8F0", width: "100%" }}>
+                          <Text style={{ fontSize: 14, color: "#1F2937", lineHeight: 20 }}>{comment}</Text>
+                        </View>
+                      ) : (
+                        <Text style={{ fontSize: 13, color: "#94A3B8", fontStyle: "italic", marginTop: 4 }}>No written comment provided</Text>
+                      )}
                     </View>
-                  ) : (
-                    <Text style={{ fontSize: 13, color: "#94A3B8", fontStyle: "italic", marginTop: 4 }}>
-                      No written comment provided
-                    </Text>
-                  )}
-                </View>
-              );
-            })()}
+                  );
+                })()}
+
+                {/* Customer Rating View */}
+                <Text style={{ fontSize: 16, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#0F172A", marginBottom: 4 }}>
+                  Customer
+                </Text>
+                <Text style={{ fontSize: 13, color: "#64748B", marginBottom: 12 }}>
+                  {viewVendorRatingOrder?.customer?.name || `Customer #${viewVendorRatingOrder?.customer_id || ''}`}
+                </Text>
+
+                {(() => {
+                  const ratingVal = fetchedVendorRating?.customerRating || viewVendorRatingOrder?.vendor_to_customer_rating;
+                  if (!ratingVal) {
+                    return (
+                      <View style={{ backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 16, padding: 20, alignItems: "center", marginBottom: 20 }}>
+                        <Text style={{ fontSize: 14, color: "#94A3B8", fontStyle: "italic" }}>Not Rated</Text>
+                      </View>
+                    );
+                  }
+
+                  const num = typeof ratingVal === "number" ? ratingVal : parseInt(ratingVal, 10) || 5;
+                  const comment = fetchedVendorRating?.customerComment || viewVendorRatingOrder?.vendor_to_customer_comment || "";
+
+                  return (
+                    <View style={{ backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 16, padding: 20, alignItems: "center", marginBottom: 20 }}>
+                      <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Text key={`c-star-${star}`} style={{ fontSize: 36, opacity: star <= num ? 1 : 0.25 }}>⭐</Text>
+                        ))}
+                      </View>
+                      <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#0F172A", marginBottom: comment ? 12 : 0 }}>
+                        {num} out of 5 stars
+                      </Text>
+                      {comment ? (
+                        <View style={{ backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, borderWidth: 1, borderColor: "#E2E8F0", width: "100%" }}>
+                          <Text style={{ fontSize: 14, color: "#1F2937", lineHeight: 20 }}>{comment}</Text>
+                        </View>
+                      ) : (
+                        <Text style={{ fontSize: 13, color: "#94A3B8", fontStyle: "italic", marginTop: 4 }}>No written comment provided</Text>
+                      )}
+                    </View>
+                  );
+                })()}
+              </ScrollView>
+            )}
 
             <TouchableOpacity
               onPress={() => setViewVendorRatingOrder(null)}
@@ -3011,6 +3228,7 @@ export default function VendorOrdersScreen() {
                 padding: 16,
                 alignItems: "center",
                 justifyContent: "center",
+                marginTop: 10,
               }}
             >
               <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#FFFFFF" }}>

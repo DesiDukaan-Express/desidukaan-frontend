@@ -18,8 +18,12 @@ import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
 import { useTranslation } from "react-i18next";
 import ProductStarRating from "../../components/ProductStarRating";
 import WishlistHeart from "../../components/WishlistHeart";
+import { io } from "socket.io-client";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+const SOCKET_URL =
+  process.env.EXPO_PUBLIC_SOCKET_URL ||
+  (BASE_URL.includes("/api") ? BASE_URL.split("/api")[0] : "http://localhost:3000");
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -998,6 +1002,61 @@ export default function VendorStoreScreen() {
       finally { setLoading(false); }
     })();
   }, [vendorId, token]);
+  // ── Real-time product updates for THIS store ───────────────────────────────
+  // Joins the store:{vendorId} room so we only receive events for the store
+  // being viewed. Updates/deletions patch local state directly — no refetch,
+  // no refresh: "milk" flips to Unavailable the moment the vendor toggles it.
+  useEffect(() => {
+    if (!vendorId) return;
+    let socket;
+    try {
+      socket = io(SOCKET_URL, {
+        auth: token ? { token } : {},
+        transports: ["websocket"],
+      });
+      socket.on("connect", () => {
+        socket.emit("store:join", { storeId: vendorId });
+      });
+      socket.on("product:updated", ({ productId, available, ...changed }) => {
+        if (productId == null) return;
+        const pid = Number(productId);
+        setInventory((prev) =>
+          prev.map((item) => {
+            const isMatch =
+              Number(item.product_id) === pid || Number(item.product?.id) === pid;
+            if (!isMatch) return item;
+            // Merge changed product fields + availability into local state
+            const nextProduct = item.product
+              ? { ...item.product }
+              : { id: pid };
+            Object.keys(changed).forEach((k) => {
+              if (changed[k] !== undefined) nextProduct[k] = changed[k];
+            });
+            if (available !== undefined) {
+              nextProduct.is_active = available;
+              return { ...item, is_active: available, product: nextProduct };
+            }
+            return { ...item, product: nextProduct };
+          }),
+        );
+      });
+      socket.on("product:deleted", ({ productId }) => {
+        if (productId == null) return;
+        const pid = Number(productId);
+        setInventory((prev) =>
+          prev.filter(
+            (item) =>
+              Number(item.product_id) !== pid && Number(item.product?.id) !== pid,
+          ),
+        );
+      });
+    } catch {
+      // socket best-effort — page load still fetches fresh inventory
+    }
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [vendorId, token]);
 
   // ── Fetch bulk product ratings after inventory loads ──────────────────────
   useEffect(() => {
@@ -1139,7 +1198,7 @@ export default function VendorStoreScreen() {
   }), [inventory, search, activeCat, getCatName, parentOfMap]);
 
   const inStock = useMemo(() => {
-    let list = [...filtered.filter(i => i.is_active ?? true)];
+    let list = [...filtered.filter(i => i.product?.is_active ?? true)];
 
     switch (sortBy) {
       case "price_asc":
@@ -1184,7 +1243,7 @@ export default function VendorStoreScreen() {
   }, [filtered, sortBy]);
 
   const outStock = useMemo(() => {
-    let list = [...filtered.filter(i => !(i.is_active ?? true))];
+    let list = [...filtered.filter(i => !(i.product?.is_active ?? true))];
 
     switch (sortBy) {
       case "price_asc":
@@ -1237,6 +1296,7 @@ export default function VendorStoreScreen() {
   // handleAdd — opens weight picker for loose, direct add for packed
   const handleAdd = useCallback((item, selectedWeight = null) => {
     const p = item.product || {};
+    if (p.is_active === false) return;
     const loose = isLooseItem(p);
 
     if (loose && !selectedWeight) {
@@ -1586,97 +1646,8 @@ export default function VendorStoreScreen() {
           onLayout={(e) => setGridAreaW(e.nativeEvent.layout.width)}
           contentContainerStyle={[s.body, { paddingHorizontal: hPad }]}
         >
-          {/* PROMO BANNERS — carousel on mobile, 3-col flex on desktop */}
-          {!search && (
-            winW < 600 ? (
-              <View style={s.carouselWrap}>
-                <FlatList
-                  ref={promoScrollRef}
-                  horizontal
-                  pagingEnabled={false}
-                  snapToInterval={promoCardW + 14}
-                  snapToAlignment="start"
-                  decelerationRate="fast"
-                  showsHorizontalScrollIndicator={false}
-                  data={[
-                    { key: "0", color: "green", title: "Fresh Vegetables", value: "Upto 20% OFF", sub: "Farm fresh & handpicked", icon: "eco", iconColor: C.green, cat: "Fruits & Vegetables", btnStyle: null },
-                    { key: "1", color: "orange", title: "Daily Essentials", value: "Upto 15% OFF", sub: "On all essentials", icon: "local-grocery-store", iconColor: C.orangeDark, cat: "All", btnStyle: s.promoShopBtnOrange },
-                    { key: "2", color: "green", title: "Weekend Special", value: "Extra 5% OFF", sub: "On orders above ₹499", icon: "card-giftcard", iconColor: C.green, cat: null, btnStyle: null },
-                  ]}
-                  keyExtractor={(item) => item.key}
-                  getItemLayout={(_, index) => ({ length: promoCardW + 14, offset: (promoCardW + 14) * index, index })}
-                  onMomentumScrollEnd={onPromoScrollEnd}
-                  contentContainerStyle={{ paddingHorizontal: hPad, gap: 14 }}
-                  renderItem={({ item }) => (
-                    <View style={[s.promoCard, item.color === "orange" ? s.promoCardOrange : s.promoCardGreen, { width: promoCardW }]}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.promoCardLabel}>{item.title}</Text>
-                        <Text style={[s.promoCardValue, item.color === "orange" && { color: C.orangeDark }]}>{item.value}</Text>
-                        <Text style={s.promoCardSub}>{item.sub}</Text>
-                        {item.cat ? (
-                          <TouchableOpacity
-                            style={[s.promoShopBtn, item.btnStyle]}
-                            onPress={() => setActiveCat(item.cat)}
-                            activeOpacity={0.85}
-                          >
-                            <Text style={s.promoShopBtnText}>Shop Now</Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={s.promoCodeBtn}>
-                            <Text style={s.promoCodeText}>Use Code: WEEKEND5</Text>
-                          </View>
-                        )}
-                      </View>
-                      <MaterialIcons name={item.icon} size={40} color={item.iconColor} style={{ opacity: 0.28 }} />
-                    </View>
-                  )}
-                />
-                <View style={s.carouselDots}>
-                  {[0, 1, 2].map(i => (
-                    <View key={i} style={[s.carouselDot, promoIdx === i && s.carouselDotActive]} />
-                  ))}
-                </View>
-              </View>
-            ) : (
-              <View style={s.promoRow}>
-                <View style={[s.promoCard, s.promoCardGreen]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.promoCardLabel}>Fresh Vegetables</Text>
-                    <Text style={s.promoCardValue}>Upto 20% OFF</Text>
-                    <Text style={s.promoCardSub}>Farm fresh & handpicked</Text>
-                    <TouchableOpacity style={s.promoShopBtn} onPress={() => setActiveCat("Fruits & Vegetables")} activeOpacity={0.85}>
-                      <Text style={s.promoShopBtnText}>Shop Now</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <MaterialIcons name="eco" size={40} color={C.green} style={{ opacity: 0.28 }} />
-                </View>
+          {/* PROMO BANNERS — 3 equal cards, now inside the scroll so they move with the page */}
 
-                <View style={[s.promoCard, s.promoCardOrange]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.promoCardLabel}>Daily Essentials</Text>
-                    <Text style={[s.promoCardValue, { color: C.orangeDark }]}>Upto 15% OFF</Text>
-                    <Text style={s.promoCardSub}>On all essentials</Text>
-                    <TouchableOpacity style={[s.promoShopBtn, s.promoShopBtnOrange]} onPress={() => setActiveCat("All")} activeOpacity={0.85}>
-                      <Text style={s.promoShopBtnText}>Shop Now</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <MaterialIcons name="local-grocery-store" size={40} color={C.orangeDark} style={{ opacity: 0.28 }} />
-                </View>
-
-                <View style={[s.promoCard, s.promoCardGreen]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.promoCardLabel}>Weekend Special</Text>
-                    <Text style={s.promoCardValue}>Extra 5% OFF</Text>
-                    <Text style={s.promoCardSub}>On orders above ₹499</Text>
-                    <View style={s.promoCodeBtn}>
-                      <Text style={s.promoCodeText}>Use Code: WEEKEND5</Text>
-                    </View>
-                  </View>
-                  <MaterialIcons name="card-giftcard" size={40} color={C.green} style={{ opacity: 0.28 }} />
-                </View>
-              </View>
-            )
-          )}
 
           {inStock.length === 0 && outStock.length === 0 ? (
             <View style={s.emptyBox}>
