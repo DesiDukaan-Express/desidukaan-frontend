@@ -1271,15 +1271,15 @@ export default function VendorOnboardingScreen({ onComplete }) {
         });
       }
 
-      // Refresh vendor status in the background (updates auth store / parent
-      // navigator so it knows onboarding is submitted / approved) but always
-      // show the success popup so the user gets feedback and a way to
-      // continue to the Dashboard — previously this was skipped whenever
-      // onComplete was provided, which is why Submit & Go Live appeared to
-      // do nothing.
-      if (onComplete) {
-        onComplete();
-      }
+      // Show the success popup FIRST and do NOT call onComplete() yet.
+      // onComplete() triggers checkVendorProfile() in the root navigator,
+      // which updates vendorStatus/vendorOnboarded — the moment that flips,
+      // the root Stack.Navigator swaps this screen out for VendorApp,
+      // unmounting VendorOnboardingScreen (and this success modal) before
+      // the user ever sees it. That's why Submit & Go Live looked like it
+      // did nothing. Instead we show the modal now and only call
+      // onComplete() once the user taps through it (see successBtn below),
+      // so the screen swap happens after they've seen the confirmation.
       setShowSuccess(true);
     } catch (err) {
       Alert.alert('Error', err.message);
@@ -1365,7 +1365,15 @@ export default function VendorOnboardingScreen({ onComplete }) {
 
             <TouchableOpacity
               style={styles.successBtn}
-              onPress={() => { setShowSuccess(false); navigation.navigate('Dashboard'); }}
+              onPress={() => {
+                // Close the modal, then refresh vendor status. Refreshing
+                // now (not right after submit) is what lets the root
+                // navigator swap from the onboarding stack to VendorApp
+                // AFTER the user has actually seen the success screen,
+                // instead of yanking it out from under them.
+                setShowSuccess(false);
+                if (onComplete) onComplete();
+              }}
               activeOpacity={0.88}
             >
               <Text style={styles.successBtnText}>Go to Dashboard →</Text>

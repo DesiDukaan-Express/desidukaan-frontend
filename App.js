@@ -8,6 +8,7 @@ import './src/i18n';
 
 import useAuthStore from './src/store/authStore';
 import useAddressStore from './src/store/addressStore';
+import { ThemeProvider } from './src/theme/ThemeContext';
 
 export default function App() {
   const hydrate = useAuthStore((state) => state.hydrate);
@@ -33,5 +34,9 @@ export default function App() {
     );
   }
 
-  return <Navigation />;
+  return (
+    <ThemeProvider>
+      <Navigation />
+    </ThemeProvider>
+  );
 }

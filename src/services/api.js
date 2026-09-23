@@ -306,20 +306,19 @@ export const searchAPI = {
 };
 // ─── Wishlist ────────────────────────────────────────────────────────────────
 export const wishlistAPI = {
-  // Get all wishlist products 
+  // Get full wishlist (product + vendor data) — for the WishlistScreen
   getAll: (token) =>
     request("GET", "/wishlist", null, token),
 
+  // Get just the wishlisted product ids — lightweight, for heart-icon state
+  getIds: (token) =>
+    request("GET", "/wishlist/ids", null, token),
+
   // Add product to wishlist
   add: (productId, token) =>
-    request("POST", `/wishlist/${productId}`, null, token),
+    request("POST", "/wishlist", { product_id: productId }, token),
 
   // Remove product from wishlist
   remove: (productId, token) =>
     request("DELETE", `/wishlist/${productId}`, null, token),
-
-  // Check whether a product is wishlisted
-  check: (productId, token) =>
-    request("GET", `/wishlist/check/${productId}`, null, token),
 };
-

@@ -15,10 +15,12 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import useAuthStore from "../../store/authStore";
+import { useTheme } from "../../theme/ThemeContext";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
-const C = {
+// ─── Theme palettes (light / dark) ─────────────────────────────────────────
+const LIGHT_COLORS = {
   bg: "#F8FAFC",
   white: "#FFFFFF",
   gray100: "#F3F4F6",
@@ -30,11 +32,131 @@ const C = {
   greenDark: "#15803D",
   orange: "#F97316",
   orangeDark: "#EA580C",
+  surface: "#FFFFFF",
 };
+const DARK_COLORS = {
+  bg: "#0F1216",
+  white: "#FFFFFF",
+  gray100: "#1F2329",
+  gray200: "#2E343C",
+  gray400: "#6A727E",
+  gray600: "#A4ABB6",
+  gray900: "#ECEFF3",
+  green: "#2F9E68",
+  greenDark: "#3AA673",
+  orange: "#DB7A33",
+  orangeDark: "#C9691F",
+  surface: "#171A1F",
+};
+
 
 const BOT_NAME = "MyShop AI";
 
 export default function ChatWidget() {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => StyleSheet.create({
+  launcher: {
+    position: "absolute",
+    right: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: C.greenDark,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+    overflow: "hidden",
+  },
+  launcherGlow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0.85,
+  },
+  launcherText: { color: C.white, fontWeight: "800", fontSize: 14 },
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    justifyContent: "flex-end",
+    alignItems: "flex-end",
+    padding: 12,
+  },
+  panel: {
+    backgroundColor: C.surface,
+    borderRadius: 20,
+    overflow: "hidden",
+    maxHeight: 560,
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  headerTitle: { color: C.white, fontSize: 17, fontWeight: "800" },
+  headerSub: { color: "rgba(255,255,255,0.85)", fontSize: 13, marginTop: 2 },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  body: { backgroundColor: C.bg, flexGrow: 0 },
+  bodyContent: { padding: 14, gap: 10 },
+  msgRow: { flexDirection: "row" },
+  msgRowUser: { justifyContent: "flex-end" },
+  msgRowBot: { justifyContent: "flex-start" },
+  bubble: { maxWidth: "80%", paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14 },
+  bubbleUser: { backgroundColor: C.green, borderTopRightRadius: 4 },
+  bubbleBot: {
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    borderTopLeftRadius: 4,
+  },
+  bubbleText: { fontSize: 14, lineHeight: 20 },
+  bubbleTextUser: { color: C.white, fontWeight: "600" },
+  bubbleTextBot: { color: C.gray600 },
+  thinkingText: { fontSize: 12, color: C.gray400, fontStyle: "italic" },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: C.gray200,
+    backgroundColor: C.surface,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: C.gray100,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === "android" ? 8 : 10,
+    fontSize: 15,
+    color: C.gray900,
+  },
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: C.orange,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sendBtnDisabled: { opacity: 0.5 },
+}), [C]);
   const token = useAuthStore((s) => s.token);
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -228,105 +350,4 @@ export default function ChatWidget() {
   );
 }
 
-const styles = StyleSheet.create({
-  launcher: {
-    position: "absolute",
-    right: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 999,
-    backgroundColor: C.greenDark,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-    overflow: "hidden",
-  },
-  launcherGlow: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0.85,
-  },
-  launcherText: { color: C.white, fontWeight: "800", fontSize: 14 },
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.5)",
-    justifyContent: "flex-end",
-    alignItems: "flex-end",
-    padding: 12,
-  },
-  panel: {
-    backgroundColor: C.white,
-    borderRadius: 20,
-    overflow: "hidden",
-    maxHeight: 560,
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  headerTitle: { color: C.white, fontSize: 17, fontWeight: "800" },
-  headerSub: { color: "rgba(255,255,255,0.85)", fontSize: 13, marginTop: 2 },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.2)",
-  },
-  body: { backgroundColor: C.bg, flexGrow: 0 },
-  bodyContent: { padding: 14, gap: 10 },
-  msgRow: { flexDirection: "row" },
-  msgRowUser: { justifyContent: "flex-end" },
-  msgRowBot: { justifyContent: "flex-start" },
-  bubble: { maxWidth: "80%", paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14 },
-  bubbleUser: { backgroundColor: C.green, borderTopRightRadius: 4 },
-  bubbleBot: {
-    backgroundColor: C.white,
-    borderWidth: 1,
-    borderColor: C.gray200,
-    borderTopLeftRadius: 4,
-  },
-  bubbleText: { fontSize: 14, lineHeight: 20 },
-  bubbleTextUser: { color: C.white, fontWeight: "600" },
-  bubbleTextBot: { color: C.gray600 },
-  thinkingText: { fontSize: 12, color: C.gray400, fontStyle: "italic" },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: C.gray200,
-    backgroundColor: C.white,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: C.gray100,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: Platform.OS === "android" ? 8 : 10,
-    fontSize: 15,
-    color: C.gray900,
-  },
-  sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: C.orange,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sendBtnDisabled: { opacity: 0.5 },
-});
+

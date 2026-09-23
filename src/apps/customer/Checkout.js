@@ -25,13 +25,17 @@ import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
 import useOrderStore from "../../store/orderStore";
 import { useTranslation } from "react-i18next";
+import { useTheme } from "../../theme/ThemeContext";
+
+import { dkBg, dkBorder, dkText } from "../../theme/darkTones";
 
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const SOCKET_URL =
   process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
-const C = {
+// ─── Theme palettes (light / dark) ─────────────────────────────────────────
+const LIGHT_COLORS = {
   orange: "#F97316",
   orangeDark: "#EA580C",
   green: "#16A34A",
@@ -53,7 +57,33 @@ const C = {
   redLight: "#FEF2F2",
   amber: "#D97706",
   amberLight: "#FEF3C7",
+  surface: "#FFFFFF",
 };
+const DARK_COLORS = {
+  orange: "#DB7A33",
+  orangeDark: "#C9691F",
+  green: "#2F9E68",
+  greenDark: "#3AA673",
+  greenLight: "#172720",
+  greenBorder: "#2B4A3B",
+  greenMid: "#1C3027",
+  white: "#FFFFFF",
+  bg: "#0F1216",
+  gray100: "#1F2329",
+  gray200: "#2E343C",
+  gray300: "#3D434C",
+  gray400: "#6A727E",
+  gray500: "#8A929E",
+  gray600: "#A4ABB6",
+  gray700: "#BFC5CE",
+  gray900: "#ECEFF3",
+  red: "#DE5C5C",
+  redLight: "#2C1E20",
+  amber: "#D9A03F",
+  amberLight: "#292319",
+  surface: "#171A1F",
+};
+
 
 const PAYMENT_METHODS = [
   {
@@ -90,6 +120,9 @@ function useBreakpoint() {
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 function Section({ num, title, icon, children, cardR, px, rightElement }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const sec = useMemo(() => makeSecStyles(C), [C]);
   return (
     <View style={[sec.wrap, { borderRadius: cardR, marginHorizontal: px }]}>
       <View style={sec.header}>
@@ -104,9 +137,9 @@ function Section({ num, title, icon, children, cardR, px, rightElement }) {
     </View>
   );
 }
-const sec = StyleSheet.create({
+const makeSecStyles = (C) => StyleSheet.create({
   wrap: {
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     marginBottom: 12,
     padding: 16,
     borderWidth: 1,
@@ -134,34 +167,9 @@ const sec = StyleSheet.create({
 });
 
 function SlotBanner({ slot }) {
-  const { t } = useTranslation();
-  if (!slot) return null;
-  const fmt = (iso) =>
-    new Date(iso).toLocaleTimeString("en-IN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
-  const isToday =
-    new Date(slot.start).toDateString() === new Date().toDateString();
-
-  return (
-    <View style={slb.wrap}>
-      <View style={slb.iconWrap}>
-        <Feather name="clock" size={16} color={C.green} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={slb.label}>
-          {t('checkout.deliveryWindow', 'DELIVERY WINDOW')}: {isToday ? t('payment.today', 'TODAY').toUpperCase() : t('payment.tomorrow', 'TOMORROW').toUpperCase()}
-        </Text>
-        <Text style={slb.time}>
-          {fmt(slot.start)} – {fmt(slot.end)}
-        </Text>
-      </View>
-    </View>
-  );
-}
-const slb = StyleSheet.create({
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const slb = useMemo(() => StyleSheet.create({
   wrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -192,7 +200,7 @@ const slb = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -200,11 +208,57 @@ const slb = StyleSheet.create({
     borderColor: C.greenBorder,
   },
   editText: { fontSize: 12, fontWeight: "700", color: C.green },
-});
+}), [C]);
+  const { t } = useTranslation();
+  if (!slot) return null;
+  const fmt = (iso) =>
+    new Date(iso).toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  const isToday =
+    new Date(slot.start).toDateString() === new Date().toDateString();
+
+  return (
+    <View style={slb.wrap}>
+      <View style={slb.iconWrap}>
+        <Feather name="clock" size={16} color={C.green} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={slb.label}>
+          {t('checkout.deliveryWindow', 'DELIVERY WINDOW')}: {isToday ? t('payment.today', 'TODAY').toUpperCase() : t('payment.tomorrow', 'TOMORROW').toUpperCase()}
+        </Text>
+        <Text style={slb.time}>
+          {fmt(slot.start)} – {fmt(slot.end)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 
 // ─── Cancellation policy ──────────────────────────────────────────────────────
 
 function CancellationPolicy() {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const cp = useMemo(() => StyleSheet.create({
+  trigger: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: dkBg("#FFFBEB", isDark), borderRadius: 14, borderWidth: 1, borderColor: dkBorder("#FDE68A", isDark), padding: 14 },
+  triggerTitle: { flex: 1, fontSize: 14, fontWeight: "700", color: dkText("#92400E", isDark) },
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.48)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: C.surface, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingTop: 10, maxHeight: "80%" },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
+  sheetHeader: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.gray100, marginBottom: 14 },
+  sheetIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.amberLight, alignItems: "center", justifyContent: "center" },
+  sheetTitle: { flex: 1, fontSize: 16, fontWeight: "900", color: C.gray900 },
+  closeBtn: { width: 30, height: 30, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
+  row: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  iconCircle: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 },
+  text: { flex: 1, fontSize: 13, color: C.gray600, lineHeight: 19 },
+  footerNote: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.gray100, borderRadius: 10, padding: 12, marginTop: 4 },
+  footerText: { flex: 1, fontSize: 11, color: C.gray500, lineHeight: 16 },
+}), [C]);
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
@@ -273,25 +327,52 @@ function CancellationPolicy() {
     </>
   );
 }
-const cp = StyleSheet.create({
-  trigger: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#FFFBEB", borderRadius: 14, borderWidth: 1, borderColor: "#FDE68A", padding: 14 },
-  triggerTitle: { flex: 1, fontSize: 14, fontWeight: "700", color: "#92400E" },
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.48)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: C.white, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingTop: 10, maxHeight: "80%" },
-  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
-  sheetHeader: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.gray100, marginBottom: 14 },
-  sheetIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.amberLight, alignItems: "center", justifyContent: "center" },
-  sheetTitle: { flex: 1, fontSize: 16, fontWeight: "900", color: C.gray900 },
-  closeBtn: { width: 30, height: 30, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
-  row: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  iconCircle: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 },
-  text: { flex: 1, fontSize: 13, color: C.gray600, lineHeight: 19 },
-  footerNote: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.gray100, borderRadius: 10, padding: 12, marginTop: 4 },
-  footerText: { flex: 1, fontSize: 11, color: C.gray500, lineHeight: 16 },
-});
+
 
 // ─── Order Summary card ───────────────────────────────────────────────────────
 function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNegotiate, deliveryTypePref = "standard", fs = 1 }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const osc = useMemo(() => StyleSheet.create({
+  wrap: {
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    padding: 0,
+    borderWidth: 0,
+  },
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+  },
+  itemBorder: { borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  itemDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green, flexShrink: 0 },
+  itemName: { flex: 1, fontSize: 13, color: C.gray700, fontWeight: "500" },
+  itemQty: { fontSize: 12, color: C.gray400 },
+  itemPrice: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.gray900,
+    minWidth: 48,
+    textAlign: "right",
+  },
+  moreText: { fontSize: 12, color: C.gray400, paddingVertical: 6 },
+  divider: { height: 1, backgroundColor: C.gray200, marginVertical: 10 },
+  dottedDivider: { borderTopWidth: 2, borderTopColor: C.gray200, borderStyle: "dashed", marginVertical: 10 },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+  },
+  label: { fontSize: 13, color: C.gray500 },
+  value: { fontSize: 13, fontWeight: "600", color: C.gray900 },
+  totalLabel: { fontSize: 15, fontWeight: "900", color: C.gray900 },
+  totalVal: { fontSize: 16, fontWeight: "900", color: C.green },
+  negotiateBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: dkBg("#FFF7ED", isDark), borderWidth: 1, borderColor: dkBorder("#FDBA74", isDark), paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  negotiateBtnText: { fontSize: 10, fontWeight: "700", color: C.orange },
+}), [C]);
   const { t } = useTranslation();
   return (
     <View style={osc.wrap}>
@@ -369,86 +450,36 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNego
     </View>
   );
 }
-const osc = StyleSheet.create({
-  wrap: {
-    backgroundColor: C.white,
-    borderRadius: 14,
-    padding: 0,
-    borderWidth: 0,
-  },
-  itemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 8,
-  },
-  itemBorder: { borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  itemDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green, flexShrink: 0 },
-  itemName: { flex: 1, fontSize: 13, color: C.gray700, fontWeight: "500" },
-  itemQty: { fontSize: 12, color: C.gray400 },
-  itemPrice: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: C.gray900,
-    minWidth: 48,
-    textAlign: "right",
-  },
-  moreText: { fontSize: 12, color: C.gray400, paddingVertical: 6 },
-  divider: { height: 1, backgroundColor: C.gray200, marginVertical: 10 },
-  dottedDivider: { borderTopWidth: 2, borderTopColor: C.gray200, borderStyle: "dashed", marginVertical: 10 },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 4,
-  },
-  label: { fontSize: 13, color: C.gray500 },
-  value: { fontSize: 13, fontWeight: "600", color: C.gray900 },
-  totalLabel: { fontSize: 15, fontWeight: "900", color: C.gray900 },
-  totalVal: { fontSize: 16, fontWeight: "900", color: C.green },
-  negotiateBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FFF7ED", borderWidth: 1, borderColor: "#FDBA74", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  negotiateBtnText: { fontSize: 10, fontWeight: "700", color: C.orange },
-});
+
 // ─── Delivery Type Selector styles ───────────────────────────────────────────
-const dts = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  pill: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12,
-    padding: 12, backgroundColor: '#FAFAFA',
-  },
-  pillActive: { backgroundColor: '#16A34A', borderColor: '#16A34A' },
-  pillQuick: { borderColor: '#FDE68A' },
-  pillQuickActive: { backgroundColor: '#D97706', borderColor: '#D97706' },
-  pillIconWrap: { width: 32, height: 32, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  pillBody: { flex: 1 },
-  pillTitle: { fontSize: 13, fontWeight: '800', color: '#374151' },
-  pillTitleActive: { color: '#FFFFFF' },
-  pillTitleQuickActive: { color: '#FFFFFF' },
-  pillSub: { fontSize: 11, color: '#9CA3AF', marginTop: 1 },
-  pillSubActive: { color: 'rgba(255,255,255,0.85)' },
-  pillSubQuickActive: { color: 'rgba(255,255,255,0.85)' },
-  pillFee: { fontSize: 14, fontWeight: '900', color: '#111827' },
-  pillFeeActive: { color: '#FFFFFF' },
-  pillFeeQuickActive: { color: '#FFFFFF' },
-  breakdown: {
-    backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12, gap: 8,
-    borderWidth: 1, borderColor: '#E5E7EB', marginTop: 4,
-  },
-  bRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  bLabel: { flex: 1, fontSize: 12, color: '#6B7280' },
-  bVal: { fontSize: 12, fontWeight: '700', color: '#374151' },
-  negotiatedNote: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#F0FDF4', borderRadius: 10, padding: 10, marginTop: 10,
-    borderWidth: 1, borderColor: '#BBF7D0',
-  },
-  negotiatedNoteText: { flex: 1, fontSize: 12, color: '#15803D', fontWeight: '600' },
-});
+
 
 
 // ─── Negotiation Banner (Shown while waiting or after response) ──────────────
 function NegotiationBanner({ status, countdown, vendorName, onDismiss }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const nb = useMemo(() => StyleSheet.create({
+  wrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginVertical: 10,
+  },
+  iconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  timer: { fontSize: 13, fontWeight: "900" },
+  title: { fontSize: 15, fontWeight: "900" },
+  sub: { fontSize: 12, color: C.gray500, marginTop: 1 },
+}), [C]);
   const { t } = useTranslation();
   const configs = {
     pending: {
@@ -456,7 +487,7 @@ function NegotiationBanner({ status, countdown, vendorName, onDismiss }) {
       sub: t('checkout.waitingForStoreSub', { defaultValue: `Waiting for ${vendorName} to accept your order.`, name: vendorName }),
       icon: "clock",
       color: C.orange,
-      bg: "#FFF7ED",
+      bg: dkBg("#FFF7ED", isDark),
       border: "#FFEDD5",
     },
     accepted: {
@@ -487,8 +518,8 @@ function NegotiationBanner({ status, countdown, vendorName, onDismiss }) {
       title: t('checkout.vendorAdjustments', 'Review Adjustments'),
       sub: t('checkout.storeSentAdjustments', 'The store suggested some changes to your order.'),
       icon: "edit-3",
-      color: "#7C3AED",
-      bg: "#F5F3FF",
+      color: dkText("#7C3AED", isDark),
+      bg: dkBg("#F5F3FF", isDark),
       border: "#DDD6FE",
     },
   };
@@ -517,30 +548,49 @@ function NegotiationBanner({ status, countdown, vendorName, onDismiss }) {
     </View>
   );
 }
-const nb = StyleSheet.create({
-  wrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    marginVertical: 10,
-  },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  timer: { fontSize: 13, fontWeight: "900" },
-  title: { fontSize: 15, fontWeight: "900" },
-  sub: { fontSize: 12, color: C.gray500, marginTop: 1 },
-});
+
 
 // ─── Counter Offer Review Component ──────────────────────────────────────────
 function CounterOfferReview({ data, onAccept, onReject, placing, fs = 1, deliveryTypePref, deliveryInfo, confirmedSlot }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const cor = useMemo(() => StyleSheet.create({
+  wrap: {
+    backgroundColor: dkBg("#F5F3FF", isDark),
+    borderRadius: 16,
+    padding: 16,
+    marginVertical: 12,
+    borderWidth: 1.5,
+    borderColor: dkBorder("#DDD6FE", isDark),
+  },
+  header: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
+  headerText: { fontSize: 13, fontWeight: "800", color: dkText("#7C3AED", isDark), letterSpacing: 0.5 },
+  note: {
+    fontSize: 13,
+    color: C.gray600,
+    fontStyle: "italic",
+    backgroundColor: isDark ? C.surface : "#fff",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  items: { gap: 8, marginBottom: 12, borderBottomWidth: 1, borderBottomColor: dkBorder("#DDD6FE", isDark), paddingBottom: 12 },
+  itemRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  itemName: { fontSize: 14, fontWeight: "600", color: C.gray900 },
+  itemSub: { fontSize: 12, color: C.gray500, marginTop: 2 },
+  itemPrice: { fontSize: 14, fontWeight: "700", color: C.gray900 },
+  totalRow: { flexDirection: "row", justifyContent: "space-between" },
+  totalLbl: { fontSize: 13, color: C.gray500 },
+  totalVal: { fontSize: 13, fontWeight: "600", color: C.gray900 },
+  grandLbl: { fontSize: 15, fontWeight: "800", color: C.gray900 },
+  grandVal: { fontSize: 18, fontWeight: "900", color: dkText("#7C3AED", isDark) },
+  actions: { flexDirection: "row", gap: 10, marginTop: 16 },
+  btn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  btnReject: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.gray300 },
+  btnRejectText: { color: C.gray600, fontWeight: "700" },
+  btnAccept: { backgroundColor: "#7C3AED" },
+  btnAcceptText: { color: C.white, fontWeight: "800" },
+}), [C]);
   const { t } = useTranslation();
   if (!data) return null;
   const { items = [], delivery_fee = 0, total = 0, note = "", slot = null } = data;
@@ -548,7 +598,7 @@ function CounterOfferReview({ data, onAccept, onReject, placing, fs = 1, deliver
   return (
     <View style={cor.wrap}>
       <View style={cor.header}>
-        <Feather name="info" size={16} color="#7C3AED" />
+        <Feather name="info" size={16} color={dkText("#7C3AED", isDark)} />
         <Text style={cor.headerText}>{t('checkout.vendorAdjustments', 'Vendor Adjustments')}</Text>
       </View>
 
@@ -630,46 +680,532 @@ function CounterOfferReview({ data, onAccept, onReject, placing, fs = 1, deliver
   );
 }
 
-const cor = StyleSheet.create({
-  wrap: {
-    backgroundColor: "#F5F3FF",
-    borderRadius: 16,
-    padding: 16,
-    marginVertical: 12,
-    borderWidth: 1.5,
-    borderColor: "#DDD6FE",
-  },
-  header: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
-  headerText: { fontSize: 13, fontWeight: "800", color: "#7C3AED", letterSpacing: 0.5 },
-  note: {
-    fontSize: 13,
-    color: C.gray600,
-    fontStyle: "italic",
-    backgroundColor: "#fff",
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  items: { gap: 8, marginBottom: 12, borderBottomWidth: 1, borderBottomColor: "#DDD6FE", paddingBottom: 12 },
-  itemRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  itemName: { fontSize: 14, fontWeight: "600", color: C.gray900 },
-  itemSub: { fontSize: 12, color: C.gray500, marginTop: 2 },
-  itemPrice: { fontSize: 14, fontWeight: "700", color: C.gray900 },
-  totalRow: { flexDirection: "row", justifyContent: "space-between" },
-  totalLbl: { fontSize: 13, color: C.gray500 },
-  totalVal: { fontSize: 13, fontWeight: "600", color: C.gray900 },
-  grandLbl: { fontSize: 15, fontWeight: "800", color: C.gray900 },
-  grandVal: { fontSize: 18, fontWeight: "900", color: "#7C3AED" },
-  actions: { flexDirection: "row", gap: 10, marginTop: 16 },
-  btn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  btnReject: { backgroundColor: C.white, borderWidth: 1, borderColor: C.gray300 },
-  btnRejectText: { color: C.gray600, fontWeight: "700" },
-  btnAccept: { backgroundColor: "#7C3AED" },
-  btnAcceptText: { color: C.white, fontWeight: "800" },
-});
+
 
 // ═══════════════════════════════════════════════════════════════════════════ //
 export default function CheckoutScreen() {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const dts = useMemo(() => StyleSheet.create({
+  row: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  pill: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1.5, borderColor: dkBorder('#E5E7EB', isDark), borderRadius: 12,
+    padding: 12, backgroundColor: dkBg('#FAFAFA', isDark),
+  },
+  pillActive: { backgroundColor: '#16A34A', borderColor: '#16A34A' },
+  pillQuick: { borderColor: dkBorder('#FDE68A', isDark) },
+  pillQuickActive: { backgroundColor: '#D97706', borderColor: '#D97706' },
+  pillIconWrap: { width: 32, height: 32, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  pillBody: { flex: 1 },
+  pillTitle: { fontSize: 13, fontWeight: '800', color: dkText('#374151', isDark) },
+  pillTitleActive: { color: '#FFFFFF' },
+  pillTitleQuickActive: { color: '#FFFFFF' },
+  pillSub: { fontSize: 11, color: '#9CA3AF', marginTop: 1 },
+  pillSubActive: { color: 'rgba(255,255,255,0.85)' },
+  pillSubQuickActive: { color: 'rgba(255,255,255,0.85)' },
+  pillFee: { fontSize: 14, fontWeight: '900', color: dkText('#111827', isDark) },
+  pillFeeActive: { color: '#FFFFFF' },
+  pillFeeQuickActive: { color: '#FFFFFF' },
+  breakdown: {
+    backgroundColor: dkBg('#F8FAFC', isDark), borderRadius: 10, padding: 12, gap: 8,
+    borderWidth: 1, borderColor: dkBorder('#E5E7EB', isDark), marginTop: 4,
+  },
+  bRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  bLabel: { flex: 1, fontSize: 12, color: dkText('#6B7280', isDark) },
+  bVal: { fontSize: 12, fontWeight: '700', color: dkText('#374151', isDark) },
+  negotiatedNote: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: dkBg('#F0FDF4', isDark), borderRadius: 10, padding: 10, marginTop: 10,
+    borderWidth: 1, borderColor: dkBorder('#BBF7D0', isDark),
+  },
+  negotiatedNoteText: { flex: 1, fontSize: 12, color: dkText('#15803D', isDark), fontWeight: '600' },
+}), [C]);
+  const s = useMemo(() => StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.bg },
+  ...makeExtraStyles(C),
+
+  // Header
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: C.surface,
+    paddingTop: Platform.OS === "android" ? 28 : 36,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerMid: { flex: 1 },
+  headerTitle: { fontSize: 20, fontWeight: "900", color: C.gray900 },
+  headerSub: { fontSize: 12, color: C.green, marginTop: 1, fontWeight: "700" },
+  totalChip: {
+    backgroundColor: C.greenMid,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  totalChipText: { fontSize: 14, fontWeight: "900", color: C.greenDark },
+
+  // Page layout
+  pageBody: { flex: 1, flexDirection: "row" },
+  pageBodyDesktop: {},
+  mainCol: { flex: 1 },
+
+  // Sidebar
+  sideCol: {
+    width: 380,
+    backgroundColor: C.bg,
+    borderLeftWidth: 1,
+    borderLeftColor: C.gray200,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 24,
+    gap: 16,
+  },
+  sideCard: {
+    backgroundColor: C.surface,
+    borderRadius: 18,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: C.gray200,
+  },
+  sideCardTitle: {
+    fontSize: 17,
+    fontWeight: "900",
+    color: C.gray900,
+    marginBottom: 14,
+  },
+
+  // Error banner
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: C.redLight,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+  },
+  errorText: { flex: 1, fontSize: 13, color: C.red, fontWeight: "500" },
+
+  // Address options
+  addrOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 13,
+    marginBottom: 8,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    backgroundColor: C.surface,
+  },
+  addrOptionActive: { borderColor: C.green, backgroundColor: C.greenLight },
+  addrIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  addrBody: { flex: 1 },
+  addrTitle: { fontSize: 14, fontWeight: "700", color: C.gray900 },
+  addrSub: { fontSize: 12, color: C.gray500, marginTop: 2 },
+  addrDetected: {
+    fontSize: 12,
+    color: C.green,
+    marginTop: 2,
+    fontWeight: "600",
+  },
+
+  // Radio buttons
+  radioOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: C.gray300,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  radioOuterActive: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: C.green,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: C.green,
+  },
+
+  // Address action buttons (2-col GPS + Manual)
+  addrActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    backgroundColor: C.surface,
+  },
+  addrActionBtnActive: { borderColor: C.green, backgroundColor: C.greenLight },
+  addrActionBtnOrange: { borderColor: C.orange, backgroundColor: C.orange },
+  addrActionText: { fontSize: 12, fontWeight: "600", textAlign: "center" },
+
+  // Manual form
+  manualForm: {
+    backgroundColor: C.gray100,
+    padding: 14,
+    gap: 10,
+    marginBottom: 8,
+  },
+  labelRow: { flexDirection: "row", gap: 8 },
+  labelChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    backgroundColor: C.surface,
+  },
+  labelChipActive: { borderColor: C.green, backgroundColor: C.greenLight },
+  labelChipText: { fontSize: 13, fontWeight: "600", color: C.gray500 },
+  labelChipTextActive: { color: C.green },
+  input: {
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: C.gray900,
+    ...Platform.select({ web: { outlineStyle: "none" } }),
+  },
+  inputRow: { flexDirection: "row", gap: 10 },
+  useAddrBtn: { borderRadius: 12, overflow: "hidden", marginTop: 4 },
+  useAddrGrad: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 13,
+  },
+  useAddrText: { fontSize: 14, fontWeight: "800", color: C.white },
+
+  // Payment
+  payOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    backgroundColor: C.surface,
+  },
+  payOptionActive: { borderColor: C.green, backgroundColor: C.greenLight },
+  payIcon: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  payBody: { flex: 1 },
+  payLabel: { fontSize: 15, fontWeight: "700", color: C.gray900 },
+  paySub: { fontSize: 12, color: C.gray500, marginTop: 2 },
+  paySubRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    paddingHorizontal: 4,
+    paddingBottom: 10,
+  },
+  upiChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    backgroundColor: C.surface,
+  },
+  upiChipActive: { borderColor: C.green, backgroundColor: C.greenLight },
+  upiChipText: { fontSize: 13, fontWeight: "600", color: C.gray600 },
+  upiChipTextActive: { color: C.green },
+
+  // Card form
+  cardForm: {
+    backgroundColor: C.gray100,
+    padding: 12,
+    gap: 10,
+    marginBottom: 8,
+  },
+  inputWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  cardInput: {
+    flex: 1,
+    fontSize: 14,
+    color: C.gray900,
+    ...Platform.select({ web: { outlineStyle: "none" } }),
+  },
+
+  // UPI panel
+  upiPanel: { backgroundColor: C.bg, padding: 14, gap: 10, marginBottom: 8 },
+  upiFieldLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: C.gray600,
+    marginBottom: 2,
+  },
+  upiInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: C.surface,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  upiInputRowErr: { borderColor: C.red, backgroundColor: C.redLight },
+  upiInputRowOk: { borderColor: C.green, backgroundColor: C.greenLight },
+  upiInput: {
+    flex: 1,
+    fontSize: 14,
+    color: C.gray900,
+    ...Platform.select({ web: { outlineStyle: "none" } }),
+  },
+  upiErrorText: {
+    fontSize: 12,
+    color: C.red,
+    fontWeight: "500",
+    marginTop: -4,
+  },
+  verifyBtn: {
+    backgroundColor: "#7C3AED18",
+    borderWidth: 1.5,
+    borderColor: "#7C3AED",
+    borderRadius: 10,
+    paddingVertical: 9,
+    alignItems: "center",
+  },
+  verifyBtnText: { fontSize: 13, fontWeight: "700", color: dkText("#7C3AED", isDark) },
+  upiVerifiedRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  upiVerifiedText: { fontSize: 13, color: C.green, fontWeight: "600" },
+  qrBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: dkBg("#F5F3FF", isDark),
+    borderWidth: 1,
+    borderColor: dkBorder("#DDD6FE", isDark),
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  qrBtnText: { fontSize: 13, fontWeight: "700", color: dkText("#7C3AED", isDark) },
+  upiDividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginVertical: 4,
+  },
+  upiDividerLine: { flex: 1, height: 1, backgroundColor: C.gray200 },
+  upiDividerText: { fontSize: 11, color: C.gray400, fontWeight: "600" },
+  mapWrapper: {
+    height: 160,
+    borderRadius: 14,
+    overflow: "hidden",
+    marginTop: 10,
+    marginBottom: 5,
+    borderWidth: 1,
+    borderColor: C.gray200,
+  },
+}), [C]);
+  const qr = useMemo(() => StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  card: {
+    backgroundColor: C.surface,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: "center",
+    width: 320,
+    gap: 10,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    marginBottom: 4,
+  },
+  title: { fontSize: 18, fontWeight: "900", color: C.gray900 },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: C.gray100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qrWrap: {
+    padding: 12,
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    marginVertical: 8,
+  },
+  upiLabel: { fontSize: 14, fontWeight: "700", color: C.gray700 },
+  amtLabel: { fontSize: 28, fontWeight: "900", color: C.gray900 },
+  sub: { fontSize: 12, color: C.gray400, textAlign: "center", lineHeight: 17 },
+  doneBtn: {
+    backgroundColor: C.green,
+    borderRadius: 14,
+    paddingHorizontal: 24,
+    paddingVertical: 13,
+    marginTop: 4,
+    width: "100%",
+    alignItems: "center",
+  },
+  doneBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
+}), [C]);
+  const toastStyle = useMemo(() => StyleSheet.create({
+  wrap: {
+    position: "absolute",
+    bottom: 90,
+    left: 20,
+    right: 20,
+    backgroundColor: C.gray900,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    zIndex: 9999,
+    elevation: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  success: { backgroundColor: C.green },
+  error: { backgroundColor: "#DC2626" },
+  text: { color: C.white, fontSize: 14, fontWeight: "700", lineHeight: 20 },
+}), [C]);
+  const negModal = useMemo(() => StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.52)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  card: {
+    backgroundColor: C.surface,
+    borderRadius: 24,
+    padding: 20,
+    width: "100%",
+    maxWidth: 440,
+    shadowColor: "#000",
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 12,
+  },
+  closeBtn: {
+    alignSelf: "flex-end",
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: C.gray100,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
+  proceedBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: C.green,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginTop: 12,
+  },
+  proceedBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
+  pendingNote: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: C.amberLight,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+  },
+  pendingNoteText: { flex: 1, fontSize: 12, color: C.amber, fontWeight: "600", lineHeight: 17 },
+  // Status chip shown at bottom of screen when modal is dismissed
+  statusChip: {
+    position: "absolute",
+    bottom: 90,
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  chipDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  chipText: { flex: 1, fontSize: 13, fontWeight: "700", color: C.gray700 },
+}), [C]);
+  const sec = useMemo(() => makeSecStyles(C), [C]);
   const { t } = useTranslation();
   const navigation = useNavigation();
   const route = useRoute();
@@ -1421,7 +1957,7 @@ export default function CheckoutScreen() {
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <View style={[s.root, { backgroundColor: isDesktop ? C.bg : C.white }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.white} />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? C.surface : C.white} />
 
       {/* HEADER */}
       <View style={[s.header, { paddingHorizontal: px }]}>
@@ -1480,7 +2016,7 @@ export default function CheckoutScreen() {
             <View
               style={[
                 s.errorBanner,
-                { marginHorizontal: px, borderRadius: cardR, backgroundColor: "#FEF2F2", borderColor: "#FCA5A5", marginBottom: 12 },
+                { marginHorizontal: px, borderRadius: cardR, backgroundColor: dkBg("#FEF2F2", isDark), borderColor: "#FCA5A5", marginBottom: 12 },
               ]}
             >
               <Feather name="alert-circle" size={15} color={C.red} />
@@ -1529,7 +2065,7 @@ export default function CheckoutScreen() {
                 activeOpacity={0.85}
               >
                 <View style={dts.pillIconWrap}>
-                  <Feather name="zap" size={18} color={deliveryTypePref === 'quick' ? C.white : '#D97706'} />
+                  <Feather name="zap" size={18} color={deliveryTypePref === 'quick' ? C.white : dkText('#D97706', isDark)} />
                 </View>
                 <View style={dts.pillBody}>
                   <Text style={[dts.pillTitle, deliveryTypePref === 'quick' && dts.pillTitleQuickActive]}>{t('checkout.quick', 'Quick')}</Text>
@@ -1707,7 +2243,8 @@ export default function CheckoutScreen() {
                 cardR={cardR}
                 px={px}
               >
-                {PAYMENT_METHODS.map((pm) => {
+                {PAYMENT_METHODS.map((pm0) => {
+                  const pm = { ...pm0, color: dkText(pm0.color, isDark) };
                   const active = selectedPay === pm.id;
                   return (
                     <View key={pm.id}>
@@ -1898,7 +2435,7 @@ export default function CheckoutScreen() {
                                   <Feather
                                     name="grid"
                                     size={16}
-                                    color="#7C3AED"
+                                    color={dkText("#7C3AED", isDark)}
                                   />
                                   <Text
                                     style={[
@@ -2236,10 +2773,10 @@ export default function CheckoutScreen() {
 
             {(orderStatus === "pending" || orderStatus === "accepted") && (
               <View style={{
-                backgroundColor: "#F8FAFC",
+                backgroundColor: dkBg("#F8FAFC", isDark),
                 borderRadius: 16,
                 borderWidth: 1.5,
-                borderColor: "#E2E8F0",
+                borderColor: dkBorder("#E2E8F0", isDark),
                 padding: 16,
                 marginTop: 14,
                 marginBottom: 4,
@@ -2262,7 +2799,7 @@ export default function CheckoutScreen() {
                   justifyContent: "space-between",
                   paddingVertical: 8,
                   borderBottomWidth: 1,
-                  borderBottomColor: "#F1F5F9",
+                  borderBottomColor: dkBorder("#F1F5F9", isDark),
                 }}>
                   <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>{t('checkout.deliveryTime', 'Delivery Time')}</Text>
                   <Text style={{ fontSize: 13, color: C.gray900, fontWeight: "700" }}>
@@ -2279,7 +2816,7 @@ export default function CheckoutScreen() {
                   justifyContent: "space-between",
                   paddingVertical: 8,
                   borderBottomWidth: 1,
-                  borderBottomColor: "#F1F5F9",
+                  borderBottomColor: dkBorder("#F1F5F9", isDark),
                 }}>
                   <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>{t('checkout.deliverySlot', 'Delivery Slot')}</Text>
                   <Text style={{ fontSize: 13, color: C.gray900, fontWeight: "700" }}>
@@ -2317,7 +2854,7 @@ export default function CheckoutScreen() {
                     alignItems: "center",
                     paddingVertical: 8,
                     borderTopWidth: 1,
-                    borderTopColor: "#F1F5F9",
+                    borderTopColor: dkBorder("#F1F5F9", isDark),
                     marginTop: 4,
                   }}>
                     <Text style={{ fontSize: 13, color: C.gray500, fontWeight: "600" }}>{t('checkout.vendorPhone', 'Vendor Phone')}</Text>
@@ -2458,6 +2995,41 @@ export default function CheckoutScreen() {
 }
 // ─── Place Order Button (shared mobile + desktop) ─────────────────────────────
 function PlaceOrderBtn({ status, total, canPlace, placing, onPress, fs = 1 }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const pob = useMemo(() => StyleSheet.create({
+  btn: { borderRadius: 16, overflow: "hidden", marginTop: 4 },
+  btnDisabled: { opacity: 0.6 },
+  grad: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 17,
+    paddingHorizontal: 20,
+  },
+  totalWrap: { alignItems: "center" },
+  totalAmt: { fontSize: 18, fontWeight: "900", color: C.white },
+  totalLbl: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.7)",
+    fontWeight: "600",
+    letterSpacing: 0.5,
+  },
+  divider: {
+    width: 1,
+    height: 28,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    marginHorizontal: 4,
+  },
+  text: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: C.white,
+    flex: 1,
+    textAlign: "center",
+  },
+}), [C]);
   const { t } = useTranslation();
   const isAccepted = status === "accepted";
   const label = isAccepted
@@ -2514,42 +3086,10 @@ function PlaceOrderBtn({ status, total, canPlace, placing, onPress, fs = 1 }) {
     </TouchableOpacity>
   );
 }
-const pob = StyleSheet.create({
-  btn: { borderRadius: 16, overflow: "hidden", marginTop: 4 },
-  btnDisabled: { opacity: 0.6 },
-  grad: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    paddingVertical: 17,
-    paddingHorizontal: 20,
-  },
-  totalWrap: { alignItems: "center" },
-  totalAmt: { fontSize: 18, fontWeight: "900", color: C.white },
-  totalLbl: {
-    fontSize: 10,
-    color: "rgba(255,255,255,0.7)",
-    fontWeight: "600",
-    letterSpacing: 0.5,
-  },
-  divider: {
-    width: 1,
-    height: 28,
-    backgroundColor: "rgba(255,255,255,0.3)",
-    marginHorizontal: 4,
-  },
-  text: {
-    fontSize: 16,
-    fontWeight: "900",
-    color: C.white,
-    flex: 1,
-    textAlign: "center",
-  },
-});
+
 
 /* Additional Styles for Slot/Contact */
-const extraStyles = {
+const makeExtraStyles = (C) => ({
   slotPickBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -2576,7 +3116,7 @@ const extraStyles = {
   slotTimeText: { fontSize: 16, fontWeight: "900", color: C.greenDark },
   slotDateText: { fontSize: 12, color: C.green, fontWeight: "600" },
   slotChangeBtn: {
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
@@ -2628,7 +3168,7 @@ const extraStyles = {
     borderRadius: 10,
   },
   callBtnText: { fontSize: 13, fontWeight: "800", color: C.white },
-};
+});
 
 // ─── Local time parser (fallback) ───────────────────────────────────────────
 function parseSlotLocally(input) {
@@ -2673,6 +3213,20 @@ function parseSlotLocally(input) {
 
 // ─── Fee Modal ───────────────────────────────────────────────────────────────
 function FeeModal({ visible, currentFee, onClose, onPropose }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const fm = useMemo(() => StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: C.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
+  title: { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 4 },
+  sub: { fontSize: 13, color: C.gray400, marginBottom: 16 },
+  inputBox: { flexDirection: "row", alignItems: "center", backgroundColor: C.gray100, borderRadius: 14, paddingHorizontal: 16, height: 60 },
+  rupee: { fontSize: 24, fontWeight: "900", color: C.gray500, marginRight: 8 },
+  input: { flex: 1, fontSize: 24, fontWeight: "900", color: C.gray900 },
+  confirmBtn: { marginTop: 20, backgroundColor: C.green, height: 56, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  confirmBtnText: { fontSize: 16, fontWeight: "800", color: C.white },
+}), [C]);
   const { t } = useTranslation();
   const [val, setVal] = useState(String(currentFee || ""));
   return (
@@ -2704,18 +3258,7 @@ function FeeModal({ visible, currentFee, onClose, onPropose }) {
   );
 }
 
-const fm = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: C.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
-  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
-  title: { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 4 },
-  sub: { fontSize: 13, color: C.gray400, marginBottom: 16 },
-  inputBox: { flexDirection: "row", alignItems: "center", backgroundColor: C.gray100, borderRadius: 14, paddingHorizontal: 16, height: 60 },
-  rupee: { fontSize: 24, fontWeight: "900", color: C.gray500, marginRight: 8 },
-  input: { flex: 1, fontSize: 24, fontWeight: "900", color: C.gray900 },
-  confirmBtn: { marginTop: 20, backgroundColor: C.green, height: 56, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  confirmBtnText: { fontSize: 16, fontWeight: "800", color: C.white },
-});
+
 
 // ─── Slot picker modal ────────────────────────────────────────────────────────
 const SLOT_OPTIONS = [
@@ -2729,6 +3272,118 @@ const SLOT_OPTIONS = [
 ];
 
 function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const sm = useMemo(() => StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.48)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: C.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 36,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: C.gray200,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: C.gray900,
+    marginBottom: 4,
+  },
+  sub: { fontSize: 13, color: C.gray400, marginBottom: 16 },
+  inputBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: "transparent",
+    minHeight: 52,
+    paddingRight: 4,
+  },
+  inputBoxError: { borderColor: C.red, backgroundColor: C.redLight },
+  inputBoxValid: { borderColor: C.green, backgroundColor: C.greenLight },
+  input: {
+    flex: 1,
+    fontSize: 15,
+    color: C.gray900,
+    paddingLeft: 10,
+    paddingVertical: 14,
+    ...Platform.select({ web: { outlineStyle: "none" } }),
+  },
+  hints: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
+  hintChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: C.gray100,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+  },
+  hintText: { fontSize: 13, color: C.gray600, fontWeight: "600" },
+  preview: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 12,
+  },
+  previewValid: { backgroundColor: C.greenLight },
+  previewInvalid: { backgroundColor: C.redLight },
+  previewText: { fontSize: 14, color: C.greenDark },
+  previewBold: { fontWeight: "800" },
+  previewTextErr: { fontSize: 13, color: C.red, flex: 1 },
+  confirmBtn: {
+    marginTop: 18,
+    backgroundColor: C.green,
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+  confirmBtnDisabled: { backgroundColor: C.greenMid },
+  confirmBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
+  slotGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 16,
+  },
+  slotChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: C.greenBorder,
+    backgroundColor: C.greenLight,
+  },
+  slotChipActive: {
+    backgroundColor: C.green,
+    borderColor: C.greenDark,
+  },
+  slotChipDisabled: {
+    backgroundColor: C.gray100,
+    borderColor: C.gray200,
+  },
+  slotChipText: { fontSize: 13, fontWeight: "700", color: C.green },
+  slotChipTextActive: { color: C.white },
+  slotChipTextDisabled: { color: C.gray300 },
+}), [C]);
   const { t } = useTranslation();
   const [day, setDay] = useState("today");
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -2875,605 +3530,15 @@ function SlotModal({ visible, onClose, onConfirm, loading, vendor }) {
   );
 }
 
-const sm = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.48)",
-    justifyContent: "flex-end",
-  },
-  sheet: {
-    backgroundColor: C.white,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 36,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: C.gray200,
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "900",
-    color: C.gray900,
-    marginBottom: 4,
-  },
-  sub: { fontSize: 13, color: C.gray400, marginBottom: 16 },
-  inputBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: C.gray100,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: "transparent",
-    minHeight: 52,
-    paddingRight: 4,
-  },
-  inputBoxError: { borderColor: C.red, backgroundColor: C.redLight },
-  inputBoxValid: { borderColor: C.green, backgroundColor: C.greenLight },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    color: C.gray900,
-    paddingLeft: 10,
-    paddingVertical: 14,
-    ...Platform.select({ web: { outlineStyle: "none" } }),
-  },
-  hints: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
-  hintChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 20,
-    backgroundColor: C.gray100,
-    borderWidth: 1.5,
-    borderColor: C.gray200,
-  },
-  hintText: { fontSize: 13, color: C.gray600, fontWeight: "600" },
-  preview: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 14,
-    padding: 12,
-    borderRadius: 12,
-  },
-  previewValid: { backgroundColor: C.greenLight },
-  previewInvalid: { backgroundColor: C.redLight },
-  previewText: { fontSize: 14, color: C.greenDark },
-  previewBold: { fontWeight: "800" },
-  previewTextErr: { fontSize: 13, color: C.red, flex: 1 },
-  confirmBtn: {
-    marginTop: 18,
-    backgroundColor: C.green,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: "center",
-  },
-  confirmBtnDisabled: { backgroundColor: C.greenMid },
-  confirmBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
-  slotGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 16,
-  },
-  slotChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: C.greenBorder,
-    backgroundColor: C.greenLight,
-  },
-  slotChipActive: {
-    backgroundColor: C.green,
-    borderColor: C.greenDark,
-  },
-  slotChipDisabled: {
-    backgroundColor: C.gray100,
-    borderColor: C.gray200,
-  },
-  slotChipText: { fontSize: 13, fontWeight: "700", color: C.green },
-  slotChipTextActive: { color: C.white },
-  slotChipTextDisabled: { color: C.gray300 },
-});
+
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
-  ...extraStyles,
 
-  // Header
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: C.white,
-    paddingTop: Platform.OS === "android" ? 28 : 36,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: C.gray100,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: C.white,
-    borderWidth: 1,
-    borderColor: C.gray200,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerMid: { flex: 1 },
-  headerTitle: { fontSize: 20, fontWeight: "900", color: C.gray900 },
-  headerSub: { fontSize: 12, color: C.green, marginTop: 1, fontWeight: "700" },
-  totalChip: {
-    backgroundColor: C.greenMid,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  totalChipText: { fontSize: 14, fontWeight: "900", color: C.greenDark },
-
-  // Page layout
-  pageBody: { flex: 1, flexDirection: "row" },
-  pageBodyDesktop: {},
-  mainCol: { flex: 1 },
-
-  // Sidebar
-  sideCol: {
-    width: 380,
-    backgroundColor: C.bg,
-    borderLeftWidth: 1,
-    borderLeftColor: C.gray200,
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 24,
-    gap: 16,
-  },
-  sideCard: {
-    backgroundColor: C.white,
-    borderRadius: 18,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: C.gray200,
-  },
-  sideCardTitle: {
-    fontSize: 17,
-    fontWeight: "900",
-    color: C.gray900,
-    marginBottom: 14,
-  },
-
-  // Error banner
-  errorBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: C.redLight,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#FCA5A5",
-  },
-  errorText: { flex: 1, fontSize: 13, color: C.red, fontWeight: "500" },
-
-  // Address options
-  addrOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 13,
-    marginBottom: 8,
-    borderWidth: 1.5,
-    borderColor: C.gray200,
-    backgroundColor: C.white,
-  },
-  addrOptionActive: { borderColor: C.green, backgroundColor: C.greenLight },
-  addrIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  addrBody: { flex: 1 },
-  addrTitle: { fontSize: 14, fontWeight: "700", color: C.gray900 },
-  addrSub: { fontSize: 12, color: C.gray500, marginTop: 2 },
-  addrDetected: {
-    fontSize: 12,
-    color: C.green,
-    marginTop: 2,
-    fontWeight: "600",
-  },
-
-  // Radio buttons
-  radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: C.gray300,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  radioOuterActive: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: C.green,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: C.green,
-  },
-
-  // Address action buttons (2-col GPS + Manual)
-  addrActionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: C.gray200,
-    backgroundColor: C.white,
-  },
-  addrActionBtnActive: { borderColor: C.green, backgroundColor: C.greenLight },
-  addrActionBtnOrange: { borderColor: C.orange, backgroundColor: C.orange },
-  addrActionText: { fontSize: 12, fontWeight: "600", textAlign: "center" },
-
-  // Manual form
-  manualForm: {
-    backgroundColor: C.gray100,
-    padding: 14,
-    gap: 10,
-    marginBottom: 8,
-  },
-  labelRow: { flexDirection: "row", gap: 8 },
-  labelChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: C.gray200,
-    backgroundColor: C.white,
-  },
-  labelChipActive: { borderColor: C.green, backgroundColor: C.greenLight },
-  labelChipText: { fontSize: 13, fontWeight: "600", color: C.gray500 },
-  labelChipTextActive: { color: C.green },
-  input: {
-    backgroundColor: C.white,
-    borderWidth: 1,
-    borderColor: C.gray200,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: C.gray900,
-    ...Platform.select({ web: { outlineStyle: "none" } }),
-  },
-  inputRow: { flexDirection: "row", gap: 10 },
-  useAddrBtn: { borderRadius: 12, overflow: "hidden", marginTop: 4 },
-  useAddrGrad: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 13,
-  },
-  useAddrText: { fontSize: 14, fontWeight: "800", color: C.white },
-
-  // Payment
-  payOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 14,
-    marginBottom: 8,
-    borderWidth: 1.5,
-    borderColor: C.gray200,
-    backgroundColor: C.white,
-  },
-  payOptionActive: { borderColor: C.green, backgroundColor: C.greenLight },
-  payIcon: {
-    width: 48,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  payBody: { flex: 1 },
-  payLabel: { fontSize: 15, fontWeight: "700", color: C.gray900 },
-  paySub: { fontSize: 12, color: C.gray500, marginTop: 2 },
-  paySubRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    paddingHorizontal: 4,
-    paddingBottom: 10,
-  },
-  upiChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: C.gray200,
-    backgroundColor: C.white,
-  },
-  upiChipActive: { borderColor: C.green, backgroundColor: C.greenLight },
-  upiChipText: { fontSize: 13, fontWeight: "600", color: C.gray600 },
-  upiChipTextActive: { color: C.green },
-
-  // Card form
-  cardForm: {
-    backgroundColor: C.gray100,
-    padding: 12,
-    gap: 10,
-    marginBottom: 8,
-  },
-  inputWrap: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: C.white,
-    borderWidth: 1,
-    borderColor: C.gray200,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-  },
-  cardInput: {
-    flex: 1,
-    fontSize: 14,
-    color: C.gray900,
-    ...Platform.select({ web: { outlineStyle: "none" } }),
-  },
-
-  // UPI panel
-  upiPanel: { backgroundColor: C.bg, padding: 14, gap: 10, marginBottom: 8 },
-  upiFieldLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: C.gray600,
-    marginBottom: 2,
-  },
-  upiInputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: C.white,
-    borderWidth: 1.5,
-    borderColor: C.gray200,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-  },
-  upiInputRowErr: { borderColor: C.red, backgroundColor: C.redLight },
-  upiInputRowOk: { borderColor: C.green, backgroundColor: C.greenLight },
-  upiInput: {
-    flex: 1,
-    fontSize: 14,
-    color: C.gray900,
-    ...Platform.select({ web: { outlineStyle: "none" } }),
-  },
-  upiErrorText: {
-    fontSize: 12,
-    color: C.red,
-    fontWeight: "500",
-    marginTop: -4,
-  },
-  verifyBtn: {
-    backgroundColor: "#7C3AED18",
-    borderWidth: 1.5,
-    borderColor: "#7C3AED",
-    borderRadius: 10,
-    paddingVertical: 9,
-    alignItems: "center",
-  },
-  verifyBtnText: { fontSize: 13, fontWeight: "700", color: "#7C3AED" },
-  upiVerifiedRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  upiVerifiedText: { fontSize: 13, color: C.green, fontWeight: "600" },
-  qrBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#F5F3FF",
-    borderWidth: 1,
-    borderColor: "#DDD6FE",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  qrBtnText: { fontSize: 13, fontWeight: "700", color: "#7C3AED" },
-  upiDividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginVertical: 4,
-  },
-  upiDividerLine: { flex: 1, height: 1, backgroundColor: C.gray200 },
-  upiDividerText: { fontSize: 11, color: C.gray400, fontWeight: "600" },
-  mapWrapper: {
-    height: 160,
-    borderRadius: 14,
-    overflow: "hidden",
-    marginTop: 10,
-    marginBottom: 5,
-    borderWidth: 1,
-    borderColor: C.gray200,
-  },
-});
 
 // ─── QR modal styles ──────────────────────────────────────────────────────────
-const qr = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  card: {
-    backgroundColor: C.white,
-    borderRadius: 24,
-    padding: 24,
-    alignItems: "center",
-    width: 320,
-    gap: 10,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    marginBottom: 4,
-  },
-  title: { fontSize: 18, fontWeight: "900", color: C.gray900 },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: C.gray100,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  qrWrap: {
-    padding: 12,
-    backgroundColor: C.white,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: C.gray200,
-    marginVertical: 8,
-  },
-  upiLabel: { fontSize: 14, fontWeight: "700", color: C.gray700 },
-  amtLabel: { fontSize: 28, fontWeight: "900", color: C.gray900 },
-  sub: { fontSize: 12, color: C.gray400, textAlign: "center", lineHeight: 17 },
-  doneBtn: {
-    backgroundColor: C.green,
-    borderRadius: 14,
-    paddingHorizontal: 24,
-    paddingVertical: 13,
-    marginTop: 4,
-    width: "100%",
-    alignItems: "center",
-  },
-  doneBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
-});
+
 
 // ─── In-app Toast StyleSheet ─────────────────────────────────────────────────
-const toastStyle = StyleSheet.create({
-  wrap: {
-    position: "absolute",
-    bottom: 90,
-    left: 20,
-    right: 20,
-    backgroundColor: C.gray900,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    zIndex: 9999,
-    elevation: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  success: { backgroundColor: C.green },
-  error: { backgroundColor: "#DC2626" },
-  text: { color: C.white, fontSize: 14, fontWeight: "700", lineHeight: 20 },
-});
+
 
 // ─── Negotiation Modal Styles ─────────────────────────────────────────────────
-const negModal = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.52)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
-  },
-  card: {
-    backgroundColor: C.white,
-    borderRadius: 24,
-    padding: 20,
-    width: "100%",
-    maxWidth: 440,
-    shadowColor: "#000",
-    shadowOpacity: 0.22,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 12,
-  },
-  closeBtn: {
-    alignSelf: "flex-end",
-    width: 30,
-    height: 30,
-    borderRadius: 10,
-    backgroundColor: C.gray100,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 6,
-  },
-  proceedBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: C.green,
-    borderRadius: 14,
-    paddingVertical: 14,
-    marginTop: 12,
-  },
-  proceedBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
-  pendingNote: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    backgroundColor: C.amberLight,
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 12,
-  },
-  pendingNoteText: { flex: 1, fontSize: 12, color: C.amber, fontWeight: "600", lineHeight: 17 },
-  // Status chip shown at bottom of screen when modal is dismissed
-  statusChip: {
-    position: "absolute",
-    bottom: 90,
-    left: 16,
-    right: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: C.white,
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: C.gray200,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-  },
-  chipDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
-  chipText: { flex: 1, fontSize: 13, fontWeight: "700", color: C.gray700 },
-});

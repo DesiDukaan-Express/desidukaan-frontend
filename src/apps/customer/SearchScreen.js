@@ -30,6 +30,7 @@ import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
+import { useTheme } from "../../theme/ThemeContext";
 import {
   categoriesAPI,
   searchAPI,
@@ -37,13 +38,16 @@ import {
   productsAPI,
 } from "../../services/api";
 
+import { dkBg, dkText, themeCfg } from "../../theme/darkTones";
+
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const NEARBY_RADIUS = 10; // km — stores within this are shown normally
 const FAR_RADIUS = 10; // km — backend validation max is 10
 const MAX_HISTORY = 8;
 
 // ─── Palette (matches app design system) ─────────────────────────────────────
-const C = {
+// ─── Theme palettes (light / dark) ─────────────────────────────────────────
+const LIGHT_COLORS = {
   orange: "#F97316",
   orangeDark: "#EA580C",
   green: "#16A34A",
@@ -65,7 +69,33 @@ const C = {
   amberLight: "#FEF3C7",
   red: "#DC2626",
   redLight: "#FEF2F2",
+  surface: "#FFFFFF",
 };
+const DARK_COLORS = {
+  orange: "#DB7A33",
+  orangeDark: "#C9691F",
+  green: "#2F9E68",
+  greenDark: "#3AA673",
+  greenLight: "#172720",
+  greenMid: "#1C3027",
+  greenBorder: "#2B4A3B",
+  white: "#FFFFFF",
+  bg: "#0F1216",
+  gray100: "#1F2329",
+  gray200: "#2E343C",
+  gray300: "#3D434C",
+  gray400: "#6A727E",
+  gray500: "#8A929E",
+  gray600: "#A4ABB6",
+  gray700: "#BFC5CE",
+  gray900: "#ECEFF3",
+  amber: "#D9A03F",
+  amberLight: "#292319",
+  red: "#DE5C5C",
+  redLight: "#2C1E20",
+  surface: "#171A1F",
+};
+
 
 const CAT_FALLBACK_IMGS = {
   "Dairy, Bread & Eggs":
@@ -180,6 +210,55 @@ function useBreakpoint() {
 
 // ─── Add/Qty button (uses real cartStore) ─────────────────────────────────────
 function AddBtn({ product, vendorId, vendorName, outOfStock }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const ab = useMemo(() => StyleSheet.create({
+  add: {
+    backgroundColor: C.surface,
+    borderWidth: 1.5,
+    borderColor: C.green,
+    borderRadius: 9,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  addTxt: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: C.green,
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+  },
+  qtyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.green,
+    borderRadius: 9,
+    overflow: "hidden",
+  },
+  qtyBtn: { paddingHorizontal: 9, paddingVertical: 7 },
+  qtyNum: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: C.white,
+    paddingHorizontal: 8,
+    minWidth: 24,
+    textAlign: "center",
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+  },
+  oosBtn: {
+    backgroundColor: C.gray100,
+    borderRadius: 9,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: C.gray200,
+  },
+  oosTxt: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.gray400,
+    fontFamily: "PlusJakartaSans_700Bold",
+  },
+}), [C]);
   const cart = useCartStore();
   const items = cart?.items || [];
   const cartItem = items.find((i) => i.id === product.id);
@@ -251,136 +330,20 @@ function AddBtn({ product, vendorId, vendorName, outOfStock }) {
     </Animated.View>
   );
 }
-const ab = StyleSheet.create({
-  add: {
-    backgroundColor: C.white,
-    borderWidth: 1.5,
-    borderColor: C.green,
-    borderRadius: 9,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  addTxt: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: C.green,
-    fontFamily: "PlusJakartaSans_800ExtraBold",
-  },
-  qtyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: C.green,
-    borderRadius: 9,
-    overflow: "hidden",
-  },
-  qtyBtn: { paddingHorizontal: 9, paddingVertical: 7 },
-  qtyNum: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: C.white,
-    paddingHorizontal: 8,
-    minWidth: 24,
-    textAlign: "center",
-    fontFamily: "PlusJakartaSans_800ExtraBold",
-  },
-  oosBtn: {
-    backgroundColor: C.gray100,
-    borderRadius: 9,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: C.gray200,
-  },
-  oosTxt: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: C.gray400,
-    fontFamily: "PlusJakartaSans_700Bold",
-  },
-});
+
 
 // ─── Product card (items tab) ─────────────────────────────────────────────────
 function ProductCard({ product, vendorId, vendorName, onSeeStores }) {
-  const disc =
-    product.mrp && product.mrp > product.price
-      ? Math.round((1 - product.price / product.mrp) * 100)
-      : null;
-  const outOfStock = !(product.is_active ?? true);
-
-  return (
-    <View style={[pc.card, outOfStock && pc.cardOos]}>
-      <View style={pc.imgWrap}>
-        <Image
-          source={{
-            uri:
-              product.image_url ||
-              "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300",
-          }}
-          style={pc.img}
-          resizeMode="cover"
-        />
-        {disc && !outOfStock && (
-          <View style={pc.discBadge}>
-            <Text style={pc.discText}>{disc}% off</Text>
-          </View>
-        )}
-        {outOfStock && (
-          <View style={pc.oosOverlay}>
-            <Text style={pc.oosOverlayText}>Out of{"\n"}Stock</Text>
-          </View>
-        )}
-      </View>
-      <View style={pc.info}>
-        <Text style={pc.brand}>
-          {product.vendor?.shop_name || vendorName || ""}
-        </Text>
-        <Text style={pc.name} numberOfLines={2}>
-          {product.name}
-        </Text>
-        <Text style={pc.unit}>{product.unit || "1 pc"}</Text>
-        <View style={pc.priceRow}>
-          <Text style={[pc.price, outOfStock && { color: C.gray400 }]}>
-            ₹{product.price}
-          </Text>
-          {product.mrp > product.price && (
-            <Text style={pc.mrp}>₹{product.mrp}</Text>
-          )}
-        </View>
-        {!outOfStock && onSeeStores && (
-          <TouchableOpacity
-            style={pc.storeBtn}
-            onPress={onSeeStores}
-            activeOpacity={0.7}
-          >
-            <Feather name="shopping-bag" size={10} color={C.green} />
-            <Text style={pc.storeBtnText}>
-              {product._storeCount > 1
-                ? `Available at ${product._storeCount} stores`
-                : "See store"}
-            </Text>
-            <Feather name="chevron-right" size={10} color={C.green} />
-          </TouchableOpacity>
-        )}
-      </View>
-      <View style={pc.ctaWrap}>
-        <AddBtn
-          product={product}
-          vendorId={vendorId}
-          vendorName={vendorName}
-          outOfStock={outOfStock}
-        />
-      </View>
-    </View>
-  );
-}
-const pc = StyleSheet.create({
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const pc = useMemo(() => StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "flex-start",
     paddingVertical: 14,
     paddingHorizontal: 16,
     gap: 12,
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     borderBottomWidth: 1,
     borderBottomColor: C.gray100,
   },
@@ -476,113 +439,88 @@ const pc = StyleSheet.create({
     fontFamily: "PlusJakartaSans_600SemiBold",
   },
   ctaWrap: { paddingTop: 16 },
-});
+}), [C]);
+  const disc =
+    product.mrp && product.mrp > product.price
+      ? Math.round((1 - product.price / product.mrp) * 100)
+      : null;
+  const outOfStock = !(product.is_active ?? true);
 
-// ─── Vendor card (places tab) ─────────────────────────────────────────────────
-function VendorCard({ vendor, distKm: dist, matchCount, onPress, tooFar }) {
-  const isOpen = isStoreCurrentlyOpen(vendor);
   return (
-    <TouchableOpacity
-      style={[vc.card, tooFar && vc.cardFar]}
-      onPress={onPress}
-      activeOpacity={0.88}
-      disabled={tooFar}
-    >
-      <View style={vc.imgWrap}>
+    <View style={[pc.card, outOfStock && pc.cardOos]}>
+      <View style={pc.imgWrap}>
         <Image
           source={{
             uri:
-              vendor.shop_image_url ||
-              "https://images.unsplash.com/photo-1542838132-92c53300491e?w=600",
+              product.image_url ||
+              "https://images.unsplash.com/photo-1542838132-92c53300491e?w=300",
           }}
-          style={vc.img}
+          style={pc.img}
           resizeMode="cover"
         />
-        <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.4)"]}
-          style={vc.imgGrad}
-        />
-
-        {/* Open/Closed */}
-        <View
-          style={[vc.openBadge, { backgroundColor: isOpen ? C.green : C.red }]}
-        >
-          <Text style={vc.openText}>{isOpen ? "Open" : "Closed"}</Text>
-        </View>
-
-        {/* Distance */}
-        {dist != null && (
-          <View style={vc.distBadge}>
-            <Feather
-              name="map-pin"
-              size={9}
-              color={tooFar ? C.amber : C.green}
-            />
-            <Text style={[vc.distText, tooFar && { color: C.amber }]}>
-              {dist.toFixed(1)} km
-            </Text>
+        {disc && !outOfStock && (
+          <View style={pc.discBadge}>
+            <Text style={pc.discText}>{disc}% off</Text>
           </View>
         )}
-
-        {/* Match count */}
-        {matchCount > 0 && !tooFar && (
-          <View style={vc.matchBadge}>
-            <Text style={vc.matchText}>
-              {matchCount} item{matchCount > 1 ? "s" : ""} found
-            </Text>
-          </View>
-        )}
-
-        {/* Too far overlay */}
-        {tooFar && (
-          <View style={vc.farOverlay}>
-            <Feather name="alert-circle" size={16} color={C.white} />
-            <Text style={vc.farText}>Can't deliver here</Text>
+        {outOfStock && (
+          <View style={pc.oosOverlay}>
+            <Text style={pc.oosOverlayText}>Out of{"\n"}Stock</Text>
           </View>
         )}
       </View>
-
-      <View style={vc.info}>
-        <View style={vc.topRow}>
-          <Text style={vc.name} numberOfLines={1}>
-            {vendor.shop_name}
-          </Text>
-          {vendor.rating > 0 && (
-            <View style={vc.rating}>
-              <Feather name="star" size={11} color="#CA8A04" />
-              <Text style={vc.ratingText}>{vendor.rating?.toFixed(1)}</Text>
-            </View>
-          )}
-        </View>
-        <Text style={vc.address} numberOfLines={1}>
-          {vendor.address_line}
+      <View style={pc.info}>
+        <Text style={pc.brand}>
+          {product.vendor?.shop_name || vendorName || ""}
         </Text>
-        <View style={vc.meta}>
-          <View style={vc.metaChip}>
-            <Feather name="clock" size={11} color={C.gray500} />
-            <Text style={vc.metaText}>~30 min</Text>
-          </View>
-          <View style={vc.metaChip}>
-            <Feather name="shopping-bag" size={11} color={C.gray500} />
-            <Text style={vc.metaText}>Min ₹{vendor.min_order || 99}</Text>
-          </View>
-          {tooFar && (
-            <View style={[vc.metaChip, { backgroundColor: C.amberLight }]}>
-              <Text
-                style={[vc.metaText, { color: C.amber, fontWeight: "700" }]}
-              >
-                Outside delivery zone
-              </Text>
-            </View>
+        <Text style={pc.name} numberOfLines={2}>
+          {product.name}
+        </Text>
+        <Text style={pc.unit}>{product.unit || "1 pc"}</Text>
+        <View style={pc.priceRow}>
+          <Text style={[pc.price, outOfStock && { color: C.gray400 }]}>
+            ₹{product.price}
+          </Text>
+          {product.mrp > product.price && (
+            <Text style={pc.mrp}>₹{product.mrp}</Text>
           )}
         </View>
+        {!outOfStock && onSeeStores && (
+          <TouchableOpacity
+            style={pc.storeBtn}
+            onPress={onSeeStores}
+            activeOpacity={0.7}
+          >
+            <Feather name="shopping-bag" size={10} color={C.green} />
+            <Text style={pc.storeBtnText}>
+              {product._storeCount > 1
+                ? `Available at ${product._storeCount} stores`
+                : "See store"}
+            </Text>
+            <Feather name="chevron-right" size={10} color={C.green} />
+          </TouchableOpacity>
+        )}
       </View>
-    </TouchableOpacity>
+      <View style={pc.ctaWrap}>
+        <AddBtn
+          product={product}
+          vendorId={vendorId}
+          vendorName={vendorName}
+          outOfStock={outOfStock}
+        />
+      </View>
+    </View>
   );
 }
-const vc = StyleSheet.create({
+
+
+// ─── Vendor card (places tab) ─────────────────────────────────────────────────
+function VendorCard({ vendor, distKm: dist, matchCount, onPress, tooFar }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const vc = useMemo(() => StyleSheet.create({
   card: {
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     borderRadius: 18,
     overflow: "hidden",
     marginBottom: 18,
@@ -682,7 +620,7 @@ const vc = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-    backgroundColor: "#FEF9C3",
+    backgroundColor: dkBg("#FEF9C3", isDark),
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 8,
@@ -690,7 +628,7 @@ const vc = StyleSheet.create({
   ratingText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#CA8A04",
+    color: dkText("#CA8A04", isDark),
     fontFamily: "PlusJakartaSans_700Bold",
   },
   address: {
@@ -714,7 +652,108 @@ const vc = StyleSheet.create({
     color: C.gray600,
     fontFamily: "PlusJakartaSans_500Medium",
   },
-});
+}), [C]);
+  const isOpen = isStoreCurrentlyOpen(vendor);
+  return (
+    <TouchableOpacity
+      style={[vc.card, tooFar && vc.cardFar]}
+      onPress={onPress}
+      activeOpacity={0.88}
+      disabled={tooFar}
+    >
+      <View style={vc.imgWrap}>
+        <Image
+          source={{
+            uri:
+              vendor.shop_image_url ||
+              "https://images.unsplash.com/photo-1542838132-92c53300491e?w=600",
+          }}
+          style={vc.img}
+          resizeMode="cover"
+        />
+        <LinearGradient
+          colors={["transparent", "rgba(0,0,0,0.4)"]}
+          style={vc.imgGrad}
+        />
+
+        {/* Open/Closed */}
+        <View
+          style={[vc.openBadge, { backgroundColor: isOpen ? C.green : C.red }]}
+        >
+          <Text style={vc.openText}>{isOpen ? "Open" : "Closed"}</Text>
+        </View>
+
+        {/* Distance */}
+        {dist != null && (
+          <View style={vc.distBadge}>
+            <Feather
+              name="map-pin"
+              size={9}
+              color={tooFar ? C.amber : C.green}
+            />
+            <Text style={[vc.distText, tooFar && { color: C.amber }]}>
+              {dist.toFixed(1)} km
+            </Text>
+          </View>
+        )}
+
+        {/* Match count */}
+        {matchCount > 0 && !tooFar && (
+          <View style={vc.matchBadge}>
+            <Text style={vc.matchText}>
+              {matchCount} item{matchCount > 1 ? "s" : ""} found
+            </Text>
+          </View>
+        )}
+
+        {/* Too far overlay */}
+        {tooFar && (
+          <View style={vc.farOverlay}>
+            <Feather name="alert-circle" size={16} color={C.white} />
+            <Text style={vc.farText}>Can't deliver here</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={vc.info}>
+        <View style={vc.topRow}>
+          <Text style={vc.name} numberOfLines={1}>
+            {vendor.shop_name}
+          </Text>
+          {vendor.rating > 0 && (
+            <View style={vc.rating}>
+              <Feather name="star" size={11} color={dkText("#CA8A04", isDark)} />
+              <Text style={vc.ratingText}>{vendor.rating?.toFixed(1)}</Text>
+            </View>
+          )}
+        </View>
+        <Text style={vc.address} numberOfLines={1}>
+          {vendor.address_line}
+        </Text>
+        <View style={vc.meta}>
+          <View style={vc.metaChip}>
+            <Feather name="clock" size={11} color={C.gray500} />
+            <Text style={vc.metaText}>~30 min</Text>
+          </View>
+          <View style={vc.metaChip}>
+            <Feather name="shopping-bag" size={11} color={C.gray500} />
+            <Text style={vc.metaText}>Min ₹{vendor.min_order || 99}</Text>
+          </View>
+          {tooFar && (
+            <View style={[vc.metaChip, { backgroundColor: C.amberLight }]}>
+              <Text
+                style={[vc.metaText, { color: C.amber, fontWeight: "700" }]}
+              >
+                Outside delivery zone
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 
 // ─── Stores for item modal ────────────────────────────────────────────────────
 function ItemStoresSheet({
@@ -724,81 +763,9 @@ function ItemStoresSheet({
   onClose,
   onSelectStore,
 }) {
-  if (!product || !stores) return null;
-  return (
-    <View style={iss.backdrop}>
-      <View style={iss.sheet}>
-        <View style={iss.handle} />
-        <View style={iss.header}>
-          <View>
-            <Text style={iss.title}>Stores selling</Text>
-            <Text style={iss.productName} numberOfLines={1}>
-              {product.name}
-            </Text>
-          </View>
-          <TouchableOpacity style={iss.closeBtn} onPress={onClose}>
-            <Feather name="x" size={16} color={C.gray600} />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 24 }}
-        >
-          {stores.map((store) => {
-            const dist =
-              userCoords && store.latitude && store.longitude
-                ? distKm(
-                    userCoords.lat,
-                    userCoords.lng,
-                    store.latitude,
-                    store.longitude,
-                  )
-                : null;
-            const tooFar = dist != null && dist > NEARBY_RADIUS;
-            return (
-              <TouchableOpacity
-                key={store.id}
-                style={[iss.storeRow, tooFar && { opacity: 0.6 }]}
-                onPress={() => !tooFar && onSelectStore(store)}
-                activeOpacity={0.85}
-                disabled={tooFar}
-              >
-                <Image
-                  source={{
-                    uri:
-                      store.shop_image_url ||
-                      "https://images.unsplash.com/photo-1542838132-92c53300491e?w=200",
-                  }}
-                  style={iss.storeImg}
-                  resizeMode="cover"
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={iss.storeName}>{store.shop_name}</Text>
-                  <Text style={iss.storeAddr} numberOfLines={1}>
-                    {store.address_line}
-                  </Text>
-                  {dist != null && (
-                    <Text style={[iss.storeDist, tooFar && { color: C.amber }]}>
-                      {dist.toFixed(1)} km{" "}
-                      {tooFar ? "· Outside delivery zone" : "away"}
-                    </Text>
-                  )}
-                </View>
-                {!tooFar ? (
-                  <Feather name="chevron-right" size={16} color={C.green} />
-                ) : (
-                  <Feather name="alert-circle" size={16} color={C.amber} />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-    </View>
-  );
-}
-const iss = StyleSheet.create({
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const iss = useMemo(() => StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -806,7 +773,7 @@ const iss = StyleSheet.create({
     zIndex: 100,
   },
   sheet: {
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: "70%",
@@ -884,10 +851,88 @@ const iss = StyleSheet.create({
     marginTop: 2,
     fontFamily: "PlusJakartaSans_600SemiBold",
   },
-});
+}), [C]);
+  if (!product || !stores) return null;
+  return (
+    <View style={iss.backdrop}>
+      <View style={iss.sheet}>
+        <View style={iss.handle} />
+        <View style={iss.header}>
+          <View>
+            <Text style={iss.title}>Stores selling</Text>
+            <Text style={iss.productName} numberOfLines={1}>
+              {product.name}
+            </Text>
+          </View>
+          <TouchableOpacity style={iss.closeBtn} onPress={onClose}>
+            <Feather name="x" size={16} color={C.gray600} />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 24 }}
+        >
+          {stores.map((store) => {
+            const dist =
+              userCoords && store.latitude && store.longitude
+                ? distKm(
+                    userCoords.lat,
+                    userCoords.lng,
+                    store.latitude,
+                    store.longitude,
+                  )
+                : null;
+            const tooFar = dist != null && dist > NEARBY_RADIUS;
+            return (
+              <TouchableOpacity
+                key={store.id}
+                style={[iss.storeRow, tooFar && { opacity: 0.6 }]}
+                onPress={() => !tooFar && onSelectStore(store)}
+                activeOpacity={0.85}
+                disabled={tooFar}
+              >
+                <Image
+                  source={{
+                    uri:
+                      store.shop_image_url ||
+                      "https://images.unsplash.com/photo-1542838132-92c53300491e?w=200",
+                  }}
+                  style={iss.storeImg}
+                  resizeMode="cover"
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={iss.storeName}>{store.shop_name}</Text>
+                  <Text style={iss.storeAddr} numberOfLines={1}>
+                    {store.address_line}
+                  </Text>
+                  {dist != null && (
+                    <Text style={[iss.storeDist, tooFar && { color: C.amber }]}>
+                      {dist.toFixed(1)} km{" "}
+                      {tooFar ? "· Outside delivery zone" : "away"}
+                    </Text>
+                  )}
+                </View>
+                {!tooFar ? (
+                  <Feather name="chevron-right" size={16} color={C.green} />
+                ) : (
+                  <Feather name="alert-circle" size={16} color={C.amber} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
+
 
 // ─── Section heading (accent tick, matches ProfileScreen's SectionLabel) ──────
 function SectionHeading({ title, action, onAction }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const s = useMemo(() => makeSStyles(C), [C]);
   return (
     <View style={s.sectionHeadWrap}>
       <View style={s.sectionHeadLeft}>
@@ -908,6 +953,36 @@ function SectionHeading({ title, action, onAction }) {
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function SearchScreen() {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const sg = useMemo(() => StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+  },
+  iconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: C.gray100,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  thumb: { width: 32, height: 32, borderRadius: 16 },
+  text: {
+    flex: 1,
+    fontSize: 14,
+    color: C.gray700,
+    fontFamily: "PlusJakartaSans_500Medium",
+  },
+}), [C]);
+  const s = useMemo(() => makeSStyles(C), [C]);
   const navigation = useNavigation();
   const route = useRoute();
   const { token } = useAuthStore();
@@ -1001,7 +1076,7 @@ export default function SearchScreen() {
     topLevelCats.forEach((c) => {
       if (c.name && !seen.has(c.name)) {
         seen.add(c.name);
-        const accent = CAT_ACCENT[c.name] || CAT_ACCENT._default;
+        const accent = themeCfg(CAT_ACCENT[c.name] || CAT_ACCENT._default, isDark);
         const fallbackImg =
           CAT_FALLBACK_IMGS[c.name] || CAT_FALLBACK_IMGS._default;
         cats.push({
@@ -1520,7 +1595,7 @@ export default function SearchScreen() {
   return (
     <View style={{ flex: 1 }}>
       <View style={[s.root, { backgroundColor: isDesktop ? C.bg : C.white }]}>
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
         {/* ── SEARCH BAR ─────────────────────────────────────────────── */}
         <View style={[s.topBar, { paddingHorizontal: px }]}>
@@ -1863,7 +1938,7 @@ export default function SearchScreen() {
                   }}
                 >
                   {storeCategories.map((cat) => {
-                    const meta = STORE_CAT_META[cat] || STORE_CAT_META._default;
+                    const meta = themeCfg(STORE_CAT_META[cat] || STORE_CAT_META._default, isDark);
                     const isActive = selectedStoreCategory === cat;
                     return (
                       <TouchableOpacity
@@ -1880,7 +1955,7 @@ export default function SearchScreen() {
                                 },
                               ]
                             : {
-                                backgroundColor: C.white,
+                                backgroundColor: C.surface,
                                 borderColor: C.gray200,
                               },
                         ]}
@@ -2324,7 +2399,7 @@ export default function SearchScreen() {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const s = StyleSheet.create({
+const makeSStyles = (C) => StyleSheet.create({
   root: { flex: 1, paddingTop: Platform.OS === "ios" ? 52 : 32 },
 
   // Floating cart
@@ -2400,7 +2475,7 @@ const s = StyleSheet.create({
     gap: 12,
     paddingBottom: 18,
     paddingTop: 6,
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     borderBottomWidth: 1,
     borderBottomColor: C.gray100,
   },
@@ -2426,7 +2501,7 @@ const s = StyleSheet.create({
   },
   inputWrapActive: {
     borderColor: C.green,
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     shadowColor: C.green,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
@@ -2463,7 +2538,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     borderBottomWidth: 1,
     borderBottomColor: C.gray200,
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     paddingHorizontal: 4,
   },
   tab: {
@@ -2506,7 +2581,7 @@ const s = StyleSheet.create({
 
   // Suggestions
   suggBox: {
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     borderBottomWidth: 1,
     borderBottomColor: C.gray100,
   },
@@ -2720,7 +2795,7 @@ const s = StyleSheet.create({
     fontFamily: "PlusJakartaSans_500Medium",
   },
   itemsCard: {
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     borderRadius: 18,
     overflow: "hidden",
     shadowColor: "#0F172A",
@@ -2744,30 +2819,4 @@ const s = StyleSheet.create({
   },
 });
 
-const sg = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: C.gray100,
-  },
-  iconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: C.gray100,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  thumb: { width: 32, height: 32, borderRadius: 16 },
-  text: {
-    flex: 1,
-    fontSize: 14,
-    color: C.gray700,
-    fontFamily: "PlusJakartaSans_500Medium",
-  },
-});
+

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { View, ActivityIndicator, AppState } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, DefaultTheme, DarkTheme } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { io } from "socket.io-client";
 import SignupScreen from "../apps/customer/SignUpScreen";
 import useAuthStore from "../store/authStore";
 import { colors } from "../styles/colors";
+import { useTheme } from "../theme/ThemeContext";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http:localhost:3000/api";
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
@@ -28,6 +29,20 @@ import AccountSuspendedScreen from "../apps/AccountSuspendedScreen";
 const Stack = createNativeStackNavigator();
 
 export default function Navigation() {
+  const { isDark } = useTheme();
+  const loadingBg = isDark ? "#0F1216" : colors.primary;
+  const navTheme = {
+    ...(isDark ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(isDark ? DarkTheme.colors : DefaultTheme.colors),
+      background: isDark ? "#0F1216" : "#F8FAFC",
+      card: isDark ? "#171A1F" : "#FFFFFF",
+      border: isDark ? "#2E343C" : "#E5E7EB",
+      text: isDark ? "#ECEFF3" : "#111827",
+      primary: isDark ? "#2F9E68" : "#16A34A",
+    },
+  };
+
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const activeRole      = useAuthStore((s) => s.activeRole);
   const isLoading       = useAuthStore((s) => s.isLoading);
@@ -206,7 +221,7 @@ export default function Navigation() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary }}>
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: loadingBg }}>
         <ActivityIndicator size="large" color="white" />
       </View>
     );
@@ -231,14 +246,14 @@ export default function Navigation() {
       (activeRole === "delivery" && deliveryOnboarded === null))
   ) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary }}>
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: loadingBg }}>
         <ActivityIndicator size="large" color="white" />
       </View>
     );
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
           <>

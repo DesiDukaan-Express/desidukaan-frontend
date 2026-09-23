@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import useCartStore from '../store/cartStore';
 import useAuthStore from '../store/authStore';
 import useOrderStore from '../store/orderStore';
+import { useTheme } from '../theme/ThemeContext';
 
 import HomeScreen from '../apps/customer/HomeScreen';
 import SearchScreen from '../apps/customer/SearchScreen';
@@ -17,14 +18,15 @@ import OrdersScreen from '../apps/customer/OrdersScreen';
 import ProfileScreen from '../apps/customer/ProfileScreen';
 import VendorStoreScreen from '../apps/customer/VendorStoreScreen';
 import TrackOrderScreen from '../apps/customer/TrackOrderScreen';
+import WishlistScreen from '../apps/customer/WishlistScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3000';
 
-// ─── Palette matching the app ──────────────────────────────────────────────────
-const C = {
+// ─── Palette matching the app (light / dark) ────────────────────────────────
+const LIGHT_COLORS = {
   green:       '#16A34A',
   greenLight:  '#F0FDF4',
   orange:      '#F97316',
@@ -39,6 +41,21 @@ const C = {
   greenDark:   '#15803D',
   red:         '#DC2626',
 };
+const DARK_COLORS = {
+  green:       '#27E26C',
+  greenLight:  '#0A481D',
+  orange:      '#F97316',
+  orangeDark:  '#F36216',
+  purple:      '#9F7AEA',
+  surface:     '#14212F',
+  surfaceLow:  '#0D161F',
+  border:      '#383E49',
+  gray400:     '#6D7787',
+  gray600:     '#9EA8B6',
+  gray900:     '#EDF0F7',
+  greenDark:   '#2DDC6E',
+  red:         '#EF4444',
+};
 
 const TAB_ICONS = {
   Home:    'home',
@@ -50,6 +67,8 @@ const TAB_ICONS = {
 
 // ─── Tab icon component ────────────────────────────────────────────────────────
 const TabIcon = ({ iconName, label, focused, cartCount }) => {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
   const isCart = label === 'Cart';
   return (
     <View
@@ -113,6 +132,8 @@ function CartTabIcon({ focused, label }) {
 // ─── Bottom tab navigator ──────────────────────────────────────────────────────
 function CustomerTabNavigator() {
   const { t } = useTranslation();
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
 
   const TAB_LABELS = {
     Home:    t('home.tab'),
@@ -173,6 +194,9 @@ function CustomerTabNavigator() {
 // Shows a live countdown. Tap → back to Checkout (re-opens modal).
 function PendingOrderMonitor() {
   const { t } = useTranslation();
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const ms = useMemo(() => makeMs(C), [C]);
   const navigation = useNavigation();
   const { token } = useAuthStore();
   const pendingOrder  = useOrderStore((s) => s.pendingOrder);
@@ -478,6 +502,7 @@ export default function CustomerTabs() {
         <Stack.Screen name="VendorStore" component={VendorStoreScreen} />
         <Stack.Screen name="TrackOrder"  component={TrackOrderScreen}  />
         <Stack.Screen name="Search"      component={SearchScreen}      />
+        <Stack.Screen name="Wishlist"    component={WishlistScreen}    />
       </Stack.Navigator>
       <PendingOrderMonitor />
     </View>
@@ -487,7 +512,7 @@ export default function CustomerTabs() {
 // ─── Styles ────────────────────────────────────────────────────────────────────
 const BOTTOM = Platform.OS === 'ios' ? 98 : 76;
 
-const ms = StyleSheet.create({
+const makeMs = (C) => StyleSheet.create({
   // Persistent banner
   banner: {
     position:        'absolute',
