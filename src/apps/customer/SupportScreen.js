@@ -1,7 +1,9 @@
+
 import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Pressable,
   SafeAreaView,
@@ -11,7 +13,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
+
 import { Feather } from "@expo/vector-icons";
 import { io } from "socket.io-client";
 import { useNavigation } from "@react-navigation/native";
@@ -47,6 +51,9 @@ const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000"
 
 export default function SupportScreen() {
   const navigation = useNavigation();
+  const { width } = useWindowDimensions();
+  const isWide = width >= 900;
+  const [searchQuery, setSearchQuery] = useState("");
   const token = useAuthStore((state) => state.token);
   const [contactVisible, setContactVisible] = useState(false);
   const [tickets, setTickets] = useState([]);
@@ -62,6 +69,12 @@ export default function SupportScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const filteredTopics = TOPICS.filter((topic) =>
+  `${topic.title} ${topic.text}`
+    .toLowerCase()
+    .includes(searchQuery.trim().toLowerCase())
+);
 
   const loadTickets = async () => {
     if (!token) return;
@@ -188,54 +201,81 @@ export default function SupportScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <View style={styles.hero}>
-          <View style={styles.heroIcon}>
-            <Feather name="life-buoy" size={26} color={C.green} />
-          </View>
-          <View style={styles.heroCopy}>
-            <Text style={styles.heroTitle}>How can we help?</Text>
-            <Text style={styles.heroText}>Find answers or get in touch with our support team.</Text>
-          </View>
-        </View>
 
-        <Text style={styles.sectionTitle}>Browse help topics</Text>
-        <View style={styles.topicList}>
-          {TOPICS.map((topic) => (
-            <TouchableOpacity key={topic.title} style={styles.topicRow} activeOpacity={0.85} onPress={() => showContactMessage(topic.title)}>
-              <View style={[styles.topicIcon, { backgroundColor: topic.background }]}>
-                <Feather name={topic.icon} size={18} color={topic.color} />
-              </View>
-              <View style={styles.topicCopy}>
-                <Text style={styles.topicTitle}>{topic.title}</Text>
-                <Text style={styles.topicText}>{topic.text}</Text>
-              </View>
-              <View style={styles.chevronWrap}>
-                <Feather name="chevron-right" size={18} color={C.gray400} />
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+<View style={styles.hero}>
+  <View style={styles.heroCopy}>
+    <Text style={styles.heroEyebrow}>WE'RE HERE TO HELP!</Text>
 
-        <Text style={styles.sectionTitle}>Your requests</Text>
-        {loading ? <ActivityIndicator color={C.green} /> : tickets.length === 0 ? <Text style={styles.emptyText}>No support requests yet.</Text> : tickets.map((ticket) => (
-          <TouchableOpacity key={ticket.id} style={styles.ticketRow} onPress={() => openTicket(ticket)} activeOpacity={0.85}>
-            <View style={styles.ticketDot} />
-            <View style={styles.ticketCopy}>
-              <Text style={styles.ticketSubject}>{ticket.subject}</Text>
-              <Text style={styles.ticketMeta}>{ticket.ticket_number} · {ticket.status.replaceAll("_", " ")}</Text>
-            </View>
-            <Feather name="chevron-right" size={17} color={C.gray400} />
-          </TouchableOpacity>
-        ))}
+    <Text style={styles.heroTitle}>
+      How can we help you today?
+    </Text>
 
-        <View style={styles.contactSection}>
-          <Text style={styles.contactTitle}>Still need help?</Text>
-          <Text style={styles.contactText}>Our support team can help with your account, orders, payments, and delivery.</Text>
-          <TouchableOpacity style={styles.contactButton} onPress={() => showContactMessage("general")} activeOpacity={0.8}>
-            <Feather name="message-circle" size={17} color={C.white} />
-            <Text style={styles.contactButtonText}>Contact Support</Text>
-          </TouchableOpacity>
-        </View>
+    <Text style={styles.heroText}>
+      Find answers to common questions or get in touch with our support team.
+    </Text>
+
+    <View style={styles.searchBox}>
+      <Feather name="search" size={21} color="#8198A6" />
+
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search help topics..."
+        placeholderTextColor="#8198A6"
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        returnKeyType="search"
+        accessibilityLabel="Search help topics"
+      />
+
+      {!!searchQuery && (
+        <TouchableOpacity
+          onPress={() => setSearchQuery("")}
+          accessibilityLabel="Clear search"
+        >
+          <Feather name="x-circle" size={19} color="#8198A6" />
+        </TouchableOpacity>
+      )}
+    </View>
+  </View>
+
+  {isWide && (
+    <View style={styles.heroImageWrap}>
+      <Image
+        
+        source={require("../../../assets/support-agent.png")}
+        style={styles.supportAgent}
+        resizeMode="contain"
+        accessibilityLabel="Friendly customer support agent"
+      />
+    </View>
+  )}
+</View>
+
+styles.sectionTitle
+
+<View style={styles.contactSection}>
+  <View style={styles.contactIcon}>
+    <Feather name="headphones" size={30} color="#07864A" />
+  </View>
+
+  <View style={styles.contactCopy}>
+    <Text style={styles.contactTitle}>Still need help?</Text>
+    <Text style={styles.contactText}>
+      Our support team can help with your account, orders, payments, and delivery.
+    </Text>
+  </View>
+
+  <TouchableOpacity
+    style={styles.contactButton}
+    onPress={() => showContactMessage("general")}
+    activeOpacity={0.8}
+  >
+    <Feather name="message-circle" size={19} color="#07864A" />
+    <Text style={styles.contactButtonText}>Contact Support</Text>
+    <Feather name="arrow-right" size={18} color="#07864A" />
+  </TouchableOpacity>
+</View>
+
       </ScrollView>
 
       <Modal
@@ -315,59 +355,454 @@ export default function SupportScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: C.bg },
-  content: { padding: 20, paddingBottom: 36 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 },
-  backButton: { width: 42, height: 42, borderRadius: 13, backgroundColor: C.white, borderWidth: 1, borderColor: C.gray200, alignItems: "center", justifyContent: "center" },
-  headerTitle: { fontSize: 18, fontWeight: "800", color: C.gray900 },
-  headerSpacer: { width: 42 },
-  hero: { flexDirection: "row", alignItems: "center", backgroundColor: C.white, borderRadius: 20, padding: 18, borderWidth: 1, borderColor: C.gray200, marginBottom: 28, shadowColor: C.shadow, shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
-  heroIcon: { width: 54, height: 54, borderRadius: 16, backgroundColor: C.greenLight, alignItems: "center", justifyContent: "center", marginRight: 14 },
-  heroCopy: { flex: 1 },
-  heroTitle: { fontSize: 18, fontWeight: "800", color: C.gray900, marginBottom: 5 },
-  heroText: { fontSize: 13, lineHeight: 19, color: C.gray500 },
-  sectionTitle: { fontSize: 12, fontWeight: "800", color: C.gray500, letterSpacing: 0.9, textTransform: "uppercase", marginBottom: 12 },
-  topicList: { gap: 12 },
-  topicRow: { flexDirection: "row", alignItems: "center", backgroundColor: C.white, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: C.gray200, shadowColor: C.shadow, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
-  topicIcon: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", marginRight: 13 },
-  topicCopy: { flex: 1 },
-  topicTitle: { fontSize: 17, fontWeight: "800", color: C.gray900, marginBottom: 4 },
-  topicText: { fontSize: 13, color: C.gray500 },
-  chevronWrap: { marginLeft: 10, width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: C.gray100 },
-  contactSection: { backgroundColor: C.greenLight, borderRadius: 18, padding: 20, marginTop: 28, borderWidth: 1, borderColor: "#BBF7D0" },
-  contactTitle: { fontSize: 17, fontWeight: "800", color: C.gray900, marginBottom: 6 },
-  contactText: { fontSize: 13, lineHeight: 20, color: C.gray700, marginBottom: 16 },
-  contactButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.green, borderRadius: 13, paddingVertical: 13 },
-  contactButtonText: { fontSize: 14, fontWeight: "800", color: C.white },
-  modalBackdrop: { flex: 1, backgroundColor: "rgba(17, 24, 39, 0.45)", alignItems: "center", justifyContent: "center", padding: 24 },
-  contactModal: { width: "100%", maxWidth: 420, backgroundColor: C.white, borderRadius: 18, padding: 24, alignItems: "center" },
-  modalIcon: { width: 52, height: 52, borderRadius: 16, backgroundColor: C.greenLight, alignItems: "center", justifyContent: "center", marginBottom: 14 },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: C.gray900, marginBottom: 8 },
-  modalText: { fontSize: 13, lineHeight: 20, color: C.gray500, textAlign: "center", marginBottom: 20 },
-  modalButton: { width: "100%", backgroundColor: C.green, borderRadius: 12, paddingVertical: 13, alignItems: "center" },
-  modalButtonText: { fontSize: 14, fontWeight: "800", color: C.white },
-  input: { width: "100%", borderWidth: 1, borderColor: C.gray200, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 11, fontSize: 13, color: C.gray900, marginBottom: 10 },
-  fieldLabel: { alignSelf: "flex-start", fontSize: 12, fontWeight: "700", color: C.gray700, marginBottom: 8 },
-  orderList: { width: "100%", maxHeight: 150, marginBottom: 10 },
-  orderOption: { width: "100%", flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: C.gray200, borderRadius: 10, padding: 10, marginBottom: 6 },
-  orderOptionSelected: { borderColor: C.green, backgroundColor: C.greenLight },
-  orderNumber: { fontSize: 13, fontWeight: "700", color: C.gray900, marginBottom: 3 },
-  messageInput: { minHeight: 90, textAlignVertical: "top" },
-  errorText: { width: "100%", color: "#DC2626", fontSize: 12, marginBottom: 10 },
-  emptyText: { color: C.gray500, fontSize: 13, marginBottom: 18 },
-  ticketRow: { flexDirection: "row", alignItems: "center", backgroundColor: C.white, borderRadius: 16, paddingVertical: 15, paddingHorizontal: 14, borderWidth: 1, borderColor: C.gray200, marginBottom: 10, shadowColor: C.shadow, shadowOpacity: 0.04, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
-  ticketDot: { width: 10, height: 10, borderRadius: 999, backgroundColor: C.green, marginRight: 12 },
-  ticketCopy: { flex: 1 },
-  ticketSubject: { fontSize: 15, fontWeight: "800", color: C.gray900, marginBottom: 4 },
-  ticketMeta: { fontSize: 12, color: C.gray500, textTransform: "capitalize" },
-  ticketModal: { width: "100%", maxWidth: 520, maxHeight: "85%", backgroundColor: C.white, borderRadius: 18, padding: 20 },
-  ticketModalHeader: { flexDirection: "row", alignItems: "flex-start", borderBottomWidth: 1, borderBottomColor: C.gray200, paddingBottom: 14, marginBottom: 12 },
-  messages: { maxHeight: 360 },
-  messagesContent: { gap: 10, paddingVertical: 4 },
-  messageBubble: { maxWidth: "82%", borderRadius: 14, padding: 12 },
-  userMessage: { alignSelf: "flex-end", backgroundColor: C.greenLight },
-  adminMessage: { alignSelf: "flex-start", backgroundColor: C.gray100 },
-  messageSender: { fontSize: 10, fontWeight: "800", color: C.gray500, marginBottom: 4 },
-  messageText: { fontSize: 13, lineHeight: 19, color: C.gray900 },
-  messageTime: { fontSize: 9, color: C.gray400, marginTop: 5 },
+  /* Page and header */
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#F7FAFC",
+  },
+  content: {
+    padding: 20,
+    paddingBottom: 36,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 24,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#DDE8E2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    fontSize: 21,
+    fontWeight: "900",
+    color: "#142D26",
+    textAlign: "center",
+  },
+  headerSpacer: {
+    width: 44,
+  },
+
+  /* Hero banner */
+  hero: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EDFAEF",
+    borderRadius: 26,
+    paddingVertical: 28,
+    paddingHorizontal: 28,
+    marginBottom: 32,
+    borderWidth: 1,
+    borderColor: "#D9F2DE",
+    overflow: "hidden",
+    minHeight: 245,
+  },
+  heroCopy: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  heroEyebrow: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#16834D",
+    letterSpacing: 1.1,
+    marginBottom: 10,
+  },
+  heroTitle: {
+    fontSize: 30,
+    lineHeight: 38,
+    fontWeight: "900",
+    color: "#104D3D",
+    marginBottom: 10,
+  },
+  heroText: {
+    fontSize: 15,
+    lineHeight: 23,
+    color: "#52796F",
+    marginBottom: 20,
+    maxWidth: 570,
+  },
+  heroImageWrap: {
+    width: "42%",
+    height: 245,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  supportAgent: {
+    width: "100%",
+    height: "100%",
+  },
+
+  /* Search bar */
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    minHeight: 54,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: "#E0ECE4",
+    gap: 12,
+    maxWidth: 620,
+    shadowColor: "#245C42",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#243F36",
+    paddingVertical: 12,
+  },
+
+  /* Section headings */
+  topicsHeading: {
+    marginBottom: 20,
+  },
+  sectionHeading: {
+    fontSize: 24,
+    fontWeight: "900",
+    color: "#164C3E",
+    marginBottom: 7,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: "#718096",
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#68766F",
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+    marginTop: 30,
+    marginBottom: 14,
+  },
+
+  /* Help topic cards */
+  topicList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 16,
+  },
+  topicCard: {
+    minHeight: 205,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 20,
+    borderWidth: 1,
+    shadowColor: "#245C42",
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  topicIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  topicCopy: {
+    flex: 1,
+  },
+  topicTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#183D31",
+    marginBottom: 7,
+  },
+  topicText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#718096",
+    paddingRight: 4,
+  },
+  topicArrow: {
+    position: "absolute",
+    right: 17,
+    bottom: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  noTopics: {
+    width: "100%",
+    padding: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    color: "#647D8C",
+    fontSize: 14,
+    lineHeight: 21,
+  },
+
+  /* Contact support banner */
+  contactSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 18,
+    backgroundColor: "#16805B",
+    borderRadius: 24,
+    padding: 25,
+    marginTop: 30,
+    overflow: "hidden",
+  },
+  contactIcon: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: "#D9FBE7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  contactCopy: {
+    flex: 1,
+    minWidth: 200,
+  },
+  contactTitle: {
+    fontSize: 21,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    marginBottom: 7,
+  },
+  contactText: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: "#E0F6EA",
+  },
+  contactButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 30,
+    paddingHorizontal: 22,
+    paddingVertical: 16,
+  },
+  contactButtonText: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#07864A",
+  },
+
+  /* Loading and support requests */
+  emptyText: {
+    color: "#647D8C",
+    fontSize: 14,
+    marginBottom: 18,
+  },
+  ticketRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 17,
+    paddingVertical: 17,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: "#E3EEE7",
+    marginBottom: 10,
+    shadowColor: "#245C42",
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  ticketDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#16A34A",
+    marginRight: 12,
+  },
+  ticketCopy: {
+    flex: 1,
+  },
+  ticketSubject: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#183D31",
+    marginBottom: 4,
+  },
+  ticketMeta: {
+    fontSize: 12,
+    color: "#708477",
+    textTransform: "capitalize",
+  },
+
+  /* Contact form modal */
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(17, 24, 39, 0.50)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  contactModal: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 24,
+    alignItems: "center",
+  },
+  modalIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: "#F0FDF4",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#111827",
+    marginBottom: 8,
+  },
+  modalText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#6B7280",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  modalButton: {
+    width: "100%",
+    backgroundColor: "#16A34A",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  modalButtonText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  input: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    paddingHorizontal: 13,
+    paddingVertical: 12,
+    fontSize: 13,
+    color: "#111827",
+    backgroundColor: "#FFFFFF",
+    marginBottom: 10,
+  },
+  fieldLabel: {
+    alignSelf: "flex-start",
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#374151",
+    marginBottom: 8,
+  },
+  orderList: {
+    width: "100%",
+    maxHeight: 150,
+    marginBottom: 10,
+  },
+  orderOption: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 6,
+  },
+  orderOptionSelected: {
+    borderColor: "#16A34A",
+    backgroundColor: "#F0FDF4",
+  },
+  orderNumber: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 3,
+  },
+  messageInput: {
+    minHeight: 90,
+    textAlignVertical: "top",
+  },
+  errorText: {
+    width: "100%",
+    color: "#DC2626",
+    fontSize: 12,
+    marginBottom: 10,
+  },
+
+  /* Ticket conversation modal */
+  ticketModal: {
+    width: "100%",
+    maxWidth: 520,
+    maxHeight: "85%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 20,
+  },
+  ticketModalHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+    paddingBottom: 14,
+    marginBottom: 12,
+  },
+  messages: {
+    maxHeight: 360,
+  },
+  messagesContent: {
+    gap: 10,
+    paddingVertical: 4,
+  },
+  messageBubble: {
+    maxWidth: "82%",
+    borderRadius: 14,
+    padding: 12,
+  },
+  userMessage: {
+    alignSelf: "flex-end",
+    backgroundColor: "#F0FDF4",
+  },
+  adminMessage: {
+    alignSelf: "flex-start",
+    backgroundColor: "#F3F4F6",
+  },
+  messageSender: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  messageText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#111827",
+  },
+  messageTime: {
+    fontSize: 9,
+    color: "#9CA3AF",
+    marginTop: 5,
+  },
 });

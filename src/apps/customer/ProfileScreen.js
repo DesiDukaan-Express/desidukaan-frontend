@@ -3,10 +3,11 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Animated, Alert, Share, Platform,
   SafeAreaView, Modal, Pressable, ActivityIndicator,
-  Switch, Linking, useWindowDimensions,
+Switch, Linking, useWindowDimensions, Image,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
@@ -15,37 +16,87 @@ import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
 import LanguageSwitcher from "../../components/common/LanguageSwitcher";
-
+import { uploadAPI } from "../../services/api";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 const C = {
-  orange: "#F97316", orangeDark: "#EA580C", orangeLight: "#FFF7ED",
-  green: "#16A34A", greenDark: "#15803D",
-  greenLight: "#F0FDF4", greenBorder: "#BBF7D0",
-  greenMid: "#DCFCE7",
-  blue: "#3B82F6", blueLight: "#EFF6FF",
-  purple: "#8B5CF6", purpleLight: "#F5F3FF",
-  white: "#FFFFFF", bg: "#F8FAFC",
-  gray100: "#F3F4F6", gray200: "#E5E7EB",
-  gray300: "#D1D5DB", gray400: "#9CA3AF",
-  gray500: "#6B7280", gray600: "#4B5563",
-  gray700: "#374151", gray900: "#111827",
-  red: "#EF4444", redLight: "#FEF2F2",
+  orange: "#F59E0B",
+  orangeDark: "#B45309",
+  orangeLight: "#FFF3D6",
+
+  green: "#22864B",
+  greenDark: "#14532D",
+  greenLight: "#E8F7EB",
+  greenBorder: "#A9DDB5",
+  greenMid: "#C9EFD1",
+
+  blue: "#22864B",
+  blueLight: "#E0F3E5",
+  purple: "#39865A",
+  purpleLight: "#E5F5E9",
+
+  white: "#FFFFFF",
+  bg: "#EAF4EB",
+
+  gray100: "#F0F6F0",
+  gray200: "#DCE9DE",
+  gray300: "#C2D4C5",
+  gray400: "#879B8B",
+  gray500: "#627568",
+  gray600: "#455B4A",
+  gray700: "#304A36",
+  gray900: "#173D25",
+
+  red: "#DC4545",
+  redLight: "#FFF1F0",
 };
 
-// ─── Avatar initials ──────────────────────────────────────────────────────
-function Avatar({ name, size = 64 }) {
+
+// ─── Avatar with profile image ────────────────────────────────────────────
+function Avatar({ name, imageUrl, size = 64 }) {
   const initials = (name || "?")
-    .trim().split(" ").slice(0, 2)
-    .map(w => w[0]?.toUpperCase() || "").join("");
+    .trim()
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() || "")
+    .join("");
+
+  if (imageUrl) {
+    return (
+      <Image
+        source={{ uri: imageUrl }}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+        }}
+        resizeMode="cover"
+      />
+    );
+  }
+
   return (
     <LinearGradient
       colors={[C.orange, C.green]}
-      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-      style={{ width: size, height: size, borderRadius: size * 0.3, alignItems: "center", justifyContent: "center" }}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size * 0.3,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
     >
-      <Text style={{ color: C.white, fontWeight: "900", fontSize: size * 0.36, letterSpacing: 1 }}>
+      <Text
+        style={{
+          color: C.white,
+          fontWeight: "900",
+          fontSize: size * 0.36,
+          letterSpacing: 1,
+        }}
+      >
         {initials}
       </Text>
     </LinearGradient>
@@ -137,17 +188,70 @@ function InfoRow({ label, value, onEdit, editable = true, icon = "user" }) {
     </View>
   );
 }
+
 const ir = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  fieldIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.greenMid, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  fieldIconWrapOff: { backgroundColor: C.gray100 },
-  left: { flex: 1 },
-  label: { fontSize: 11, fontWeight: "700", color: C.gray400, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 5 },
-  value: { fontSize: 16, fontWeight: "600", color: C.gray900 },
-  valuePlaceholder: { color: C.gray400, fontWeight: "400", fontStyle: "italic" },
-  editBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: C.greenMid, alignItems: "center", justifyContent: "center" },
-  lockWrap: { width: 34, height: 34, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
+row: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 14,
+  paddingVertical: 16,
+  paddingHorizontal: 4,
+  borderBottomWidth: 1,
+  borderBottomColor: C.gray100,
+},
+  fieldIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: C.greenLight,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  fieldIconWrapOff: {
+    backgroundColor: C.gray100,
+  },
+  left: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+label: {
+  fontSize: 12,
+  color: C.gray500,
+  fontWeight: "600",
+  marginBottom: 4,
+},
+
+value: {
+  fontSize: 14,
+  color: C.gray900,
+  fontWeight: "700",
+  lineHeight: 21,
+},
+
+  valuePlaceholder: {
+    color: C.gray400,
+    fontWeight: "500",
+  },
+  editBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: C.greenLight,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  lockWrap: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
 });
+
 
 // ─── Address card ─────────────────────────────────────────────────────────
 function AddressCard({ addr, isSelected, onSelect, onRemove }) {
@@ -170,20 +274,71 @@ function AddressCard({ addr, isSelected, onSelect, onRemove }) {
     </TouchableOpacity>
   );
 }
+
 const adc = StyleSheet.create({
-  card: {
-    flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 16,
-    backgroundColor: C.white, marginBottom: 10, borderWidth: 1, borderColor: C.gray100,
-    shadowColor: "#0F172A", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
+
+card: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 14,
+  padding: 16,
+  borderRadius: 16,
+  backgroundColor: C.white,
+  marginBottom: 12,
+  borderWidth: 1,
+  borderColor: C.gray200,
+  shadowColor: "#0F172A",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.04,
+  shadowRadius: 8,
+  elevation: 1,
+},
+
+  cardActive: {
+    borderColor: C.green,
+    backgroundColor: C.greenLight,
+    shadowOpacity: 0.07,
   },
-  cardActive: { borderColor: C.greenBorder, backgroundColor: C.greenLight, shadowOpacity: 0.08 },
-  icon: { width: 32, height: 32, borderRadius: 10, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  iconActive: { backgroundColor: C.green },
-  text: { flex: 1, fontSize: 13.5, color: C.gray700, fontWeight: "500", lineHeight: 19 },
-  textActive: { color: C.greenDark, fontWeight: "700" },
-  activeLabel: { fontSize: 11, color: C.green, fontWeight: "700", marginTop: 3 },
-  tick: { width: 22, height: 22, borderRadius: 7, backgroundColor: C.green, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  icon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    backgroundColor: C.gray100,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  iconActive: {
+    backgroundColor: C.green,
+  },
+  text: {
+    flex: 1,
+    fontSize: 14,
+    color: C.gray700,
+    fontWeight: "500",
+    lineHeight: 20,
+  },
+  textActive: {
+    color: C.greenDark,
+    fontWeight: "700",
+  },
+  activeLabel: {
+    fontSize: 11,
+    color: C.greenDark,
+    fontWeight: "800",
+    marginTop: 5,
+  },
+  tick: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    backgroundColor: C.green,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
 });
+
 
 // ─── Row menu item ────────────────────────────────────────────────────────
 const TINTS = {
@@ -211,17 +366,60 @@ function MenuItem({ icon, label, onPress, danger, right, sub, tint }) {
   );
 }
 const mi = StyleSheet.create({
-  row: {
-    flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 15, paddingHorizontal: 16,
-    backgroundColor: C.white, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: C.gray100,
-    shadowColor: "#0F172A", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 1,
-  },
-  rowDanger: { borderColor: "#FECACA", backgroundColor: C.redLight, shadowOpacity: 0 },
-  iconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
-  iconDanger: { backgroundColor: "#FEE2E2" },
-  label: { fontSize: 15, color: C.gray900, fontWeight: "600" },
-  labelDanger: { color: C.red },
-  sub: { fontSize: 12, color: C.gray400, marginTop: 2 },
+   
+row: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 12,
+  paddingVertical: 13,
+  paddingHorizontal: 14,
+  backgroundColor: C.white,
+  borderRadius: 16,
+  marginBottom: 10,
+  borderWidth: 1,
+  borderColor: C.gray200,
+  shadowColor: "#0F172A",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.035,
+  shadowRadius: 8,
+  elevation: 1,
+},
+
+iconWrap: {
+  width: 42,
+  height: 42,
+  borderRadius: 14,
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0,
+},
+
+label: {
+  fontSize: 14,
+  color: C.gray900,
+  fontWeight: "700",
+},
+
+sub: {
+  fontSize: 12,
+  color: C.gray500,
+  marginTop: 4,
+  lineHeight: 17,
+},
+
+
+rowDanger: {
+  borderColor: "#FECACA",
+  backgroundColor: C.redLight,
+},
+iconDanger: {
+  backgroundColor: C.redLight,
+},
+labelDanger: {
+  color: C.red,
+},
+
+
 });
 
 // ─── Address Detail Modal ─────────────────────────────────────────────────
@@ -346,11 +544,30 @@ function SectionLabel({ title }) {
     </View>
   );
 }
+
 const secStyles = StyleSheet.create({
-  wrap: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14, marginTop: 30 },
-  tick: { width: 3, height: 14, borderRadius: 2, backgroundColor: C.green },
-  text: { fontSize: 12, fontWeight: "800", color: C.gray500, letterSpacing: 0.8, textTransform: "uppercase" },
+  wrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    marginBottom: 13,
+    marginTop: 26,
+  },
+  tick: {
+    width: 4,
+    height: 18,
+    borderRadius: 3,
+    backgroundColor: C.green,
+  },
+  text: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: C.greenDark,
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+  },
 });
+
 
 // ─── Logout modal ─────────────────────────────────────────────────────────
 function LogoutModal({ visible, onConfirm, onCancel }) {
@@ -429,11 +646,26 @@ export default function ProfileScreen() {
   const { user, token, logout, updateUser, setActiveRole } = useAuthStore();
   const { clearCart } = useCartStore();
   const addressStore = useAddressStore();
-  const { width: winW } = useWindowDimensions();
-  const isWide = winW > 600;
-  const [showLanguage, setShowLanguage] = useState(false);
-  const contentMaxW = Math.min(winW, 640);
-  const hPad = isWide ? Math.max(24, Math.floor((winW - contentMaxW) / 2)) : 20;
+  const scrollViewRef = useRef(null);
+const [addressSectionY, setAddressSectionY] = useState(0);
+  
+
+const scrollToAddresses = () => {
+  scrollViewRef.current?.scrollTo({
+    y: Math.max(0, addressSectionY - 20),
+    animated: true,
+  });
+};
+
+const { width: winW } = useWindowDimensions();
+
+const isDesktop = winW >= 1024;
+const isWide = winW > 600;
+
+const [showLanguage, setShowLanguage] = useState(false);
+
+// Responsive spacing for mobile, tablet, and laptop
+const hPad = isDesktop ? 32 : isWide ? 24 : 20;
 
   const [showLogout, setShowLogout] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
@@ -441,6 +673,7 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [detailAddr, setDetailAddr] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // Load notification preference from AsyncStorage
   useEffect(() => {
@@ -459,6 +692,106 @@ export default function ProfileScreen() {
       Animated.spring(slideY, { toValue: 0, tension: 70, friction: 10, useNativeDriver: true }),
     ]).start();
   }, []);
+
+  // ── Select profile photo ────────────────────────────────────────────────
+const handleProfilePhoto = async () => {
+  try {
+    const permission =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        "Permission required",
+        "Please allow photo library access to choose a profile picture."
+      );
+      return;
+    }
+
+    if (!token) {
+      Alert.alert(
+        "Not authenticated",
+        "Please log in again and try again."
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets?.length) {
+      return;
+    }
+
+    const asset = result.assets[0];
+
+    setUploadingPhoto(true);
+
+    // 1. Upload image to backend
+    const mimeType = asset.mimeType || "image/jpeg";
+
+    const uploadResult = await uploadAPI.upload(
+      asset.uri,
+      mimeType,
+      token
+    );
+
+    if (!uploadResult?.url) {
+      throw new Error("Image upload did not return a URL.");
+    }
+
+    console.log("Uploaded profile image URL:", uploadResult.url);
+
+    // 2. Save image URL to user's profile
+    const response = await fetch(`${BASE_URL}/auth/me`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        profile_image_url: uploadResult.url,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data?.msg ||
+        data?.message ||
+        "Failed to update profile picture."
+      );
+    }
+
+    // 3. Update Zustand user immediately
+    if (data.user) {
+      updateUser(data.user);
+    } else {
+      updateUser({
+        profile_image_url: uploadResult.url,
+      });
+    }
+
+    Alert.alert(
+      "Success",
+      "Your profile picture has been updated."
+    );
+  } catch (error) {
+    console.error("Profile photo upload error:", error);
+
+    Alert.alert(
+      "Upload failed",
+      error?.message ||
+        "Could not upload your profile picture. Please try again."
+    );
+  } finally {
+    setUploadingPhoto(false);
+  }
+};
 
   // ── Save field ─────────────────────────────────────────────────────────
   const handleSave = async (value) => {
@@ -514,84 +847,240 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={s.root}>
       <Animated.ScrollView
+        ref={scrollViewRef}
         style={{ opacity: fadeO }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 60 }}
       >
 
-        {/* ── Hero header ─────────────────────────────────────────────── */}
-        <Animated.View style={{ transform: [{ translateY: slideY }] }}>
-          <LinearGradient
-            colors={[C.greenDark, C.green, "#22c55e"]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={[s.hero, { paddingHorizontal: hPad }]}
-          >
-            {/* Decorative accents */}
-            <View style={s.heroDecorCircle1} pointerEvents="none" />
-            <View style={s.heroDecorCircle2} pointerEvents="none" />
 
-            {/* Top row */}
-            <View style={s.heroTop}>
-              <Text style={s.heroLabel}>{t('profile.myProfile')}</Text>
-            </View>
+        {/* ── Profile banner ─────────────────────────────────────── */}
+        
+      
+{/* Responsive top section: greeting + profile banner */}
+<View
+  style={[
+    s.topHeroRow,
+    {
+      paddingHorizontal: hPad,
+      flexDirection: "column",
+    },
+  ]}
+>
+  {/* Greeting card */}
+  <View style={s.greetingTopCard}>
+    <View style={s.greetingWelcomeRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={s.greetingText}>Welcome back,</Text>
+        <Text style={s.greetingName} numberOfLines={1}>
+          {user?.name?.split(" ")[0] || "there"}!
+        </Text>
+        <Text style={s.greetingSub}>
+          Shop local. Support local.
+        </Text>
+      </View>
 
-            {/* Avatar + name */}
-            <View style={s.heroMain}>
-              <View style={s.avatarRing}>
-                <View style={s.avatarOuter}>
-                  <Avatar name={user?.name} size={72} />
-                  <View style={s.verifiedDot}>
-                    <Feather name="check" size={9} color={C.white} />
-                  </View>
-                </View>
-              </View>
-              <View style={s.heroInfo}>
-                <Text style={s.heroName} numberOfLines={1}>{user?.name || "Guest"}</Text>
-                <View style={s.heroPill}>
-                  <Feather name="phone" size={11} color={C.green} />
-                  <Text style={s.heroPillText}>{user?.phone || "—"}</Text>
-                </View>
-                {memberSince && <Text style={s.heroSince}>{t('profile.memberSince', { date: memberSince })}</Text>}
-              </View>
-            </View>
-          </LinearGradient>
+      <View style={s.greetingLeafCircle}>
+        <Feather name="feather" size={30} color={C.green} />
+      </View>
+    </View>
 
-          {/* Stats — sits OUTSIDE the hero's overflow:hidden box so the
-              overlap isn't clipped; it overlaps upward via negative marginTop
-              on statsWrap instead, and paints on top since it's a later sibling */}
-          <View style={[s.statsWrap, { paddingHorizontal: hPad }]}>
-            <View style={s.stats}>
-              <View style={s.statItem}>
-                <View style={[s.statIconWrap, { backgroundColor: C.greenMid }]}>
-                  <Feather name="map-pin" size={13} color={C.greenDark} />
-                </View>
-                <Text style={s.statNum}>{addressStore?.addresses?.length ?? 0}</Text>
-                <Text style={s.statLabel}>{t('profile.savedAddresses')}</Text>
-              </View>
-              <View style={s.statSep} />
-              <View style={s.statItem}>
-                <View style={[s.statIconWrap, { backgroundColor: C.orangeLight }]}>
-                  <Feather name="credit-card" size={13} color={C.orangeDark} />
-                </View>
-                <Text style={s.statNum}>₹150</Text>
-                <Text style={s.statLabel}>{t('profile.credits')}</Text>
-              </View>
-              <View style={s.statSep} />
-              <View style={s.statItem}>
-                <View style={[s.statIconWrap, { backgroundColor: C.blueLight }]}>
-                  <Feather name="user" size={13} color={C.blue} />
-                </View>
-                <Text style={[s.statNum, { fontSize: 12.5 }]} numberOfLines={1}>
-                  {(user?.role || "customer").toUpperCase()}
-                </Text>
-                <Text style={s.statLabel}>{t('profile.account')}</Text>
-              </View>
-            </View>
+    <View style={s.greetingDecorativeRow}>
+      <View style={s.greetingAccentLine} />
+      <Text style={s.greetingFooter}>
+        Your neighbourhood, your marketplace.
+      </Text>
+    </View>
+  </View>
+
+  {/* Profile banner */}
+  <Animated.View
+    style={[
+      s.hero,
+      {
+        flex: isDesktop ? 1 : undefined,
+        width: isDesktop ? undefined : "100%",
+        transform: [{ translateY: slideY }],
+      },
+    ]}
+  >
+    {/* Decorative background circles */}
+    <View style={s.heroDecorCircle1} pointerEvents="none" />
+    <View style={s.heroDecorCircle2} pointerEvents="none" />
+
+    {/* Profile information */}
+    <View
+      style={[
+        s.heroMain,
+        {
+          flexDirection: isDesktop ? "row" : "column",
+          alignItems: isDesktop ? "center" : "flex-start",
+        },
+      ]}
+    >
+      {/* Profile photo */}
+      <TouchableOpacity
+        style={s.avatarRing}
+        onPress={handleProfilePhoto}
+        disabled={uploadingPhoto}
+        activeOpacity={0.85}
+        accessibilityLabel="Change profile picture"
+      >
+        <View style={s.avatarOuter}>
+          <Avatar
+            name={user?.name}
+            imageUrl={user?.profile_image_url}
+            size={88}
+          />
+
+          <View style={s.verifiedDot}>
+            {uploadingPhoto ? (
+              <ActivityIndicator size="small" color={C.white} />
+            ) : (
+              <Feather name="camera" size={17} color={C.white} />
+            )}
           </View>
-        </Animated.View>
+        </View>
+      </TouchableOpacity>
 
+      {/* Profile details */}
+      <View style={s.heroInfo}>
+        <Text style={s.heroName} numberOfLines={2}>
+          {user?.name || "Guest"}
+        </Text>
+
+        <View style={s.heroDetailRow}>
+          <Feather name="phone" size={16} color={C.greenDark} />
+          <Text style={s.heroDetailText}>
+            {user?.phone || "Add phone number"}
+          </Text>
+        </View>
+
+        <View style={s.heroDetailRow}>
+          <Feather name="mail" size={16} color={C.greenDark} />
+          <Text style={s.heroDetailText} numberOfLines={2}>
+            {user?.email || "Add email address"}
+          </Text>
+        </View>
+
+        <View style={s.roleBadge}>
+          <Text style={s.roleBadgeText}>
+            {(user?.role || "customer").charAt(0).toUpperCase() +
+              (user?.role || "customer").slice(1)}
+          </Text>
+        </View>
+
+        {memberSince && (
+          <Text style={s.heroSince}>
+            {t("profile.memberSince", { date: memberSince })}
+          </Text>
+        )}
+      </View>
+
+      {/* Edit profile button */}
+      <TouchableOpacity
+        style={s.heroEditButton}
+        onPress={() =>
+          setEditField({
+            field: "name",
+            label: t("profile.name"),
+            value: user?.name,
+          })
+        }
+        activeOpacity={0.8}
+      >
+        <Feather name="edit-2" size={15} color={C.greenDark} />
+        <Text style={s.heroEditText}>Edit Profile</Text>
+      </TouchableOpacity>
+    </View>
+  </Animated.View>
+</View>
+{/* End responsive top section */}
+
+
+        {/* ── Profile shortcut cards ─────────────────────────── */}
+        <View
+          style={[
+            s.shortcutGrid,
+            { paddingHorizontal: hPad },
+          ]}
+        >
+          <TouchableOpacity
+            style={[s.shortcutCard, s.shortcutGreen]}
+            onPress={() => navigation.navigate("Orders")}
+            activeOpacity={0.8}
+          >
+            <View style={s.shortcutTop}>
+              <View style={[s.shortcutIcon, { backgroundColor: "#DCFCE7" }]}>
+                <Feather name="shopping-bag" size={22} color="#15803D" />
+              </View>
+              <Feather name="chevron-right" size={20} color="#64748B" />
+            </View>
+            <Text style={s.shortcutTitle}>My Orders</Text>
+            <Text style={s.shortcutSub}>Track your orders</Text>
+          </TouchableOpacity>
+
+
+<TouchableOpacity
+  style={[s.shortcutCard, s.shortcutGreen]}
+onPress={scrollToAddresses}
+  activeOpacity={0.8}
+>
+  <View style={s.shortcutTop}>
+    <View
+      style={[
+        s.shortcutIcon,
+        { backgroundColor: "#D1FAE5" },
+      ]}
+    >
+      <Feather
+        name="map-pin"
+        size={22}
+        color="#047857"
+      />
+    </View>
+
+    <Feather
+      name="chevron-right"
+      size={20}
+      color="#64748B"
+    />
+  </View>
+
+  <Text style={s.shortcutTitle}>Addresses</Text>
+  <Text style={s.shortcutSub}>Manage addresses</Text>
+</TouchableOpacity>
+
+
+
+          <TouchableOpacity
+            style={[s.shortcutCard, s.shortcutBlue]}
+            onPress={() => setShowPayments(true)}
+            activeOpacity={0.8}
+          >
+            <View style={s.shortcutTop}>
+              <View style={[s.shortcutIcon, { backgroundColor: "#DBEAFE" }]}>
+                <Feather name="credit-card" size={22} color="#2563EB" />
+              </View>
+              <Feather name="chevron-right" size={20} color="#2563EB" />
+            </View>
+            <Text style={s.shortcutTitle}>Payment Methods</Text>
+            <Text style={s.shortcutSub}>Manage payments</Text>
+          </TouchableOpacity>
+        </View>
         {/* ── Body ────────────────────────────────────────────────────── */}
-        <View style={{ paddingHorizontal: hPad }}>
+        {/* ── Responsive profile body ── */}
+<View
+  style={[
+    s.bodyLayout,
+    {
+      paddingHorizontal: hPad,
+      flexDirection: isDesktop ? "row" : "column",
+    },
+  ]}
+>
+  {/* Main content column */}
+  <View style={s.mainColumn}>
 
           {/* Personal info */}
           <SectionLabel title={t('profile.personalInfo')} />
@@ -621,6 +1110,27 @@ export default function ProfileScreen() {
           </View>
 
           {/* Delivery addresses */}
+{/* Delivery addresses */}
+<View
+  onLayout={(event) => {
+    const node = event.target;
+
+    if (Platform.OS === "web" && node?.getBoundingClientRect) {
+      const sectionTop = node.getBoundingClientRect().top;
+      const scrollTop =
+        scrollViewRef.current?.getScrollableNode?.()?.getBoundingClientRect?.().top;
+
+      if (typeof scrollTop === "number") {
+        setAddressSectionY(
+          sectionTop - scrollTop +
+          (scrollViewRef.current?.getScrollableNode?.()?.scrollTop || 0)
+        );
+      }
+    } else {
+      setAddressSectionY(event.nativeEvent.layout.y);
+    }
+  }}
+>
           <SectionLabel title={t('profile.deliveryAddresses')} />
           {addressStore?.addresses?.length === 0 ? (
             <View style={s.emptyBox}>
@@ -653,15 +1163,9 @@ export default function ProfileScreen() {
               ))}
             </>
           )}
-
-          {/* Activity */}
-          <SectionLabel title={t('profile.activity')} />
-          <MenuItem
-            icon="shopping-bag"
-            label={t('profile.orderHistory')}
-            sub={t('profile.orderHistorySub')}
-            onPress={() => navigation.navigate("Orders")}
-          />
+          </View>
+ {/* App */}
+         <SectionLabel title={t('profile.app')} />
           <MenuItem
             icon="gift"
             label={t('profile.inviteFriends')}
@@ -669,8 +1173,6 @@ export default function ProfileScreen() {
             onPress={handleInvite}
           />
 
-          {/* App */}
-          <SectionLabel title={t('profile.app')} />
           <MenuItem
             icon="bell"
             label={t('profile.pushNotifications')}
@@ -685,34 +1187,6 @@ export default function ProfileScreen() {
                 ios_backgroundColor={C.gray200}
               />
             }
-          />
-          <MenuItem
-            icon="globe"
-            label={t('profile.language')}
-            sub={t('profile.languageSub')}
-            onPress={() => setShowLanguage(true)}
-          />
-          <MenuItem
-            icon="credit-card"
-            label={t('profile.paymentMethods')}
-            sub={t('profile.paymentMethodsSub')}
-            onPress={() => setShowPayments(true)}
-          />
-          <MenuItem
-            icon="help-circle"
-            label={t('profile.helpSupport')}
-            sub={t('profile.helpSupportSub')}
-            onPress={() => navigation.navigate("Support")}
-          />
-          <MenuItem
-            icon="shield"
-            label={t('auth.privacyPolicy')}
-            onPress={() => navigation.navigate("Privacy")}
-          />
-          <MenuItem
-            icon="file-text"
-            label={t('profile.termsConditions')}
-            onPress={() => navigation.navigate("Terms")}
           />
 
           {/* Account */}
@@ -732,6 +1206,115 @@ export default function ProfileScreen() {
             right={null}
           />
 
+        
+</View>
+
+
+          {/* Right-side column — visible alongside content on desktop */}
+
+          <View style={s.sideColumn}>
+
+{/* Account overview */}
+
+            {/* Saved address overview */}
+            <View style={s.sideCard}>
+              <View style={s.sideTitleRow}>
+                <Feather name="map-pin" size={17} color={C.green} />
+                <Text style={s.sideTitle}>Delivery Addresses</Text>
+              </View>
+
+              <View style={s.addressSummary}>
+                <Text style={s.addressSummaryNumber}>
+                  {addressStore?.addresses?.length ?? 0}
+                </Text>
+                <Text style={s.addressSummaryText}>
+                  saved {(addressStore?.addresses?.length ?? 0) === 1
+                    ? "address"
+                    : "addresses"}
+                </Text>
+              </View>
+
+              <Text style={s.sideLinkSub}>
+                {addressStore?.addresses?.length
+                  ? "Your saved delivery locations are ready to use."
+                  : "Add a delivery address to make checkout easier."}
+              </Text>
+            </View>
+
+            {/* Help and policies */}
+            <View style={s.sideCard}>
+              <View style={s.sideTitleRow}>
+                <Feather name="help-circle" size={17} color={C.green} />
+                <Text style={s.sideTitle}>Need Help?</Text>
+              </View>
+
+              <TouchableOpacity
+                style={s.sideLink}
+                onPress={() => navigation.navigate("Support")}
+                activeOpacity={0.75}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={s.sideLinkTitle}>Customer Support</Text>
+                  <Text style={s.sideLinkSub}>We're here to help you</Text>
+                </View>
+                <Feather name="chevron-right" size={17} color={C.gray400} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={s.sideLink}
+                onPress={() => navigation.navigate("Terms")}
+                activeOpacity={0.75}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={s.sideLinkTitle}>Terms & Conditions</Text>
+                  <Text style={s.sideLinkSub}>Read our terms of service</Text>
+                </View>
+                <Feather name="chevron-right" size={17} color={C.gray400} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={s.sideLink}
+                onPress={() => navigation.navigate("Privacy")}
+                activeOpacity={0.75}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={s.sideLinkTitle}>Privacy Policy</Text>
+                  <Text style={s.sideLinkSub}>Learn how we protect your data</Text>
+                </View>
+                <Feather name="chevron-right" size={17} color={C.gray400} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Local shopping promotional card */}
+            <LinearGradient
+              colors={[C.greenDark, C.green]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.localPromo}
+            >
+              <View style={s.promoIcon}>
+                <Feather name="heart" size={22} color={C.white} />
+              </View>
+
+              <Text style={s.localPromoTitle}>
+                Support Local Stores
+              </Text>
+
+              <Text style={s.localPromoText}>
+                Every order helps nearby shops grow and brings your community closer.
+              </Text>
+
+              <TouchableOpacity
+                style={s.promoFooter}
+                onPress={() => navigation.navigate("Orders")}
+                activeOpacity={0.8}
+              >
+                <Text style={s.promoFooterText}>Explore your orders</Text>
+                <Feather name="arrow-up-right" size={15} color={C.white} />
+              </TouchableOpacity>
+            </LinearGradient>
+
+          </View>
         </View>
       </Animated.ScrollView>
 
@@ -791,63 +1374,605 @@ export default function ProfileScreen() {
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
+  root: {
+  flex: 1,
+  backgroundColor: "#EAF4EB",
+},
 
   // Hero — rounded bottom edge + decorative circles for depth
-  hero: {
-    paddingTop: Platform.OS === "android" ? 32 : 24, paddingBottom: 44,
-    borderBottomLeftRadius: 28, borderBottomRightRadius: 28,
-    overflow: "hidden",
+
+
+  // Profile banner
+
+hero: {
+  position: "relative",
+  paddingHorizontal: 20,
+  paddingTop: 22,
+  paddingBottom: 22,
+  borderRadius: 22,
+  overflow: "hidden",
+  borderWidth: 1,
+  borderColor: "#A2D9AE",
+  backgroundColor: "#C8EED0",
+  marginTop: 16,
+},
+
+
+
+heroDecorCircle1: {
+  position: "absolute",
+  top: -55,
+  right: -25,
+  width: 180,
+  height: 180,
+  borderRadius: 90,
+  backgroundColor: "rgba(34,134,75,0.13)",
+},
+
+heroDecorCircle2: {
+  position: "absolute",
+  bottom: -65,
+  right: 100,
+  width: 150,
+  height: 150,
+  borderRadius: 75,
+  backgroundColor: "rgba(34,134,75,0.10)",
+},
+
+
+heroMain: {
+flexDirection: "row",
+alignItems: "center",
+gap: 16,
+width: "100%",
+},
+
+
+  avatarRing: {
+    padding: 5,
+    borderRadius: 100,
+    backgroundColor: C.white,
+    borderWidth: 1,
+    borderColor: "#E0F2E5",
   },
-  heroDecorCircle1: { position: "absolute", top: -50, right: -40, width: 150, height: 150, borderRadius: 75, backgroundColor: "rgba(255,255,255,0.08)" },
-  heroDecorCircle2: { position: "absolute", top: 70, right: 50, width: 56, height: 56, borderRadius: 28, backgroundColor: "rgba(255,255,255,0.07)" },
 
-  heroTop: { marginBottom: 24 },
-  heroLabel: { fontSize: 13, fontWeight: "800", color: "rgba(255,255,255,0.7)", letterSpacing: 1, textTransform: "uppercase" },
-  heroMain: { flexDirection: "row", alignItems: "center", gap: 18, marginBottom: 28 },
+  avatarOuter: {
+    position: "relative",
+  },
 
-  avatarRing: { padding: 4, borderRadius: 26, backgroundColor: "rgba(255,255,255,0.22)" },
-  avatarOuter: { position: "relative" },
   verifiedDot: {
-    position: "absolute", bottom: -2, right: -2,
-    width: 22, height: 22, borderRadius: 11,
-    backgroundColor: C.green, borderWidth: 2.5, borderColor: C.white,
-    alignItems: "center", justifyContent: "center",
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: C.greenDark,
+    borderWidth: 3,
+    borderColor: C.white,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  heroInfo: { flex: 1 },
-  heroName: { fontSize: 24, fontWeight: "900", color: C.white, letterSpacing: -0.3, flexWrap: "wrap" },
-  heroPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.white, alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, marginTop: 8 },
-  heroPillText: { fontSize: 13, fontWeight: "700", color: C.green },
-  heroSince: { fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 6 },
+heroInfo: {
+flex: 1,
+minWidth: 0,
+gap: 8,
+justifyContent: "center",
+},
+
+
+heroName: {
+  fontSize: 22,
+  fontWeight: "900",
+  color: "#104C29",
+  flexShrink: 1,
+},
+
+
+
+  heroDetailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+heroDetailText: {
+flex: 1,
+minWidth: 0,
+fontSize: 14,
+color: C.gray900,
+},
+
+
+
+  roleBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#C7EBD1",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginTop: 3,
+  },
+
+  roleBadgeText: {
+    fontSize: 12,
+    color: "#086B3C",
+    fontWeight: "800",
+  },
+
+  heroSince: {
+    fontSize: 12,
+    color: C.gray600,
+    marginTop: 2,
+  },
+
+heroEditButton: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: "#E5F8E9",
+  borderWidth: 1,
+  borderColor: "#91CFA0",
+  borderRadius: 24,
+  paddingVertical: 10,
+  paddingHorizontal: 12,
+  gap: 5,
+  flexShrink: 0,
+},
+
+
+heroEditText: {
+fontSize: 13,
+fontWeight: "700",
+color: C.greenDark,
+flexShrink: 0,
+},
 
   // Stats wrapper — a plain sibling AFTER the hero (not inside its
   // overflow:hidden box), pulled up with a negative marginTop so it overlaps
   // the green area. Because it paints after the hero, the overlap renders on
   // top instead of being clipped.
   statsWrap: { marginTop: -64 },
-  stats: {
-    flexDirection: "row", backgroundColor: C.white, borderRadius: 22, paddingVertical: 20,
-    shadowColor: "#0F172A", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.12, shadowRadius: 18, elevation: 6,
-    borderWidth: 1, borderColor: C.gray100,
-  },
+
+stats: {
+  flexDirection: "row",
+  backgroundColor: C.white,
+  borderRadius: 22,
+  paddingVertical: 22,
+  paddingHorizontal: 8,
+  shadowColor: "#0F172A",
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.10,
+  shadowRadius: 18,
+  elevation: 5,
+  borderWidth: 1,
+  borderColor: C.gray100,
+},
   statItem: { flex: 1, alignItems: "center", gap: 6 },
   statIconWrap: { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center", marginBottom: 2 },
   statNum: { fontSize: 19, fontWeight: "900", color: C.gray900 },
-  statLabel: { fontSize: 11.5, color: C.gray400, fontWeight: "600" },
+  
+statLabel: {
+  fontSize: 11,
+  color: C.gray500,
+  fontWeight: "600",
+  textAlign: "center",
+},
   statSep: { width: 1, backgroundColor: C.gray200 },
 
   // Cards — soft shadow instead of a flat border
-  card: {
-    backgroundColor: C.white, borderRadius: 18, paddingHorizontal: 18, marginTop: 8,
-    borderWidth: 1, borderColor: C.gray100,
-    shadowColor: "#0F172A", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 2,
-  },
+  
+screen: {
+  flex: 1,
+  backgroundColor: "#EAF4EB",
+},
+
+card: {
+  backgroundColor: "#F7FCF7",
+  borderColor: "#C5E3CB",
+  borderWidth: 1,
+  borderRadius: 20,
+  paddingHorizontal: 16,
+  paddingVertical: 8,
+  shadowColor: "#14532D",
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.06,
+  shadowRadius: 8,
+  elevation: 2,
+},
 
   // Empty address
-  emptyBox: { alignItems: "center", paddingVertical: 32, gap: 8, backgroundColor: C.white, borderRadius: 16, borderWidth: 1.5, borderColor: C.gray200, ...Platform.select({ web: { borderStyle: "dashed" }, default: { borderStyle: "solid" } }) },
-  emptyTitle: { fontSize: 15, fontWeight: "700", color: C.gray500 },
-  emptySub: { fontSize: 13, color: C.gray400, textAlign: "center", paddingHorizontal: 24, lineHeight: 19 },
+  
+emptyBox: {
+  alignItems: "center",
+  paddingVertical: 36,
+  paddingHorizontal: 20,
+  gap: 10,
+  backgroundColor: C.white,
+  borderRadius: 20,
+  borderWidth: 1.5,
+  borderColor: C.gray200,
+  ...Platform.select({
+    web: { borderStyle: "dashed" },
+    default: { borderStyle: "solid" },
+  }),
+},
+emptyTitle: {
+  fontSize: 16,
+  fontWeight: "800",
+  color: C.gray700,
+  textAlign: "center",
+},
+emptySub: {
+  fontSize: 13,
+  color: C.gray500,
+  textAlign: "center",
+  paddingHorizontal: 16,
+  lineHeight: 20,
+},
+
+  
+  // Responsive two-column profile layout
+
+bodyLayout: {
+  width: "100%",
+  maxWidth: 1440,
+  alignSelf: "center",
+  gap: 22,
+  paddingTop: 8,
+  paddingBottom: 24,
+},
+
+mainColumn: {
+  flex: 1.6,
+  minWidth: 0,
+},
+
+sideColumn: {
+  flex: 1,
+  minWidth: 0,
+  gap: 14,
+},
+
+
+shortcutGrid: {
+  width: "100%",
+  maxWidth: 1440,
+  alignSelf: "center",
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 12,
+  paddingTop: 18,
+  paddingBottom: 10,
+},
+
+
+shortcutCard: {
+  flexGrow: 1,
+  flexBasis: 180,
+  minWidth: 145,
+  padding: 16,
+  borderRadius: 18,
+  borderWidth: 1,
+  marginBottom: 0,
+  shadowColor: "#14532D",
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.08,
+  shadowRadius: 7,
+  elevation: 2,
+},
+
+shortcutGreen: {
+  backgroundColor: "#DDF4E1",
+  borderColor: "#A9DDB5",
+},
+
+shortcutRed: {
+  backgroundColor: "#E7F6E9",
+  borderColor: "#B6E0BE",
+},
+
+shortcutBlue: {
+  backgroundColor: "#D9F0DE",
+  borderColor: "#A4D9B0",
+},
+
+shortcutTop: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginBottom: 16,
+},
+
+shortcutIcon: {
+  width: 46,
+  height: 46,
+  borderRadius: 15,
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+shortcutTitle: {
+  fontSize: 15,
+  fontWeight: "800",
+  color: "#173D25",
+  marginBottom: 5,
+},
+
+shortcutSub: {
+  fontSize: 12,
+  lineHeight: 18,
+  color: "#4E7057",
+},
+
+shortcutIconWrap: {
+  backgroundColor: "#BFE8C7",
+  borderRadius: 13,
+},
+
+  // Right-side information cards
+sideCard: {
+  backgroundColor: "#E5F4E7",
+  borderRadius: 18,
+  padding: 20,
+  borderWidth: 1,
+  borderColor: "#B9DDBF",
+  shadowColor: "#173D25",
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.06,
+  shadowRadius: 10,
+  elevation: 2,
+},
+  sideTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 16,
+  },
+  sideTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: C.gray900,
+  },
+  quickStat: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 13,
+    borderTopWidth: 1,
+    borderTopColor: C.gray100,
+  },
+  quickStatIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickStatValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: C.gray900,
+    marginBottom: 4,
+  },
+  quickStatLabel: {
+    fontSize: 12,
+    color: C.gray500,
+    lineHeight: 17,
+  },
+  addressSummary: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 8,
+    marginBottom: 8,
+  },
+  addressSummaryNumber: {
+    fontSize: 30,
+    fontWeight: "900",
+    color: C.greenDark,
+  },
+  addressSummaryText: {
+    fontSize: 14,
+    color: C.gray600,
+    fontWeight: "600",
+  },
+  sideLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: C.gray100,
+  },
+  sideLinkTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: C.gray900,
+    marginBottom: 4,
+  },
+  sideLinkSub: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: C.gray500,
+  },
+
+  // Local shopping promotional card
+  localPromo: {
+    borderRadius: 20,
+    padding: 22,
+    overflow: "hidden",
+  },
+  promoIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  localPromoTitle: {
+    fontSize: 19,
+    fontWeight: "900",
+    color: C.white,
+    marginBottom: 8,
+  },
+  localPromoText: {
+    fontSize: 13,
+    lineHeight: 21,
+    color: "rgba(255,255,255,0.85)",
+  },
+  promoFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    alignSelf: "flex-start",
+    marginTop: 18,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.16)",
+  },
+  promoFooterText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: C.white,
+  },
+
+accountSummaryRow: {
+  flexDirection: "row",
+  alignItems: "stretch",
+  justifyContent: "space-between",
+  backgroundColor: "#F7FCF8",
+  borderRadius: 14,
+  paddingVertical: 14,
+},
+accountSummaryItem: {
+  flex: 1,
+  alignItems: "center",
+  justifyContent: "center",
+  paddingHorizontal: 4,
+  gap: 6,
+},
+accountSummaryIcon: {
+  width: 44,
+  height: 44,
+  borderRadius: 22,
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: "#E4F5E8",
+  marginBottom: 4,
+},
+accountSummaryValue: {
+  fontSize: 13,
+  fontWeight: "700",
+  color: C.gray900,
+  textAlign: "center",
+},
+accountSummaryLabel: {
+  fontSize: 11,
+  color: C.gray500,
+  textAlign: "center",
+},
+accountSummaryDivider: {
+  width: 1,
+  backgroundColor: C.gray200,
+  marginVertical: 6,
+},
+
+
+topHeroRow: {
+  width: "100%",
+  maxWidth: 1440,
+  alignSelf: "center",
+  gap: 12,
+  alignItems: "stretch",
+  marginTop: 12,
+  marginBottom: 8,
+},
+
+greetingTopCard: {
+  width: "100%",
+  minWidth: 0,
+  paddingHorizontal: 22,
+  paddingVertical: 18,
+  borderRadius: 20,
+  backgroundColor: "#DDF4DF",
+  borderWidth: 1,
+  borderColor: "#B7E4BE",
+  overflow: "hidden",
+  borderRadius: 22,
+},
+
+greetingWelcomeRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+},
+
+greetingText: {
+  fontSize: 14,
+  color: "#52745B",
+  fontWeight: "600",
+},
+
+greetingName: {
+  fontSize: 25,
+  lineHeight: 34,
+  color: "#14532D",
+  fontWeight: "800",
+  marginTop: 3,
+},
+
+greetingSub: {
+  fontSize: 14,
+  lineHeight: 20,
+  color: "#326D43",
+  marginTop: 5,
+},
+
+greetingLeafCircle: {
+  width: 60,
+  height: 60,
+  borderRadius: 20,
+  backgroundColor: "#B8E8C2",
+  borderWidth: 1,
+  borderColor: "#9AD9A8",
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+greetingDecorativeRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 9,
+  marginTop: 14,
+},
+
+greetingAccentLine: {
+  width: 30,
+  height: 4,
+  borderRadius: 3,
+  backgroundColor: "#22864B",
+},
+
+greetingFooter: {
+  flex: 1,
+  fontSize: 12,
+  lineHeight: 17,
+  color: "#326D43",
+  fontWeight: "600",
+},
+
+profileBanner: {
+  backgroundColor: "#C9EFD0",
+  borderColor: "#9FD9AB",
+  borderWidth: 1,
+  borderRadius: 22,
+},
+
 });
 
 

@@ -40,29 +40,23 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 const TIP_PRESETS = [10, 20, 50, 100];
 
 const C = {
-  yellow: "#F59E0B",
-  orange: "#F97316",
-  orangeDark: "#EA580C",
-  green: "#16A34A",
-  greenDark: "#15803D",
-  greenLight: "#F0FDF4",
-  greenMid: "#DCFCE7",
-  greenBorder: "#BBF7D0",
-  white: "#FFFFFF",
-  bg: "#F8FAFC",
-  gray100: "#F3F4F6",
-  gray200: "#E5E7EB",
-  gray300: "#D1D5DB",
-  gray400: "#9CA3AF",
-  gray500: "#6B7280",
-  gray600: "#4B5563",
-  gray700: "#374151",
-  gray800: "#1F2937",
-  gray900: "#111827",
-  red: "#DC2626",
-  redLight: "#FEF2F2",
-  cyan: "#0891B2",
-  cyanLight: "#ECFEFF",
+
+green: "#16803D",
+greenDark: "#116530",
+greenLight: "#F0F9F2",
+greenMid: "#DDF2E2",
+greenBorder: "#CBE5D1",
+bg: "#F5F8F5",
+gray100: "#F1F4F1",
+gray200: "#E1E8E2",
+gray300: "#C8D3CA",
+gray400: "#93A197",
+gray500: "#68766B",
+gray600: "#4C5B4F",
+gray700: "#344638",
+gray800: "#243629",
+gray900: "#172D1E",
+
 };
 
 // ─── Status config — matches backend OrderStatus enum exactly ─────────────────
@@ -2668,24 +2662,35 @@ export default function MyOrdersScreen() {
     <View style={s.root}>
       <StatusBar barStyle={Platform.OS === 'ios' ? 'dark-content' : 'default'} backgroundColor="#FFFFFF" />
 
-      {/* HEADER */}
-      <View style={s.header}>
-        <TouchableOpacity
-          style={s.backBtn}
-          onPress={goBack}
-          activeOpacity={0.8}
-        >
-          <Feather name="arrow-left" size={20} color={C.gray800} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>{t('orders.myOrders') || 'Order History'}</Text>
-        <TouchableOpacity
-          style={s.refreshBtn}
-          onPress={() => fetchOrders(true)}
-          activeOpacity={0.8}
-        >
-          <Feather name="refresh-cw" size={16} color={C.gray800} />
-        </TouchableOpacity>
-      </View>
+
+{/* HEADER */}
+<View style={s.header}>
+  <TouchableOpacity
+    style={s.backBtn}
+    onPress={goBack}
+    activeOpacity={0.8}
+  >
+    <Feather name="arrow-left" size={22} color={C.greenDark} />
+  </TouchableOpacity>
+
+  <View style={s.headerTextWrap}>
+    <Text style={s.headerTitle}>
+      {t('orders.myOrders', 'My Orders') || 'My Orders'}
+    </Text>
+    <Text style={s.headerSubtitle}>
+      Track, manage, and revisit your grocery orders
+    </Text>
+  </View>
+
+  <TouchableOpacity
+    style={s.refreshBtn}
+    onPress={() => fetchOrders(true)}
+    activeOpacity={0.8}
+  >
+    <Feather name="refresh-cw" size={19} color={C.greenDark} />
+  </TouchableOpacity>
+</View>
+
 
       {/* SEARCH BAR */}
       <View style={s.searchBarContainer}>
@@ -2747,52 +2752,62 @@ export default function MyOrdersScreen() {
       </View>
 
       {/* BODY */}
-      {loading ? (
-        <View style={s.centered}>
-          <ActivityIndicator size="large" color={C.green} />
-          <Text style={s.loadingText}>{t('orders.fetchingOrders', 'Fetching your orders…')}</Text>
-        </View>
-      ) : filtered.length === 0 ? (
-        <View style={s.emptyWrap}>
-          <View style={s.emptyIconWrap}>
-            <Feather name="shopping-bag" size={30} color={C.gray300} />
-          </View>
-          <Text style={s.emptyTitle}>
-            {activeTab === "active"
-              ? t('orders.noActiveOrders', 'No active orders')
-              : activeTab === "past"
-                ? t('orders.noPastOrders', 'No past orders')
-                : t('orders.noOrders', 'No orders yet')}
-          </Text>
-          <Text style={s.emptySub}>
-            {activeTab === "all"
-              ? "Your order history will appear here"
-              : "Check back later"}
-          </Text>
-          {activeTab === "all" && (
-            <TouchableOpacity
-              style={s.shopBtn}
-              onPress={() =>
-                navigation.navigate("CustomerApp", {
-                  screen: "CustomerTabNavigator",
-                  params: { screen: "Home" },
-                })
-              }
-              activeOpacity={0.85}
-            >
-              <LinearGradient
-                colors={[C.green, C.greenDark]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={s.shopBtnGrad}
-              >
-                <Text style={s.shopBtnText}>Start Shopping</Text>
-                <Feather name="arrow-right" size={15} color={C.white} />
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : (
+
+{loading ? (
+  <View style={s.centered}>
+    <ActivityIndicator size="large" color={C.green} />
+    <Text style={s.loadingText}>
+      {t('orders.fetchingOrders', 'Fetching your orders…')}
+    </Text>
+  </View>
+) : filtered.length === 0 ? (
+  <View style={s.emptyWrap}>
+    <View style={s.emptyIconWrap}>
+      <Image
+        source={require("../../../assets/orders-empty.png")}
+        style={s.emptyIllustration}
+        resizeMode="contain"
+      />
+    </View>
+
+    <Text style={s.emptyTitle}>
+      {activeTab === "active"
+        ? t('orders.noActiveOrders', 'No active orders')
+        : activeTab === "past"
+          ? t('orders.noPastOrders', 'No past orders')
+          : t('orders.noOrders', 'No orders yet')}
+    </Text>
+
+    <Text style={s.emptySub}>
+      {activeTab === "all"
+        ? "Your order history will appear here"
+        : "Check back later"}
+    </Text>
+
+    {activeTab === "all" && (
+      <TouchableOpacity
+        style={s.shopBtn}
+        onPress={() =>
+          navigation.navigate("CustomerApp", {
+            screen: "CustomerTabNavigator",
+            params: { screen: "Home" },
+          })
+        }
+        activeOpacity={0.85}
+      >
+        <LinearGradient
+          colors={[C.green, C.greenDark]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={s.shopBtnGrad}
+        >
+          <Text style={s.shopBtnText}>Start Shopping</Text>
+          <Feather name="arrow-right" size={15} color={C.white} />
+        </LinearGradient>
+      </TouchableOpacity>
+    )}
+  </View>
+) : (
         <ScrollView
           contentContainerStyle={s.list}
           showsVerticalScrollIndicator={false}
@@ -3155,38 +3170,51 @@ const s = StyleSheet.create({
   },
   loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500" },
 
-  header: {
-    paddingTop: Platform.OS === "android" ? 36 : 48,
-    paddingBottom: 14,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: C.white,
-  },
-  backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: C.gray100,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: C.gray900,
-    flex: 1,
-    letterSpacing: -0.5,
-  },
-  refreshBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: C.gray100,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+header: {
+  flexDirection: "row",
+  alignItems: "center",
+  paddingHorizontal: 24,
+  paddingTop: 20,
+  paddingBottom: 16,
+  gap: 16,
+  backgroundColor: "#FFFFFF",
+},
+backBtn: {
+  width: 52,
+  height: 52,
+  borderRadius: 26,
+  backgroundColor: "#F0FAF3",
+  borderWidth: 1,
+  borderColor: "#D9F3E2",
+  alignItems: "center",
+  justifyContent: "center",
+},
+headerTextWrap: {
+  flex: 1,
+  gap: 3,
+},
+headerTitle: {
+  fontSize: 26,
+  fontWeight: "900",
+  color: "#123F32",
+},
+headerSubtitle: {
+  fontSize: 14,
+  color: "#78909C",
+  fontWeight: "500",
+},
+refreshBtn: {
+  width: 52,
+  height: 52,
+  borderRadius: 26,
+  backgroundColor: "#F0FAF3",
+  borderWidth: 1,
+  borderColor: "#D9F3E2",
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+
 
   searchBarContainer: {
     paddingHorizontal: 16,
@@ -3195,14 +3223,20 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: C.gray100,
   },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: C.gray100,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 46,
-  },
+
+
+searchBar: {
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: "#F1F4F8",
+  borderRadius: 17,
+  paddingHorizontal: 18,
+  height: 56,
+  borderWidth: 1,
+  borderColor: "#EEF1F5",
+},
+
+
   searchIcon: {
     marginRight: 8,
   },
@@ -3227,19 +3261,36 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: C.gray100,
   },
-  tab: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: C.gray200,
-  },
-  tabActive: { backgroundColor: C.green, borderColor: C.green },
-  tabLabel: { fontSize: 13, fontWeight: "600", color: C.gray600 },
-  tabLabelActive: { color: C.white },
+
+
+tab: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  paddingHorizontal: 24,
+  paddingVertical: 12,
+  borderRadius: 28,
+  borderWidth: 1,
+  borderColor: "#E4EAF0",
+  backgroundColor: "#FFFFFF",
+  minHeight: 46,
+},
+tabActive: {
+  backgroundColor: "#079447",
+  borderColor: "#079447",
+},
+tabLabel: {
+  fontSize: 15,
+  fontWeight: "700",
+  color: "#60758A",
+},
+tabLabelActive: {
+  color: "#FFFFFF",
+  fontWeight: "800",
+},
+
+
   tabBubble: {
     backgroundColor: C.gray100,
     paddingHorizontal: 6,
@@ -3271,41 +3322,79 @@ const s = StyleSheet.create({
   },
   activeBannerText: { fontSize: 13, color: C.green, fontWeight: "600" },
 
-  emptyWrap: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 32,
-  },
-  emptyIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
-    backgroundColor: C.gray100,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: C.gray800,
-    textAlign: "center",
-  },
-  emptySub: {
-    fontSize: 14,
-    color: C.gray400,
-    textAlign: "center",
-    marginTop: 6,
-    marginBottom: 24,
-  },
-  shopBtn: { borderRadius: 14, overflow: "hidden" },
-  shopBtnGrad: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-  },
-  shopBtnText: { fontSize: 16, fontWeight: "800", color: C.white },
+
+
+emptyWrap: {
+  flex: 1,
+  alignItems: "center",
+  justifyContent: "center",
+  paddingHorizontal: 24,
+  paddingVertical: 32,
+  marginHorizontal: 24,
+  marginBottom: 20,
+  borderRadius: 18,
+  borderWidth: 1,
+  borderColor: "#D8F4DE",
+  backgroundColor: "#F0FCEF",
+  overflow: "hidden",
+},
+emptyIconWrap: {
+  width: 116,
+  height: 116,
+  borderRadius: 34,
+  backgroundColor: "#DDF8E3",
+  borderWidth: 1,
+  borderColor: "#C9F0D2",
+  alignItems: "center",
+  justifyContent: "center",
+  marginBottom: 22,
+},
+
+
+emptyIllustration: {
+  width: 320,
+  height: 260,
+},
+
+emptyTitle: {
+  fontSize: 27,
+  lineHeight: 34,
+  fontWeight: "900",
+  color: "#075C3D",
+  textAlign: "center",
+  letterSpacing: -0.6,
+},
+emptySub: {
+  fontSize: 16,
+  lineHeight: 24,
+  color: "#56877B",
+  fontWeight: "500",
+  textAlign: "center",
+  marginTop: 8,
+  marginBottom: 24,
+  maxWidth: 560,
+},
+shopBtn: {
+  borderRadius: 30,
+  overflow: "hidden",
+  elevation: 4,
+  shadowColor: "#075C3D",
+  shadowOffset: { width: 0, height: 5 },
+  shadowOpacity: 0.2,
+  shadowRadius: 8,
+},
+shopBtnGrad: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 12,
+  paddingHorizontal: 34,
+  paddingVertical: 17,
+},
+shopBtnText: {
+  fontSize: 16,
+  fontWeight: "800",
+  color: "#FFFFFF",
+},
+
 });

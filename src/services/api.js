@@ -115,101 +115,267 @@ export const uploadAPI = {
    *        documents as authenticated Cloudinary assets (signed, expiring URL).
    * @returns {Promise<{url: string, public_id: string, mime: string}>}
    */
-  upload: async (localUri, mimeType, token, onProgress = null, options = {}) => {
-    const ext =
-      mimeType === "application/pdf" ? ".pdf"
-      : mimeType === "image/png"    ? ".png"
-      : mimeType === "image/webp"   ? ".webp"
+upload: async (localUri, mimeType, token, onProgress = null, options = {}) => {
+  const ext =
+    mimeType === "application/pdf"
+      ? ".pdf"
+      : mimeType === "image/png"
+      ? ".png"
+      : mimeType === "image/webp"
+      ? ".webp"
       : ".jpg";
 
-    const fileName = `upload_${Date.now()}${ext}`;
-    const formData = new FormData();
-    if (options.authenticated) formData.append("authenticated", "1");
+  const fileName = `upload_${Date.now()}${ext}`;
+  const formData = new FormData();
 
-    if (Platform.OS === 'web') {
-      try {
-        const response = await fetch(localUri);
-        const blob = await response.blob();
-        const bytes = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
-        if (!matchesMagicBytes(bytes, mimeType)) {
-          throw new ContentMismatchError(
-            mimeType === "application/pdf"
-              ? "This file doesn't look like a valid PDF. Please upload the actual PDF file (not a renamed HTML/text page)."
-              : "This file doesn't match the selected type. Please upload a valid JPG, PNG, WebP or PDF file."
-          );
-        }
-        formData.append("file", blob, fileName);
-      } catch (err) {
-        if (err instanceof ContentMismatchError) throw err;
-        console.error("Web upload blob conversion failed:", err);
-        throw new Error("Could not process file for upload");
+  if (options.authenticated) {
+    formData.append("authenticated", "1");
+  }
+
+  // ─── Web upload ──────────────────────────────────────────────────────────
+  if (Platform.OS === "web") {
+    try {
+      const response = await fetch(localUri);
+      const blob = await response.blob();
+
+      // Expo ImagePicker on web can report a MIME type that differs
+      // from the browser Blob MIME type.
+      const actualMimeType =
+        blob.type && blob.type.startsWith("image/")
+          ? blob.type
+          : mimeType;
+
+      console.log(
+        "Web upload - passed MIME type:",
+        mimeType
+      );
+
+      console.log(
+        "Web upload - actual Blob MIME type:",
+        blob.type
+      );
+
+      console.log(
+        "Web upload - using MIME type:",
+        actualMimeType
+      );
+
+      const bytes = new Uint8Array(
+        await blob.slice(0, 12).arrayBuffer()
+      );
+
+      console.log("WEB DEBUG - blob.type:", blob.type);
+      console.log("WEB DEBUG - mimeType:", mimeType);
+      console.log(
+      "WEB DEBUG - first bytes:",
+      Array.from(bytes)
+);
+console.log(
+  "WEB DEBUG - localUri:",
+  localUri
+);
+
+      if (!matchesMagicBytes(bytes, actualMimeType)) {
+        throw new ContentMismatchError(
+          "The selected file is not a valid image. Please choose a JPG, PNG or WebP image."
+        );
       }
-    } else {
-      formData.append("file", {
-        uri:  localUri,
-        name: fileName,
-        type: mimeType,
+
+      const uploadBlob = new Blob([blob], {
+        type: actualMimeType,
       });
+
+      const actualExtension =
+        actualMimeType === "image/png"
+          ? ".png"
+          : actualMimeType === "image/webp"
+          ? ".webp"
+          : ".jpg";
+
+      const actualFileName =
+        `profile_${Date.now()}${actualExtension}`;
+
+      formData.append(
+        "file",
+        uploadBlob,
+        actualFileName
+      );
+    } catch (err) {
+      if (err instanceof ContentMismatchError) {
+        throw err;
+      }
+
+      console.error(
+        "Web upload blob conversion failed:",
+        err
+      );
+
+      throw new Error(
+        "Could not process file for upload"
+      );
     }
+  }
 
-    console.log("📤 Uploading file to:", `${BASE_URL}/upload`, "Platform:", Platform.OS);
+  // ─── Native upload ───────────────────────────────────────────────────────
+  else {
+    formData.append("file", {
+      uri: localUri,
+      name: fileName,
+      type: mimeType,
+    });
+  }
 
-    const _doUpload = (uploadToken) => new Promise((resolve, reject) => {
+  console.log(
+    "📤 Uploading file to:",
+    `${BASE_URL}/upload`,
+    "Platform:",
+    Platform.OS
+  );
+
+  // ─── Actual upload request ───────────────────────────────────────────────
+  const _doUpload = (uploadToken) =>
+    new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", `${BASE_URL}/upload`);
-      xhr.setRequestHeader("Authorization", `Bearer ${uploadToken}`);
+
+      xhr.open(
+        "POST",
+        `${BASE_URL}/upload`
+      );
+
+      xhr.setRequestHeader(
+        "Authorization",
+        `Bearer ${uploadToken}`
+      );
+
       xhr.timeout = 60000;
 
       xhr.upload.onprogress = (e) => {
-        if (onProgress && e.lengthComputable && e.total > 0) {
-          onProgress(Math.min(100, Math.round((e.loaded / e.total) * 100)));
+        if (
+          onProgress &&
+          e.lengthComputable &&
+          e.total > 0
+        ) {
+          onProgress(
+            Math.min(
+              100,
+              Math.round((e.loaded / e.total) * 100)
+            )
+          );
         }
       };
-      xhr.onerror = () => reject(new Error("Network error during upload"));
-      xhr.ontimeout = () => reject(new Error("Upload timed out. Please try again."));
+
+      xhr.onerror = () => {
+        reject(
+          new Error("Network error during upload")
+        );
+      };
+
+      xhr.ontimeout = () => {
+        reject(
+          new Error(
+            "Upload timed out. Please try again."
+          )
+        );
+      };
 
       xhr.onload = () => {
         let data = {};
+
         try {
-          data = JSON.parse(xhr.responseText || "{}");
+          data = JSON.parse(
+            xhr.responseText || "{}"
+          );
         } catch (err) {
-          console.error("Upload: could not parse response", err);
+          console.error(
+            "Upload: could not parse response",
+            err
+          );
         }
-        if (xhr.status >= 200 && xhr.status < 300 && data.url) {
-          if (onProgress) onProgress(100);
+
+        if (
+          xhr.status >= 200 &&
+          xhr.status < 300 &&
+          data.url
+        ) {
+          if (onProgress) {
+            onProgress(100);
+          }
+
           resolve(data);
-        } else if (xhr.status === 401 && data.error === "TOKEN_EXPIRED") {
-          reject({ _tokenExpired: true });
+        } else if (
+          xhr.status === 401 &&
+          data.error === "TOKEN_EXPIRED"
+        ) {
+          reject({
+            _tokenExpired: true,
+          });
         } else {
-          reject(new Error(data.message || data.msg || "Upload failed"));
+          reject(
+            new Error(
+              data.message ||
+              data.msg ||
+              "Upload failed"
+            )
+          );
         }
       };
 
       xhr.send(formData);
     });
 
-    try {
-      return await _doUpload(token);
-    } catch (err) {
-      if (err?._tokenExpired) {
-        const { tryRefreshToken, default: useAuthStore } = await import('../store/authStore');
-        const refreshResult = await tryRefreshToken();
-        const newAccessToken = refreshResult?.token;
-        if (newAccessToken) {
-          useAuthStore.getState()._setAccessToken(newAccessToken);
-          return await _doUpload(newAccessToken);
-        } else if (refreshResult?.error === "ACCOUNT_DEACTIVATED") {
-          useAuthStore.getState().flagDeactivated();
-          throw new Error("Your account has been deactivated.");
-        } else {
-          useAuthStore.getState().logout();
-          throw new Error("Session expired. Please log in again.");
-        }
-      }
-      throw err;
-    }
-  },
+  // ─── Upload + automatic token refresh ───────────────────────────────────
+  try {
+    return await _doUpload(token);
+  } catch (err) {
+    if (err?._tokenExpired) {
+      const {
+        tryRefreshToken,
+        default: useAuthStore,
+      } = await import(
+        "../store/authStore"
+      );
 
+      const refreshResult =
+        await tryRefreshToken();
+
+      const newAccessToken =
+        refreshResult?.token;
+
+      if (newAccessToken) {
+        useAuthStore
+          .getState()
+          ._setAccessToken(
+            newAccessToken
+          );
+
+        return await _doUpload(
+          newAccessToken
+        );
+      } else if (
+        refreshResult?.error ===
+        "ACCOUNT_DEACTIVATED"
+      ) {
+        useAuthStore
+          .getState()
+          .flagDeactivated();
+
+        throw new Error(
+          "Your account has been deactivated."
+        );
+      } else {
+        useAuthStore
+          .getState()
+          .logout();
+
+        throw new Error(
+          "Session expired. Please log in again."
+        );
+      }
+    }
+
+    throw err;
+  }
+},
   /**
    * Delete an uploaded asset from Cloudinary (signed, through the backend).
    * @param {string} publicId - Cloudinary public_id (or local filename fallback)
