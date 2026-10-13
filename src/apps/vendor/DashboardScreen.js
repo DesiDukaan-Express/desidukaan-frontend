@@ -840,7 +840,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 }}
               >
                 <Text style={{ fontSize: 11, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: C.textLight }}>
-                  Ctrl + K
+                
                 </Text>
               </View>
             </TouchableOpacity>
@@ -1276,28 +1276,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                   value: stats.today.totalOrders,
                   label: "Today's Orders",
                 },
-                {
-                  icon: "account-balance-wallet",
-                  iconColor: C.purple,
-                  iconBg: C.purpleSoft,
-                  value: `₹${Number(stats.today.revenue).toLocaleString("en-IN")}`,
-                  label: "Today's Revenue",
-                },
-                {
-                  icon: "schedule",
-                  iconColor: C.blue,
-                  iconBg: C.blueSoft,
-                  value: `${stats.today.avgPrepTime}m`,
-                  label: "Avg. Prep Time",
-                },
-                {
-                  icon: "inventory-2",
-                  iconColor: C.orange,
-                  iconBg: C.orangeSoft,
-                  value: String(stats.lowStockCount),
-                  label: "Low Stock Items",
-                  isLink: true,
-                },
+                
+                
+                
               ].map((item, idx) => (
                 <React.Fragment key={item.label}>
                   {idx > 0 && SCREEN_W >= 640 && (

@@ -15,7 +15,7 @@ import {
   Animated,
   Linking,
 } from "react-native";
-import { Feather, FontAwesome, MaterialIcons } from "@expo/vector-icons";
+import { Feather, FontAwesome, MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import { io } from "socket.io-client";
@@ -69,27 +69,27 @@ const DARK_COLORS = {
   yellow: "#D9A03F",
   orange: "#DB7A33",
   orangeDark: "#C9691F",
-  green: "#2F9E68",
-  greenDark: "#3AA673",
-  greenLight: "#172720",
-  greenMid: "#1C3027",
-  greenBorder: "#2B4A3B",
+  green: "#14A06C",
+  greenDark: "#2DBE85",
+  greenLight: "#0F2219",
+  greenMid: "#0C3828",
+  greenBorder: "#17513B",
   white: "#FFFFFF",
-  bg: "#0F1216",
-  gray100: "#1F2329",
-  gray200: "#2E343C",
-  gray300: "#3D434C",
-  gray400: "#6A727E",
-  gray500: "#8A929E",
-  gray600: "#A4ABB6",
-  gray700: "#BFC5CE",
-  gray800: "#D3D8DF",
-  gray900: "#ECEFF3",
+  bg: "#0A0D12",
+  gray100: "#151A21",
+  gray200: "#222A34",
+  gray300: "#343D49",
+  gray400: "#6B7686",
+  gray500: "#8B96A6",
+  gray600: "#A7B0BE",
+  gray700: "#C5CCD7",
+  gray800: "#DDE2E9",
+  gray900: "#F3F5F8",
   red: "#DE5C5C",
   redLight: "#2C1E20",
   cyan: "#4DA8C0",
   cyanLight: "#172529",
-  surface: "#171A1F",
+  surface: "#0F1318",
 };
 
 
@@ -1748,13 +1748,15 @@ export default function MyOrdersScreen() {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: C.surface,
+    backgroundColor: isDark ? C.bg : C.surface,
   },
   backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: C.gray100,
+    width: isDark ? 40 : 38,
+    height: isDark ? 40 : 38,
+    borderRadius: isDark ? 12 : 19,
+    backgroundColor: isDark ? C.surface : C.gray100,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: C.gray100,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1766,28 +1768,36 @@ export default function MyOrdersScreen() {
     letterSpacing: -0.5,
   },
   refreshBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: C.gray100,
+    width: isDark ? undefined : 38,
+    height: isDark ? 40 : 38,
+    paddingHorizontal: isDark ? 16 : 0,
+    flexDirection: "row",
+    gap: 8,
+    borderRadius: isDark ? 12 : 19,
+    backgroundColor: isDark ? C.surface : C.gray100,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: C.gray100,
     alignItems: "center",
     justifyContent: "center",
   },
+  refreshText: { fontSize: 13.5, fontWeight: "700", color: C.gray800 },
 
   searchBarContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: C.surface,
-    borderBottomWidth: 1,
+    paddingBottom: isDark ? 14 : 12,
+    backgroundColor: isDark ? C.bg : C.surface,
+    borderBottomWidth: isDark ? 0 : 1,
     borderBottomColor: C.gray100,
   },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: C.gray100,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 46,
+    backgroundColor: isDark ? C.surface : C.gray100,
+    borderRadius: isDark ? 14 : 12,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: C.gray100,
+    paddingHorizontal: isDark ? 16 : 12,
+    height: isDark ? 52 : 46,
   },
   searchIcon: {
     marginRight: 8,
@@ -1806,9 +1816,9 @@ export default function MyOrdersScreen() {
 
   tabs: {
     flexDirection: "row",
-    backgroundColor: C.surface,
+    backgroundColor: isDark ? C.bg : C.surface,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: isDark ? 14 : 10,
     gap: 8,
     borderBottomWidth: 1,
     borderBottomColor: C.gray100,
@@ -1817,14 +1827,17 @@ export default function MyOrdersScreen() {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: C.gray200,
+    paddingHorizontal: isDark ? 20 : 16,
+    paddingVertical: isDark ? 10 : 8,
+    borderRadius: isDark ? 12 : 20,
+    borderWidth: isDark ? 1 : 1.5,
+    borderColor: isDark ? C.gray100 : C.gray200,
+    backgroundColor: isDark ? C.surface : "transparent",
   },
-  tabActive: { backgroundColor: C.green, borderColor: C.green },
-  tabLabel: { fontSize: 13, fontWeight: "600", color: C.gray600 },
+  tabActive: isDark
+    ? { backgroundColor: C.greenMid, borderColor: C.greenBorder }
+    : { backgroundColor: C.green, borderColor: C.green },
+  tabLabel: { fontSize: 13, fontWeight: isDark ? "700" : "600", color: isDark ? C.gray800 : C.gray600 },
   tabLabelActive: { color: C.white },
   tabBubble: {
     backgroundColor: C.gray100,
@@ -1872,26 +1885,33 @@ export default function MyOrdersScreen() {
     justifyContent: "center",
     marginBottom: 16,
   },
+  emptyIllo: { width: 170, height: 150, alignItems: "center", justifyContent: "center", marginBottom: 14 },
+  emptyIlloCircle: { position: "absolute", top: 0, width: 136, height: 136, borderRadius: 68, backgroundColor: C.surface, borderWidth: 1, borderColor: C.gray100 },
+  emptyIlloBag: { position: "absolute", top: 30, width: 66, height: 78, borderRadius: 8, backgroundColor: C.gray200, alignItems: "center", justifyContent: "center" },
+  emptyIlloGround: { position: "absolute", bottom: 10, width: 164, height: 2, borderRadius: 1, backgroundColor: C.gray200 },
+  emptyIlloLeafL: { position: "absolute", bottom: 12, left: 4, transform: [{ rotate: "-20deg" }] },
+  emptyIlloLeafR: { position: "absolute", bottom: 12, right: 4, transform: [{ scaleX: -1 }, { rotate: "-20deg" }] },
+  emptySpark: { position: "absolute", fontSize: 11, color: C.gray300 },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: C.gray800,
+    fontSize: isDark ? 22 : 20,
+    fontWeight: isDark ? "900" : "800",
+    color: isDark ? C.gray900 : C.gray800,
     textAlign: "center",
   },
   emptySub: {
-    fontSize: 14,
-    color: C.gray400,
+    fontSize: isDark ? 15 : 14,
+    color: isDark ? C.gray500 : C.gray400,
     textAlign: "center",
     marginTop: 6,
     marginBottom: 24,
   },
-  shopBtn: { borderRadius: 14, overflow: "hidden" },
+  shopBtn: { borderRadius: isDark ? 12 : 14, overflow: "hidden" },
   shopBtnGrad: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
+    gap: 10,
+    paddingHorizontal: isDark ? 32 : 28,
+    paddingVertical: isDark ? 17 : 14,
   },
   shopBtnText: { fontSize: 16, fontWeight: "800", color: C.white },
 }), [C]);
@@ -2170,6 +2190,7 @@ export default function MyOrdersScreen() {
           activeOpacity={0.8}
         >
           <Feather name="refresh-cw" size={16} color={C.gray800} />
+          {isDark && <Text style={s.refreshText}>{t('orders.refresh', 'Refresh')}</Text>}
         </TouchableOpacity>
       </View>
 
@@ -2180,7 +2201,7 @@ export default function MyOrdersScreen() {
           <TextInput
             style={s.searchInput}
             placeholder={t('orders.searchPlaceholder', 'Search your grocery orders')}
-            placeholderTextColor={C.gray400}
+            placeholderTextColor={isDark ? C.gray500 : C.gray400}
             value={searchQuery}
             onChangeText={setSearchQuery}
             clearButtonMode="while-editing"
@@ -2240,9 +2261,23 @@ export default function MyOrdersScreen() {
         </View>
       ) : filtered.length === 0 ? (
         <View style={s.emptyWrap}>
-          <View style={s.emptyIconWrap}>
-            <Feather name="shopping-bag" size={30} color={C.gray300} />
-          </View>
+          {isDark ? (
+            <View style={s.emptyIllo}>
+              <View style={s.emptyIlloCircle} />
+              <View style={s.emptyIlloBag}>
+                <Feather name="shopping-bag" size={30} color={C.gray500} />
+              </View>
+              <View style={s.emptyIlloGround} />
+              <MaterialCommunityIcons name="leaf" size={30} color={C.green} style={s.emptyIlloLeafL} />
+              <MaterialCommunityIcons name="leaf" size={30} color={C.green} style={s.emptyIlloLeafR} />
+              <Text style={[s.emptySpark, { top: 12, left: 4 }]}>+</Text>
+              <Text style={[s.emptySpark, { top: 12, right: 4 }]}>+</Text>
+            </View>
+          ) : (
+            <View style={s.emptyIconWrap}>
+              <Feather name="shopping-bag" size={30} color={C.gray300} />
+            </View>
+          )}
           <Text style={s.emptyTitle}>
             {activeTab === "active"
               ? t('orders.noActiveOrders', 'No active orders')
@@ -2267,11 +2302,12 @@ export default function MyOrdersScreen() {
               activeOpacity={0.85}
             >
               <LinearGradient
-                colors={[C.green, C.greenDark]}
+                colors={isDark ? ["#13A672", "#0B7C56"] : [C.green, C.greenDark]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={s.shopBtnGrad}
               >
+                {isDark && <Feather name="shopping-cart" size={17} color={C.white} />}
                 <Text style={s.shopBtnText}>Start Shopping</Text>
                 <Feather name="arrow-right" size={15} color={C.white} />
               </LinearGradient>
@@ -2584,5 +2620,3 @@ export default function MyOrdersScreen() {
     </View>
   );
 }
-
-

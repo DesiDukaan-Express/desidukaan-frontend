@@ -8,7 +8,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
+  ActivityIndicator,    
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import useAuthStore from "../../store/authStore";

@@ -184,7 +184,7 @@ export default function ChatWidget() {
     return () => clearInterval(id);
   }, [sending]);
 
-  const send = async () => {
+  const send = async () => {   
     const text = input.trim();
     if (!text || sending) return;
     const userMsg = { id: `${Date.now()}-u`, role: "user", text };
