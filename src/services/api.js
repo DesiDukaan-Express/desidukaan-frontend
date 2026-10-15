@@ -101,6 +101,12 @@ export const authAPI = {
   sendOTP: (phone) => request("POST", "/auth/login", { phone }),
 
   verifyOTP: (phone, code, role) => request("POST", "/auth/verify", { phone, code, role }),
+
+    sendEmailOTP: (email) =>
+    request("POST", "/auth/email/send-otp", { email }),
+
+  verifyEmailOTP: (email, otp) =>
+    request("POST", "/auth/email/verify", { email, otp }),
 };
 
 // ─── Upload ───────────────────────────────────────────────────────────────────
