@@ -230,7 +230,7 @@ export default function SignupScreen({ navigation, route }) {
 
   // Step 2: verify OTP → issue JWT → navigate to dashboard
   const handleVerifyOtp = async () => {
-    if (otp.length !== 6) return;
+    if (otp.length !== 6 || loading) return;
     setLoading(true); setError("");
     try {
       const res = await fetch(`${BASE_URL}/auth/verify`, {
@@ -315,19 +315,29 @@ export default function SignupScreen({ navigation, route }) {
                         onPress={() => navigation.navigate("Login")}
                       >
                         <Feather name="arrow-left" size={15} color={C.gray700} />
-                        <Text style={s.backBtnText}>Back to Login</Text>
+                        <Text style={s.backBtnText}>
+  {t("common.back", { defaultValue: "Back" })} to Login
+</Text>
                       </TouchableOpacity>
 
-                      <Text style={[s.formHeading, { fontSize: headingSize }]}>Create account</Text>
-                      <Text style={s.formSubheading}>Tell us a little about yourself</Text>
+                      <Text style={[s.formHeading, { fontSize: headingSize }]}>
+  {t("auth.createAccount", { defaultValue: "Create Account" })}
+</Text>
+<Text style={s.formSubheading}>
+  {t("auth.signupSubtitle", {
+    defaultValue: "Tell us a little about yourself",
+  })}
+</Text>
 
 
                       {/* Full Name */}
-                      <Field label="Full Name">
+                     <Field label={t("profile.fullName", { defaultValue: t("auth.fullName", { defaultValue: "Full Name" }) })}>
                         <View style={[s.inputBox, focusedField === "name" && s.inputBoxFocused]}>
                           <IIcon name="user" focused={focusedField === "name"} />
                           <TextInput
-                            placeholder="Your full name"
+                            placeholder={t("auth.fullNamePlaceholder", {
+  defaultValue: "Your full name",
+})}
                             placeholderTextColor={C.gray400}
                             autoCapitalize="words"
                             value={name}
@@ -343,7 +353,7 @@ export default function SignupScreen({ navigation, route }) {
 
                       {/* Mobile */}
                       <Field
-                        label="Mobile Number"
+                        label={t("auth.mobileNumber", { defaultValue: "Mobile Number" })}
                         error={mobileStartError}
                         hint={
                           !mobileStartError && mobile.length > 0 && !isMobileReady && !prefillPhone
@@ -363,7 +373,9 @@ export default function SignupScreen({ navigation, route }) {
                             <View style={s.prefixDivider} />
                           </View>
                           <TextInput
-                            placeholder="10-digit number"
+                            placeholder={t("auth.mobilePlaceholder", {
+  defaultValue: "10-digit number",
+})}
                             placeholderTextColor={C.gray400}
                             keyboardType="phone-pad"
                             maxLength={10}
@@ -440,7 +452,9 @@ export default function SignupScreen({ navigation, route }) {
                         </View>
 
                         <View style={[s.fieldGroup, tablet ? { flex: 2 } : { width: "100%" }]}>
-                          <Text style={s.fieldLabel}>Gender</Text>
+                          <Text style={s.fieldLabel}>
+  {t("auth.gender", { defaultValue: "Gender" })}
+</Text>
                           <View style={s.genderRow}>
                             {GENDERS.map((g) => {
                               const active = gender === g.key;
@@ -453,7 +467,7 @@ export default function SignupScreen({ navigation, route }) {
                                 >
                                   <FontAwesome name={g.icon} size={15} color={active ? C.white : C.greenBright} />
                                   <Text style={[s.genderText, active && s.genderTextActive]}>
-                                    {g.label}
+                                    {t(`auth.genderOptions.${g.key}`, { defaultValue: g.label })}
                                   </Text>
                                 </TouchableOpacity>
                               );
@@ -473,26 +487,38 @@ export default function SignupScreen({ navigation, route }) {
                             {agreed && <Feather name="check" size={10} color={C.white} />}
                           </View>
                         </TouchableOpacity>
-                        <Text style={s.checkboxText}>
-                          I agree to the{" "}
-                          <Text style={s.checkboxLink} onPress={() => navigation.navigate("Terms")}>
-                            Terms of Service
-                          </Text>
-                          {" "}and{" "}
-                          <Text style={s.checkboxLink} onPress={() => navigation.navigate("Privacy")}>
-                            Privacy Policy
-                          </Text>
-                        </Text>
+<Text style={s.checkboxText}>
+  {t("auth.agreeTo", { defaultValue: "I agree to the" })}{" "}
+  <Text
+    style={s.checkboxLink}
+    onPress={() => navigation.navigate("Terms")}
+  >
+    {t("auth.termsOfService", { defaultValue: "Terms of Service" })}
+  </Text>
+  {" "}{t("auth.and", { defaultValue: "and" })}{" "}
+  <Text
+    style={s.checkboxLink}
+    onPress={() => navigation.navigate("Privacy")}
+  >
+    {t("auth.privacyPolicy", { defaultValue: "Privacy Policy" })}
+  </Text>
+</Text>
                       </View>
 
                       {error ? <ErrorBox msg={error} /> : null}
 
-                      <GreenCta
-                        label={IS_TESTING ? "Create Account" : "Create Account & Send OTP"}
-                        loading={loading}
-                        disabled={!isFormValid}
-                        onPress={handleSignup}
-                      />
+<GreenCta
+  label={
+    IS_TESTING
+      ? t("auth.createAccount", { defaultValue: "Create Account" })
+      : t("auth.createAccountSendOtp", {
+          defaultValue: "Create Account & Send OTP",
+        })
+  }
+  loading={loading}
+  disabled={!isFormValid}
+  onPress={handleSignup}
+/>
 
                       <View style={s.orRow}>
                         <View style={s.orLine} />
@@ -538,6 +564,7 @@ export default function SignupScreen({ navigation, route }) {
                             placeholder="6-digit code"
                             placeholderTextColor={C.gray400}
                             keyboardType="number-pad"
+                            returnKeyType="done"
                             maxLength={6}
                             value={otp}
                             onChangeText={(t) => { setOtp(t.replace(/\D/g, "")); setError(""); }}

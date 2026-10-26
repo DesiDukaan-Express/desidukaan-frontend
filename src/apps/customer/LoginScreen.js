@@ -178,7 +178,7 @@ export default function LoginScreen({ navigation }) {
   };
 
   const handleVerifyOtp = async () => {
-    if (otp.length !== 6) return;
+    if (otp.length !== 6 || loading) return;
     setLoading(true); setError("");
     try {
       const res  = await fetch(`${BASE_URL}/auth/verify`, {
@@ -349,18 +349,38 @@ export default function LoginScreen({ navigation }) {
                           <View style={s.prefixArea}>
                             <Feather name="lock" size={16} color={C.outline} />
                           </View>
-                          <TextInput
-                            style={[s.fieldInput, otp.length > 0 && s.otpInput]}
-                            placeholder={t("auth.otpPlaceholder")}
-                            placeholderTextColor={C.outlineVar}
-                            keyboardType="number-pad"
-                            maxLength={6}
-                            value={otp}
-                            onChangeText={(v) => { setOtp(v.replace(/\D/g, "")); setError(""); }}
-                            onFocus={() => setFocusedField("otp")}
-                            onBlur={() => setFocusedField(null)}
-                            underlineColorAndroid="transparent"
-                          />
+<TextInput
+  style={[s.fieldInput, otp.length > 0 && s.otpInput]}
+  placeholder={t("auth.otpPlaceholder")}
+  placeholderTextColor={C.outlineVar}
+  keyboardType="number-pad"
+  returnKeyType="done"
+  blurOnSubmit={false}
+  maxLength={6}
+  value={otp}
+  onChangeText={(v) => {
+    setOtp(v.replace(/\D/g, ""));
+    setError("");
+  }}
+  onFocus={() => setFocusedField("otp")}
+  onBlur={() => setFocusedField(null)}
+  onSubmitEditing={() => {
+    if (otp.length === 6 && !loading) {
+      handleVerifyOtp();
+    }
+  }}
+  onKeyPress={(e) => {
+    if (
+      Platform.OS === "web" &&
+      e.nativeEvent.key === "Enter" &&
+      otp.length === 6 &&
+      !loading
+    ) {
+      handleVerifyOtp();
+    }
+  }}
+  underlineColorAndroid="transparent"
+/>
                           {otp.length === 6 && !error && (
                             <Feather name="check-circle" size={16} color={C.greenBright} style={{ marginRight: 14 }} />
                           )}

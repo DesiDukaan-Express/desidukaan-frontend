@@ -988,4 +988,18 @@ export default {
     addToCart: "Add to Cart",
     remove: "Remove",
   },
+
+  signupSubtitle: "Tell us a little about yourself",
+fullName: "Full Name",
+fullNamePlaceholder: "Your full name",
+gender: "Gender",
+genderOptions: {
+  male: "Male",
+  female: "Female",
+  other: "Other",
+},
+agreeTo: "I agree to the",
+and: "and",
+createAccountSendOtp: "Create Account & Send OTP",
+
 };
