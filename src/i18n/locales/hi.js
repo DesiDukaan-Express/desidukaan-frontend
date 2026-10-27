@@ -896,5 +896,18 @@ export default {
     "itemCount": "{{count}} आइटम",
     "addToCart": "कार्ट में जोड़ें",
     "remove": "हटाएं"
-  }
+  },
+
+  "signupSubtitle": "अपने बारे में थोड़ा बताएं",
+fullName: "पूरा नाम",
+fullNamePlaceholder: "अपना पूरा नाम लिखें",
+gender: "लिंग",
+genderOptions: {
+  male: "पुरुष",
+  female: "महिला",
+  other: "अन्य",
+},
+"agreeTo": "मैं सहमत हूं:",
+"and": "और",
+"createAccountSendOtp": "खाता बनाएं और OTP भेजें",
 };

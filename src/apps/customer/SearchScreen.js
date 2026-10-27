@@ -51,29 +51,38 @@ const FAR_RADIUS = 10; // km — backend validation max is 10
 const MAX_HISTORY = 8;
 
 // ─── Palette (matches app design system) ─────────────────────────────────────
+
 const C = {
-  orange: "#F97316",
-  orangeDark: "#EA580C",
-  green: "#16A34A",
-  greenDark: "#15803D",
-  greenLight: "#F0FDF4",
-  greenMid: "#DCFCE7",
-  greenBorder: "#BBF7D0",
+  orange: "#F59E0B",
+  orangeDark: "#B45309",
+  orangeLight: "#FFFBEB",
+
+  green: "#22864B",
+  greenDark: "#14532D",
+  greenLight: "#F0F9F2",
+  greenBorder: "#D5E9D9",
+  greenMid: "#DDF2E2",
+
+  blue: "#22864B",
+  blueLight: "#EAF6ED",
+  purple: "#39865A",
+  purpleLight: "#EDF7EF",
+
   white: "#FFFFFF",
-  bg: "#F8FAFC",
-  gray100: "#F3F4F6",
-  gray200: "#E5E7EB",
-  gray300: "#D1D5DB",
-  gray400: "#9CA3AF",
-  gray500: "#6B7280",
-  gray600: "#4B5563",
-  gray700: "#374151",
-  gray900: "#111827",
-  amber: "#D97706",
-  amberLight: "#FEF3C7",
-  red: "#DC2626",
-  redLight: "#FEF2F2",
+  bg: "#F5F8F5",
+  gray100: "#F1F5F1",
+  gray200: "#E1E9E2",
+  gray300: "#C8D4CA",
+  gray400: "#93A197",
+  gray500: "#68766B",
+  gray600: "#4C5B4F",
+  gray700: "#344638",
+  gray900: "#172D1E",
+
+  red: "#DC4545",
+  redLight: "#FFF1F0",
 };
+
 
 const CAT_FALLBACK_IMGS = {
   "Dairy, Bread & Eggs":

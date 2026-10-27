@@ -11,20 +11,54 @@ import useCartStore    from "../../store/cartStore";
 import useAuthStore    from "../../store/authStore";
 import useAddressStore from "../../store/addressStore";
 import { useTranslation } from "react-i18next";
-
+import { useTheme } from "../../theme/ThemeContext";
+import { dkBg, dkBorder, dkText } from "../../theme/darkTones";
 const BASE_URL   = process.env.EXPO_PUBLIC_API_URL    || "http://localhost:3000/api";
 
-const C = {
-  orange:     "#F97316", orangeDark: "#EA580C",
-  green:      "#16A34A", greenDark:  "#15803D",
-  greenLight: "#F0FDF4", greenBorder:"#BBF7D0",
-  greenMid:   "#DCFCE7",
-  white:      "#FFFFFF", bg:         "#F8FAFC",
-  gray100:    "#F3F4F6", gray200:    "#E5E7EB",
-  gray300:    "#D1D5DB", gray400:    "#9CA3AF",
-  gray500:    "#6B7280", gray600:    "#4B5563",
-  gray700:    "#374151", gray900:    "#111827",
-  red:        "#EF4444", redLight:   "#FEF2F2",
+const LIGHT_COLORS = {
+  orange: "#F97316",
+  orangeDark: "#EA580C",
+  green: "#16A34A",
+  greenDark: "#15803D",
+  greenLight: "#F0FDF4",
+  greenBorder: "#BBF7D0",
+  greenMid: "#DCFCE7",
+  white: "#FFFFFF",
+  surface: "#FFFFFF",
+  bg: "#F8FAFC",
+  gray100: "#F3F4F6",
+  gray200: "#E5E7EB",
+  gray300: "#D1D5DB",
+  gray400: "#9CA3AF",
+  gray500: "#6B7280",
+  gray600: "#4B5563",
+  gray700: "#374151",
+  gray900: "#111827",
+  red: "#EF4444",
+  redLight: "#FEF2F2",
+};
+
+const DARK_COLORS = {
+  orange: "#DB7A33",
+  orangeDark: "#C9691F",
+  green: "#2F9E68",
+  greenDark: "#3AA673",
+  greenLight: "#172720",
+  greenBorder: "#2B4A3B",
+  greenMid: "#1C3027",
+  white: "#FFFFFF",
+  surface: "#171A1F",
+  bg: "#0F1216",
+  gray100: "#1F2329",
+  gray200: "#2E343C",
+  gray300: "#3D434C",
+  gray400: "#6A727E",
+  gray500: "#8A929E",
+  gray600: "#A4ABB6",
+  gray700: "#BFC5CE",
+  gray900: "#ECEFF3",
+  red: "#DE5C5C",
+  redLight: "#2C1E20",
 };
 
 // ─── Local time parser (fallback so button always works) ──────────────────────
@@ -70,6 +104,9 @@ function parseSlotLocally(input) {
     end_label:   fmt(end),
   };
 }
+
+// Global fallback for styles created outside React components
+const C = LIGHT_COLORS;
 
 // Modals removed to consolidate features in Checkout screen.
 
@@ -140,9 +177,50 @@ export default function CartScreen() {
   const subtotal   = items.reduce((s, i) => s + i.price * (i.qty || i.quantity || 0), 0);
   const activeFee  = deliveryInfo?.delivery_fee ?? "failed to fetch";
   const grandTotal = subtotal + activeFee;
-
+  const { isDark } = useTheme();
+  const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
   //   ─── Fetch real delivery fee as soon as Cart loads ─────────────────────────────────────────
   // Triggers whenever address selection, coordinates, or subtotal changes
+const themedStyles = React.useMemo(() => ({
+  root: { backgroundColor: themeColors.bg },
+  header: {
+    backgroundColor: themeColors.surface,
+    borderBottomColor: themeColors.gray200,
+  },
+  backBtn: { backgroundColor: themeColors.gray100 },
+  headerTitle: { color: themeColors.gray900 },
+  headerSub: { color: themeColors.gray500 },
+  pageBody: { backgroundColor: themeColors.bg },
+  sideCol: {
+    backgroundColor: themeColors.bg,
+    borderLeftColor: themeColors.gray200,
+  },
+  itemsCard: {
+    backgroundColor: themeColors.surface,
+    borderColor: themeColors.gray200,
+  },
+  itemsTitle: { borderBottomColor: themeColors.gray200 },
+  itemRowBorder: { borderBottomColor: themeColors.gray200 },
+  itemImg: { backgroundColor: themeColors.gray100 },
+  itemName: { color: themeColors.gray900 },
+  itemUnit: { color: themeColors.gray500 },
+  itemPrice: { color: themeColors.gray900 },
+  qtyRow: { borderColor: themeColors.green },
+  qtyNum: { color: themeColors.gray900 },
+  billCard: {
+    backgroundColor: themeColors.surface,
+    borderColor: themeColors.gray200,
+  },
+  sideCardTitle: { color: themeColors.gray900 },
+  proceedBar: {
+    backgroundColor: themeColors.surface,
+    borderTopColor: themeColors.gray200,
+  },
+  proceedTotal: { color: themeColors.gray900 },
+  proceedSub: { color: themeColors.gray500 },
+  emptyTitle: { color: themeColors.gray900 },
+  emptySub: { color: themeColors.gray500 },
+}), [themeColors]);
 
   useEffect(() => {
     if (!vendorId) return;
@@ -218,13 +296,13 @@ export default function CartScreen() {
   // ── Empty cart ─────────────────────────────────────────────────────────────
   if (items.length === 0) {
     return (
-      <View style={s.root}>
-        <StatusBar barStyle="dark-content" />
-        <View style={s.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+      <View style={[s.root, themedStyles.root]}>
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+        <View style={[s.header, themedStyles.header]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[s.backBtn, themedStyles.backBtn]}>
             <Feather name="arrow-left" size={20} color={C.gray900} />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>{t('cart.title')}</Text>
+          <Text style={[s.headerTitle, themedStyles.headerTitle]}>{t('cart.title')}</Text>
         </View>
         <View style={s.emptyWrap}>
           <Text style={s.emptyEmoji}>🛒</Text>
@@ -244,16 +322,19 @@ export default function CartScreen() {
   // ── Main render ────────────────────────────────────────────────────────────
 
   return (
-    <View style={[s.root, { backgroundColor: isDesktop ? C.bg : C.white }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.white} />
+<View style={[s.root, themedStyles.root]}>
+  <StatusBar
+    barStyle={isDark ? "light-content" : "dark-content"}
+    backgroundColor={themeColors.surface}
+  />
 
       {/* HEADER */}
-      <View style={[s.header, { paddingHorizontal: px }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+      <View style={[s.header, themedStyles.header, { paddingHorizontal: px }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[s.backBtn, themedStyles.backBtn]}>
           <Feather name="arrow-left" size={20} color={C.gray900} />
         </TouchableOpacity>
         <View style={s.headerMid}>
-          <Text style={[s.headerTitle, { fontSize: Math.round(20 * fs) }]}>{t('cart.title')}</Text>
+          <Text style={[s.headerTitle, themedStyles.headerTitle, { fontSize: Math.round(20 * fs) }]}>{t('cart.title')}</Text>
           <Text style={[s.headerSub, { fontSize: Math.round(12 * fs) }]}>{vendorName}</Text>
         </View>
         <View style={s.headerBadge}>
@@ -298,7 +379,7 @@ export default function CartScreen() {
             contentContainerStyle={{ paddingHorizontal: px, paddingTop: 8 }}
           >
             {/* Items card */}
-            <View style={[s.itemsCard, { borderRadius: cardR }]}>
+            <View style={[s.itemsCard, themedStyles.itemsCard, { borderRadius: cardR }]}>
               <Text style={[s.itemsTitle, {
                 paddingHorizontal: isDesktop ? 22 : 14,
                 paddingVertical: isDesktop ? 14 : 10,
@@ -308,22 +389,22 @@ export default function CartScreen() {
               {items.map((item, idx) => (
                 <View key={item.id} style={[
                   s.itemRow,
-                  idx < items.length - 1 && s.itemRowBorder,
+                  idx < items.length - 1 && [s.itemRowBorder, themedStyles.itemRowBorder],
                   { paddingHorizontal: isDesktop ? 22 : 14, paddingVertical: isDesktop ? 18 : 12 },
                 ]}>
                   <Image
                     source={{ uri: item.image || "https://images.unsplash.com/photo-1542838132-92c53300491e?w=200" }}
-                    style={[s.itemImg, {
-                      width:  isDesktop ? 70 : isTablet ? 58 : 48,
-                      height: isDesktop ? 70 : isTablet ? 58 : 48,
-                      borderRadius: isDesktop ? 14 : 10,
-                    }]}
+style={[s.itemImg, themedStyles.itemImg, {
+  width: isDesktop ? 70 : isTablet ? 58 : 48,
+  height: isDesktop ? 70 : isTablet ? 58 : 48,
+  borderRadius: isDesktop ? 14 : 10,
+}]}
                     resizeMode="cover"
                   />
                   <View style={s.itemMid}>
-                    <Text style={[s.itemName, { fontSize: Math.round(14 * fs) }]} numberOfLines={1}>{item.name}</Text>
-                    {item.unit ? <Text style={[s.itemUnit, { fontSize: Math.round(12 * fs) }]}>{formatWeight(item.unit)}</Text> : null}
-                    <Text style={[s.itemPrice, { fontSize: Math.round(15 * fs) }]}>₹{item.price * (item.qty ?? item.quantity ?? 1)}</Text>
+                    <Text style={[s.itemName, themedStyles.itemName, { fontSize: Math.round(14 * fs) }]} numberOfLines={1}>{item.name}</Text>
+                    {item.unit ? <Text style={[s.itemUnit, themedStyles.itemUnit, { fontSize: Math.round(12 * fs) }]}>{formatWeight(item.unit)}</Text> : null}
+                    <Text style={[s.itemPrice, themedStyles.itemPrice, { fontSize: Math.round(15 * fs) }]}>₹{item.price * (item.qty ?? item.quantity ?? 1)}</Text>
                   </View>
                   <View style={[s.qtyRow, { borderRadius: isDesktop ? 12 : 9 }]}>
                     <TouchableOpacity
@@ -352,7 +433,7 @@ export default function CartScreen() {
 
             {/* Bill summary — inline on mobile/tablet, hidden on desktop (shown in sidebar) */}
             {!isDesktop && (
-              <View style={[s.billCard, { borderRadius: cardR, marginTop: 8 }]}>
+              <View style={[s.billCard, themedStyles.billCard, { borderRadius: cardR, marginTop: 8 }]}>
                 <BillSummary
                   subtotal={subtotal}
                   activeFee={activeFee}
@@ -367,9 +448,9 @@ export default function CartScreen() {
 
           {/* Proceed bar — bottom of main col on mobile/tablet */}
           {!isDesktop && (
-            <View style={[s.proceedBar, { paddingHorizontal: px }]}>
+            <View style={[s.proceedBar, themedStyles.proceedBar, { paddingHorizontal: px }]}>
               <View>
-                <Text style={[s.proceedTotal, { fontSize: Math.round(20 * fs) }]}>₹{grandTotal}</Text>
+                <Text style={[s.proceedTotal, themedStyles.proceedTotal, { fontSize: Math.round(20 * fs) }]}>₹{grandTotal}</Text>
                 <Text style={[s.proceedSub, { fontSize: Math.round(11 * fs) }]}>{t('cart.total')}</Text>
               </View>
 
@@ -396,7 +477,7 @@ export default function CartScreen() {
           <View style={s.sideCol}>
 
             {/* Bill card */}
-            <View style={[s.billCard, s.billCardSide]}>
+            <View style={[s.billCard, themedStyles.billCard, s.billCardSide]}>
               <Text style={s.sideCardTitle}>{t('cart.orderSummary') || 'Order Summary'}</Text>
               <BillSummary
                 subtotal={subtotal}
@@ -432,6 +513,73 @@ export default function CartScreen() {
 // ─── BillSummary (shared between inline and sidebar) ──────────────────────────
 function BillSummary({ subtotal, activeFee, grandTotal, fs = 1 }) {
   const { t } = useTranslation();
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+
+  const bs = StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 5,
+    },
+    label: { fontSize: 14, color: C.gray600 },
+    value: { fontSize: 14, fontWeight: "600", color: C.gray900 },
+    divider: {
+      height: 1,
+      backgroundColor: C.gray200,
+      marginVertical: 8,
+    },
+    grandLabel: { fontSize: 16, fontWeight: "900", color: C.gray900 },
+    negotiateBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 3,
+      backgroundColor: C.greenLight,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 8,
+    },
+    negotiateBtnText: { fontSize: 10, fontWeight: "700", color: C.green },
+    pendingBadge: {
+      backgroundColor: dkBg("#FEF3C7", isDark),
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      borderRadius: 6,
+    },
+    pendingBadgeText: {
+      fontSize: 10,
+      fontWeight: "700",
+      color: dkText("#D97706", isDark),
+    },
+    agreedBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 3,
+      backgroundColor: C.greenMid,
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      borderRadius: 6,
+    },
+    agreedBadgeText: { fontSize: 10, fontWeight: "700", color: C.green },
+    freeHint: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      backgroundColor: C.greenLight,
+      borderRadius: 8,
+      padding: 8,
+      marginTop: 4,
+    },
+    freeHintText: {
+      fontSize: 11,
+      color: C.green,
+      fontWeight: "600",
+      flex: 1,
+    },
+  });
+
+  // Keep your existing return (...) block here unchanged.
   return (
     <>
       <View style={bs.row}>
@@ -455,22 +603,6 @@ function BillSummary({ subtotal, activeFee, grandTotal, fs = 1 }) {
     </>
   );
 }
-
-const bs = StyleSheet.create({
-  row:              { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 5 },
-  label:            { fontSize: 14, color: C.gray600 },
-  value:            { fontSize: 14, fontWeight: "600", color: C.gray900 },
-  divider:          { height: 1, backgroundColor: C.gray100, marginVertical: 8 },
-  grandLabel:       { fontSize: 16, fontWeight: "900", color: C.gray900 },
-  negotiateBtn:     { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: C.greenLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  negotiateBtnText: { fontSize: 10, fontWeight: "700", color: C.green },
-  pendingBadge:     { backgroundColor: "#FEF3C7", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
-  pendingBadgeText: { fontSize: 10, fontWeight: "700", color: "#D97706" },
-  agreedBadge:      { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: C.greenMid, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
-  agreedBadgeText:  { fontSize: 10, fontWeight: "700", color: C.green },
-  freeHint:         { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.greenLight, borderRadius: 8, padding: 8, marginTop: 4 },
-  freeHintText:     { fontSize: 11, color: C.green, fontWeight: "600", flex: 1 },
-});
 
 // ─── Responsive hook ─────────────────────────────────────────────────────────
 function useBreakpoint() {

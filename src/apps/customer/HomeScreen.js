@@ -303,6 +303,11 @@ function AddressPicker({
         { headers: { "User-Agent": "KwikPik/1.0 (desidukaan-express; location-picker)" } }
       );
       const data = await res.json();
+      const detectedPincode = extractPincode(data.address || {});
+
+if (detectedPincode) {
+  setInputPincode(detectedPincode);
+}
       displayName = data?.display_name || "";
     } catch (err) {
       displayName = "";
@@ -322,21 +327,40 @@ function AddressPicker({
   }, [t]);
 
   const handleSaveAdd = () => {
-    if (!pickLat || !pickLng) {
-      setInputErr("Please select your location on the map above.");
-      return;
-    }
+    if (
+  pickLat == null ||
+  pickLng == null ||
+  !Number.isFinite(Number(pickLat)) ||
+  !Number.isFinite(Number(pickLng))
+) {
+  setInputErr("Please select your location on the map above.");
+  return;
+}
     const fullAddr = (inputText || "").trim();
     const house = (inputHouseNo || "").trim();
     const landmark = (inputLandmark || "").trim();
     const pin = (inputPincode || "").trim();
 
-    if (!house || !landmark || !pin || fullAddr.length < 5) {
-      setInputErr("All address fields (House/Flat No., Landmark, Pincode & Address) are compulsory.");
-      return;
-    }
+if (!house || !pin || fullAddr.length < 5) {
+  setInputErr(
+    "Enter your House/Flat No., a valid 6-digit Pincode, and your address."
+  );
+  return;
+}
 
-    const combinedAddress = `${house ? house + ", " : ""}${fullAddr}${landmark ? " (Landmark: " + landmark + ")" : ""}${pin ? " - " + pin : ""}`;
+if (!/^[1-9]\d{5}$/.test(pin)) {
+  setInputErr("Please enter a valid 6-digit Indian pincode.");
+  return;
+}
+
+   const combinedAddress = [
+  house,
+  fullAddr,
+  landmark ? `Landmark: ${landmark}` : "",
+  pin,
+]
+  .filter(Boolean)
+  .join(", ");
 
     onSaveNew(combinedAddress, { lat: pickLat, lng: pickLng, house_no: house, landmark, pincode: pin, address_line: fullAddr });
     setMode("list");
@@ -357,12 +381,26 @@ function AddressPicker({
     const landmark = (inputLandmark || "").trim();
     const pin = (inputPincode || "").trim();
 
-    if (!house || !landmark || !pin || fullAddr.length < 5) {
-      setInputErr("All address fields (House/Flat No., Landmark, Pincode & Address) are compulsory.");
-      return;
-    }
+ if (!house || !pin || fullAddr.length < 5) {
+  setInputErr(
+    "Enter your House/Flat No., a valid 6-digit Pincode, and your address."
+  );
+  return;
+}
 
-    const combinedAddress = `${house ? house + ", " : ""}${fullAddr}${landmark ? " (Landmark: " + landmark + ")" : ""}${pin ? " - " + pin : ""}`;
+if (!/^[1-9]\d{5}$/.test(pin)) {
+  setInputErr("Please enter a valid 6-digit Indian pincode.");
+  return;
+}
+
+    const combinedAddress = [
+  house,
+  fullAddr,
+  landmark ? `Landmark: ${landmark}` : "",
+  pin,
+]
+  .filter(Boolean)
+  .join(", ");
 
     setSaving(true);
     const patch = {
@@ -395,7 +433,46 @@ function AddressPicker({
   };
 
   const isFormMode = mode === "add" || mode === "edit";
+const hasValidCoords =
+  pickLat != null &&
+  pickLng != null &&
+  Number.isFinite(Number(pickLat)) &&
+  Number.isFinite(Number(pickLng));
 
+const canSaveAddress =
+  hasValidCoords &&
+  !!(inputHouseNo || "").trim() &&
+  /^[1-9]\d{5}$/.test((inputPincode || "").trim()) &&
+  (inputText || "").trim().length >= 5 &&
+  !saving;
+
+  const extractPincode = (address = {}) => {
+  // Prefer the postcode returned by map geocoding.
+  const postcode = String(address.postcode || "").trim();
+
+  if (/^[1-9]\d{5}$/.test(postcode)) {
+    return postcode;
+  }
+
+  // Fallback: find a valid Indian PIN code in the address text.
+  const addressText = [
+    address.display_name,
+    address.name,
+    address.road,
+    address.suburb,
+    address.city,
+    address.town,
+    address.village,
+    address.state_district,
+    address.state,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const matches = addressText.match(/\b[1-9]\d{5}\b/g);
+
+  return matches?.[0] || "";
+};
   return (
     <Modal
       visible={visible}
@@ -599,9 +676,13 @@ function AddressPicker({
                           style={ap.input}
                           placeholder="e.g. 201301"
                           placeholderTextColor={C.gray400}
-                          keyboardType="numeric"
+                          keyboardType="number-pad"
+                          maxLength={6}
                           value={inputPincode}
-                          onChangeText={(t) => { setInputPincode(t); setInputErr(""); }}
+                           onChangeText={(value) => {
+    setInputPincode(value.replace(/\D/g, "").slice(0, 6));
+    setInputErr("");
+  }}
                           underlineColorAndroid="transparent"
                         />
                       </View>
@@ -623,26 +704,30 @@ function AddressPicker({
 
                   {inputErr ? <Text style={ap.inputErr}>{inputErr}</Text> : null}
 
-                  <TouchableOpacity
-                    style={[
-                      ap.saveBtn,
-                      (!pickLat || !pickLng || !inputHouseNo || !inputLandmark || !inputPincode || (inputText || "").trim().length < 5 || saving) && ap.saveBtnDisabled,
-                    ]}
-                    onPress={mode === "edit" ? handleSaveEdit : handleSaveAdd}
-                    activeOpacity={0.85}
-                    disabled={!pickLat || !pickLng || !inputHouseNo || !inputLandmark || !inputPincode || (inputText || "").trim().length < 5 || saving}
-                  >
-                    {saving ? (
-                      <ActivityIndicator size="small" color={C.white} />
-                    ) : (
-                      <>
-                        <MaterialIcons name="check" size={16} color={C.white} />
-                        <Text style={ap.saveBtnText}>
-                          {mode === "edit" ? t("home.updateAddress") : t("home.saveAddress")}
-                        </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+
+<TouchableOpacity
+  style={[
+    ap.saveBtn,
+    !canSaveAddress && ap.saveBtnDisabled,
+  ]}
+  onPress={mode === "edit" ? handleSaveEdit : handleSaveAdd}
+  activeOpacity={0.85}
+  disabled={!canSaveAddress}
+>
+  {saving ? (
+    <ActivityIndicator size="small" color={C.white} />
+  ) : (
+    <>
+      <MaterialIcons name="check" size={16} color={C.white} />
+      <Text style={ap.saveBtnText}>
+        {mode === "edit"
+          ? t("home.updateAddress")
+          : t("home.saveAddress")}
+      </Text>
+    </>
+  )}
+</TouchableOpacity>
+
                 </View>
               </ScrollView>
             </KeyboardAvoidingView>
