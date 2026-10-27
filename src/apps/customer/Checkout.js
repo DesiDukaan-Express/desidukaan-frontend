@@ -476,10 +476,12 @@ function NegotiationBanner({ status, countdown, vendorName, onDismiss }) {
     alignItems: "center",
     justifyContent: "center",
   },
-  timer: { fontSize: 13, fontWeight: "900" },
-  title: { fontSize: 15, fontWeight: "900" },
-  sub: { fontSize: 12, color: C.gray500, marginTop: 1 },
-}), [C]);
+  negotiatedNoteText: { flex: 1, fontSize: 12, color: '#15803D', fontWeight: '600' },
+});
+
+
+// ─── Negotiation Banner (Shown while waiting or after response) ──────────────
+function NegotiationBanner({ status, countdown, vendorName, onDismiss, declineReason }) {
   const { t } = useTranslation();
   const configs = {
     pending: {
@@ -500,7 +502,7 @@ function NegotiationBanner({ status, countdown, vendorName, onDismiss }) {
     },
     rejected: {
       title: t('checkout.orderDeclined', 'Order Declined'),
-      sub: t('orders.storeDeclinedSub', "The store couldn't fulfill your order right now."),
+      sub: declineReason ? `Note: "${declineReason}"` : t('orders.storeDeclinedSub', "The store couldn't fulfill your order right now."),
       icon: "x-circle",
       color: C.red,
       bg: C.redLight,
@@ -762,30 +764,33 @@ export default function CheckoutScreen() {
   pageBodyDesktop: {},
   mainCol: { flex: 1 },
 
-  // Sidebar
-  sideCol: {
-    width: 380,
-    backgroundColor: C.bg,
-    borderLeftWidth: 1,
-    borderLeftColor: C.gray200,
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 24,
-    gap: 16,
-  },
-  sideCard: {
-    backgroundColor: C.surface,
-    borderRadius: 18,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: C.gray200,
-  },
-  sideCardTitle: {
-    fontSize: 17,
-    fontWeight: "900",
-    color: C.gray900,
-    marginBottom: 14,
-  },
+  // ── Order state ────────────────────────────────────────────────────────────
+  const [placing, setPlacing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [orderId, setOrderId] = useState(route.params?.orderId || resumeOrder?.id || null);
+  const [orderStatus, setOrderStatus] = useState(
+    route.params?.initialOrderStatus || resumeOrder?.status || "idle"
+  ); // idle, pending, accepted, rejected, expired, countered
+  const [declineReason, setDeclineReason] = useState(
+    route.params?.cancellation_reason || resumeOrder?.cancellation_reason || resumeOrder?.reason || null
+  );
+  const [countdown, setCountdown] = useState(300);
+  const [counterData, setCounterData] = useState(() => {
+    const rawCounter = resumeOrder?.counter_offer || null;
+    if (!rawCounter) return null;
+    const rawSlot = rawCounter.slot || rawCounter.delivery_slot || null;
+    const slot = rawSlot ? {
+      start: rawSlot.vendor_slot_start || rawSlot.slot_start || rawSlot.start,
+      end: rawSlot.vendor_slot_end || rawSlot.slot_end || rawSlot.end,
+    } : null;
+    return {
+      ...rawCounter,
+      slot,
+    };
+  });
+  const timerRef = useRef(null);
+  const scrollViewRef = useRef(null);       // ref to main ScrollView
+  const paymentSectionY = useRef(0);        // Y-offset of payment section inside scroll
 
   // Error banner
   errorBanner: {
@@ -1252,13 +1257,26 @@ export default function CheckoutScreen() {
     items[0]?.vendorName ||
     "Store";
 
-  // ── Snapshot of cart items/subtotal taken before cart is cleared on order submit ──
-  const [snapshotItems, setSnapshotItems] = useState(
-    route.params?.snapshotItems || resumeOrder?.snapshotItems || null
-  );
-  const [snapshotSubtotal, setSnapshotSubtotal] = useState(
-    route.params?.snapsgithotSubtotal ?? resumeOrder?.snapshotSubtotal ?? null
-  );
+            // Sync counter data if countered
+            if (order.status === "countered") {
+              setCounterData({
+                items: order.counter_offer_items,
+                delivery_fee: order.delivery_fee,
+                total: order.total,
+                note: order.vendor_note,
+                slot: order.delivery_slot ? {
+                start: order.delivery_slot.vendor_slot_start || order.delivery_slot.slot_start,
+                end: order.delivery_slot.vendor_slot_end || order.delivery_slot.slot_end,
+                } : null,
+              });
+            }
+          }
+        } catch (e) {
+          console.error("Error fetching order details on mount:", e);
+        }
+      })();
+    }
+  }, [orderId, token]);
 
   // ── Order state ────────────────────────────────────────────────────────────
   const [placing, setPlacing] = useState(false);
@@ -1301,9 +1319,37 @@ export default function CheckoutScreen() {
     route.params?.deliveryTypePref || resumeOrder?.deliveryTypePref || resumeOrder?.delivery_type_pref || 'standard'
   );
 
-  // ── Live delivery fee info from backend ──────────────────────────────────
-  const [deliveryInfo, setDeliveryInfo] = useState(null);  // {fees, eta_minutes, quick_eta_minutes, ...}
-  const [fetchingDeliveryInfo, setFetchingDeliveryInfo] = useState(false);
+  // ── Place order ────────────────────────────────────────────────────────────
+  const placeOrder = async () => {
+    console.log("placeOrder function INVOKED"); // START LOG
+    if (!confirmedSlot) {
+      setSlotModalVisible(true);
+      return;
+    }
+    setErrorMsg(null);
+    setPlacing(true);
+    try {
+      let addrId = null;
+      if (selectedAddrId === "detected") {
+        const allAddrs = addressStore?.addresses || [];
+        const existing = allAddrs.find(a =>
+          a.label === "Current Location" &&
+          (a.address_line === detectedAddr || a.address === detectedAddr)
+        );
+        if (existing) {
+          addrId = existing.id;
+        } else {
+          const savedId = await addressStore.addAddress(
+            { address: detectedAddr, lat: detectedCoords?.lat, lng: detectedCoords?.lng, label: "Current Location" },
+            token
+          );
+          addrId = savedId;
+        }
+      } else if (selectedAddrId === "manual") {
+        addrId = savedAddresses[0]?.id || null;
+      } else {
+        addrId = selectedAddrId || savedAddresses[0]?.id || null;
+      }
 
   // ── Negotiation modal visibility ───────────────────────────────────────────
   const [negotiationModalVisible, setNegotiationModalVisible] = useState(false);
@@ -1532,7 +1578,11 @@ export default function CheckoutScreen() {
               delivery_fee: order.delivery_fee,
               total: order.total,
               note: order.vendor_note,
-              slot: normalizedSlot,
+              slot: order.delivery_slot ? {
+                start: order.delivery_slot.vendor_slot_start || order.delivery_slot.slot_start,
+                end: order.delivery_slot.vendor_slot_end || order.delivery_slot.slot_end,
+              
+              } : null,
             });
             setOrderStatus("countered");
             setPlacing(false);
@@ -1995,21 +2045,13 @@ export default function CheckoutScreen() {
             </View>
           )}
 
-          {/* Error banner */}
-          {errorMsg && (
-            <View
-              style={[
-                s.errorBanner,
-                { marginHorizontal: px, borderRadius: cardR },
-              ]}
-            >
-              <Feather name="alert-circle" size={15} color={C.red} />
-              <Text style={s.errorText}>{errorMsg}</Text>
-              <TouchableOpacity onPress={() => setErrorMsg(null)}>
-                <Feather name="x" size={14} color={C.red} />
-              </TouchableOpacity>
-            </View>
-          )}
+            <NegotiationBanner
+              status={orderStatus}
+              countdown={countdown}
+              vendorName={vendorName}
+              onDismiss={null}
+              declineReason={declineReason}
+            />
 
           {/* Min Order warning banner */}
           {isBelowMinOrder && (
@@ -2653,15 +2695,33 @@ export default function CheckoutScreen() {
             {/* Cancellation policy in sidebar */}
             <CancellationPolicy />
 
-            {/* Place order button in sidebar */}
-            <PlaceOrderBtn
-              status={orderStatus}
-              total={total}
-              canPlace={canPlace}
-              placing={placing}
-              onPress={orderStatus === "accepted" ? handlePayment : placeOrder}
-              fs={fs}
-            />
+          {vendor?.opening_time && vendor?.closing_time && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.greenLight, borderRadius: 12, padding: 12, marginBottom: 16 }}>
+              <Feather name="clock" size={16} color={C.green} />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: C.greenDark }}>
+                {t('checkout.storeOpen', 'Store open')}: {vendor.opening_time} – {vendor.closing_time}
+              </Text>
+            </View>
+          )}
+
+          <View style={{ marginBottom: 18 }}>
+            <Text style={{ fontWeight: '700', marginBottom: 10, color: C.gray700 }}>{t('checkout.selectDay', 'Select Day')}</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {['today', 'tomorrow'].map((d) => (
+                <TouchableOpacity
+                  key={d}
+                  style={[
+                    sm.hintChip,
+                    day === d && { borderColor: C.green, backgroundColor: C.greenLight }
+                  ]}
+                  onPress={() => { setDay(d); setSelectedSlot(null); }}
+                >
+                  <Text style={[sm.hintText, day === d && { color: C.green }]}>
+                    {d === 'today' ? t('payment.today', 'Today') : t('payment.tomorrow', 'Tomorrow')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         )}
       </View>

@@ -36,7 +36,8 @@ const loadPersistedEnabledRoles = async (userRoles = []) => {
     const stored = await AsyncStorage.getItem(ENABLED_ROLES_KEY);
     const parsed = stored ? JSON.parse(stored) : [];
     return Array.from(new Set([...ALL_ROLES, ...userRoles, ...parsed].filter(Boolean)));
-  } catch {
+  } 
+  catch {
     return Array.from(new Set([...ALL_ROLES, ...userRoles].filter(Boolean)));
   }
 };
@@ -112,6 +113,9 @@ const useAuthStore = create((set, get) => ({
   // is shown to the vendor role. Scoped to the vendor role only (a suspended
   // shop does not block the same user from using the app as a customer).
   vendorSuspended: false,
+  // deliverySuspended: true → the full-screen "Account Suspended" block screen
+  // is shown to the delivery role. Scoped to delivery role only.
+  deliverySuspended: false,
 
   // Internal setter used by tryRefreshToken without triggering a full re-login
   _setAccessToken: (accessToken) => set({ token: accessToken }),
@@ -203,11 +207,11 @@ const useAuthStore = create((set, get) => ({
           enabledRoles,
           activeRole: null,   // ← always null on app open → triggers role picker
           isAuthenticated: true,
-          accountDeactivated: false,
+          accountDeactivated: currentUser?.is_active === false,
           isLoading: false,
         });
         await useAddressStore.getState().loadAddresses(refreshResult.token);
-        useWishlistStore.getState().loadIds(refreshResult.token);
+        await useWishlistStore.getState().loadIds(refreshResult.token);
       } else if (refreshResult && refreshResult.error === "ACCOUNT_DEACTIVATED") {
         set({ accountDeactivated: true, isLoading: false });
       } else if (refreshResult && refreshResult.error === "INVALID_TOKEN") {
@@ -268,17 +272,17 @@ const useAuthStore = create((set, get) => ({
           body: JSON.stringify({ refreshToken }),
         }).catch(() => {});
       }
-    } finally {
-      await AsyncStorage.removeItem("user");
-      await AsyncStorage.removeItem(ACTIVE_ROLE_KEY);
-      await AsyncStorage.removeItem(ENABLED_ROLES_KEY);
-      await secureDelete(REFRESH_KEY);
-      useAddressStore.getState().clearAddresses();
-      useWishlistStore.getState().clearWishlist();
-      set({ user: null, token: null, role: null, activeRole: null, enabledRoles: ["customer", "vendor", "delivery"], isAuthenticated: false, accountDeactivated: false });
-    }
+    } catch (_) {}
+    try { await AsyncStorage.removeItem("user"); } catch (_) {}
+    try { await AsyncStorage.removeItem(ACTIVE_ROLE_KEY); } catch (_) {}
+    try { await AsyncStorage.removeItem(ENABLED_ROLES_KEY); } catch (_) {}
+    try { await secureDelete(REFRESH_KEY); } catch (_) {}
+    try { useAddressStore.getState().clearAddresses(); } catch (_) {}
+    try { useWishlistStore.getState().clearWishlist(); } catch (_) {}
+    set({ user: null, token: null, role: null, activeRole: null, enabledRoles: ["customer", "vendor", "delivery"], isAuthenticated: false, accountDeactivated: false, vendorSuspended: false });
   },
 
+  
   updateUser: (updates) =>
     set((state) => ({
       user: { ...state.user, ...updates },
@@ -295,6 +299,30 @@ const useAuthStore = create((set, get) => ({
 
   // ── Clear the vendor suspension block (socket "vendor:reactivated") ──────
   clearVendorSuspended: () => set({ vendorSuspended: false }),
+
+  // ── Flag delivery partner as suspended (socket "delivery:suspended") ────
+  flagDeliverySuspended: () => set({ deliverySuspended: true }),
+
+  // ── Clear delivery suspension (socket "delivery:reactivated") ────────────
+  clearDeliverySuspended: () => set({ deliverySuspended: false }),
+
+  checkDeliveryStatus: async () => {
+    const { token, isAuthenticated, activeRole, deliverySuspended } = get();
+    if (!token || !isAuthenticated || activeRole !== "delivery") return;
+    try {
+      const res = await fetch(`${BASE_URL}/delivery/me/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const partner = data?.data || data?.partner;
+      if (!partner) return;
+      const isSuspended = partner.is_active === false;
+      if (isSuspended !== deliverySuspended) {
+        set({ deliverySuspended: isSuspended });
+      }
+    } catch {}
+  },
 
   // ── Live vendor-status check ─────────────────────────────────────────────
   // Called periodically + on app foreground while authenticated as a vendor,
@@ -331,21 +359,21 @@ const useAuthStore = create((set, get) => ({
   // backend reports is_active=false (admin deactivated the account), we flag
   // it so the full-screen block appears immediately, without needing a reload.
   checkAccountStatus: async () => {
-    const { token, isAuthenticated, accountDeactivated } = get();
-    if (!token || !isAuthenticated || accountDeactivated) return;
+    const { token, isAuthenticated } = get();
+    if (!token || !isAuthenticated) return;
 
     try {
       const res = await fetch(`${BASE_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return; // ignore TOKEN_EXPIRED etc. — normal refresh flow handles it
+      if (!res.ok) return;
       const data = await res.json();
-      if (data.user && data.user.is_active === false) {
-        set({ accountDeactivated: true });
-        return;
-      }
-      if (data.user && JSON.stringify(data.user) !== JSON.stringify(get().user)) {
-        set({ user: data.user, role: data.user.role });
+      if (data.user) {
+        set({
+          accountDeactivated: data.user.is_active === false,
+          user: data.user,
+          role: data.user.role,
+        });
       }
     } catch {
       // network error — leave as-is, retry on next tick

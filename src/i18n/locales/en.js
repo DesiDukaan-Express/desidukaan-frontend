@@ -30,7 +30,7 @@ export default {
 
   // ── Auth ──
   auth: {
-    welcomeBack: "Welcome Back",
+    welcomeBack: "Welcome",
     loginSubtitle: "Log in with your mobile number",
     mobileNumber: "Mobile Number",
     mobilePlaceholder: "10-digit number",
@@ -49,6 +49,10 @@ export default {
     createAccount: "Create Account",
     termsOfService: "Terms of Service",
     privacyPolicy: "Privacy Policy",
+    dateOfBirth: "Date of Birth",
+    dobPlaceholder: "DD / MM / YYYY",
+    mustBeAtleast16: "Must be at least 16 years old",
+    invalidDob: "Please enter a valid date of birth",
     invalidOtp: "Invalid OTP",
     failedToSendOtp: "Failed to send OTP",
   },
@@ -113,7 +117,7 @@ export default {
     goodAfternoon: "Good Afternoon",
     goodEvening: "Good Evening",
     goodNight: "Good Night",
-    welcomeBack: "Welcome back, {{name}}",
+    welcomeBack: "Welcome, {{name}}",
     welcomeGuest: "Welcome to KwikPik",
     heroSubHeader: "Fresh groceries & daily essentials, delivered fast.",
     freshFromNearby: "Fresh from nearby stores",
@@ -235,6 +239,10 @@ export default {
   description: "Description",
   youSave: "You save ₹{{amount}} per item",
   totalPayable: "Total Payable",
+  rateProduct: "Rate this product",
+  yourRating: "Your rating",
+  loginRequired: "Login required",
+  loginToRate: "Please log in as a customer to rate this product.",
   },
 
   // ── Checkout & Payment ──
@@ -474,6 +482,9 @@ export default {
     disabled: "Disabled",
     paymentMethods: "Payment Methods",
     paymentMethodsSub: "Manage UPI & cards",
+    helpSupport: "Help & Support",
+    helpSupportSub: "Get help with your account or order",
+    helpSupportMessage: "For assistance, please contact support with your order details.",
     termsConditions: "Terms & Conditions",
     termsSub: "Platform usage terms",
     privacySub: "How we use your data",
@@ -657,6 +668,8 @@ export default {
     orderItems: "Order Items",
     specialInstructions: "Special Instructions",
     manageOrder: "Manage Order",
+    manageOrderDeclinedSingle: "Manage Order — {{name}} delivery partner declined",
+    manageOrderDeclinedMultiple: "Manage Order — {{count}} delivery partners declined",
     manageDelivery: "Manage Delivery",
     markPreparing: "Mark Preparing",
     markReady: "Mark Ready",
@@ -962,4 +975,31 @@ export default {
     noResults: "No results found",
     results: "Results",
   },
+
+  // ── Wishlist ──
+  wishlist: {
+    title: "My Wishlist",
+    empty: "Your wishlist is empty",
+    emptySub: "Browse products and tap the heart icon to save them here",
+    browse: "Browse Products",
+    added: "Added to wishlist",
+    removed: "Removed from wishlist",
+    itemCount: "{{count}} items",
+    addToCart: "Add to Cart",
+    remove: "Remove",
+  },
+
+  signupSubtitle: "Tell us a little about yourself",
+fullName: "Full Name",
+fullNamePlaceholder: "Your full name",
+gender: "Gender",
+genderOptions: {
+  male: "Male",
+  female: "Female",
+  other: "Other",
+},
+agreeTo: "I agree to the",
+and: "and",
+createAccountSendOtp: "Create Account & Send OTP",
+
 };

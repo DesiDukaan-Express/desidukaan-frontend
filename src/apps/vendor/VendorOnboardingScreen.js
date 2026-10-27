@@ -2214,35 +2214,64 @@ export default function VendorOnboardingScreen({ onComplete }) {
                         <View style={{ width: 12 }} />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.label}>Unit <Text style={styles.req}>*</Text></Text>
-                          <View
-                            style={styles.dropdownWrap}
-                            ref={unitOpenIdx === index ? unitTriggerRef : null}
-                          >
-                            <TouchableOpacity
-                              style={styles.dropdownBox}
-                              activeOpacity={0.8}
-                              onPress={() => setUnitOpenIdx(unitOpenIdx === index ? null : index)}
+                          {Platform.OS === 'web' ? (
+                            <select
+                              value={product.unit || ''}
+                              onChange={(e) => updateManualProd(index, 'unit', e.target.value)}
+                              style={{
+                                width: '100%',
+                                height: 44,
+                                borderRadius: 10,
+                                borderWidth: 1,
+                                borderStyle: 'solid',
+                                borderColor: '#e5e7eb',
+                                paddingLeft: 12,
+                                paddingRight: 12,
+                                fontSize: 14,
+                                backgroundColor: '#ffffff',
+                                color: product.unit ? '#111827' : '#9ca3af',
+                                outline: 'none',
+                                cursor: 'pointer',
+                              }}
                             >
-                              <Text style={[styles.dropdownValue, !product.unit && styles.dropdownPlaceholder]}>
-                                {product.unit || 'Select Unit...'}
-                              </Text>
-                              <MaterialIcons name={unitOpenIdx === index ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#666" />
-                            </TouchableOpacity>
-                            {unitOpenIdx === index && (
-                              <UnitDropdownMenu
-                                anchorRef={unitTriggerRef}
-                                listRef={unitDropdownRef}
-                                options={MANUAL_UNIT_OPTIONS}
-                                value={product.unit}
-                                hover={unitHover}
-                                onHover={setUnitHover}
-                                onSelect={(u) => {
-                                  updateManualProd(index, 'unit', u);
-                                  setUnitOpenIdx(null);
-                                }}
-                              />
-                            )}
-                          </View>
+                              <option value="" disabled>Select Unit...</option>
+                              {MANUAL_UNIT_OPTIONS.map((u) => (
+                                <option key={u} value={u} style={{ color: '#111827' }}>
+                                  {u}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <View
+                              style={styles.dropdownWrap}
+                              ref={unitOpenIdx === index ? unitTriggerRef : null}
+                            >
+                              <TouchableOpacity
+                                style={styles.dropdownBox}
+                                activeOpacity={0.8}
+                                onPress={() => setUnitOpenIdx(unitOpenIdx === index ? null : index)}
+                              >
+                                <Text style={[styles.dropdownValue, !product.unit && styles.dropdownPlaceholder]}>
+                                  {product.unit || 'Select Unit...'}
+                                </Text>
+                                <MaterialIcons name={unitOpenIdx === index ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#666" />
+                              </TouchableOpacity>
+                              {unitOpenIdx === index && (
+                                <UnitDropdownMenu
+                                  anchorRef={unitTriggerRef}
+                                  listRef={unitDropdownRef}
+                                  options={MANUAL_UNIT_OPTIONS}
+                                  value={product.unit}
+                                  hover={unitHover}
+                                  onHover={setUnitHover}
+                                  onSelect={(u) => {
+                                    updateManualProd(index, 'unit', u);
+                                    setUnitOpenIdx(null);
+                                  }}
+                                />
+                              )}
+                            </View>
+                          )}
                         </View>
                       </View>
 

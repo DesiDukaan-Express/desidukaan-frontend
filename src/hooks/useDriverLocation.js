@@ -80,8 +80,6 @@ export default function useDriverLocation(orderId, token, orderStatus, hasDriver
     const socket = io(SOCKET_URL, {
       auth: { token },
       transports: ["websocket"],
-      reconnectionAttempts: 10,
-      reconnectionDelay: 2000,
     });
     socketRef.current = socket;
 

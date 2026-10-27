@@ -344,9 +344,7 @@ export default function PdfViewerModal({ visible, uri, fileName = 'document.pdf'
                   style={{ flex: 1 }}
                   contentContainerStyle={styles.scrollContent}
                   showsVerticalScrollIndicator
-                  maximumZoomScale={3}
-                  minimumZoomScale={0.5}
-                  bouncesZoom
+                  showsHorizontalScrollIndicator
                 >
                   {rendering ? (
                     <View style={styles.centerBox}>
@@ -354,15 +352,17 @@ export default function PdfViewerModal({ visible, uri, fileName = 'document.pdf'
                       <Text style={styles.centerTxt}>Rendering page…</Text>
                     </View>
                   ) : null}
-                  <Image
-                    source={{ uri: pageImage }}
-                    style={{
-                      width: Math.min(containerW || 400, 680),
-                      height: (Math.min(containerW || 400, 680) || 400) / pageRatio,
-                    }}
-                    resizeMode="contain"
-                    accessibilityLabel={`PDF page ${pageNumber}`}
-                  />
+                  <ScrollView horizontal contentContainerStyle={{ alignItems: 'center', justifyContent: 'center' }}>
+                    <Image
+                      source={{ uri: pageImage }}
+                      style={{
+                        width: Math.max(200, (containerW || 400) * (zoom / 100)),
+                        height: Math.max(200, ((containerW || 400) * (zoom / 100)) / (pageRatio || 1)),
+                      }}
+                      resizeMode="contain"
+                      accessibilityLabel={`PDF page ${pageNumber}`}
+                    />
+                  </ScrollView>
                 </ScrollView>
               ) : null}
             </View>

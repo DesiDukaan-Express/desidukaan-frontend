@@ -26,7 +26,7 @@ export default {
     "selectLanguage": "भाषा चुनें"
   },
   "auth": {
-    "welcomeBack": "वापस स्वागत है",
+    "welcomeBack": "स्वागत है",
     "loginSubtitle": "अपने मोबाइल नंबर से लॉग इन करें",
     "mobileNumber": "मोबाइल नंबर",
     "mobilePlaceholder": "10 अंकों का नंबर",
@@ -45,6 +45,10 @@ export default {
     "createAccount": "खाता बनाएं",
     "termsOfService": "सेवा की शर्तें",
     "privacyPolicy": "गोपनीयता नीति",
+    "dateOfBirth": "जन्म तिथि",
+    "dobPlaceholder": "दिन / माह / वर्ष",
+    "mustBeAtleast16": "आपकी आयु कम से कम 16 वर्ष होनी चाहिए",
+    "invalidDob": "कृपया एक मान्य जन्म तिथि दर्ज करें",
     "invalidOtp": "अमान्य OTP",
     "failedToSendOtp": "OTP भेजने में विफल"
   },
@@ -86,7 +90,7 @@ export default {
     "goodAfternoon": "शुभ दोपहर",
     "goodEvening": "शुभ संध्या",
     "goodNight": "शुभ रात्रि",
-    "welcomeBack": "वापसी पर स्वागत है, {{name}}",
+    "welcomeBack": "स्वागत है, {{name}}",
     "welcomeGuest": "KwikPik में आपका स्वागत है",
     "heroSubHeader": "ताज़ा राशन और रोज़मर्रा का सामान, तेज़ी से डिलीवरी।",
     "freshFromNearby": "पास की दुकानों से ताज़ा",
@@ -599,6 +603,8 @@ export default {
     "orderItems": "ऑर्डर के सामान",
     "specialInstructions": "विशेष निर्देश",
     "manageOrder": "ऑर्डर प्रबंधित करें",
+    "manageOrderDeclinedSingle": "ऑर्डर प्रबंधित करें — {{name}} डिलीवरी पार्टनर ने अस्वीकार किया",
+    "manageOrderDeclinedMultiple": "ऑर्डर प्रबंधित करें — {{count}} डिलीवरी पार्टनरों ने अस्वीकार किया",
     "manageDelivery": "डिलीवरी प्रबंधित करें",
     "markPreparing": "तैयारी चिह्नित करें",
     "markReady": "तैयार चिह्नित करें",
@@ -879,5 +885,29 @@ export default {
     "placeholder": "उत्पाद, श्रेणी खोजें...",
     "noResults": "कोई परिणाम नहीं मिला",
     "results": "परिणाम"
-  }
+  },
+  "wishlist": {
+    "title": "मेरी विशलिस्ट",
+    "empty": "आपकी विशलिस्ट खाली है",
+    "emptySub": "उत्पाद ब्राउज़ करें और उन्हें यहां सहेजने के लिए दिल आइकन पर टैप करें",
+    "browse": "उत्पाद ब्राउज़ करें",
+    "added": "विशलिस्ट में जोड़ा गया",
+    "removed": "विशलिस्ट से हटाया गया",
+    "itemCount": "{{count}} आइटम",
+    "addToCart": "कार्ट में जोड़ें",
+    "remove": "हटाएं"
+  },
+
+  "signupSubtitle": "अपने बारे में थोड़ा बताएं",
+fullName: "पूरा नाम",
+fullNamePlaceholder: "अपना पूरा नाम लिखें",
+gender: "लिंग",
+genderOptions: {
+  male: "पुरुष",
+  female: "महिला",
+  other: "अन्य",
+},
+"agreeTo": "मैं सहमत हूं:",
+"and": "और",
+"createAccountSendOtp": "खाता बनाएं और OTP भेजें",
 };

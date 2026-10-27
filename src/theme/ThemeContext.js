@@ -80,9 +80,14 @@ export function ThemeProvider({ children }) {
     AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {});
   };
 
-  const isDark = mode === "default" ? systemScheme === "dark" : mode === "dark";
+  const isDark = mode === "default"
+  ? systemScheme === "dark"
+  : mode === "dark";
   const colors = isDark ? darkColors : lightColors;
-
+useEffect(() => {
+  console.log("Theme mode:", mode);
+  console.log("Is dark:", isDark);
+}, [mode, isDark]);
   const value = useMemo(
     () => ({ mode, isDark, colors, setMode }),
     [mode, isDark, colors]

@@ -14,6 +14,7 @@ import {
   Pressable,
   Animated,
   Linking,
+  Dimensions,
 } from "react-native";
 import { Feather, FontAwesome, MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -21,6 +22,7 @@ import { useNavigation } from "@react-navigation/native";
 import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
+import { productReviewsAPI } from "../../services/productReviews";
 import { TextInput, Alert } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -38,58 +40,26 @@ import { dkBg, dkBorder, themeCfg } from "../../theme/darkTones";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
-// ─── Theme palettes (light / dark) ─────────────────────────────────────────
-const LIGHT_COLORS = {
-  yellow: "#F59E0B",
-  orange: "#F97316",
-  orangeDark: "#EA580C",
-  green: "#16A34A",
-  greenDark: "#15803D",
-  greenLight: "#F0FDF4",
-  greenMid: "#DCFCE7",
-  greenBorder: "#BBF7D0",
-  white: "#FFFFFF",
-  bg: "#F8FAFC",
-  gray100: "#F3F4F6",
-  gray200: "#E5E7EB",
-  gray300: "#D1D5DB",
-  gray400: "#9CA3AF",
-  gray500: "#6B7280",
-  gray600: "#4B5563",
-  gray700: "#374151",
-  gray800: "#1F2937",
-  gray900: "#111827",
-  red: "#DC2626",
-  redLight: "#FEF2F2",
-  cyan: "#0891B2",
-  cyanLight: "#ECFEFF",
-  surface: "#FFFFFF",
-};
-const DARK_COLORS = {
-  yellow: "#D9A03F",
-  orange: "#DB7A33",
-  orangeDark: "#C9691F",
-  green: "#14A06C",
-  greenDark: "#2DBE85",
-  greenLight: "#0F2219",
-  greenMid: "#0C3828",
-  greenBorder: "#17513B",
-  white: "#FFFFFF",
-  bg: "#0A0D12",
-  gray100: "#151A21",
-  gray200: "#222A34",
-  gray300: "#343D49",
-  gray400: "#6B7686",
-  gray500: "#8B96A6",
-  gray600: "#A7B0BE",
-  gray700: "#C5CCD7",
-  gray800: "#DDE2E9",
-  gray900: "#F3F5F8",
-  red: "#DE5C5C",
-  redLight: "#2C1E20",
-  cyan: "#4DA8C0",
-  cyanLight: "#172529",
-  surface: "#0F1318",
+const TIP_PRESETS = [10, 20, 50, 100];
+
+const C = {
+
+green: "#16803D",
+greenDark: "#116530",
+greenLight: "#F0F9F2",
+greenMid: "#DDF2E2",
+greenBorder: "#CBE5D1",
+bg: "#F5F8F5",
+gray100: "#F1F4F1",
+gray200: "#E1E8E2",
+gray300: "#C8D3CA",
+gray400: "#93A197",
+gray500: "#68766B",
+gray600: "#4C5B4F",
+gray700: "#344638",
+gray800: "#243629",
+gray900: "#172D1E",
+
 };
 
 
@@ -168,22 +138,22 @@ const haversineKm = (lat1, lng1, lat2, lng2) => {
 
 // ─── Status → header message mapping ─────────────────────────────────────────
 const STATUS_HEADER_TEXTS = {
-  pending:   "Order Placed",
-  accepted:  "Order Accepted",
+  pending: "Order Placed",
+  accepted: "Order Accepted",
   preparing: "Order is being prepared",
-  ready:     "Ready for pickup",
+  ready: "Ready for pickup",
   picked_up: "Order is on the way",
   delivered: "Delivered!",
   cancelled: "Order Cancelled",
-  rejected:  "Order Rejected",
+  rejected: "Order Rejected",
 };
 const getHeaderText = (s) => STATUS_HEADER_TEXTS[s] || "Order Placed";
 
 // ─── Status → partner message mapping ────────────────────────────────────────
 const PARTNER_STATUS_MSGS = {
-  accepted:  "I have accepted your order and am heading to the store",
+  accepted: "I have accepted your order and am heading to the store",
   preparing: "I am at the store preparing your order",
-  ready:     "I have your order and am ready to head your way",
+  ready: "I have your order and am ready to head your way",
   picked_up: "I have picked up your order and am on the way to your location",
 };
 const getPartnerMsg = (s) => PARTNER_STATUS_MSGS[s] || "Your delivery partner is on the way";
@@ -227,7 +197,7 @@ const getETALabel = (status, mins) => {
   if (mins == null) return null;
   const t = formatETA(mins);
   if (status === "picked_up") return `Arriving in ~${t}`;
-  if (status === "ready")     return `Pickup ready · ~${t} away`;
+  if (status === "ready") return `Pickup ready · ~${t} away`;
   return `Est. delivery in ~${t}`;
 };
 
@@ -351,17 +321,17 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
 
   const initialLocation =
     order?.delivery?.partner?.current_lat &&
-    order?.delivery?.partner?.current_lng
+      order?.delivery?.partner?.current_lng
       ? {
-          lat: order.delivery.partner.current_lat,
-          lng: order.delivery.partner.current_lng,
-        }
+        lat: order.delivery.partner.current_lat,
+        lng: order.delivery.partner.current_lng,
+      }
       : order?.delivery_partner?.current_lat &&
-          order?.delivery_partner?.current_lng
+        order?.delivery_partner?.current_lng
         ? {
-            lat: order.delivery_partner.current_lat,
-            lng: order.delivery_partner.current_lng,
-          }
+          lat: order.delivery_partner.current_lat,
+          lng: order.delivery_partner.current_lng,
+        }
         : null;
 
   const hookData = useDriverLocation(
@@ -372,9 +342,9 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
     initialLocation,
   );
 
-  const partnerPos  = externalPos  ?? hookData.partnerPos;
-  const connected   = externalConnected ?? hookData.connected;
-  const lastUpdate  = externalLastUpdate ?? hookData.lastUpdate;
+  const partnerPos = externalPos ?? hookData.partnerPos;
+  const connected = externalConnected ?? hookData.connected;
+  const lastUpdate = externalLastUpdate ?? hookData.lastUpdate;
 
   // Pulsing "LIVE" badge animation
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -402,65 +372,191 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
 
   const isLocating = !partnerPos;
 
+  // Distance & ETA from driver to customer
+  const distKm = partnerPos?.lat && destLat && destLng
+    ? haversineKm(partnerPos.lat, partnerPos.lng, destLat, destLng)
+    : null;
+  const distDisplay = distKm != null ? Number(distKm) : null;
+  const etaMins = distDisplay != null ? Math.max(2, Math.round(distDisplay * 4)) : null;
+  const etaLabel = etaMins != null
+    ? etaMins < 60
+      ? `~${etaMins} min`
+      : (() => { const h = Math.floor(etaMins / 60); const m = etaMins % 60; return m > 0 ? `~${h}h ${m}m` : `~${h}h`; })()
+    : null;
+
+  const [showFullMap, setShowFullMap] = useState(false);
+  const SCREEN_H = Dimensions.get("window").height;
+
   return (
-    <View style={dlm.card}>
-      {/* Card header */}
-      <View style={dlm.header}>
-        <View style={dlm.headerLeft}>
-          <View style={dlm.mapIconBg}>
-            <Feather name="map" size={14} color={C.green} />
+    <>
+      <View style={dlm.card}>
+        {/* Card header */}
+        <View style={dlm.header}>
+          <View style={dlm.headerLeft}>
+            <View style={dlm.mapIconBg}>
+              <Feather name="map" size={14} color={C.green} />
+            </View>
+            <Text style={dlm.headerTitle}>Driver Location</Text>
           </View>
-          <Text style={dlm.headerTitle}>Driver Location</Text>
-        </View>
-        <View style={dlm.liveBadge}>
-          <Animated.View style={[dlm.liveDot, { opacity: pulseAnim }]} />
-          <Text style={dlm.liveText}>LIVE</Text>
-        </View>
-      </View>
-
-      {/* Map */}
-      <View style={dlm.mapWrap}>
-        <CustomerMapView
-          partnerPos={partnerPos}
-          destLat={destLat}
-          destLng={destLng}
-        />
-
-        {/* Locating overlay — shown until first position arrives */}
-        {isLocating && (
-          <View style={dlm.locatingOverlay}>
-            <ActivityIndicator size="small" color={C.green} />
-            <Text style={dlm.locatingText}>
-              {hasDriver
-                ? "Locating driver…"
-                : "Waiting for driver assignment…"}
-            </Text>
+          <View style={dlm.headerRight}>
+            <TouchableOpacity
+              style={dlm.viewBtn}
+              onPress={() => setShowFullMap(true)}
+              activeOpacity={0.7}
+            >
+              <Feather name="maximize-2" size={13} color={C.green} />
+              <Text style={dlm.viewBtnText}>View</Text>
+            </TouchableOpacity>
+            <View style={dlm.liveBadge}>
+              <Animated.View style={[dlm.liveDot, { opacity: pulseAnim }]} />
+              <Text style={dlm.liveText}>LIVE</Text>
+            </View>
           </View>
-        )}
-      </View>
+        </View>
 
-      {/* Status row */}
-      <View style={dlm.statusRow}>
-        <View
-          style={[
-            dlm.connDot,
-            { backgroundColor: connected ? C.green : C.gray300 },
-          ]}
-        />
-        <Text style={dlm.connText}>
-          {connected ? "Connected — live updates" : "Reconnecting…"}
-        </Text>
-        {lastUpdate && (
-          <Text style={dlm.lastUpdate}>
-            {lastUpdate.toLocaleTimeString("en-IN", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            })}
+        {/* Map */}
+        <View style={dlm.mapWrap}>
+          <CustomerMapView
+            partnerPos={partnerPos}
+            destLat={destLat}
+            destLng={destLng}
+          />
+
+          {/* Arriving banner on map */}
+          {partnerPos && etaMins != null && (
+            <View style={dlm.mapArriveBanner}>
+              <Feather name="navigation" size={14} color={C.green} />
+              <Text style={dlm.mapArriveText}>
+                Arriving in{" "}
+                <Text style={dlm.mapArriveBold}>
+                  ~{etaMins} {etaMins === 1 ? "min" : "mins"}
+                </Text>
+              </Text>
+            </View>
+          )}
+
+          {/* Locating overlay — shown until first position arrives */}
+          {isLocating && (
+            <View style={dlm.locatingOverlay}>
+              <ActivityIndicator size="small" color={C.green} />
+              <Text style={dlm.locatingText}>
+                {hasDriver
+                  ? "Locating driver…"
+                  : "Waiting for driver assignment…"}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Status row */}
+        <View style={dlm.statusRow}>
+          <View
+            style={[
+              dlm.connDot,
+              { backgroundColor: connected ? C.green : C.gray300 },
+            ]}
+          />
+          <Text style={dlm.connText}>
+            {connected ? "Connected — live updates" : "Reconnecting…"}
           </Text>
-        )}
+          {lastUpdate && (
+            <Text style={dlm.lastUpdate}>
+              {lastUpdate.toLocaleTimeString("en-IN", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
+            </Text>
+          )}
+        </View>
       </View>
-    </View>
+
+      {/* ── Full-Screen Map Modal ── */}
+      <Modal
+        visible={showFullMap}
+        animationType="slide"
+        onRequestClose={() => setShowFullMap(false)}
+      >
+        <View style={dlm.fullScreenWrap}>
+          {/* Header row */}
+          <View style={dlm.fullMapHeader}>
+            <View style={dlm.fullMapHeaderLeft}>
+              <View style={dlm.mapIconBg}>
+                <Feather name="map" size={14} color={C.green} />
+              </View>
+              <Text style={dlm.fullMapTitle}>Live Tracking</Text>
+            </View>
+            <View style={dlm.fullMapHeaderRight}>
+              {partnerPos && (
+                <View style={dlm.fullMapLiveBadge}>
+                  <Animated.View style={[dlm.liveDot, { opacity: pulseAnim }]} />
+                  <Text style={dlm.liveText}>LIVE</Text>
+                </View>
+              )}
+              <TouchableOpacity
+                style={dlm.fullMapCloseBtn}
+                onPress={() => setShowFullMap(false)}
+                activeOpacity={0.7}
+              >
+                <Feather name="x" size={18} color={C.white} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Arriving banner on full map */}
+          {partnerPos && etaMins != null && (
+            <View style={dlm.fullMapArriveBanner}>
+              <Feather name="navigation" size={15} color={C.green} />
+              <Text style={dlm.fullMapArriveText}>
+                Arriving in{" "}
+                <Text style={dlm.fullMapArriveBold}>
+                  ~{etaMins} {etaMins === 1 ? "min" : "mins"}
+                </Text>
+              </Text>
+            </View>
+          )}
+
+          {/* Full map — fills remaining space */}
+          <View style={dlm.fullMapContainer}>
+            <CustomerMapView
+              partnerPos={partnerPos}
+              destLat={destLat}
+              destLng={destLng}
+              style={{ height: "100%", borderRadius: 0 }}
+            />
+
+            {/* Locating overlay */}
+            {isLocating && (
+              <View style={dlm.locatingOverlayFull}>
+                <ActivityIndicator size="small" color={C.green} />
+                <Text style={dlm.locatingText}>
+                  {hasDriver ? "Locating driver…" : "Waiting for driver assignment…"}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Bottom info bar */}
+          <View style={dlm.fullMapInfoBar}>
+            <View style={dlm.fullMapInfoLeft}>
+              <View style={[dlm.connDot, { backgroundColor: connected ? C.green : C.gray300 }]} />
+              <Text style={dlm.fullMapInfoText}>
+                {connected ? "Connected — live updates" : "Reconnecting…"}
+              </Text>
+            </View>
+            {lastUpdate && (
+              <Text style={dlm.fullMapInfoTime}>
+                {lastUpdate.toLocaleTimeString("en-IN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })}
+              </Text>
+            )}
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -553,12 +649,18 @@ function OrderDetailModal({ order, onClose }) {
   // Compact order number row
   orderNumRow: {
     flexDirection: "row",
+    gap: 8,
+    zIndex: 10,
+    minHeight: 280,
+  },
+  locatingOverlayFull: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(248,250,252,0.88)",
     alignItems: "center",
-    gap: 6,
-    marginBottom: 16,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: C.gray100,
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    zIndex: 10,
   },
   orderNumCompact: {
     fontSize: 13,
@@ -868,14 +970,187 @@ function OrderDetailModal({ order, onClose }) {
     fontWeight: "600",
     color: C.gray600,
   },
-}), [C]);
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  viewBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: C.white,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.greenBorder,
+  },
+  viewBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.green,
+  },
+  // ── Half-Screen Map Modal ──
+  fullScreenWrap: {
+    flex: 1,
+    backgroundColor: C.gray50,
+  },
+  fullMapHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 10,
+    backgroundColor: C.green,
+  },
+  fullMapHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  fullMapHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  fullMapTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: C.white,
+  },
+  fullMapLiveBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: C.green,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  fullMapCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fullMapContainer: {
+    flex: 1,
+    position: "relative",
+  },
+  fullMapInfoBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: C.white,
+  },
+  fullMapInfoLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  fullMapInfoText: {
+    fontSize: 12,
+    color: C.gray500,
+    fontWeight: "500",
+  },
+  fullMapInfoTime: {
+    fontSize: 11,
+    color: C.gray400,
+    fontWeight: "500",
+  },
+  mapArriveBanner: {
+    position: "absolute",
+    top: 10,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: C.white,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 6,
+    zIndex: 20,
+  },
+  mapArriveText: {
+    fontSize: 13,
+    color: C.gray600,
+    fontWeight: "500",
+  },
+  mapArriveBold: {
+    fontSize: 16,
+    color: C.green,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+  },
+  fullMapArriveBanner: {
+    position: "absolute",
+    top: 60,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: C.white,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 26,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 8,
+    zIndex: 20,
+  },
+  fullMapArriveText: {
+    fontSize: 14,
+    color: C.gray600,
+    fontWeight: "500",
+  },
+  fullMapArriveBold: {
+    fontSize: 18,
+    color: C.green,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+  },
+});
+
+// ─── Order Detail Modal ───────────────────────────────────────────────────────
+function OrderDetailModal({ order, onClose }) {
   const { t } = useTranslation();
   const navigation = useNavigation();
   const { token } = useAuthStore();
   const [fullOrder, setFullOrder] = useState(null);
   const [fetching, setFetching] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const showMap = MAP_ACTIVE_STATUSES.includes(order?.status);
+  const [tipSent, setTipSent] = useState(false);
+  const [selectedTip, setSelectedTip] = useState(null);
+  const [customTip, setCustomTip] = useState("");
+  const [tipSending, setTipSending] = useState(false);
+
+  // Per-item product reviews (read-only display for delivered orders)
+  const [itemRatingsMap, setItemRatingsMap] = useState({});
+  const [itemRatingsLoading, setItemRatingsLoading] = useState(false);
+
+  // Use fullOrder if available for more details, otherwise fallback to order
+  const displayOrder = fullOrder || order;
+
+  const hasDriver = !!(
+    displayOrder?.delivery_partner_id ||
+    displayOrder?.delivery_partner ||
+    displayOrder?.delivery?.partner_id ||
+    displayOrder?.delivery?.partner
+  );
+  const deliveryStatus = displayOrder?.delivery?.status;
 
   useEffect(() => {
     if (order?.id) {
@@ -912,16 +1187,44 @@ function OrderDetailModal({ order, onClose }) {
     }
   };
 
+  // Reset tip state whenever a different order is opened
+  useEffect(() => {
+    setTipSent(false);
+    setSelectedTip(null);
+    setCustomTip("");
+  }, [order?.id]);
+
+  // Fetch per-item product reviews for read-only display in delivered orders
+  useEffect(() => {
+    if (!order || order.status !== "delivered") return;
+    const items = order.order_items || order.items || [];
+    const productIds = items.map(i => i.product_id).filter(Boolean);
+    if (productIds.length === 0) return;
+
+    setItemRatingsLoading(true);
+    productReviewsAPI.getBulk(productIds, token, order.id)
+      .then(res => {
+        if (res.success) {
+          const map = {};
+          Object.entries(res.data).forEach(([pid, info]) => {
+            map[pid] = info;
+          });
+          setItemRatingsMap(map);
+        }
+      })
+      .catch(() => { })
+      .finally(() => setItemRatingsLoading(false));
+  }, [order?.id, order?.status, token]);
+
+  const handleSendTip = () => {
+    if (!(selectedTip || customTip)) return;
+    Alert.alert("Tipping coming soon", "Tips aren't available yet. Hang tight!");
+  };
+
   // ── Live driver location & ETA — MUST be before early return (hooks rule) ──
-  const hasDriver = !!(
-    order?.delivery_partner_id ||
-    order?.delivery_partner ||
-    order?.delivery?.partner_id ||
-    order?.delivery?.partner
-  );
   const initialLocation =
     order?.delivery?.partner?.current_lat &&
-    order?.delivery?.partner?.current_lng
+      order?.delivery?.partner?.current_lng
       ? { lat: order.delivery.partner.current_lat, lng: order.delivery.partner.current_lng }
       : order?.delivery_partner?.current_lat && order?.delivery_partner?.current_lng
         ? { lat: order.delivery_partner.current_lat, lng: order.delivery_partner.current_lng }
@@ -955,6 +1258,7 @@ function OrderDetailModal({ order, onClose }) {
   })();
 
   const isActive = order && !["delivered", "cancelled", "rejected"].includes(order.status);
+  const showMap = hasDriver && order?.status === "picked_up";
   const headerStatusText = getHeaderText(order?.status);
   const partnerName = order?.delivery?.partner?.user?.name || order?.delivery_partner?.user?.name || "Delivery Partner";
   const partnerPhone = order?.delivery?.partner?.user?.phone || order?.delivery_partner?.user?.phone;
@@ -962,13 +1266,11 @@ function OrderDetailModal({ order, onClose }) {
 
   if (!order) return null;
 
-  // Use fullOrder if available for more details, otherwise fallback to order
-  const displayOrder = fullOrder || order;
-
-  const st = getStatus(order.status, isDark);
+  const st = getStatus(order.status);
   const stepIdx = stepIndex(order.status);
   const isFailed = order.status === "cancelled" || order.status === "rejected";
   const isDelivered = order?.status === "delivered";
+  const canTip = order?.status === "picked_up" || order?.status === "delivered";
   const items = displayOrder.order_items || displayOrder.items || [];
   const subtotal = displayOrder.subtotal || 0;
   const deliveryFee = displayOrder.delivery_fee ?? 20;
@@ -977,28 +1279,32 @@ function OrderDetailModal({ order, onClose }) {
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={od.backdrop} onPress={onClose}>
-        <Pressable style={od.sheet} onPress={() => {}}>
+        <Pressable style={od.sheet} onPress={() => { }}>
           <View style={od.handle} />
 
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* ── Order number row (compact) — first ── */}
             <View style={od.orderNumRow}>
-              <Feather name="package" size={14} color={C.gray400} />
-              <Text style={od.orderNumCompact}>
-                {order.order_number || `#${order.id?.toString().slice(-6).toUpperCase()}`}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Feather name="package" size={14} color={C.gray400} />
+                <Text style={od.orderNumCompact}>
+                  {order.order_number || `#${order.id?.toString().slice(-6).toUpperCase()}`}
+                </Text>
+              </View>
               <Text style={od.orderDateCompact}>{formatDate(order.created_at)}</Text>
             </View>
 
             {/* ── Colored status banner ── */}
-            <View style={[od.statusCard, { backgroundColor: (() => {
-              const s = order?.status;
-              if (["accepted", "preparing", "ready", "delivered"].includes(s)) return C.green;
-              if (s === "picked_up") return "#0E7490";
-              if (s === "pending") return "#D97706";
-              if (["cancelled", "rejected"].includes(s)) return C.gray500;
-              return C.green;
-            })() }]}>
+            <View style={[od.statusCard, {
+              backgroundColor: (() => {
+                const s = order?.status;
+                if (["accepted", "preparing", "ready", "delivered"].includes(s)) return C.green;
+                if (s === "picked_up") return "#0E7490";
+                if (s === "pending") return "#D97706";
+                if (["cancelled", "rejected"].includes(s)) return C.gray500;
+                return C.green;
+              })()
+            }]}>
               <View style={od.statusRow}>
                 <View style={od.statusIconBg}>
                   <Feather name={order?.status === "picked_up" ? "truck" : order?.status === "delivered" ? "check-circle" : isFailed ? "x-circle" : "package"} size={26} color={C.white} />
@@ -1007,16 +1313,23 @@ function OrderDetailModal({ order, onClose }) {
                   <Text style={od.statusLabel}>
                     {order?.status === "delivered" ? "DELIVERED"
                       : isFailed ? (order?.status || "").toUpperCase()
-                      : order?.status === "picked_up" ? "OUT FOR DELIVERY"
-                      : order?.status === "ready" ? "READY FOR PICKUP"
-                      : order?.status === "preparing" ? "PREPARING"
-                      : order?.status === "accepted" ? "ACCEPTED"
-                      : "ORDER PLACED"}
+                        : order?.status === "picked_up" ? "OUT FOR DELIVERY"
+                          : order?.status === "ready" ? "READY FOR PICKUP"
+                            : order?.status === "preparing" ? "PREPARING"
+                              : order?.status === "accepted" ? "ACCEPTED"
+                                : "ORDER PLACED"}
                   </Text>
                   <Text style={od.statusTitle}>
                     {isActive
                       ? partnerPos?.lat
-                        ? `Arriving in ~${liveEtaMins} ${liveEtaMins === 1 ? "min" : "mins"}`
+                        ? (
+                          <>
+                            {"Arriving in "}
+                            <Text style={od.statusEtaBold}>
+                              ~{liveEtaMins} {liveEtaMins === 1 ? "min" : "mins"}
+                            </Text>
+                          </>
+                        )
                         : hasDriver
                           ? "Locating driver…"
                           : order?.status === "ready"
@@ -1052,7 +1365,74 @@ function OrderDetailModal({ order, onClose }) {
                 />
               )}
 
-              {/* ── Delivery Partner Card — shown when partner is assigned ── */}
+              {/* ── TIP & FEEDBACK SECTION ── */}
+              {canTip && (
+                <View style={od.tipFeedbackCard}>
+                  {/* ── Tipping ── */}
+                  {!tipSent ? (
+                    <>
+                      <View style={od.tfHeader}>
+                        <View style={od.tfIconBg}>
+                          <Feather name="heart" size={18} color={C.orange} />
+                        </View>
+                        <View>
+                          <Text style={od.tfTitle}>{t('orders.tipTitle', 'Show some love')}</Text>
+                          <Text style={od.tfSubtitle}>{t('orders.tipSubtitle', 'Thank your delivery partner')}</Text>
+                        </View>
+                      </View>
+                      <View style={od.tipPresets}>
+                        {TIP_PRESETS.map((amt) => (
+                          <TouchableOpacity
+                            key={amt}
+                            style={[od.tipPresetBtn, selectedTip === amt && od.tipPresetBtnActive]}
+                            onPress={() => { setSelectedTip(amt); setCustomTip(""); }}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[od.tipPresetRupee, selectedTip === amt && od.tipPresetRupeeActive]}>₹</Text>
+                            <Text style={[od.tipPresetAmount, selectedTip === amt && od.tipPresetAmountActive]}>{amt}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <View style={od.tipCustomRow}>
+                        <View style={od.tipCustomInputWrap}>
+                          <Text style={od.tipCurrency}>₹</Text>
+                          <TextInput
+                            style={od.tipCustomInput}
+                            placeholder={t('orders.customTip', 'Custom amount')}
+                            placeholderTextColor={C.gray400}
+                            keyboardType="number-pad"
+                            maxLength={4}
+                            value={customTip}
+                            onChangeText={(t) => { setCustomTip(t); setSelectedTip(null); }}
+                          />
+                        </View>
+                        <TouchableOpacity
+                          style={[od.tipSendBtn, (!(selectedTip || customTip) || tipSending) && { opacity: 0.5 }]}
+                          onPress={handleSendTip}
+                          disabled={!(selectedTip || customTip) || tipSending}
+                          activeOpacity={0.7}
+                        >
+                          {tipSending ? (
+                            <ActivityIndicator size="small" color={C.white} />
+                          ) : (
+                            <>
+                              <Feather name="heart" size={14} color={C.white} />
+                              <Text style={od.tipSendBtnText}>{t('orders.sendTip', 'Send Tip')}</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : (
+                    <View style={od.tipSuccess}>
+                      <Feather name="heart" size={24} color={C.green} />
+                      <Text style={od.tipSuccessText}>{t('orders.tipThanks', 'Thank you for tipping!')}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* ── Delivery Partner Card ── */}
               {hasDriver && isActive && (
                 <View style={od.partnerInfoCard}>
                   <View style={od.partnerAvatar}>
@@ -1181,29 +1561,61 @@ function OrderDetailModal({ order, onClose }) {
                 const name = item.product_name || p.name || "Item";
                 const price = item.product_price || p.price || item.price || 0;
                 const qty = item.quantity || 1;
+                const pid = item.product_id;
+                const alreadyRated = pid && itemRatingsMap[pid]?.ratedInOrder;
                 return (
-                  <View key={i} style={od.itemRow}>
-                    <Image
-                      source={{
-                        uri:
-                          p.image_url ||
-                          "https://images.unsplash.com/photo-1542838132-92c53300491e?w=200",
-                      }}
-                      style={od.itemImg}
-                      resizeMode="cover"
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={od.itemName} numberOfLines={2}>
-                        {name}
-                      </Text>
-                      <Text style={od.itemUnit}>
-                        {p.unit || item.unit || "1 pc"}
-                      </Text>
+                  <View key={i}>
+                    <View style={od.itemRow}>
+                      <Image
+                        source={{
+                          uri:
+                            p.image_url ||
+                            "https://images.unsplash.com/photo-1542838132-92c53300491e?w=200",
+                        }}
+                        style={od.itemImg}
+                        resizeMode="cover"
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={od.itemName} numberOfLines={2}>
+                          {name}
+                        </Text>
+                        <Text style={od.itemUnit}>
+                          {p.unit || item.unit || "1 pc"}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: "flex-end" }}>
+                        <Text style={od.itemQty}>×{qty}</Text>
+                        <Text style={od.itemPrice}>₹{price * qty}</Text>
+                      </View>
                     </View>
-                    <View style={{ alignItems: "flex-end" }}>
-                      <Text style={od.itemQty}>×{qty}</Text>
-                      <Text style={od.itemPrice}>₹{price * qty}</Text>
-                    </View>
+                    {/* Per-item review display (delivered orders only) */}
+                    {isDelivered && pid && itemRatingsLoading && (
+                      <View style={od.itemRatingRow}>
+                        <ActivityIndicator size="small" color={C.yellow} />
+                      </View>
+                    )}
+                    {isDelivered && pid && !itemRatingsLoading && alreadyRated && (
+                      <View style={od.itemRatingRow}>
+                        <View>
+                          <View style={od.itemRatingDone}>
+                            <Text style={od.itemRatingDoneText}>Rated </Text>
+                            {[1, 2, 3, 4, 5].map(s => (
+                              <MaterialIcons
+                                key={s}
+                                name={s <= (itemRatingsMap[pid]?.myRatingInOrder || 0) ? "star" : "star-outline"}
+                                size={14}
+                                color={s <= (itemRatingsMap[pid]?.myRatingInOrder || 0) ? "#F59E0B" : "#D1D5DB"}
+                              />
+                            ))}
+                          </View>
+                          {itemRatingsMap[pid]?.myComment && (
+                            <Text style={{ fontSize: 11, color: "#6B7280", fontStyle: "italic", marginLeft: 4, marginTop: 2 }}>
+                              {itemRatingsMap[pid].myComment}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    )}
                   </View>
                 );
               })}
@@ -1356,36 +1768,286 @@ function OrderDetailModal({ order, onClose }) {
   );
 }
 
-
-
-// ─── Order Card ───────────────────────────────────────────────────────────────
-const formatCardDate = (iso) => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const datePart = d.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-  });
-  
-  let hours = d.getHours();
-  const minutes = d.getMinutes();
-  const ampm = hours >= 12 ? 'pm' : 'am';
-  hours = hours % 12;
-  hours = hours ? hours : 12;
-  const minutesStr = minutes < 10 ? '0'+minutes : minutes;
-  
-  return `${datePart}, ${hours}:${minutesStr} ${ampm}`;
-};
-
-
-function OrderCard({ order, onPress, onRate, onViewRating, alreadyRated, onReorder, onDownloadInvoice, isFirstDelivered }) {
-  const { isDark } = useTheme();
-  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
-  const oc = useMemo(() => StyleSheet.create({
-  card: {
-    backgroundColor: C.surface,
-    borderRadius: 16,
+const od = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: C.bg,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: "92%",
+    overflow: "hidden",
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: C.gray300,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginTop: 10,
+  },
+  // Polished status header (colored banner)
+  statusCard: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  statusCardDelivered: {
+    backgroundColor: C.green,
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  statusIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusIconGreen: { backgroundColor: "rgba(255,255,255,0.18)" },
+  statusIconBlue: { backgroundColor: "rgba(255,255,255,0.18)" },
+  statusIconRed: { backgroundColor: "rgba(255,255,255,0.18)" },
+  statusLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.75)",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 3,
+  },
+  statusTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: C.white,
+    lineHeight: 21,
+  },
+  statusEtaBold: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: C.white,
+    letterSpacing: 0.3,
+    textShadowColor: "rgba(0,0,0,0.25)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  statusLivePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  statusLiveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: C.white,
+  },
+  statusLiveText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: C.white,
+    letterSpacing: 0.8,
+  },
+  // Compact order number row
+  orderNumRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 8,
     marginBottom: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+  },
+  orderNumCompact: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.gray600,
+    paddingVertical: 4,
+    paddingLeft: 4,
+  },
+  orderDateCompact: {
+    fontSize: 11,
+    color: C.gray400,
+    paddingVertical: 4,
+    paddingRight: 4,
+  },
+  // Partner info card
+  partnerInfoCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: C.white,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: C.greenBorder,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  partnerAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: C.green,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  partnerInfoName: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: C.gray900,
+    marginBottom: 3,
+  },
+  partnerInfoMsg: {
+    fontSize: 12,
+    color: C.gray500,
+    lineHeight: 17,
+  },
+  partnerCallBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: C.green,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
+  body: { padding: 20 },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: C.gray900,
+    marginBottom: 14,
+    marginTop: 4,
+  },
+
+              {/* ── Delivery address ── */}
+              {displayOrder.delivery_address && (
+                <View style={od.addressBox}>
+                  <View style={od.addressIcon}>
+                    <Feather name="map-pin" size={14} color={C.green} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={od.addressLbl}>Delivery address</Text>
+                    <Text style={od.addressVal}>
+                      {(() => {
+                        const line = displayOrder.delivery_address?.address_line ||
+                          (typeof displayOrder.delivery_address === "string" ? displayOrder.delivery_address : "");
+                        const city = displayOrder.delivery_address?.city || "";
+                        // Only show city if it's not already mentioned in the address line
+                        const shouldAppendCity = city && !line.toLowerCase().includes(city.toLowerCase());
+                        return shouldAppendCity ? `${line}, ${city}` : line;
+                      })()}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {/* ── Payment ── */}
+              {displayOrder.payment && (
+                <View style={od.paymentRow}>
+                  <Feather name="credit-card" size={14} color={C.gray500} />
+                  <Text style={od.paymentText}>
+                    {displayOrder.payment.method?.toUpperCase() || "UPI"}
+                    {" · "}
+                    <Text
+                      style={{
+                        color:
+                          displayOrder.payment.status === "paid" ? C.green : C.gray500,
+                        fontWeight: "700",
+                      }}
+                    >
+                      {displayOrder.payment.status === "paid" ? "Paid" : "Pending"}
+                    </Text>
+                  </Text>
+                </View>
+              )}
+
+  // Items
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+  },
+  itemImg: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: C.gray100,
+  },
+  itemName: { fontSize: 14, fontWeight: "600", color: C.gray900 },
+  itemUnit: { fontSize: 12, color: C.gray400, marginTop: 2 },
+  itemQty: { fontSize: 12, color: C.gray500, fontWeight: "600" },
+  itemPrice: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: C.gray900,
+    marginTop: 2,
+  },
+  itemRatingRow: {
+    paddingLeft: 60,
+    paddingBottom: 8,
+  },
+  itemRatingDone: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  itemRatingDoneText: {
+    fontSize: 12,
+    color: C.green,
+    fontWeight: "600",
+    marginRight: 2,
+  },
+  itemRatingInteractive: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  itemRatingLabel: {
+    fontSize: 12,
+    color: C.gray500,
+    fontWeight: "600",
+    marginRight: 2,
+  },
+  submitRatingsBtn: {
+    backgroundColor: C.green,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  submitRatingsBtnText: {
+    color: C.white,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
+  // Bill
+  billBox: {
+    backgroundColor: C.white,
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 20,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: C.gray100,
     shadowColor: "#000",
@@ -1505,12 +2167,179 @@ function OrderCard({ order, onPress, onRate, onViewRating, alreadyRated, onReord
     fontWeight: "700",
     color: C.orangeDark,
   },
-  etaDistText: {
-    fontSize: 11,
-    fontWeight: "500",
+
+  // ── Tip & Feedback Modal Styles ──
+  tipFeedbackCard: {
+    backgroundColor: C.white,
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    marginBottom: 16,
+  },
+  tfHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 14,
+  },
+  tfIconBg: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#FFF7ED",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  tfTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: C.gray900,
+  },
+  tfSubtitle: {
+    fontSize: 12,
     color: C.gray500,
   },
-}), [C]);
+  tipPresets: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
+  },
+  tipPresetBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: C.greenLight,
+    borderWidth: 2,
+    borderColor: C.greenBorder,
+  },
+  tipPresetBtnActive: {
+    backgroundColor: C.green,
+    borderColor: C.green,
+  },
+  tipPresetRupee: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.green,
+  },
+  tipPresetRupeeActive: {
+    color: "rgba(255,255,255,0.8)",
+  },
+  tipPresetAmount: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: C.greenDark,
+    marginTop: 2,
+  },
+  tipPresetAmountActive: {
+    color: C.white,
+  },
+  tipCustomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  tipCustomInputWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 48,
+  },
+  tipCurrency: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: C.gray500,
+    marginRight: 4,
+  },
+  tipCustomInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+    color: C.gray900,
+    paddingVertical: 0,
+  },
+  tipSendBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: C.green,
+    paddingHorizontal: 20,
+    height: 48,
+    borderRadius: 14,
+  },
+  tipSendBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: C.white,
+  },
+  tipSuccess: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 20,
+  },
+  tipSuccessText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: C.green,
+  },
+  tfDivider: {
+    height: 1,
+    backgroundColor: C.gray100,
+    marginVertical: 16,
+  },
+  feedbackRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  feedbackInput: {
+    flex: 1,
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    fontSize: 14,
+    color: C.gray900,
+  },
+  feedbackSendBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: C.green,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});
+
+// ─── Order Card ───────────────────────────────────────────────────────────────
+const formatCardDate = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const datePart = d.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+  });
+
+  let hours = d.getHours();
+  const minutes = d.getMinutes();
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const minutesStr = minutes < 10 ? '0' + minutes : minutes;
+
+  return `${datePart}, ${hours}:${minutesStr} ${ampm}`;
+};
+
+
+function OrderCard({ order, onPress, onRate, onViewRating, alreadyRated, onReorder, onDownloadInvoice, isFirstDelivered }) {
   const { t } = useTranslation();
   const st = getStatus(order.status, isDark);
   const stepIdx = stepIndex(order.status);
@@ -1589,9 +2418,9 @@ function OrderCard({ order, onPress, onRate, onViewRating, alreadyRated, onReord
       else etaMins = 30;
     }
   }
-  const showETA  = etaMins != null;
+  const showETA = etaMins != null;
   const etaLabel = showETA ? getETALabel(order.status, etaMins) : null;
-  const distKm   = order.delivery_distance_km ?? null;
+  const distKm = order.delivery_distance_km ?? null;
 
 
   return (
@@ -1674,7 +2503,7 @@ function OrderCard({ order, onPress, onRate, onViewRating, alreadyRated, onReord
                 <Text style={oc.actionBtnText}>{t('orders.reorder', 'Reorder')}</Text>
               </TouchableOpacity>
             )}
-            
+
             <View style={oc.actionDivider} />
 
             {(() => {
@@ -1682,9 +2511,9 @@ function OrderCard({ order, onPress, onRate, onViewRating, alreadyRated, onReord
               const num = ratingVal ? parseInt(ratingVal, 10) || 5 : 5;
               const starsText = "★".repeat(Math.max(1, Math.min(5, num)));
               return (
-                <TouchableOpacity 
-                  style={oc.actionBtn} 
-                  onPress={alreadyRated ? () => onViewRating(order) : onRate} 
+                <TouchableOpacity
+                  style={oc.actionBtn}
+                  onPress={alreadyRated ? () => onViewRating(order) : onRate}
                   activeOpacity={0.7}
                 >
                   {alreadyRated ? (
@@ -1703,7 +2532,7 @@ function OrderCard({ order, onPress, onRate, onViewRating, alreadyRated, onReord
         ) : (
           <>
             {["accepted", "preparing", "ready", "picked_up"].includes(order.status) &&
-            (order.delivery_partner_id || order.delivery_partner) ? (
+              (order.delivery_partner_id || order.delivery_partner) ? (
               <TouchableOpacity style={oc.actionBtn} onPress={onPress} activeOpacity={0.7}>
                 <Text style={oc.actionBtnText}>{t('orders.trackOrder', 'Track Order')}</Text>
               </TouchableOpacity>
@@ -1712,7 +2541,7 @@ function OrderCard({ order, onPress, onRate, onViewRating, alreadyRated, onReord
                 <Text style={oc.actionBtnText}>{t('orders.viewDetails', 'View Details')}</Text>
               </TouchableOpacity>
             )}
-            
+
             <View style={oc.actionDivider} />
 
             <TouchableOpacity style={oc.actionBtn} onPress={onPress} activeOpacity={0.7}>
@@ -1928,19 +2757,35 @@ export default function MyOrdersScreen() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [reviewOrder, setReviewOrder] = useState(null);
+  const [reviewMode, setReviewMode] = useState(null); // null | "select" | "product" | "shop"
   const [viewRatingOrder, setViewRatingOrder] = useState(null);
   const [viewRatingLoading, setViewRatingLoading] = useState(false);
   const [fetchedRating, setFetchedRating] = useState(null);
-  const [reviewRating, setReviewRating] = useState(0);
-  const [reviewComment, setReviewComment] = useState("");
+  const [storeRating, setStoreRating] = useState(0);
+  const [storeComment, setStoreComment] = useState("");
+  const [deliveryRating, setDeliveryRating] = useState(0);
+  const [deliveryComment, setDeliveryComment] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [shopFeedback, setShopFeedback] = useState("");
+  const [productRatings, setProductRatings] = useState({});
+  const [productComments, setProductComments] = useState({});
+  const [productRatingsSubmitting, setProductRatingsSubmitting] = useState(false);
 
   const handleOpenViewRating = async (order) => {
     setViewRatingOrder(order);
     setViewRatingLoading(true);
-    const initialRating = order.user_rating || order.rating || (order.reviews?.[0]?.vendor_rating) || 5;
-    const initialComment = order.review_comment || (order.reviews?.[0]?.comment) || "";
-    setFetchedRating({ rating: initialRating, comment: initialComment });
+    const rev = order.reviews?.[0] || {};
+    const initialStoreRating = order.user_rating || order.rating || rev.vendor_rating || null;
+    const initialStoreComment = order.review_comment || rev.comment || "";
+    const initialDeliveryRating = rev.partner_rating || null;
+    const initialDeliveryComment = rev.partner_comment || "";
+
+    setFetchedRating({
+      storeRating: initialStoreRating,
+      storeComment: initialStoreComment,
+      deliveryRating: initialDeliveryRating,
+      deliveryComment: initialDeliveryComment
+    });
 
     try {
       const res = await fetch(`${BASE_URL}/orders/${order.id}`, {
@@ -1949,9 +2794,12 @@ export default function MyOrdersScreen() {
       const data = await res.json();
       const o = data.data?.order || data.order;
       if (o) {
+        const oRev = o.reviews?.[0] || {};
         setFetchedRating({
-          rating: o.user_rating ?? o.reviews?.[0]?.vendor_rating ?? initialRating,
-          comment: o.review_comment ?? o.reviews?.[0]?.comment ?? initialComment,
+          storeRating: o.user_rating ?? oRev.vendor_rating ?? initialStoreRating,
+          storeComment: o.review_comment ?? oRev.comment ?? initialStoreComment,
+          deliveryRating: oRev.partner_rating ?? initialDeliveryRating,
+          deliveryComment: oRev.partner_comment ?? initialDeliveryComment,
         });
       }
     } catch (e) {
@@ -1962,8 +2810,8 @@ export default function MyOrdersScreen() {
   };
 
   const submitReview = async () => {
-    if (reviewRating === 0) {
-      Alert.alert("Please select a rating");
+    if (storeRating === 0) {
+      Alert.alert("Please select a store rating");
       return;
     }
     setReviewLoading(true);
@@ -1975,31 +2823,85 @@ export default function MyOrdersScreen() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          vendor_rating: reviewRating,
-          comment: reviewComment,
+          vendor_rating: storeRating,
+          comment: storeComment,
+          partner_rating: deliveryRating > 0 ? deliveryRating : null,
+          partner_comment: deliveryComment,
         }),
       });
       const data = await res.json();
       if (data.success) {
-        const submittedRating = reviewRating;
         const currentOrderId = reviewOrder.id;
         setOrders((prev) =>
           prev.map((o) =>
             o.id === currentOrderId
-              ? { ...o, has_reviewed: true, user_rating: submittedRating }
+              ? { ...o, has_reviewed: true, user_rating: storeRating }
               : o
           )
         );
         setReviewOrder(null);
-        setReviewRating(0);
-        setReviewComment("");
+        setStoreRating(0);
+        setStoreComment("");
+        setDeliveryRating(0);
+        setDeliveryComment("");
         fetchOrders(true);
-        Alert.alert("Thank you!", "Your review has been submitted.");
+        Alert.alert("Thank you!", "Shop review submitted.");
+      } else {
+        Alert.alert("Error", data.message || "Failed to submit review.");
       }
     } catch (e) {
       Alert.alert("Error", "Failed to submit review.");
     } finally {
       setReviewLoading(false);
+    }
+  };
+
+  const submitProductReviews = async () => {
+    const items = reviewOrder.order_items || reviewOrder.items || [];
+    const orderId = reviewOrder.id;
+    const toSubmit = items
+      .map((item) => {
+        const pid = item.product_id;
+        if (!pid) return null;
+        const r = productRatings[pid];
+        if (!r) return null;
+        return {
+          product_id: pid,
+          rating: r,
+          order_id: orderId,
+          ...(productComments[pid]?.trim() ? { comment: productComments[pid].trim() } : {}),
+        };
+      })
+      .filter(Boolean);
+
+    if (toSubmit.length === 0) {
+      Alert.alert("Please rate at least one product");
+      return;
+    }
+    setProductRatingsSubmitting(true);
+    try {
+      const res = await productReviewsAPI.submitBulk(toSubmit, token);
+      if (res.success) {
+        const currentOrderId = reviewOrder.id;
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === currentOrderId
+              ? { ...o, has_reviewed: true }
+              : o
+          )
+        );
+        setReviewOrder(null);
+        setReviewMode(null);
+        setProductRatings({});
+        setProductComments({});
+        Alert.alert("Thank you!", "Product ratings submitted.");
+      } else {
+        Alert.alert("Error", res.message || "Failed to submit ratings.");
+      }
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to submit ratings.");
+    } finally {
+      setProductRatingsSubmitting(false);
     }
   };
 
@@ -2082,12 +2984,12 @@ export default function MyOrdersScreen() {
       Alert.alert("Error", "No items found in this order to reorder.");
       return;
     }
-    
+
     const vendorId = order.vendor_id || order.vendor?.id;
-    
+
     // Clear cart first so we can fill it with the reordered items cleanly
     clearCart();
-    
+
     // Add each item
     items.forEach(item => {
       const p = item.product || {};
@@ -2101,13 +3003,13 @@ export default function MyOrdersScreen() {
         image: p.image_url,
         unit: p.unit || item.unit || "1 pc"
       };
-      
+
       addItem(prod, vendorId);
       if (qty > 1) {
         updateQty(prod.id, qty);
       }
     });
-    
+
     Alert.alert(
       "Reordered!",
       "All items have been added to your cart.",
@@ -2127,24 +3029,24 @@ export default function MyOrdersScreen() {
   const filtered = orders.filter((o) => {
     if (activeTab === "active" && !ACTIVE_STATUSES.includes(o.status)) return false;
     if (activeTab === "past" && !PAST_STATUSES.includes(o.status)) return false;
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       const shopName = (o.vendor?.shop_name || o.vendor_name || "").toLowerCase();
       const orderNum = (o.order_number || o.id?.toString() || "").toLowerCase();
-      
+
       const matchesShop = shopName.includes(query);
       const matchesOrderNum = orderNum.includes(query);
-      
+
       const items = o.order_items || o.items || [];
       const matchesItems = items.some(item => {
         const name = (item.product_name || item.product?.name || "").toLowerCase();
         return name.includes(query);
       });
-      
+
       return matchesShop || matchesOrderNum || matchesItems;
     }
-    
+
     return true;
   });
 
@@ -2174,25 +3076,35 @@ export default function MyOrdersScreen() {
     <View style={s.root}>
       <StatusBar barStyle={isDark ? 'light-content' : (Platform.OS === 'ios' ? 'dark-content' : 'default')} backgroundColor={isDark ? C.bg : "#FFFFFF"} />
 
-      {/* HEADER */}
-      <View style={s.header}>
-        <TouchableOpacity
-          style={s.backBtn}
-          onPress={goBack}
-          activeOpacity={0.8}
-        >
-          <Feather name="arrow-left" size={20} color={C.gray800} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>{t('orders.myOrders') || 'Order History'}</Text>
-        <TouchableOpacity
-          style={s.refreshBtn}
-          onPress={() => fetchOrders(true)}
-          activeOpacity={0.8}
-        >
-          <Feather name="refresh-cw" size={16} color={C.gray800} />
-          {isDark && <Text style={s.refreshText}>{t('orders.refresh', 'Refresh')}</Text>}
-        </TouchableOpacity>
-      </View>
+
+{/* HEADER */}
+<View style={s.header}>
+  <TouchableOpacity
+    style={s.backBtn}
+    onPress={goBack}
+    activeOpacity={0.8}
+  >
+    <Feather name="arrow-left" size={22} color={C.greenDark} />
+  </TouchableOpacity>
+
+  <View style={s.headerTextWrap}>
+    <Text style={s.headerTitle}>
+      {t('orders.myOrders', 'My Orders') || 'My Orders'}
+    </Text>
+    <Text style={s.headerSubtitle}>
+      Track, manage, and revisit your grocery orders
+    </Text>
+  </View>
+
+  <TouchableOpacity
+    style={s.refreshBtn}
+    onPress={() => fetchOrders(true)}
+    activeOpacity={0.8}
+  >
+    <Feather name="refresh-cw" size={19} color={C.greenDark} />
+  </TouchableOpacity>
+</View>
+
 
       {/* SEARCH BAR */}
       <View style={s.searchBarContainer}>
@@ -2254,67 +3166,62 @@ export default function MyOrdersScreen() {
       </View>
 
       {/* BODY */}
-      {loading ? (
-        <View style={s.centered}>
-          <ActivityIndicator size="large" color={C.green} />
-          <Text style={s.loadingText}>{t('orders.fetchingOrders', 'Fetching your orders…')}</Text>
-        </View>
-      ) : filtered.length === 0 ? (
-        <View style={s.emptyWrap}>
-          {isDark ? (
-            <View style={s.emptyIllo}>
-              <View style={s.emptyIlloCircle} />
-              <View style={s.emptyIlloBag}>
-                <Feather name="shopping-bag" size={30} color={C.gray500} />
-              </View>
-              <View style={s.emptyIlloGround} />
-              <MaterialCommunityIcons name="leaf" size={30} color={C.green} style={s.emptyIlloLeafL} />
-              <MaterialCommunityIcons name="leaf" size={30} color={C.green} style={s.emptyIlloLeafR} />
-              <Text style={[s.emptySpark, { top: 12, left: 4 }]}>+</Text>
-              <Text style={[s.emptySpark, { top: 12, right: 4 }]}>+</Text>
-            </View>
-          ) : (
-            <View style={s.emptyIconWrap}>
-              <Feather name="shopping-bag" size={30} color={C.gray300} />
-            </View>
-          )}
-          <Text style={s.emptyTitle}>
-            {activeTab === "active"
-              ? t('orders.noActiveOrders', 'No active orders')
-              : activeTab === "past"
-                ? t('orders.noPastOrders', 'No past orders')
-                : t('orders.noOrders', 'No orders yet')}
-          </Text>
-          <Text style={s.emptySub}>
-            {activeTab === "all"
-              ? "Your order history will appear here"
-              : "Check back later"}
-          </Text>
-          {activeTab === "all" && (
-            <TouchableOpacity
-              style={s.shopBtn}
-              onPress={() =>
-                navigation.navigate("CustomerApp", {
-                  screen: "CustomerTabNavigator",
-                  params: { screen: "Home" },
-                })
-              }
-              activeOpacity={0.85}
-            >
-              <LinearGradient
-                colors={isDark ? ["#13A672", "#0B7C56"] : [C.green, C.greenDark]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={s.shopBtnGrad}
-              >
-                {isDark && <Feather name="shopping-cart" size={17} color={C.white} />}
-                <Text style={s.shopBtnText}>Start Shopping</Text>
-                <Feather name="arrow-right" size={15} color={C.white} />
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : (
+
+{loading ? (
+  <View style={s.centered}>
+    <ActivityIndicator size="large" color={C.green} />
+    <Text style={s.loadingText}>
+      {t('orders.fetchingOrders', 'Fetching your orders…')}
+    </Text>
+  </View>
+) : filtered.length === 0 ? (
+  <View style={s.emptyWrap}>
+    <View style={s.emptyIconWrap}>
+      <Image
+        source={require("../../../assets/orders-empty.png")}
+        style={s.emptyIllustration}
+        resizeMode="contain"
+      />
+    </View>
+
+    <Text style={s.emptyTitle}>
+      {activeTab === "active"
+        ? t('orders.noActiveOrders', 'No active orders')
+        : activeTab === "past"
+          ? t('orders.noPastOrders', 'No past orders')
+          : t('orders.noOrders', 'No orders yet')}
+    </Text>
+
+    <Text style={s.emptySub}>
+      {activeTab === "all"
+        ? "Your order history will appear here"
+        : "Check back later"}
+    </Text>
+
+    {activeTab === "all" && (
+      <TouchableOpacity
+        style={s.shopBtn}
+        onPress={() =>
+          navigation.navigate("CustomerApp", {
+            screen: "CustomerTabNavigator",
+            params: { screen: "Home" },
+          })
+        }
+        activeOpacity={0.85}
+      >
+        <LinearGradient
+          colors={[C.green, C.greenDark]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={s.shopBtnGrad}
+        >
+          <Text style={s.shopBtnText}>Start Shopping</Text>
+          <Feather name="arrow-right" size={15} color={C.white} />
+        </LinearGradient>
+      </TouchableOpacity>
+    )}
+  </View>
+) : (
         <ScrollView
           contentContainerStyle={s.list}
           showsVerticalScrollIndicator={false}
@@ -2344,8 +3251,10 @@ export default function MyOrdersScreen() {
               onPress={() => setDetailOrder(order)}
               onRate={() => {
                 setReviewOrder(order);
-                setReviewRating(0);
-                setReviewComment("");
+                setStoreRating(0);
+                setStoreComment("");
+                setDeliveryRating(0);
+                setDeliveryComment("");
               }}
               onViewRating={(o) => handleOpenViewRating(o)}
               alreadyRated={!!order.has_reviewed}
@@ -2369,7 +3278,7 @@ export default function MyOrdersScreen() {
         visible={!!reviewOrder}
         animationType="slide"
         transparent
-        onRequestClose={() => setReviewOrder(null)}
+        onRequestClose={() => { setReviewOrder(null); setReviewMode(null); }}
       >
         <Pressable
           style={{
@@ -2377,7 +3286,7 @@ export default function MyOrdersScreen() {
             backgroundColor: "rgba(0,0,0,0.5)",
             justifyContent: "flex-end",
           }}
-          onPress={() => setReviewOrder(null)}
+          onPress={() => { setReviewOrder(null); setReviewMode(null); }}
         >
           <Pressable
             style={{
@@ -2386,101 +3295,108 @@ export default function MyOrdersScreen() {
               borderTopRightRadius: 24,
               padding: 24,
               paddingBottom: 40,
+              maxHeight: "85%",
             }}
-            onPress={() => {}}
+            onTouchStart={(e) => e.stopPropagation()}
           >
-            <View
-              style={{
-                width: 40,
-                height: 4,
-                backgroundColor: C.gray200,
-                borderRadius: 2,
-                alignSelf: "center",
-                marginBottom: 20,
-              }}
-            />
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "900",
-                color: C.gray900,
-                marginBottom: 4,
-              }}
-            >
-              Rate your order
-            </Text>
-            <Text style={{ fontSize: 13, color: C.gray400, marginBottom: 20 }}>
-              {reviewOrder?.vendor?.shop_name || "Your order"}
-            </Text>
+            <View style={{ width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 }} />
 
-            {/* Star picker */}
-            <View
-              style={{
-                flexDirection: "row",
-                gap: 10,
-                marginBottom: 20,
-                justifyContent: "center",
-              }}
-            >
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity
-                  key={star}
-                  onPress={() => setReviewRating(star)}
-                >
-                  <Text
-                    style={{
-                      fontSize: 36,
-                      opacity: star <= reviewRating ? 1 : 0.25,
-                    }}
-                  >
-                    ⭐
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Comment input */}
-            <TextInput
-              style={{
-                backgroundColor: C.gray100,
-                borderRadius: 12,
-                padding: 14,
-                fontSize: 14,
-                color: C.gray900,
-                minHeight: 80,
-                textAlignVertical: "top",
-                marginBottom: 20,
-                borderWidth: 1,
-                borderColor: C.gray200,
-              }}
-              placeholder="Tell us about your experience (optional)"
-              placeholderTextColor={C.gray400}
-              multiline
-              value={reviewComment}
-              onChangeText={setReviewComment}
-            />
-
-            <TouchableOpacity
-              onPress={submitReview}
-              disabled={reviewLoading}
-              style={{
-                backgroundColor: reviewLoading ? C.gray200 : C.green,
-                borderRadius: 14,
-                padding: 16,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {reviewLoading ? (
-                <ActivityIndicator color={C.white} />
-              ) : (
-                <Text
-                  style={{ fontSize: 16, fontWeight: "800", color: C.white }}
-                >
-                  Submit Review
+            {/* ═══════ SELECT VIEW ═══════ */}
+            {reviewMode === "select" && (
+              <>
+                <Text style={{ fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 4 }}>
+                  Rate Your Order
                 </Text>
-              )}
-            </TouchableOpacity>
+                <Text style={{ fontSize: 13, color: C.gray400, marginBottom: 20 }}>
+                  {reviewOrder?.vendor?.shop_name || "Your order"}
+                </Text>
+
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+                  {/* Delivery Rating */}
+                  {(reviewOrder?.delivery_partner_id || reviewOrder?.delivery_partner || reviewOrder?.delivery?.partner_id) && (
+                    <View style={{ marginBottom: 24 }}>
+                      <Text style={{ fontSize: 15, fontWeight: "700", color: C.gray800, marginBottom: 12 }}>
+                        Rate delivery
+                      </Text>
+                      <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <TouchableOpacity key={star} onPress={() => setDeliveryRating(star)}>
+                            <Text style={{ fontSize: 32, opacity: star <= deliveryRating ? 1 : 0.25 }}>⭐</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <TextInput
+                        style={{
+                          backgroundColor: C.gray100,
+                          borderRadius: 12,
+                          padding: 14,
+                          fontSize: 14,
+                          color: C.gray900,
+                          minHeight: 80,
+                          textAlignVertical: "top",
+                          borderWidth: 1,
+                          borderColor: C.gray200,
+                        }}
+                        placeholder="How was the delivery experience? (optional)"
+                        placeholderTextColor={C.gray400}
+                        multiline
+                        value={deliveryComment}
+                        onChangeText={setDeliveryComment}
+                      />
+                    </View>
+                  )}
+
+                  {/* Store Rating */}
+                  <View style={{ marginBottom: 20 }}>
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: C.gray800, marginBottom: 12 }}>
+                      Rate store
+                    </Text>
+                    <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <TouchableOpacity key={star} onPress={() => setStoreRating(star)}>
+                          <Text style={{ fontSize: 32, opacity: star <= storeRating ? 1 : 0.25 }}>⭐</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <TextInput
+                      style={{
+                        backgroundColor: C.gray100,
+                        borderRadius: 12,
+                        padding: 14,
+                        fontSize: 14,
+                        color: C.gray900,
+                        minHeight: 80,
+                        textAlignVertical: "top",
+                        borderWidth: 1,
+                        borderColor: C.gray200,
+                      }}
+                      placeholder="How was the store experience? (optional)"
+                      placeholderTextColor={C.gray400}
+                      multiline
+                      value={storeComment}
+                      onChangeText={setStoreComment}
+                    />
+                  </View>
+                </ScrollView>
+
+                <TouchableOpacity
+                  onPress={submitShopReview}
+                  disabled={reviewLoading || reviewRating === 0}
+                  style={{
+                    backgroundColor: reviewLoading || reviewRating === 0 ? C.gray200 : C.green,
+                    borderRadius: 14,
+                    padding: 16,
+                    alignItems: "center",
+                  }}
+                >
+                  {reviewLoading ? (
+                    <ActivityIndicator color={C.white} />
+                  ) : (
+                    <Text style={{ fontSize: 16, fontWeight: "800", color: C.white }}>Submit Review</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
@@ -2508,7 +3424,7 @@ export default function MyOrdersScreen() {
               padding: 24,
               paddingBottom: 40,
             }}
-            onPress={() => {}}
+            onPress={() => { }}
           >
             {/* Handle */}
             <View
@@ -2523,15 +3439,15 @@ export default function MyOrdersScreen() {
             />
 
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-              <Text style={{ fontSize: 18, fontWeight: "900", color: C.gray900 }}>
-                Your Submitted Rating
+              <Text style={{ fontSize: 18, fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray900 }}>
+                Your Submitted Ratings
               </Text>
               <TouchableOpacity onPress={() => setViewRatingOrder(null)} style={{ padding: 4 }}>
                 <Feather name="x" size={20} color={C.gray500} />
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 13, color: C.gray400, marginBottom: 20 }}>
+            <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, marginBottom: 20 }}>
               {viewRatingOrder?.vendor?.shop_name || "Your order"} · {formatCardDate(viewRatingOrder?.created_at)}
             </Text>
 
@@ -2542,61 +3458,98 @@ export default function MyOrdersScreen() {
                 <Text style={{ fontSize: 13, color: C.gray400, marginTop: 10 }}>Fetching your review…</Text>
               </View>
             ) : (() => {
-              const ratingVal = fetchedRating?.rating || viewRatingOrder?.user_rating || 5;
-              const num = typeof ratingVal === "number" ? ratingVal : parseInt(ratingVal, 10) || 5;
-              const comment = fetchedRating?.comment || viewRatingOrder?.review_comment || "";
+              const sRatingVal = fetchedRating?.storeRating ?? viewRatingOrder?.user_rating ?? null;
+              const sNum = sRatingVal != null ? (typeof sRatingVal === "number" ? sRatingVal : parseInt(sRatingVal, 10)) : null;
+              const sComment = fetchedRating?.storeComment || viewRatingOrder?.review_comment || "";
+
+              const dRatingVal = fetchedRating?.deliveryRating;
+              const dNum = dRatingVal != null ? (typeof dRatingVal === "number" ? dRatingVal : parseInt(dRatingVal, 10)) : null;
+              const dComment = fetchedRating?.deliveryComment || "";
 
               return (
-                <View
-                  style={{
-                    backgroundColor: C.gray100,
-                    borderWidth: 1,
-                    borderColor: C.gray200,
-                    borderRadius: 16,
-                    padding: 20,
-                    alignItems: "center",
-                    marginBottom: 20,
-                  }}
-                >
-                  <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Text
-                        key={star}
-                        style={{
-                          fontSize: 36,
-                          opacity: star <= num ? 1 : 0.25,
-                        }}
-                      >
-                        ⭐
-                      </Text>
-                    ))}
-                  </View>
-
-                  <Text style={{ fontSize: 15, fontWeight: "800", color: C.gray900, marginBottom: comment ? 12 : 0 }}>
-                    {num} out of 5 stars
-                  </Text>
-
-                  {comment ? (
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
+                  {/* Store Rating */}
+                  <View style={{ marginBottom: 20 }}>
+                    <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_700Bold", color: C.gray900, marginBottom: 8, marginLeft: 4 }}>
+                      Store: {viewRatingOrder?.vendor?.shop_name || "Store"}
+                    </Text>
                     <View
                       style={{
-                        backgroundColor: C.surface,
-                        borderRadius: 12,
-                        padding: 14,
+                        backgroundColor: C.gray100,
                         borderWidth: 1,
                         borderColor: C.gray200,
-                        width: "100%",
+                        borderRadius: 16,
+                        padding: 20,
+                        alignItems: "center",
                       }}
                     >
-                      <Text style={{ fontSize: 14, color: C.gray800, lineHeight: 20 }}>
-                        {comment}
-                      </Text>
+                      {sNum !== null ? (
+                        <>
+                          <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Text key={star} style={{ fontSize: 36, opacity: star <= sNum ? 1 : 0.25 }}>⭐</Text>
+                            ))}
+                          </View>
+                          <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray900, marginBottom: sComment ? 12 : 0 }}>
+                            {sNum} out of 5 stars
+                          </Text>
+                          {sComment ? (
+                            <View style={{ backgroundColor: C.white, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: C.gray200, width: "100%" }}>
+                              <Text style={{ fontSize: 14, fontFamily: "PlusJakartaSans_500Medium", color: C.gray800, lineHeight: 20 }}>{sComment}</Text>
+                            </View>
+                          ) : (
+                            <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, fontStyle: "italic", marginTop: 4 }}>No written comment provided</Text>
+                          )}
+                        </>
+                      ) : (
+                        <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray400 }}>
+                          Not Rated
+                        </Text>
+                      )}
                     </View>
-                  ) : (
-                    <Text style={{ fontSize: 13, color: C.gray400, fontStyle: "italic", marginTop: 4 }}>
-                      No written comment provided
+                  </View>
+
+                  {/* Delivery Rating */}
+                  <View style={{ marginBottom: 20 }}>
+                    <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_700Bold", color: C.gray900, marginBottom: 8, marginLeft: 4 }}>
+                      Delivery: {viewRatingOrder?.delivery?.partner?.user?.name || viewRatingOrder?.delivery_partner?.user?.name || "Partner"}
                     </Text>
-                  )}
-                </View>
+                    <View
+                      style={{
+                        backgroundColor: C.gray100,
+                        borderWidth: 1,
+                        borderColor: C.gray200,
+                        borderRadius: 16,
+                        padding: 20,
+                        alignItems: "center",
+                      }}
+                    >
+                      {dNum !== null ? (
+                        <>
+                          <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Text key={star} style={{ fontSize: 36, opacity: star <= dNum ? 1 : 0.25 }}>⭐</Text>
+                            ))}
+                          </View>
+                          <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray900, marginBottom: dComment ? 12 : 0 }}>
+                            {dNum} out of 5 stars
+                          </Text>
+                          {dComment ? (
+                            <View style={{ backgroundColor: C.white, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: C.gray200, width: "100%" }}>
+                              <Text style={{ fontSize: 14, fontFamily: "PlusJakartaSans_500Medium", color: C.gray800, lineHeight: 20 }}>{dComment}</Text>
+                            </View>
+                          ) : (
+                            <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, fontStyle: "italic", marginTop: 4 }}>No written comment provided</Text>
+                          )}
+                        </>
+                      ) : (
+                        <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray400 }}>
+                          Not Rated
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                </ScrollView>
               );
             })()}
 
@@ -2610,7 +3563,7 @@ export default function MyOrdersScreen() {
                 justifyContent: "center",
               }}
             >
-              <Text style={{ fontSize: 15, fontWeight: "800", color: C.white }}>
+              <Text style={{ fontSize: 16, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.white }}>
                 Close
               </Text>
             </TouchableOpacity>
@@ -2620,3 +3573,242 @@ export default function MyOrdersScreen() {
     </View>
   );
 }
+
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.bg },
+  centered: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500" },
+
+header: {
+  flexDirection: "row",
+  alignItems: "center",
+  paddingHorizontal: 24,
+  paddingTop: 20,
+  paddingBottom: 16,
+  gap: 16,
+  backgroundColor: "#FFFFFF",
+},
+backBtn: {
+  width: 52,
+  height: 52,
+  borderRadius: 26,
+  backgroundColor: "#F0FAF3",
+  borderWidth: 1,
+  borderColor: "#D9F3E2",
+  alignItems: "center",
+  justifyContent: "center",
+},
+headerTextWrap: {
+  flex: 1,
+  gap: 3,
+},
+headerTitle: {
+  fontSize: 26,
+  fontWeight: "900",
+  color: "#123F32",
+},
+headerSubtitle: {
+  fontSize: 14,
+  color: "#78909C",
+  fontWeight: "500",
+},
+refreshBtn: {
+  width: 52,
+  height: 52,
+  borderRadius: 26,
+  backgroundColor: "#F0FAF3",
+  borderWidth: 1,
+  borderColor: "#D9F3E2",
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+
+
+  searchBarContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: C.white,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+  },
+
+
+searchBar: {
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: "#F1F4F8",
+  borderRadius: 17,
+  paddingHorizontal: 18,
+  height: 56,
+  borderWidth: 1,
+  borderColor: "#EEF1F5",
+},
+
+
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: C.gray900,
+    fontWeight: "600",
+    padding: 0,
+    outlineStyle: "none",
+  },
+  clearBtn: {
+    padding: 4,
+  },
+
+  tabs: {
+    flexDirection: "row",
+    backgroundColor: C.white,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+  },
+
+
+tab: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  paddingHorizontal: 24,
+  paddingVertical: 12,
+  borderRadius: 28,
+  borderWidth: 1,
+  borderColor: "#E4EAF0",
+  backgroundColor: "#FFFFFF",
+  minHeight: 46,
+},
+tabActive: {
+  backgroundColor: "#079447",
+  borderColor: "#079447",
+},
+tabLabel: {
+  fontSize: 15,
+  fontWeight: "700",
+  color: "#60758A",
+},
+tabLabelActive: {
+  color: "#FFFFFF",
+  fontWeight: "800",
+},
+
+
+  tabBubble: {
+    backgroundColor: C.gray100,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 10,
+  },
+  tabBubbleActive: { backgroundColor: "rgba(255,255,255,0.25)" },
+  tabBubbleText: { fontSize: 10, fontWeight: "800", color: C.gray500 },
+  tabBubbleTextActive: { color: C.white },
+
+  list: { padding: 16, paddingTop: 12 },
+
+  activeBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: C.greenLight,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: C.greenBorder,
+  },
+  activeBannerDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: C.green,
+  },
+  activeBannerText: { fontSize: 13, color: C.green, fontWeight: "600" },
+
+
+
+emptyWrap: {
+  flex: 1,
+  alignItems: "center",
+  justifyContent: "center",
+  paddingHorizontal: 24,
+  paddingVertical: 32,
+  marginHorizontal: 24,
+  marginBottom: 20,
+  borderRadius: 18,
+  borderWidth: 1,
+  borderColor: "#D8F4DE",
+  backgroundColor: "#F0FCEF",
+  overflow: "hidden",
+},
+emptyIconWrap: {
+  width: 116,
+  height: 116,
+  borderRadius: 34,
+  backgroundColor: "#DDF8E3",
+  borderWidth: 1,
+  borderColor: "#C9F0D2",
+  alignItems: "center",
+  justifyContent: "center",
+  marginBottom: 22,
+},
+
+
+emptyIllustration: {
+  width: 320,
+  height: 260,
+},
+
+emptyTitle: {
+  fontSize: 27,
+  lineHeight: 34,
+  fontWeight: "900",
+  color: "#075C3D",
+  textAlign: "center",
+  letterSpacing: -0.6,
+},
+emptySub: {
+  fontSize: 16,
+  lineHeight: 24,
+  color: "#56877B",
+  fontWeight: "500",
+  textAlign: "center",
+  marginTop: 8,
+  marginBottom: 24,
+  maxWidth: 560,
+},
+shopBtn: {
+  borderRadius: 30,
+  overflow: "hidden",
+  elevation: 4,
+  shadowColor: "#075C3D",
+  shadowOffset: { width: 0, height: 5 },
+  shadowOpacity: 0.2,
+  shadowRadius: 8,
+},
+shopBtnGrad: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 12,
+  paddingHorizontal: 34,
+  paddingVertical: 17,
+},
+shopBtnText: {
+  fontSize: 16,
+  fontWeight: "800",
+  color: "#FFFFFF",
+},
+
+});

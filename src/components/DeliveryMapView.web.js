@@ -1,10 +1,56 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 
-export default function DeliveryMapView({ currentRegion, markers }) {
+// Bold scooter silhouette — same as Customer/VendorMapView
+const BIKE_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72">
+  <style>
+    @keyframes pulse-ring {
+      0% { r: 32; opacity: 0.5; }
+      50% { r: 36; opacity: 0.12; }
+      100% { r: 32; opacity: 0.5; }
+    }
+    .pulse-ring { animation: pulse-ring 1.4s ease-in-out infinite; }
+  </style>
+  <circle cx="36" cy="36" r="32" fill="#16A34A" class="pulse-ring"/>
+  <ellipse cx="36" cy="64" rx="14" ry="4" fill="rgba(0,0,0,0.15)"/>
+  <circle cx="36" cy="36" r="27" fill="#16A34A" stroke="#fff" stroke-width="3.5"/>
+  <g transform="translate(36,34)" fill="#fff" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="-11" cy="10" r="7" fill="none" stroke="#fff" stroke-width="3"/>
+    <circle cx="-11" cy="10" r="2" fill="#fff"/>
+    <circle cx="12" cy="10" r="7" fill="none" stroke="#fff" stroke-width="3"/>
+    <circle cx="12" cy="10" r="2" fill="#fff"/>
+    <line x1="-11" y1="3" x2="-11" y2="17" stroke="#fff" stroke-width="1"/>
+    <line x1="-18" y1="10" x2="-4" y2="10" stroke="#fff" stroke-width="1"/>
+    <line x1="12" y1="3" x2="12" y2="17" stroke="#fff" stroke-width="1"/>
+    <line x1="5" y1="10" x2="19" y2="10" stroke="#fff" stroke-width="1"/>
+    <path d="M-11 10 L-6 -2 L2 -4 L6 -2 L12 10" fill="none" stroke="#fff" stroke-width="3.5"/>
+    <line x1="-11" y1="10" x2="6" y2="10" stroke="#fff" stroke-width="3.5"/>
+    <rect x="-8" y="-8" width="12" height="5" rx="2.5" fill="#fff"/>
+    <line x1="10" y1="-2" x2="14" y2="-10" stroke="#fff" stroke-width="3"/>
+    <line x1="11" y1="-10" x2="17" y2="-10" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="17" cy="-7" r="2.5" fill="#FBBF24" stroke="#FBBF24" stroke-width="1"/>
+    <circle cx="-11" cy="4" r="1.5" fill="#F87171"/>
+  </g>
+</svg>`;
+
+// Red pin icon for destination — matches CustomerMapView style
+const DEST_ICON_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
+  <path d="M16 0C7.163 0 0 7.163 0 16c0 10 16 24 16 24S32 26 32 16C32 7.163 24.837 0 16 0z" fill="#DC2626"/>
+  <circle cx="16" cy="16" r="6" fill="#fff"/>
+  <circle cx="16" cy="16" r="3" fill="#DC2626"/>
+</svg>`;
+
+function svgToDataUrl(svg) {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+export default function DeliveryMapView({ currentRegion, markers, destLat, destLng, destTitle }) {
   const mapRef = useRef(null);
   const leafletMap = useRef(null);
   const markersRef = useRef([]);
+  const routeLineRef = useRef(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
@@ -43,17 +89,25 @@ export default function DeliveryMapView({ currentRegion, markers }) {
 
     const L = window.L;
 
-    const center = currentRegion 
-      ? [currentRegion.latitude, currentRegion.longitude] 
-      : [28.6139, 77.2090];
+    const hasPartner = currentRegion && currentRegion.latitude != null;
+    const hasDest = destLat != null && destLng != null;
+
+    const center = hasPartner
+      ? [currentRegion.latitude, currentRegion.longitude]
+      : hasDest
+        ? [destLat, destLng]
+        : [28.6139, 77.2090];
 
     if (!leafletMap.current) {
       leafletMap.current = L.map(mapRef.current, {
         zoomControl: false,
         attributionControl: false
-      }).setView(center, 14);
+      }).setView(center, 15);
 
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(leafletMap.current);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        subdomains: 'abcd',
+        maxZoom: 20,
+      }).addTo(leafletMap.current);
     } else {
       leafletMap.current.setView(center);
     }
@@ -62,17 +116,70 @@ export default function DeliveryMapView({ currentRegion, markers }) {
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
-    // Add new markers
+    // Clear old route line
+    if (routeLineRef.current) {
+      routeLineRef.current.remove();
+      routeLineRef.current = null;
+    }
+
+    // Add partner bike markers
     if (markers) {
       markers.forEach(m => {
-        const marker = L.marker([m.coordinate.latitude, m.coordinate.longitude])
+        const markerIcon = L.icon({
+          iconUrl: svgToDataUrl(BIKE_SVG),
+          iconSize: [64, 64],
+          iconAnchor: [32, 58],
+          popupAnchor: [0, -58],
+        });
+        const marker = L.marker([m.coordinate.latitude, m.coordinate.longitude], { icon: markerIcon })
           .addTo(leafletMap.current)
           .bindPopup(m.title);
         markersRef.current.push(marker);
       });
     }
 
-  }, [isLoaded, currentRegion, markers]);
+    // Add destination pin marker
+    if (hasDest) {
+      const destIcon = L.icon({
+        iconUrl: svgToDataUrl(DEST_ICON_SVG),
+        iconSize: [32, 40],
+        iconAnchor: [16, 40],
+        popupAnchor: [0, -40],
+      });
+      const destMarker = L.marker([destLat, destLng], { icon: destIcon })
+        .addTo(leafletMap.current)
+        .bindTooltip(destTitle || "Destination", { permanent: false, direction: "top" });
+      markersRef.current.push(destMarker);
+    }
+
+    // Add route polyline
+    if (hasPartner && hasDest) {
+      routeLineRef.current = L.polyline(
+        [
+          [currentRegion.latitude, currentRegion.longitude],
+          [destLat, destLng],
+        ],
+        {
+          color: "#16A34A",
+          weight: 4,
+          dashArray: "10 8",
+          opacity: 0.75,
+          lineCap: "round",
+          lineJoin: "round",
+        }
+      ).addTo(leafletMap.current);
+    }
+
+    // Auto-fit bounds when both markers are present
+    if (hasPartner && hasDest) {
+      const bounds = L.latLngBounds(
+        [currentRegion.latitude, currentRegion.longitude],
+        [destLat, destLng]
+      );
+      leafletMap.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 15, animate: true, duration: 0.8 });
+    }
+
+  }, [isLoaded, currentRegion, markers, destLat, destLng, destTitle]);
 
   return (
     <View style={styles.container}>

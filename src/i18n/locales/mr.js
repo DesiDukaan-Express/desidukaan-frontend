@@ -26,7 +26,7 @@ export default {
     "selectLanguage": "भाषा निवडा"
   },
   "auth": {
-    "welcomeBack": "पुन्हा स्वागत",
+    "welcomeBack": "स्वागत आहे",
     "loginSubtitle": "तुमच्या मोबाइल नंबरने लॉगिन करा",
     "mobileNumber": "मोबाइल नंबर",
     "mobilePlaceholder": "10 अंकी नंबर",
@@ -45,6 +45,10 @@ export default {
     "createAccount": "खाते तयार करा",
     "termsOfService": "सेवा अटी",
     "privacyPolicy": "गोपनीयता धोरण",
+    "dateOfBirth": "जन्म तारीख",
+    "dobPlaceholder": "दिवस / महिना / वर्ष",
+    "mustBeAtleast16": "तुमचे वय किमान १६ वर्षे असणे आवश्यक आहे",
+    "invalidDob": "कृपया वैध जन्म तारीख टाका",
     "invalidOtp": "अवैध OTP",
     "failedToSendOtp": "OTP पाठवण्यात अयशस्वी"
   },
@@ -86,7 +90,7 @@ export default {
     "goodAfternoon": "शुभ दुपार",
     "goodEvening": "शुभ संध्या",
     "goodNight": "शुभ रात्री",
-    "welcomeBack": "पुन्हा स्वागत आहे, {{name}}",
+    "welcomeBack": "स्वागत आहे, {{name}}",
     "welcomeGuest": "KwikPik मध्ये आपले स्वागत आहे",
     "heroSubHeader": "ताजा किराणा आणि दैनंदिन गरजा, जलद डिलिव्हरी.",
     "freshFromNearby": "जवळच्या दुकानांमधून ताजे",
@@ -461,6 +465,9 @@ export default {
     "acceptOrder": "ऑर्डर स्वीकारा",
     "rejectOrder": "ऑर्डर नाकारा",
     "markReady": "तयार म्हणून चिन्हांकित करा",
+    "manageOrder": "ऑर्डर व्यवस्थापित करा",
+    "manageOrderDeclinedSingle": "ऑर्डर व्यवस्थापित करा — {{name}} डिलिव्हरी पार्टनरने नाकारले",
+    "manageOrderDeclinedMultiple": "ऑर्डर व्यवस्थापित करा — {{count}} डिलिव्हरी पार्टनर्सने नाकारले",
     "addProduct": "उत्पादन जोडा",
     "editProduct": "उत्पादन संपादित करा",
     "productName": "उत्पादनाचे नाव",
@@ -806,5 +813,16 @@ export default {
     "placeholder": "उत्पादने, श्रेणी शोधा...",
     "noResults": "कोणताही परिणाम सापडला नाही",
     "results": "परिणाम"
+  },
+  "wishlist": {
+    "title": "मेरी विशलिस्ट",
+    "empty": "आपकी विशलिस्ट खाली है",
+    "emptySub": "उत्पाद ब्राउज़ करें और उन्हें यहां सहेजने के लिए दिल आइकन पर टैप करें",
+    "browse": "उत्पाद ब्राउज़ करें",
+    "added": "विशलिस्ट में जोड़ा गया",
+    "removed": "विशलिस्ट से हटाया गया",
+    "itemCount": "{{count}} आइटम",
+    "addToCart": "कार्ट में जोड़ें",
+    "remove": "हटाएं"
   }
 };

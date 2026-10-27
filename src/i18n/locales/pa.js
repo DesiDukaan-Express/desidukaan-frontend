@@ -26,7 +26,7 @@ export default {
     "selectLanguage": "ਭਾਸ਼ਾ ਚੁਣੋ"
   },
   "auth": {
-    "welcomeBack": "ਵਾਪਸ ਜੀ ਆਇਆਂ ਨੂੰ",
+    "welcomeBack": "ਜੀ ਆਇਆਂ ਨੂੰ",
     "loginSubtitle": "ਆਪਣੇ ਮੋਬਾਈਲ ਨੰਬਰ ਨਾਲ ਲੌਗਿਨ ਕਰੋ",
     "mobileNumber": "ਮੋਬਾਈਲ ਨੰਬਰ",
     "mobilePlaceholder": "10 ਅੰਕਾਂ ਦਾ ਨੰਬਰ",
@@ -45,6 +45,10 @@ export default {
     "createAccount": "ਖਾਤਾ ਬਣਾਓ",
     "termsOfService": "ਸੇਵਾ ਦੀਆਂ ਸ਼ਰਤਾਂ",
     "privacyPolicy": "ਗੋਪਨੀਯਤਾ ਨੀਤੀ",
+    "dateOfBirth": "ਜਨਮ ਮਿਤੀ",
+    "dobPlaceholder": "ਦਿਨ / ਮਹੀਨਾ / ਸਾਲ",
+    "mustBeAtleast16": "ਤੁਹਾਡੀ ਉਮਰ ਘੱਟੋ-ਘੱਟ 16 ਸਾਲ ਹੋਣੀ ਚਾਹੀਦੀ ਹੈ",
+    "invalidDob": "ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਵੈਧ ਜਨਮ ਮਿਤੀ ਦਰਜ ਕਰੋ",
     "invalidOtp": "ਗਲਤ OTP",
     "failedToSendOtp": "OTP ਭੇਜਣ ਵਿੱਚ ਅਸਫਲ"
   },
@@ -461,6 +465,9 @@ export default {
     "acceptOrder": "ਆਰਡਰ ਸਵੀਕਾਰ ਕਰੋ",
     "rejectOrder": "ਆਰਡਰ ਰੱਦ ਕਰੋ",
     "markReady": "ਤਿਆਰ ਦਰਸਾਓ",
+    "manageOrder": "ਆਰਡਰ ਪ੍ਰਬੰਧਨ ਕਰੋ",
+    "manageOrderDeclinedSingle": "ਆਰਡਰ ਪ੍ਰਬੰਧਨ ਕਰੋ — {{name}} ਡਿਲੀਵਰੀ ਪਾਰਟਨਰ ਨੇ ਰੱਦ ਕੀਤਾ",
+    "manageOrderDeclinedMultiple": "ਆਰਡਰ ਪ੍ਰਬੰਧਨ ਕਰੋ — {{count}} ਡਿਲੀਵਰੀ ਪਾਰਟਨਰਾਂ ਨੇ ਰੱਦ ਕੀਤਾ",
     "addProduct": "ਉਤਪਾਦ ਜੋੜੋ",
     "editProduct": "ਉਤਪਾਦ ਸੰਪਾਦਿਤ ਕਰੋ",
     "productName": "ਉਤਪਾਦ ਦਾ ਨਾਮ",
@@ -806,5 +813,16 @@ export default {
     "placeholder": "ਉਤਪਾਦ, ਸ਼੍ਰੇਣੀਆਂ ਖੋਜੋ...",
     "noResults": "ਕੋਈ ਨਤੀਜਾ ਨਹੀਂ ਮਿਲਿਆ",
     "results": "ਨਤੀਜੇ"
+  },
+  "wishlist": {
+    "title": "मेरी विशलिस्ट",
+    "empty": "आपकी विशलिस्ट खाली है",
+    "emptySub": "उत्पाद ब्राउज़ करें और उन्हें यहां सहेजने के लिए दिल आइकन पर टैप करें",
+    "browse": "उत्पाद ब्राउज़ करें",
+    "added": "विशलिस्ट में जोड़ा गया",
+    "removed": "विशलिस्ट से हटाया गया",
+    "itemCount": "{{count}} आइटम",
+    "addToCart": "कार्ट में जोड़ें",
+    "remove": "हटाएं"
   }
 };

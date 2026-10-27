@@ -45,6 +45,10 @@ export default {
     "createAccount": "অ্যাকাউন্ট তৈরি করুন",
     "termsOfService": "সেবার শর্তাবলী",
     "privacyPolicy": "গোপনীয়তা নীতি",
+    "dateOfBirth": "জন্ম তারিখ",
+    "dobPlaceholder": "দিন / মাস / বছর",
+    "mustBeAtleast16": "আপনার বয়স কমপক্ষে ১৬ বছর হতে হবে",
+    "invalidDob": "একটি বৈধ জন্ম তারিখ লিখুন",
     "invalidOtp": "অবৈধ OTP",
     "failedToSendOtp": "OTP পাঠাতে ব্যর্থ"
   },
@@ -461,6 +465,9 @@ export default {
     "acceptOrder": "অর্ডার গ্রহণ করুন",
     "rejectOrder": "অর্ডার প্রত্যাখ্যান করুন",
     "markReady": "প্রস্তুত চিহ্নিত করুন",
+    "manageOrder": "অর্ডার পরিচালনা করুন",
+    "manageOrderDeclinedSingle": "অর্ডার পরিচালনা করুন — {{name}} ডেলিভারি পার্টনার প্রত্যাখ্যান করেছে",
+    "manageOrderDeclinedMultiple": "অর্ডার পরিচালনা করুন — {{count}} জন ডেলিভারি পার্টনার প্রত্যাখ্যান করেছে",
     "addProduct": "পণ্য যোগ করুন",
     "editProduct": "পণ্য সম্পাদনা করুন",
     "productName": "পণ্যের নাম",
@@ -844,5 +851,16 @@ export default {
     "placeholder": "পণ্য, বিভাগ অনুসন্ধান করুন...",
     "noResults": "কোনও ফলাফল পাওয়া যায়নি",
     "results": "ফলাফল"
+  },
+  "wishlist": {
+    "title": "মেরি ভिशलिस्ट",
+    "empty": "আপনার ভিশলিস্ট খালি আছে",
+    "emptySub": "পণ্য ব্রাউজ করুন এবং এখানে সংরক্ষণ করতে হৃদয় আইকনে ট্যাপ করুন",
+    "browse": "পণ্য ব্রাউজ করুন",
+    "added": "ভিশলিস্টে যোগ করা হয়েছে",
+    "removed": "ভিশলিস্ট থেকে সরানো হয়েছে",
+    "itemCount": "{{count}} আইটেম",
+    "addToCart": "কার্টে যোগ করুন",
+    "remove": "সরান"
   }
 };

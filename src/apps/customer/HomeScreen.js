@@ -21,27 +21,30 @@ import {
   Dimensions,
   StatusBar,
   Pressable,
+  KeyboardAvoidingView,
 } from "react-native";
 import { MaterialIcons, Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, CommonActions } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import { vendorsAPI, ordersAPI, categoriesAPI } from "../../services/api";
+import { io } from "socket.io-client";
 import ChatWidget from "./ChatWidget";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
 import LocationMapPicker from "../../components/LocationMapPicker";
 import UseCurrentLocationButton from "../../components/UseCurrentLocationButton";
-import { useTheme } from "../../theme/ThemeContext";
-
-import { dkBg, dkBorder, dkText, themeCfg } from "../../theme/darkTones";
+import WishlistHeart from "../../components/WishlistHeart";
 
 // Use env var works on device, emulator, and web
 // In your .env: EXPO_PUBLIC_API_URL=http://192.168.x.x:3000/api
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+const SOCKET_URL =
+  process.env.EXPO_PUBLIC_SOCKET_URL ||
+  (BASE_URL.includes("/api") ? BASE_URL.split("/api")[0] : "http://localhost:3000");
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 // ─── Theme palettes (light / dark) ─────────────────────────────────────────
@@ -397,6 +400,9 @@ function AddressPicker({
   const [mode, setMode] = React.useState("list");
   const [editingAddr, setEditingAddr] = React.useState(null);
   const [inputText, setInputText] = React.useState("");
+  const [inputPincode, setInputPincode] = React.useState("");
+  const [inputLandmark, setInputLandmark] = React.useState("");
+  const [inputHouseNo, setInputHouseNo] = React.useState("");
   const [inputLabel, setInputLabel] = React.useState("");
   const [inputErr, setInputErr] = React.useState("");
   const [saving, setSaving] = React.useState(false);
@@ -405,6 +411,7 @@ function AddressPicker({
   const [pickLng, setPickLng] = React.useState(null);
   // Autocomplete suggestions + point to fly the map to on selection
   const [suggestions, setSuggestions] = React.useState([]);
+  const [isInputFocused, setIsInputFocused] = React.useState(false);
   const [focusPoint, setFocusPoint] = React.useState(null);
   const suggestionSelectRef = React.useRef(false);
   const focusSeqRef = React.useRef(0);
@@ -416,12 +423,16 @@ function AddressPicker({
       setMode("list");
       setEditingAddr(null);
       setInputText("");
+      setInputPincode("");
+      setInputLandmark("");
+      setInputHouseNo("");
       setInputLabel("");
       setInputErr("");
       setSaving(false);
       setPickLat(null);
       setPickLng(null);
       setSuggestions([]);
+      setIsInputFocused(false);
       setFocusPoint(null);
       suggestionSelectRef.current = false;
       setLocating(false);
@@ -432,6 +443,9 @@ function AddressPicker({
   const openAdd = () => {
     setEditingAddr(null);
     setInputText("");
+    setInputPincode("");
+    setInputLandmark("");
+    setInputHouseNo("");
     setInputLabel("");
     setInputErr("");
     setPickLat(null);
@@ -447,6 +461,9 @@ function AddressPicker({
   const openEdit = (addr) => {
     setEditingAddr(addr);
     setInputText(addr.address_line || addr.address || "");
+    setInputPincode(addr.pincode || "");
+    setInputLandmark(addr.landmark || "");
+    setInputHouseNo(addr.house_no || "");
     setInputLabel(addr.label || t("home.labelPlaceholder"));
     setInputErr("");
     setPickLat(addr.lat || null);
@@ -472,11 +489,12 @@ function AddressPicker({
   // map to it, and close the dropdown.
   const selectSuggestion = React.useCallback((s) => {
     suggestionSelectRef.current = true;
-    setInputText(s.display_name);
+    const text = s.label || s.display_name || "";
+    setInputText(text);
     setInputErr("");
     setPickLat(s.lat);
     setPickLng(s.lng);
-    setFocusPoint({ key: ++focusSeqRef.current, lat: s.lat, lng: s.lng, displayName: s.display_name });
+    setFocusPoint({ key: ++focusSeqRef.current, lat: s.lat, lng: s.lng, label: text, displayName: text });
     setSuggestions([]);
   }, []);
 
@@ -485,42 +503,77 @@ function AddressPicker({
   const handleUseCurrentLocation = React.useCallback(async () => {
     setLocating(true);
     setLocError("");
-    if (!navigator?.geolocation) {
+
+    let lat = null;
+    let lng = null;
+
+    if (Platform.OS === "web") {
+      if (!navigator?.geolocation) {
+        setLocError(t("home.locErrorUnavailable"));
+        setLocating(false);
+        return;
+      }
+      try {
+        const pos = await new Promise((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 12000,
+            maximumAge: 0,
+          })
+        );
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      } catch (e) {
+        setLocError(e?.code === 1 ? t("home.locErrorDenied") : t("home.locErrorUnavailable"));
+        setLocating(false);
+        return;
+      }
+    } else {
+      try {
+        const Location = require("expo-location");
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          setLocError(t("home.locErrorDenied"));
+          setLocating(false);
+          return;
+        }
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      } catch (e) {
+        setLocError(t("home.locErrorUnavailable"));
+        setLocating(false);
+        return;
+      }
+    }
+
+    if (!lat || !lng) {
       setLocError(t("home.locErrorUnavailable"));
       setLocating(false);
       return;
     }
-    let pos;
-    try {
-      pos = await new Promise((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 12000,
-          maximumAge: 0,
-        })
-      );
-    } catch (e) {
-      setLocError(e?.code === 1 ? t("home.locErrorDenied") : t("home.locErrorUnavailable"));
-      setLocating(false);
-      return;
-    }
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
+
     let displayName = "";
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        { headers: { "User-Agent": "KwikPik/1.0 (desidukaan-express; location-picker)" } }
       );
       const data = await res.json();
+      const detectedPincode = extractPincode(data.address || {});
+
+if (detectedPincode) {
+  setInputPincode(detectedPincode);
+}
       displayName = data?.display_name || "";
     } catch (err) {
       displayName = "";
     }
+
     if (!displayName) {
-      setLocError(t("home.locErrorUnavailable"));
-      setLocating(false);
-      return;
+      displayName = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     }
+
     setPickLat(lat);
     setPickLng(lng);
     setInputText(displayName);
@@ -531,25 +584,87 @@ function AddressPicker({
   }, [t]);
 
   const handleSaveAdd = () => {
-    if (inputText.trim().length < 5) {
-      setInputErr(t("home.addressError"));
-      return;
-    }
-    onSaveNew(inputText.trim(), { lat: pickLat, lng: pickLng });
+    if (
+  pickLat == null ||
+  pickLng == null ||
+  !Number.isFinite(Number(pickLat)) ||
+  !Number.isFinite(Number(pickLng))
+) {
+  setInputErr("Please select your location on the map above.");
+  return;
+}
+    const fullAddr = (inputText || "").trim();
+    const house = (inputHouseNo || "").trim();
+    const landmark = (inputLandmark || "").trim();
+    const pin = (inputPincode || "").trim();
+
+if (!house || !pin || fullAddr.length < 5) {
+  setInputErr(
+    "Enter your House/Flat No., a valid 6-digit Pincode, and your address."
+  );
+  return;
+}
+
+if (!/^[1-9]\d{5}$/.test(pin)) {
+  setInputErr("Please enter a valid 6-digit Indian pincode.");
+  return;
+}
+
+   const combinedAddress = [
+  house,
+  fullAddr,
+  landmark ? `Landmark: ${landmark}` : "",
+  pin,
+]
+  .filter(Boolean)
+  .join(", ");
+
+    onSaveNew(combinedAddress, { lat: pickLat, lng: pickLng, house_no: house, landmark, pincode: pin, address_line: fullAddr });
     setMode("list");
     setInputText("");
+    setInputPincode("");
+    setInputLandmark("");
+    setInputHouseNo("");
     setInputErr("");
   };
 
   const handleSaveEdit = async () => {
-    if (inputText.trim().length < 5) {
-      setInputErr(t("home.addressError"));
+    if (!pickLat || !pickLng) {
+      setInputErr("Please select your location on the map above.");
       return;
     }
+    const fullAddr = (inputText || "").trim();
+    const house = (inputHouseNo || "").trim();
+    const landmark = (inputLandmark || "").trim();
+    const pin = (inputPincode || "").trim();
+
+ if (!house || !pin || fullAddr.length < 5) {
+  setInputErr(
+    "Enter your House/Flat No., a valid 6-digit Pincode, and your address."
+  );
+  return;
+}
+
+if (!/^[1-9]\d{5}$/.test(pin)) {
+  setInputErr("Please enter a valid 6-digit Indian pincode.");
+  return;
+}
+
+    const combinedAddress = [
+  house,
+  fullAddr,
+  landmark ? `Landmark: ${landmark}` : "",
+  pin,
+]
+  .filter(Boolean)
+  .join(", ");
+
     setSaving(true);
     const patch = {
-      address_line: inputText.trim(),
-      label: inputLabel.trim() || editingAddr.label || t("home.labelPlaceholder"),
+      address_line: combinedAddress,
+      pincode: pin,
+      landmark: landmark,
+      label: (inputLabel || "").trim() || editingAddr?.label || t("home.labelPlaceholder"),
     };
     if (pickLat && pickLng) {
       patch.latitude = pickLat;
@@ -560,6 +675,9 @@ function AddressPicker({
     setMode("list");
     setEditingAddr(null);
     setInputText("");
+    setInputPincode("");
+    setInputLandmark("");
+    setInputHouseNo("");
     setInputLabel("");
   };
 
@@ -572,7 +690,46 @@ function AddressPicker({
   };
 
   const isFormMode = mode === "add" || mode === "edit";
+const hasValidCoords =
+  pickLat != null &&
+  pickLng != null &&
+  Number.isFinite(Number(pickLat)) &&
+  Number.isFinite(Number(pickLng));
 
+const canSaveAddress =
+  hasValidCoords &&
+  !!(inputHouseNo || "").trim() &&
+  /^[1-9]\d{5}$/.test((inputPincode || "").trim()) &&
+  (inputText || "").trim().length >= 5 &&
+  !saving;
+
+  const extractPincode = (address = {}) => {
+  // Prefer the postcode returned by map geocoding.
+  const postcode = String(address.postcode || "").trim();
+
+  if (/^[1-9]\d{5}$/.test(postcode)) {
+    return postcode;
+  }
+
+  // Fallback: find a valid Indian PIN code in the address text.
+  const addressText = [
+    address.display_name,
+    address.name,
+    address.road,
+    address.suburb,
+    address.city,
+    address.town,
+    address.village,
+    address.state_district,
+    address.state,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const matches = addressText.match(/\b[1-9]\d{5}\b/g);
+
+  return matches?.[0] || "";
+};
   return (
     <Modal
       visible={visible}
@@ -581,7 +738,7 @@ function AddressPicker({
       onRequestClose={onClose}
     >
       <Pressable style={ap.backdrop} onPress={onClose}>
-        <Pressable style={ap.sheet} onPress={() => { }}>
+        <Pressable style={ap.sheet} onPress={(e) => e.stopPropagation?.()}>
           {/* Handle */}
           <View style={ap.handle} />
 
@@ -608,142 +765,229 @@ function AddressPicker({
 
           {isFormMode ? (
             /* ── Add / Edit Form ── */
-            <View style={ap.formWrap}>
-              {/* Label field (only shown in edit) */}
-              {mode === "edit" && (
-                <>
-                  <Text style={ap.formLabel}>{t("home.labelHint")}</Text>
-                  <View style={[ap.inputBoxSingle, inputErr ? ap.inputBoxError : null]}>
-                    <MaterialIcons
-                      name="label"
-                      size={15}
-                      color={C.green}
-                      style={{ marginLeft: 14 }}
-                    />
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              style={{ flexShrink: 1 }}
+            >
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingBottom: 20 }}
+              >
+                <View style={ap.formWrap}>
+                  {/* Label field (only shown in edit) */}
+                  {mode === "edit" && (
+                    <>
+                      <Text style={ap.formLabel}>{t("home.labelHint")}</Text>
+                      <View style={[ap.inputBoxSingle, inputErr ? ap.inputBoxError : null]}>
+                        <MaterialIcons
+                          name="label"
+                          size={15}
+                          color={C.green}
+                          style={{ marginLeft: 14 }}
+                        />
+                        <TextInput
+                          style={ap.input}
+                          placeholder={t("home.labelPlaceholder")}
+                          placeholderTextColor={C.gray400}
+                          value={inputLabel}
+                          onChangeText={(t) => setInputLabel(t)}
+                          underlineColorAndroid="transparent"
+                        />
+                      </View>
+                      <View style={{ height: 12 }} />
+                    </>
+                  )}
+
+                  {/* ── Section 1: Location Map & Auto-detected Address (Mandatory) ── */}
+                  <View style={ap.sectionHeaderRow}>
+                    <Text style={ap.sectionStepBadge}>1</Text>
+                    <Text style={ap.sectionTitle}>Pin Location on Map (Compulsory)</Text>
+                  </View>
+                  <UseCurrentLocationButton
+                    onPress={handleUseCurrentLocation}
+                    loading={locating}
+                    style={ap.locBtn}
+                  />
+                  {locError ? <Text style={ap.locErrorText}>{locError}</Text> : null}
+                  <LocationMapPicker
+                    initialCoords={
+                      mode === "edit"
+                        ? editingAddr?.lat && editingAddr?.lng
+                          ? { lat: editingAddr.lat, lng: editingAddr.lng }
+                          : null
+                        : initialCoords
+                    }
+                    addressText={inputText}
+                    focusPoint={focusPoint}
+                    autoReverseOnReady={mode === "add"}
+                    onPick={handleMapPick}
+                    onSuggestions={setSuggestions}
+                  />
+                  <View style={{ height: 10 }} />
+
+                  {/* Fetched Location input & floating suggestions dropdown */}
+                  <View style={{ zIndex: 100, position: "relative" }}>
+                    <Text style={ap.formLabel}>Fetched Location</Text>
+                    <View style={[ap.inputBoxSingle, inputErr ? ap.inputBoxError : null]}>
+                      <MaterialIcons
+                        name="my-location"
+                        size={15}
+                        color={C.green}
+                        style={{ marginLeft: 14 }}
+                      />
+                      <TextInput
+                        style={ap.input}
+                        placeholder="Selected map location will appear here..."
+                        placeholderTextColor={C.gray400}
+                        value={inputText}
+                        onFocus={() => setIsInputFocused(true)}
+                        onChangeText={(text) => {
+                          setInputText(text);
+                          setInputErr("");
+                          if ((text || "").trim().length < 3) setSuggestions([]);
+                        }}
+                        onKeyPress={(e) => {
+                          if (e.nativeEvent?.key === "Escape") setSuggestions([]);
+                        }}
+                        onBlur={() => {
+                          setTimeout(() => {
+                            if (!suggestionSelectRef.current) {
+                              setIsInputFocused(false);
+                            }
+                            suggestionSelectRef.current = false;
+                          }, 150);
+                        }}
+                        underlineColorAndroid="transparent"
+                      />
+                    </View>
+
+                    {/* Autocomplete suggestions dropdown (Only shown when input is focused & gives Option to Close/Hide) */}
+                    {isInputFocused && suggestions.length > 0 && (
+                      <View style={ap.suggestWrap}>
+                        <View style={ap.suggestHeader}>
+                          <Text style={ap.suggestHeaderText}>{t("home.suggestions")}</Text>
+                          <TouchableOpacity
+                            onPress={() => setSuggestions([])}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            style={{ padding: 2 }}
+                          >
+                            <MaterialIcons name="close" size={16} color={C.gray500} />
+                          </TouchableOpacity>
+                        </View>
+                        <ScrollView
+                          showsVerticalScrollIndicator={false}
+                          style={{ maxHeight: 180 }}
+                          keyboardShouldPersistTaps="handled"
+                        >
+                          {suggestions.map((s, i) => (
+                            <Pressable
+                              key={`${s.lat}-${s.lng}-${i}`}
+                              style={({ pressed, hovered }) => [
+                                ap.suggestRow,
+                                (pressed || hovered) && ap.suggestRowActive,
+                                i === suggestions.length - 1 && ap.suggestRowLast,
+                              ]}
+                              onPress={() => selectSuggestion(s)}
+                            >
+                              <View style={ap.suggestIconWrap}>
+                                <MaterialIcons name="location-on" size={16} color={C.green} />
+                              </View>
+                              <Text style={ap.suggestText} numberOfLines={2}>
+                                {s.label || s.display_name}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* ── Section 2: Manual Address Details (Compulsory) ── */}
+                  <View style={[ap.sectionHeaderRow, { marginTop: 16 }]}>
+                    <Text style={ap.sectionStepBadge}>2</Text>
+                    <Text style={ap.sectionTitle}>Manual Details (Compulsory)</Text>
+                  </View>
+
+                  <View style={ap.gridRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={ap.formLabel}>House / Flat No.</Text>
+                      <View style={[ap.inputBoxSingle, inputErr && !inputHouseNo ? ap.inputBoxError : null]}>
+                        <MaterialIcons name="home" size={15} color={C.green} style={{ marginLeft: 14 }} />
+                        <TextInput
+                          style={ap.input}
+                          placeholder="e.g. 102, Block A"
+                          placeholderTextColor={C.gray400}
+                          value={inputHouseNo}
+                          onChangeText={(t) => { setInputHouseNo(t); setInputErr(""); }}
+                          underlineColorAndroid="transparent"
+                        />
+                      </View>
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={ap.formLabel}>Pincode</Text>
+                      <View style={[ap.inputBoxSingle, inputErr && !inputPincode ? ap.inputBoxError : null]}>
+                        <MaterialIcons name="pin-drop" size={15} color={C.green} style={{ marginLeft: 14 }} />
+                        <TextInput
+                          style={ap.input}
+                          placeholder="e.g. 201301"
+                          placeholderTextColor={C.gray400}
+                          keyboardType="number-pad"
+                          maxLength={6}
+                          value={inputPincode}
+                           onChangeText={(value) => {
+    setInputPincode(value.replace(/\D/g, "").slice(0, 6));
+    setInputErr("");
+  }}
+                          underlineColorAndroid="transparent"
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  <Text style={ap.formLabel}>Landmark</Text>
+                  <View style={[ap.inputBoxSingle, inputErr && !inputLandmark ? ap.inputBoxError : null]}>
+                    <MaterialIcons name="store" size={15} color={C.green} style={{ marginLeft: 14 }} />
                     <TextInput
                       style={ap.input}
-                      placeholder={t("home.labelPlaceholder")}
+                      placeholder="e.g. Near Metro Station / City Hospital"
                       placeholderTextColor={C.gray400}
-                      value={inputLabel}
-                      onChangeText={(t) => setInputLabel(t)}
+                      value={inputLandmark}
+                      onChangeText={(t) => { setInputLandmark(t); setInputErr(""); }}
                       underlineColorAndroid="transparent"
                     />
                   </View>
-                  <View style={{ height: 12 }} />
-                </>
-              )}
 
-              {/* Map location picker (web) — pin stays centred, map pans below */}
-              <UseCurrentLocationButton
-                onPress={handleUseCurrentLocation}
-                loading={locating}
-                style={ap.locBtn}
-              />
-              {locError ? <Text style={ap.locErrorText}>{locError}</Text> : null}
-              <LocationMapPicker
-                initialCoords={
-                  mode === "edit"
-                    ? editingAddr?.lat && editingAddr?.lng
-                      ? { lat: editingAddr.lat, lng: editingAddr.lng }
-                      : null
-                    : initialCoords
-                }
-                addressText={inputText}
-                focusPoint={focusPoint}
-                autoReverseOnReady={mode === "add"}
-                onPick={handleMapPick}
-                onSuggestions={setSuggestions}
-              />
-              <View style={{ height: 14 }} />
+                  {inputErr ? <Text style={ap.inputErr}>{inputErr}</Text> : null}
 
-              <Text style={ap.formLabel}>{t("home.fullAddress")}</Text>
-              <View style={[ap.inputBox, inputErr ? ap.inputBoxError : null]}>
-                <MaterialIcons
-                  name="location-on"
-                  size={15}
-                  color={inputErr ? C.red : C.green}
-                  style={{ marginLeft: 14 }}
-                />
-                <TextInput
-                  style={ap.input}
-                  placeholder={t("home.addressPlaceholder")}
-                  placeholderTextColor={C.gray400}
-                  value={inputText}
-                  onChangeText={(text) => {
-                    setInputText(text);
-                    setInputErr("");
-                    if (text.trim().length < 3) setSuggestions([]);
-                  }}
-                  onKeyPress={(e) => {
-                    if (e.nativeEvent?.key === "Escape") setSuggestions([]);
-                  }}
-                  onBlur={() => {
-                    setTimeout(() => {
-                      if (!suggestionSelectRef.current) setSuggestions([]);
-                      suggestionSelectRef.current = false;
-                    }, 120);
-                  }}
-                  multiline
-                  numberOfLines={3}
-                  autoFocus
-                  underlineColorAndroid="transparent"
-                />
-              </View>
-              {inputErr ? <Text style={ap.inputErr}>{inputErr}</Text> : null}
 
-              {/* Autocomplete suggestions dropdown (web) */}
-              {suggestions.length > 0 && (
-                <View style={ap.suggestWrap}>
-                  <View style={ap.suggestHeader}>
-                    <Text style={ap.suggestHeaderText}>{t("home.suggestions")}</Text>
-                  </View>
-                  <ScrollView
-                    showsVerticalScrollIndicator={false}
-                    style={{ maxHeight: 176 }}
-                    keyboardShouldPersistTaps="handled"
-                  >
-                    {suggestions.map((s, i) => (
-                      <Pressable
-                        key={`${s.lat}-${s.lng}-${i}`}
-                        style={({ pressed, hovered }) => [
-                          ap.suggestRow,
-                          (pressed || hovered) && ap.suggestRowActive,
-                          i === suggestions.length - 1 && ap.suggestRowLast,
-                        ]}
-                        onPressIn={() => selectSuggestion(s)}
-                      >
-                        <View style={ap.suggestIconWrap}>
-                          <MaterialIcons name="location-on" size={16} color={C.green} />
-                        </View>
-                        <Text style={ap.suggestText} numberOfLines={2}>
-                          {s.display_name}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+<TouchableOpacity
+  style={[
+    ap.saveBtn,
+    !canSaveAddress && ap.saveBtnDisabled,
+  ]}
+  onPress={mode === "edit" ? handleSaveEdit : handleSaveAdd}
+  activeOpacity={0.85}
+  disabled={!canSaveAddress}
+>
+  {saving ? (
+    <ActivityIndicator size="small" color={C.white} />
+  ) : (
+    <>
+      <MaterialIcons name="check" size={16} color={C.white} />
+      <Text style={ap.saveBtnText}>
+        {mode === "edit"
+          ? t("home.updateAddress")
+          : t("home.saveAddress")}
+      </Text>
+    </>
+  )}
+</TouchableOpacity>
+
                 </View>
-              )}
-              <TouchableOpacity
-                style={[
-                  ap.saveBtn,
-                  (inputText.trim().length < 5 || saving) && ap.saveBtnDisabled,
-                ]}
-                onPress={mode === "edit" ? handleSaveEdit : handleSaveAdd}
-                activeOpacity={0.85}
-                disabled={inputText.trim().length < 5 || saving}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color={C.white} />
-                ) : (
-                  <>
-                    <MaterialIcons name="check" size={16} color={C.white} />
-                    <Text style={ap.saveBtnText}>
-                      {mode === "edit" ? t("home.updateAddress") : t("home.saveAddress")}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
           ) : (
             /* ── Address List ── */
             <>
@@ -840,13 +1084,14 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
     justifyContent: "flex-end",
   },
   sheet: {
-    backgroundColor: C.surface,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 36,
-    maxHeight: "80%",
+    backgroundColor: C.white,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 24,
+    maxHeight: "88%",
+    flexShrink: 1,
   },
   handle: {
     width: 40,
@@ -895,11 +1140,93 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
   addStoreBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    backgroundColor: C.green,
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 6,
+    paddingVertical: 16,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: C.green,
+    backgroundColor: C.greenLight,
+  },
+  addNewText: { fontSize: 15, fontWeight: "700", color: C.green },
+  // Form
+  formWrap: { paddingTop: 4 },
+  formLabel: { fontSize: 12, fontWeight: "700", color: C.gray700, marginBottom: 8, letterSpacing: 0.2 },
+  locBtn: { marginBottom: 12 },
+  locErrorText: { fontSize: 12, color: C.red, marginTop: 6, marginBottom: 4, lineHeight: 16 },
+  inputBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    minHeight: 90,
+    paddingVertical: 12,
+    paddingRight: 14,
+  },
+  inputBoxError: { borderColor: "#FCA5A5", backgroundColor: "#FEF2F2" },
+  input: {
+    flex: 1,
+    fontSize: 14,
+    color: C.gray900,
+    paddingLeft: 10,
+    paddingTop: 0,
+    fontWeight: "500",
+    textAlignVertical: "top",
+    lineHeight: 22,
+    ...Platform.select({ web: { outlineStyle: "none" } }),
+  },
+  inputErr: { fontSize: 12, color: C.red, marginTop: 6, fontWeight: "500" },
+  // Autocomplete suggestions dropdown (Floating overlay above subsequent fields)
+  suggestWrap: {
+    position: "absolute",
+    top: 50,
+    left: 0,
+    right: 0,
+    zIndex: 9999,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    backgroundColor: C.white,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 14,
+    elevation: 10,
+    overflow: "hidden",
+  },
+  suggestHeader: {
     paddingHorizontal: 14,
     paddingVertical: 9,
-    borderRadius: 12,
+    backgroundColor: C.gray100,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray200,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  suggestHeaderText: { fontSize: 11, fontWeight: "700", color: C.gray500, letterSpacing: 0.3 },
+  suggestRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+  },
+  suggestRowActive: { backgroundColor: C.greenLight },
+  suggestRowLast: { borderBottomWidth: 0 },
+  suggestIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: C.greenLight,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    marginTop: 1,
   },
   addStoreBtnText: { fontSize: 14, fontWeight: "800", color: C.white },
   cancelBtn: {
@@ -909,15 +1236,53 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
     borderRadius: 14,
     backgroundColor: C.gray100,
   },
-  cancelText: { fontSize: 15, fontWeight: "700", color: C.gray600 },
-}), [C]);
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  sectionStepBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: C.green,
+    color: C.white,
+    fontSize: 12,
+    fontWeight: "800",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: C.gray900,
+  },
+  gridRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 4,
+  },
+});
+
+// ─── Store Picker Modal ────────────────────────────────────────────────────────
+function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
   const { t } = useTranslation();
   if (!item) return null;
 
+  const itemNormName = item.name ? item.name.trim().toLowerCase() : "";
+
   const vendorsWithItem = vendors.filter((v) =>
-    v._inventory?.some(
-      (inv) => inv.product?.id === item.id && (inv.is_active ?? true),
-    ),
+    v._inventory?.some((inv) => {
+      if (!inv.product) return false;
+      const invActive = inv.is_active ?? true;
+      const prodActive = inv.product.is_active ?? true;
+      if (!invActive || !prodActive) return false;
+
+      const matchId = item.id && Number(inv.product.id || inv.product_id) === Number(item.id);
+      const matchName = itemNormName && inv.product.name?.trim()?.toLowerCase() === itemNormName;
+      return matchId || matchName;
+    }),
   );
 
   return (
@@ -947,9 +1312,12 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
               </View>
             ) : (
               vendorsWithItem.map((v) => {
-                const invItem = v._inventory?.find(
-                  (inv) => inv.product?.id === item.id,
-                );
+                const invItem = v._inventory?.find((inv) => {
+                  if (!inv.product) return false;
+                  const matchId = item.id && Number(inv.product.id || inv.product_id) === Number(item.id);
+                  const matchName = itemNormName && inv.product.name?.trim()?.toLowerCase() === itemNormName;
+                  return matchId || matchName;
+                });
                 const price = invItem?.product?.price ?? item.price;
                 return (
                   <TouchableOpacity
@@ -1002,6 +1370,8 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
 }
 
 
+
+const NEARBY_RADIUS_KM = 10;
 
 const CAT_FALLBACK_IMGS = {
   "Dairy, Bread & Eggs": "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80",
@@ -1130,7 +1500,7 @@ function buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCate
 function CategoryBrowseSheet({
   visible, category, hierarchy, onClose,
   onAdd, onRemove, getCartQty, onOpenWeightPicker, vendors,
-  onStoreSelect, apiCategories, onItemDetail,
+  onStoreSelect, apiCategories, onItemDetail, allInventoryItems,
 }) {
   const { isDark } = useTheme();
   const C = isDark ? DARK_COLORS : LIGHT_COLORS;
@@ -1326,8 +1696,9 @@ function CategoryBrowseSheet({
 
   const findCategoryNode = (nodes, targetName) => {
     if (!nodes || !targetName) return null;
+    const targetLower = targetName.trim().toLowerCase();
     for (const node of nodes) {
-      if (node.name === targetName) return node;
+      if (node.name?.trim()?.toLowerCase() === targetLower) return node;
       if (node.children && node.children.length > 0) {
         const found = findCategoryNode(node.children, targetName);
         if (found) return found;
@@ -1336,40 +1707,124 @@ function CategoryBrowseSheet({
     return null;
   };
 
-  // Direct child subcategories at current level ONLY
+  // Direct child subcategories at current level (from API tree or hierarchy)
   const currentChildSubCats = React.useMemo(() => {
     const targetCat = activeSubCat || category;
+    const subCatsSet = new Set();
+
     const node = findCategoryNode(apiCategories, targetCat);
     if (node && node.children && node.children.length > 0) {
-      return node.children.map(c => c.name);
+      node.children.forEach(c => { if (c.name) subCatsSet.add(c.name); });
     }
-    return [];
-  }, [activeSubCat, category, apiCategories]);
 
-  // Determine items for current active subcategory
-  const subCatItems = React.useMemo(() => {
-    if (!category || !hierarchy) return [];
-    const targetCat = activeSubCat || category;
-    
-    let items = [];
-    if (hierarchy[targetCat]) {
+    if (hierarchy && hierarchy[targetCat]) {
       Object.keys(hierarchy[targetCat]).forEach(k => {
-        items.push(...(hierarchy[targetCat][k] || []));
+        if (k !== "All") subCatsSet.add(k);
       });
     }
 
-    if (hierarchy[category] && hierarchy[category][targetCat]) {
-      items.push(...(hierarchy[category][targetCat] || []));
+    return Array.from(subCatsSet);
+  }, [activeSubCat, category, apiCategories, hierarchy]);
+
+  // Determine items for current active subcategory or category
+  const subCatItems = React.useMemo(() => {
+    if (!category) return [];
+    const targetCat = activeSubCat || category;
+    const targetLower = targetCat.trim().toLowerCase();
+
+    // Map variant names (singular/plural)
+    const SYNONYMS = {
+      grocery: "groceries", groceries: "grocery",
+      snack: "snacks", snacks: "snack",
+      beverage: "beverages", beverages: "beverage",
+      fruit: "fruits", fruits: "fruit",
+      medicine: "medicines", medicines: "medicine",
+    };
+
+    const allowedNames = new Set([targetLower]);
+    if (SYNONYMS[targetLower]) allowedNames.add(SYNONYMS[targetLower]);
+
+    // Add descendant subcategories from apiCategories tree
+    const collectDescendants = (nodes) => {
+      for (const node of nodes || []) {
+        const nodeLower = node.name?.trim()?.toLowerCase();
+        if (nodeLower && allowedNames.has(nodeLower)) {
+          const addChildren = (children) => {
+            for (const child of children || []) {
+              if (child.name) {
+                const cLower = child.name.trim().toLowerCase();
+                allowedNames.add(cLower);
+                if (SYNONYMS[cLower]) allowedNames.add(SYNONYMS[cLower]);
+              }
+              if (child.children?.length) addChildren(child.children);
+            }
+          };
+          if (node.children) addChildren(node.children);
+        } else if (node.children?.length) {
+          collectDescendants(node.children);
+        }
+      }
+    };
+    collectDescendants(apiCategories);
+
+    let items = [];
+
+    // 1. Collect from hierarchy
+    if (hierarchy) {
+      Object.keys(hierarchy).forEach(topKey => {
+        const topLower = topKey.trim().toLowerCase();
+        // If we are looking for a top category or specific subcategory
+        if (allowedNames.has(topLower)) {
+          Object.keys(hierarchy[topKey]).forEach(subKey => {
+            if (!activeSubCat || subKey.trim().toLowerCase() === targetLower || allowedNames.has(subKey.trim().toLowerCase())) {
+              items.push(...(hierarchy[topKey][subKey] || []));
+            }
+          });
+        } else {
+          // Check subcategories inside other top-level keys
+          Object.keys(hierarchy[topKey]).forEach(subKey => {
+            if (subKey.trim().toLowerCase() === targetLower || allowedNames.has(subKey.trim().toLowerCase())) {
+              items.push(...(hierarchy[topKey][subKey] || []));
+            }
+          });
+        }
+      });
     }
 
-    const seen = new Set();
+    // 2. Collect from allInventoryItems
+    if (allInventoryItems && allInventoryItems.length > 0) {
+      allInventoryItems.forEach((inv) => {
+        if (!inv.product) return;
+        const catObj = inv.product.category;
+        let rawCat = "";
+        if (typeof catObj === "object" && catObj?.name) rawCat = catObj.name;
+        else if (typeof catObj === "string") rawCat = catObj;
+        else if (inv.product.category_id && apiCategories) {
+          const foundNode = apiCategories.find(c => Number(c.id) === Number(inv.product.category_id));
+          if (foundNode) rawCat = foundNode.name;
+        }
+
+        const catLower = rawCat ? rawCat.trim().toLowerCase() : "";
+        if (catLower && allowedNames.has(catLower)) {
+          items.push(inv);
+        }
+      });
+    }
+
+    // 3. Deduplicate by normalized name + brand + unit (same product from different vendors = 1 row)
+    const seen = new Map();
     return items.filter(inv => {
-      if (!inv?.id) return false;
-      if (seen.has(inv.id)) return false;
-      seen.add(inv.id);
+      if (!inv?.id && !inv?.product?.id) return false;
+      const p = inv.product;
+      const name = (p.name || "").trim().toLowerCase();
+      const brand = (p.brand || "").trim().toLowerCase();
+      const unit = (p.unit || "").trim().toLowerCase();
+      const key = `${name}|${brand}|${unit}`;
+      if (seen.has(key)) return false;
+      seen.set(key, inv);
       return true;
     });
-  }, [category, activeSubCat, hierarchy]);
+  }, [category, activeSubCat, hierarchy, apiCategories, allInventoryItems]);
 
   if (!visible || !category) return null;
 
@@ -1433,52 +1888,58 @@ function CategoryBrowseSheet({
             </View>
           )}
 
-          {/* ── Subcategory Grid View ── */}
-          {showSubCatGrid ? (
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={cbs.subCatGridContainer}
-            >
-              <Text style={cbs.subCatGridTitle}>
-                {subCatPath.length === 0 ? t("home.selectSubCategory") : `Subcategories of ${activeSubCat}`}
-              </Text>
-              <View style={cbs.subCatGrid}>
-                {currentChildSubCats.map(sc => {
-                  const subItems = hierarchy[category]?.[sc] || hierarchy[sc]?.["All"] || (hierarchy[sc] ? Object.values(hierarchy[sc]).flat() : []);
-                  const count = subItems.length;
-                  const firstItemImg = subItems[0]?.product?.image_url;
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+            {/* ── Section 1: Subcategories (if any) ── */}
+            {showSubCatGrid && (
+              <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 }}>
+                <Text style={cbs.subCatGridTitle}>
+                  {subCatPath.length === 0 ? t("home.selectSubCategory") : `Subcategories of ${activeSubCat}`}
+                </Text>
+                <View style={cbs.subCatGrid}>
+                  {currentChildSubCats.map(sc => {
+                    const subCatNode = findCategoryNode(apiCategories, sc);
+                    const subItems = hierarchy[category]?.[sc] || hierarchy[sc]?.["All"] || (hierarchy[sc] ? Object.values(hierarchy[sc]).flat() : []);
+                    const count = subItems.length;
+                    const firstItemImg = subItems[0]?.product?.image_url;
+                    const displayImg = subCatNode?.image_url || subCatNode?.image || firstItemImg;
 
-                  return (
-                    <TouchableOpacity
-                      key={sc}
-                      style={[cbs.subCatCard, { borderColor: catAccent.bg }]}
-                      onPress={() => handlePushPath(sc)}
-                      activeOpacity={0.85}
-                    >
-                      <View style={[cbs.subCatCardIconWrap, { backgroundColor: catAccent.bg }]}>
-                        {firstItemImg ? (
-                          <Image source={{ uri: firstItemImg }} style={cbs.subCatCardImg} resizeMode="cover" />
-                        ) : (
-                          <Text style={cbs.subCatCardEmoji}>{catAccent.icon || "📂"}</Text>
-                        )}
-                      </View>
-                      <View style={cbs.subCatCardInfo}>
-                        <Text style={cbs.subCatCardName} numberOfLines={2}>{sc}</Text>
-                        {count > 0 && (
-                          <Text style={cbs.subCatCardCount}>{t("home.itemsCount", { count })}</Text>
-                        )}
-                      </View>
-                      <MaterialIcons name="chevron-right" size={20} color={catAccent.accent} />
-                    </TouchableOpacity>
-                  );
-                })}
+                    return (
+                      <TouchableOpacity
+                        key={sc}
+                        style={[cbs.subCatCard, { borderColor: catAccent.bg }]}
+                        onPress={() => handlePushPath(sc)}
+                        activeOpacity={0.85}
+                      >
+                        <View style={[cbs.subCatCardIconWrap, { backgroundColor: catAccent.bg }]}>
+                          {displayImg ? (
+                            <Image source={{ uri: displayImg }} style={cbs.subCatCardImg} resizeMode="cover" />
+                          ) : (
+                            <Text style={cbs.subCatCardEmoji}>{catAccent.icon || "📂"}</Text>
+                          )}
+                        </View>
+                        <View style={cbs.subCatCardInfo}>
+                          <Text style={cbs.subCatCardName} numberOfLines={2}>{sc}</Text>
+                          {count > 0 && (
+                            <Text style={cbs.subCatCardCount}>{t("home.itemsCount", { count })}</Text>
+                          )}
+                        </View>
+                        <MaterialIcons name="chevron-right" size={20} color={catAccent.accent} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
-            </ScrollView>
-          ) : (
-            <>
-              {/* Note: Upper gray pills bar removed as requested to keep UI clean & strictly hierarchical */}
+            )}
 
-              {/* ── Column Headers ── */}
+            {/* ── Section 2: Items in Category ── */}
+            <View style={{ borderTopWidth: showSubCatGrid ? 1 : 0, borderTopColor: "#E2E8F0", paddingTop: showSubCatGrid ? 12 : 4 }}>
+              {showSubCatGrid && (
+                <Text style={[cbs.subCatGridTitle, { paddingHorizontal: 16, marginBottom: 8 }]}>
+                  Items in {activeSubCat || category}
+                </Text>
+              )}
+
+              {/* Column Headers */}
               <View style={cbs.tableHeader}>
                 <Text style={[cbs.thCell, { flex: 2 }]}>{t("home.colProduct")}</Text>
                 <Text style={[cbs.thCell, { flex: 1, textAlign: "center" }]}>{t("home.brand")}</Text>
@@ -1486,121 +1947,132 @@ function CategoryBrowseSheet({
                 <Text style={[cbs.thCell, { width: 80, textAlign: "right" }]}>{t("home.price")}</Text>
               </View>
 
-              {/* ── Product Rows ── */}
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                style={{ flex: 1 }}
-              >
-                {subCatItems.length === 0 ? (
-                  <View style={cbs.emptyWrap}>
-                    <MaterialIcons name="inventory" size={32} color={C.gray300} />
-                    <Text style={cbs.emptyText}>{t("home.noSubCatItems")}</Text>
-                  </View>
-                ) : (
-                  subCatItems.map((inv, idx) => {
-                    const p = inv.product;
-                    if (!p) return null;
-                    const qty = getCartQty(p.id);
-                    const loose = isLooseItem(p);
-                    const hasMrp = p.mrp && p.mrp > p.price;
-                    const discPct = hasMrp ? Math.round((1 - p.price / p.mrp) * 100) : 0;
-                    const vendorName = inv._vendorName || "";
+              {/* Product Rows */}
+              {subCatItems.length === 0 ? (
+                <View style={cbs.emptyWrap}>
+                  <MaterialIcons name="inventory" size={32} color={C.gray300} />
+                  <Text style={cbs.emptyText}>{t("home.noSubCatItems")}</Text>
+                </View>
+              ) : (
+                subCatItems.map((inv, idx) => {
+                  const p = inv.product;
+                  if (!p) return null;
+                  const qty = getCartQty(p.id);
+                  const loose = isLooseItem(p);
+                  const hasMrp = p.mrp && p.mrp > p.price;
+                  const discPct = hasMrp ? Math.round((1 - p.price / p.mrp) * 100) : 0;
+                  const vendorName = inv._vendorName || "";
+                  const isActive = p.is_active !== false;
 
-                    const item = {
-                      id: p.id, name: p.name, price: p.price,
-                      img: p.image_url || null, unit: p.unit || "1 pc",
-                      orig: hasMrp ? p.mrp : null, category,
-                      item_type: p.item_type, weight_options: p.weight_options,
-                    };
+                  const item = {
+                    id: p.id, name: p.name, price: p.price,
+                    img: p.image_url || null, unit: p.unit || "1 pc",
+                    orig: hasMrp ? p.mrp : null, category,
+                    item_type: p.item_type, weight_options: p.weight_options,
+                  };
 
-                    return (
-                      <View key={`${p.id}-${idx}`} style={[
-                        cbs.productRow,
-                        idx % 2 === 0 && cbs.productRowAlt,
-                      ]}>
-                        {/* Image + Name */}
-                        <View style={[cbs.productCell, { flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }]}>
-                          <View style={cbs.productImgWrap}>
-                            <Image
-                              source={{
-                                uri: p.image_url ||
-                                  CAT_FALLBACK_IMGS[category] ||
-                                  CAT_FALLBACK_IMGS._default
-                              }}
-                              style={cbs.productImg}
-                              resizeMode="cover"
-                            />
-                            {hasMrp && (
-                              <View style={cbs.discPill}>
-                                <Text style={cbs.discPillText}>{discPct}%</Text>
-                              </View>
-                            )}
-                            {loose && (
-                              <View style={[cbs.discPill, { backgroundColor: "#0891B2" }]}>
-                                <Text style={cbs.discPillText}>{t("home.loose")}</Text>
-                              </View>
-                            )}
-                            <TouchableOpacity
-                              style={cbs.eyeBtn}
-                              activeOpacity={0.7}
-                              onPress={() => onItemDetail && onItemDetail(item, p)}
-                            >
-                              <MaterialIcons name="visibility" size={11} color={C.white} />
-                            </TouchableOpacity>
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={cbs.productName} numberOfLines={2}>{p.name}</Text>
-                            {p.description ? (
-                              <Text style={cbs.productDesc} numberOfLines={1}>{p.description}</Text>
-                            ) : null}
-                          </View>
-                        </View>
-
-                        {/* Brand (vendor) */}
-                        <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
-                          <Text style={cbs.brandText} numberOfLines={2}>{vendorName}</Text>
-                        </View>
-
-                        {/* Qty / Unit (Particulars) */}
-                        <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
-                          <Text style={cbs.unitText}>{p.unit || "1 pc"}</Text>
-                        </View>
-
-                        {/* Price + ADD */}
-                        <View style={[cbs.productCell, { width: 80, alignItems: "flex-end" }]}>
-                          <Text style={cbs.priceText}>₹{p.price}</Text>
-                          {hasMrp && <Text style={cbs.mrpText}>₹{p.mrp}</Text>}
-                          {qty === 0 ? (
-                            <TouchableOpacity
-                              style={[cbs.addBtn, loose && { backgroundColor: "#0891B2" }]}
-                              activeOpacity={0.8}
-                              onPress={() => {
-                                if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
-                                else onAdd(item);
-                              }}
-                            >
-                              <Text style={cbs.addBtnText}>{loose ? t("home.select") : t("common.add")}</Text>
-                            </TouchableOpacity>
-                          ) : (
-                            <View style={cbs.qtyRow}>
-                              <TouchableOpacity style={cbs.qtyBtn} onPress={() => onRemove(item)}>
-                                <MaterialIcons name="remove" size={10} color={C.white} />
-                              </TouchableOpacity>
-                              <Text style={cbs.qtyNum}>{qty}</Text>
-                              <TouchableOpacity style={cbs.qtyBtn} onPress={() => onAdd(item)}>
-                                <MaterialIcons name="add" size={10} color={C.white} />
-                              </TouchableOpacity>
+                  return (
+                    <View key={`${p.id}-${idx}`} style={[
+                      cbs.productRow,
+                      idx % 2 === 0 && cbs.productRowAlt,
+                      !isActive && cbs.productRowUnavailable,
+                    ]}>
+                      {/* Image + Name */}
+                      <View style={[cbs.productCell, { flex: 2, flexDirection: "row", alignItems: "center", gap: 10 }]}>
+                        <View style={cbs.productImgWrap}>
+                          <Image
+                            source={{
+                              uri: p.image_url ||
+                                CAT_FALLBACK_IMGS[category] ||
+                                CAT_FALLBACK_IMGS._default
+                            }}
+                            style={[cbs.productImg, !isActive && { opacity: 0.4 }]}
+                            resizeMode="cover"
+                          />
+                          {hasMrp && isActive && (
+                            <View style={cbs.discPill}>
+                              <Text style={cbs.discPillText}>{discPct}%</Text>
                             </View>
                           )}
+                          {loose && isActive && (
+                            <View style={[cbs.discPill, { backgroundColor: "#0891B2" }]}>
+                              <Text style={cbs.discPillText}>{t("home.loose")}</Text>
+                            </View>
+                          )}
+                          {!isActive && (
+                            <View style={[cbs.discPill, { backgroundColor: C.red }]}>
+                              <Text style={cbs.discPillText}>N/A</Text>
+                            </View>
+                          )}
+                          <TouchableOpacity
+                            style={cbs.eyeBtn}
+                            activeOpacity={0.7}
+                            onPress={() => onItemDetail && onItemDetail(item, p)}
+                          >
+                            <MaterialIcons name="visibility" size={11} color={C.white} />
+                          </TouchableOpacity>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[cbs.productName, !isActive && { color: C.gray400 }]} numberOfLines={2}>{p.name}</Text>
+                          {p.description ? (
+                            <Text style={[cbs.productDesc, !isActive && { color: C.gray300 }]} numberOfLines={1}>{p.description}</Text>
+                          ) : null}
                         </View>
                       </View>
-                    );
-                  })
-                )}
-                <View style={{ height: 24 }} />
-              </ScrollView>
-            </>
-          )}
+
+                      {/* Brand (vendor) */}
+                      <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
+                        <Text style={[cbs.brandText, !isActive && { color: C.gray300 }]} numberOfLines={2}>{vendorName}</Text>
+                      </View>
+
+                      {/* Qty / Unit (Particulars) */}
+                      <View style={[cbs.productCell, { flex: 1, alignItems: "center" }]}>
+                        <Text style={[cbs.unitText, !isActive && { color: C.gray300 }]}>{p.unit || "1 pc"}</Text>
+                      </View>
+
+                      {/* Price + ADD / Unavailable badge */}
+                      <View style={[cbs.productCell, { width: 80, alignItems: "flex-end" }]}>
+                        {!isActive ? (
+                          <View style={cbs.unavailableBadge}>
+                            <MaterialIcons name="block" size={10} color={C.red} />
+                            <Text style={cbs.unavailableText}>Unavailable</Text>
+                          </View>
+                        ) : (
+                          <>
+                            <Text style={cbs.priceText}>₹{p.price}</Text>
+                            {hasMrp && <Text style={cbs.mrpText}>₹{p.mrp}</Text>}
+                            {qty === 0 ? (
+                              <TouchableOpacity
+                                style={[cbs.addBtn, loose && { backgroundColor: "#0891B2" }]}
+                                activeOpacity={0.8}
+                                onPress={() => {
+                                  if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
+                                  else onAdd(item);
+                                }}
+                              >
+                                <Text style={cbs.addBtnText}>{loose ? t("home.select") : t("common.add")}</Text>
+                              </TouchableOpacity>
+                            ) : (
+                              <View style={cbs.qtyRow}>
+                                <TouchableOpacity style={cbs.qtyBtn} onPress={() => onRemove(item)}>
+                                  <MaterialIcons name="remove" size={10} color={C.white} />
+                                </TouchableOpacity>
+                                <Text style={cbs.qtyNum}>{qty}</Text>
+                                <TouchableOpacity style={cbs.qtyBtn} onPress={() => onAdd(item)}>
+                                  <MaterialIcons name="add" size={10} color={C.white} />
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+              <View style={{ height: 24 }} />
+            </View>
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -1671,6 +2143,34 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
   price: { fontSize: 15, fontWeight: "900", color: C.gray900 },
   orig: { fontSize: 10, color: C.gray400, textDecorationLine: "line-through" },
   addBtn: {
+    marginTop: 4,
+    backgroundColor: C.green, borderRadius: 7,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  addBtnText: { fontSize: 11, fontWeight: "800", color: C.white },
+  qtyRow: {
+    marginTop: 4,
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: C.green, borderRadius: 7, overflow: "hidden",
+  },
+  qtyBtn: { paddingHorizontal: 7, paddingVertical: 5 },
+  qtyNum: { fontSize: 11, fontWeight: "800", color: C.white, minWidth: 18, textAlign: "center" },
+  productRowUnavailable: { backgroundColor: "#FEF2F2" },
+  unavailableBadge: {
+    flexDirection: "row", alignItems: "center", gap: 3,
+    backgroundColor: C.redLight, borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 3,
+    borderWidth: 1, borderColor: "#FECACA",
+  },
+  unavailableText: { fontSize: 9, fontWeight: "700", color: C.red },
+  emptyWrap: { alignItems: "center", paddingVertical: 40, gap: 12 },
+  emptyText: { fontSize: 14, color: C.gray400 },
+
+  // Custom subcategory grid
+  subCatGridContainer: { paddingHorizontal: 20, paddingVertical: 16, paddingBottom: 40 },
+  subCatGridTitle: { fontSize: 13, fontWeight: "600", color: C.gray500, marginBottom: 16 },
+  subCatGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  subCatCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -1717,6 +2217,7 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
             <Text style={ic.badgeText}>{t("home.discountOff", { count: discPct })}</Text>
           </View>
         )}
+        <WishlistHeart productId={item.id} size={18} style={{ position: "absolute", top: 6, right: 6 }} />
         <Image
           source={{ uri: imgUri }}
           style={[ic.img, { width: size - 16, height: size - 16 }]}
@@ -1766,9 +2267,118 @@ function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker })
 
 // ─── Popular Item Card (horizontal scroll, HTML-reference style) ───────────────
 function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPress }) {
-  const { isDark } = useTheme();
-  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
-  const pic = useMemo(() => StyleSheet.create({
+  const { t } = useTranslation();
+  const CARD_W = 160;
+  const IMG_H = 100;
+
+  const imgUri =
+    item.img ||
+    item.image_url ||
+    CAT_FALLBACK_IMGS[item.category] ||
+    CAT_FALLBACK_IMGS._default;
+  const hasMrp = item.orig && item.orig > item.price;
+  const discPct = hasMrp ? Math.round((1 - item.price / item.orig) * 100) : 0;
+  const loose = isLooseItem(item);
+  const available = item.isAvailableNearby !== false;
+
+  return (
+    <TouchableOpacity
+      style={[pic.card, !available && { opacity: 0.55 }]}
+      onPress={available ? onPress : undefined}
+      activeOpacity={available ? 0.85 : 1}
+    >
+      {/* ── Image section ── */}
+      <View style={[pic.imgWrap, { height: IMG_H }]}>
+        {/* Out of stock or Discount badge – top-left */}
+        {!available ? (
+          <View style={[pic.discBadge, { backgroundColor: "#EF4444", left: 6, top: 6 }]}>
+            <Text style={pic.discBadgeText}>Out of stock</Text>
+          </View>
+        ) : (
+          hasMrp && (
+            <View style={pic.discBadge}>
+              <Text style={pic.discBadgeText}>{t("home.discountOffUpper", { count: discPct })}</Text>
+            </View>
+          )
+        )}
+        {/* Loose badge – top-right */}
+        {loose && (
+          <View style={[pic.discBadge, { right: 32, left: 'auto', backgroundColor: C.cyan }]}>
+            <Text style={pic.discBadgeText}>{t("home.loose")}</Text>
+          </View>
+        )}
+        <WishlistHeart productId={item.id} size={16} style={{ position: "absolute", bottom: 6, left: 6 }} />
+        <TouchableOpacity
+          style={pic.eyeBtn}
+          onPress={(e) => { e.stopPropagation?.(); onPress?.(); }}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons name="visibility" size={14} color={C.white} />
+        </TouchableOpacity>
+        <Image
+          source={{ uri: imgUri }}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="cover"
+        />
+      </View>
+
+      {/* ── Info section ── */}
+      <View style={pic.info}>
+        <Text style={pic.name} numberOfLines={1}>{item.name}</Text>
+        <Text style={pic.unit}>{item.unit}</Text>
+
+        {/* Price + Add button row */}
+        <View style={pic.priceRow}>
+          <View>
+            <Text style={pic.price}>₹{qty > 0 ? item.price * qty : item.price}</Text>
+            {hasMrp && <Text style={pic.orig}>₹{item.orig}</Text>}
+          </View>
+
+          {!available ? (
+            <View style={[pic.addBtn, { backgroundColor: "#9CA3AF" }]}>
+              <Text style={{ color: "#FFF", fontSize: 10, fontWeight: "700" }}>N/A</Text>
+            </View>
+          ) : qty === 0 ? (
+            <TouchableOpacity
+              style={pic.addBtn}
+              onPress={() => {
+                if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
+                else onAdd(item);
+              }}
+              activeOpacity={0.85}
+            >
+              <MaterialIcons
+                name={loose ? 'tune' : 'add'}
+                size={18}
+                color={C.white}
+              />
+            </TouchableOpacity>
+          ) : (
+            <View style={pic.qtyRow}>
+              <TouchableOpacity
+                style={pic.qtyBtn}
+                onPress={() => onRemove(item)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <MaterialIcons name="remove" size={12} color={C.white} />
+              </TouchableOpacity>
+              <Text style={pic.qtyNum}>{qty}</Text>
+              <TouchableOpacity
+                style={pic.qtyBtn}
+                onPress={() => onAdd(item)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <MaterialIcons name="add" size={12} color={C.white} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const pic = StyleSheet.create({
   card: {
     width: 160,
     backgroundColor: C.surface,
@@ -2007,6 +2617,9 @@ function WeightPickerModal({ item, onClose, onAdd }) {
 
   if (!item) return null;
 
+  const selectedWeightStr = formatWeight(selected);
+  const selectedPrice = calculateProportionalPrice(item.price, selectedWeightStr, item.unit || "1kg");
+
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={wp.backdrop} onPress={onClose}>
@@ -2026,8 +2639,10 @@ function WeightPickerModal({ item, onClose, onAdd }) {
               </View>
               <Text style={wp.productName} numberOfLines={2}>{item.name}</Text>
               <Text style={wp.basePriceText}>
-                ₹{item.price}{" "}
-                <Text style={wp.perUnit}>{t("home.perUnit", { unit: item.unit || "unit" })}</Text>
+                ₹{selectedPrice}{" "}
+                <Text style={wp.perUnit}>
+                  for {selectedWeightStr} (₹{item.price}/{item.unit || "1kg"})
+                </Text>
               </Text>
             </View>
           </View>
@@ -2038,6 +2653,7 @@ function WeightPickerModal({ item, onClose, onAdd }) {
             {weightOptions.map(w => {
               const formatted = formatWeight(w);
               const isActive = selected === w;
+              const chipPrice = calculateProportionalPrice(item.price, formatted, item.unit || "1kg");
               return (
                 <TouchableOpacity
                   key={formatted}
@@ -2045,7 +2661,9 @@ function WeightPickerModal({ item, onClose, onAdd }) {
                   onPress={() => setSelected(w)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[wp.chipText, isActive && wp.chipTextActive]}>{formatted}</Text>
+                  <Text style={[wp.chipText, isActive && wp.chipTextActive]}>
+                    {formatted} • ₹{chipPrice}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
@@ -2063,7 +2681,9 @@ function WeightPickerModal({ item, onClose, onAdd }) {
               style={wp.addBtnGrad}
             >
               <MaterialIcons name="shopping-cart" size={16} color={C.white} />
-              <Text style={wp.addBtnText}>{t("home.addWeightToCart", { weight: formatWeight(selected) })}</Text>
+              <Text style={wp.addBtnText}>
+                Add {selectedWeightStr} to Cart • ₹{selectedPrice}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         </Pressable>
@@ -2505,8 +3125,1837 @@ export default function HomeScreen() {
     paddingBottom: 14,
     paddingTop: 4,
   },
+  addBtnText: { fontSize: 15, fontWeight: "800", color: "#fff" },
+  qtyRow: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: C.green, borderRadius: 14, overflow: "hidden",
+    shadowColor: C.green, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
+  },
+  qtyBtn: { paddingHorizontal: 18, paddingVertical: 13 },
+  qtyNum: { fontSize: 16, fontWeight: "900", color: "#fff", minWidth: 34, textAlign: "center" },
+  handleWrap: { alignItems: "center", paddingBottom: 8, paddingTop: 2 },
+  handleBar: { width: 36, height: 4, borderRadius: 2, backgroundColor: C.gray200 },
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+export default function HomeScreen() {
+  const { t } = useTranslation();
+  const { token, user } = useAuthStore();
+  const navigation = useNavigation();
+  const goToSearch = (focusField) => {
+    const validFields = ["stores", "categories", "items"];
+    const field = validFields.includes(focusField) ? focusField : null;
+    navigation.dispatch(
+      CommonActions.navigate({
+        name: 'Search',
+        params: field ? { focusField: field } : undefined,
+      })
+    );
+  };
+  const addressStore = useAddressStore();
+  const cart = useCartStore();
+
+  const { currentLocation } = addressStore;
+
+  const [selectedAddrId, setSelectedAddrId] = useState(addressStore.selectedId || null);
+
+
+  // Derive locationShort label from selected address or GPS detecting
+  const locationShort = useMemo(() => {
+    if (selectedAddrId) {
+      const found = addressStore?.addresses?.find((a) => a.id === selectedAddrId);
+      if (found) {
+        const addrText = found.address_line || found.address || "";
+        const parts = addrText.split(",");
+        return (
+          [parts[0]?.trim(), parts[1]?.trim()].filter(Boolean).join(", ") ||
+          addrText
+        );
+      }
+    }
+    return currentLocation.displayName || t("home.setLocation");
+  }, [selectedAddrId, addressStore.addresses, currentLocation.displayName, t]);
+
+  // Address picker state moved up to avoid ReferenceError in locationCoords
+
+  const locationCoords = useMemo(() => {
+    // If a specific address is selected, use its coordinates
+    if (selectedAddrId) {
+      const found = addressStore?.addresses?.find(a => a.id === selectedAddrId);
+      if (found?.lat && found?.lng) return { lat: found.lat, lng: found.lng };
+    }
+    // Fallback to GPS detection
+    return currentLocation.lat
+      ? { lat: currentLocation.lat, lng: currentLocation.lng }
+      : null;
+  }, [currentLocation.lat, currentLocation.lng, selectedAddrId, addressStore.addresses]);
+  const locationLoading = currentLocation.loading;
+
+  const [vendors, setVendors] = useState([]);
+  const vendorsRef = useRef(vendors);
+  vendorsRef.current = vendors;
+  const [recentOrders, setRecentOrders] = useState([]);
+  // Kept for backward-compat (fetchPopularProducts still writes to it) but no
+  // longer used in the popularItems derivation — popular items are now derived
+  // entirely from live inventory, which the backend keeps current via global
+  // product:updated socket broadcasts.
+  const [popularFromAPI, setPopularFromAPI] = useState([]);
+  const [loadingVendors, setLoadingVendors] = useState(false);
+  const [loadingInventory, setLoadingInventory] = useState(false);
+
+  // Store category filter
+  const [selectedStoreCategory, setSelectedStoreCategory] = useState(null);
+  const [storeCategories, setStoreCategories] = useState([]);
+
+  // Category hierarchy from API
+  const [apiCategories, setApiCategories] = useState([]);
+
+  // Category browse sheet
+  const [catSheetVisible, setCatSheetVisible] = useState(false);
+  const [catSheetCategory, setCatSheetCategory] = useState(null);
+
+  // Store picker
+  const [pickerItem, setPickerItem] = useState(null);
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [loosePickerItem, setLoosePickerItem] = useState(null);
+  const [popularDetailItem, setPopularDetailItem] = useState(null);
+  const [catDetailItem, setCatDetailItem] = useState(null);
+
+  // Address picker
+  const [addrPickerVisible, setAddrPickerVisible] = useState(false);
+
+  // Responsive
+  const [winW, setWinW] = useState(() =>
+    Platform.OS === "web" && typeof window !== "undefined"
+      ? window.innerWidth
+      : Dimensions.get("window").width,
+  );
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const h = () => setWinW(window.innerWidth);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+  const wide = winW > 700;
+
+  // ── Single source of truth for cart — read directly from cartStore ──────────
+  // Do NOT maintain local itemQtys — it diverges from VendorStoreScreen changes
+  const cartItems = cart?.items || [];
+  const cartCount = cartItems.reduce((s, i) => s + (i.qty || 0), 0);
+  const cartTotal = cartItems.reduce((s, i) => s + i.price * (i.qty || 0), 0);
+  const getCartQty = useCallback(
+    (itemId) => cartItems.find((i) => i.id === itemId)?.qty || 0,
+    [cartItems],
+  );
+
+  // Sync with addressStore & auto-popup add address screen if no addresses exist
+  useEffect(() => {
+    if (addressStore.selectedId) {
+      setSelectedAddrId(addressStore.selectedId);
+    }
+  }, [addressStore.selectedId]);
+
+  useEffect(() => {
+    // If addresses list is loaded and empty, show address screen automatically
+    const validAddresses = (addressStore?.addresses || []).filter(a => a.label !== "Current Location");
+    if (validAddresses.length === 0) {
+      setAddrPickerVisible(true);
+    }
+  }, [addressStore?.addresses]);
+
+  // ── Animations ───────────────────────────────────────────────────────────────
+  const headerOpacity = useRef(new Animated.Value(0)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const contentY = useRef(new Animated.Value(16)).current;
+  const floatingY = useRef(new Animated.Value(120)).current;
+  const vendorListAnim = useRef(new Animated.Value(0)).current;
+  const vendorListY = useRef(new Animated.Value(12)).current;
+  const prevLoadingVendors = useRef(true);
+
+  useEffect(() => {
+    Animated.stagger(100, [
+      Animated.timing(headerOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.parallel([
+        Animated.timing(contentOpacity, {
+          toValue: 1,
+          duration: 350,
+          useNativeDriver: true,
+        }),
+        Animated.spring(contentY, {
+          toValue: 0,
+          tension: 60,
+          friction: 9,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+  }, []);
+
+  useEffect(() => {
+    if (wide) return;
+    Animated.spring(floatingY, {
+      toValue: cartCount > 0 ? 0 : 120,
+      tension: 70,
+      friction: 12,
+      useNativeDriver: true,
+    }).start();
+  }, [cartCount, wide]);
+
+  useEffect(() => {
+    if (prevLoadingVendors.current && !loadingVendors && vendors.length > 0) {
+      vendorListAnim.setValue(0);
+      vendorListY.setValue(12);
+      Animated.parallel([
+        Animated.timing(vendorListAnim, {
+          toValue: 1,
+          duration: 350,
+          useNativeDriver: true,
+        }),
+        Animated.spring(vendorListY, {
+          toValue: 0,
+          tension: 60,
+          friction: 9,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+    prevLoadingVendors.current = loadingVendors;
+  }, [loadingVendors, vendors.length]);
+
+  useEffect(() => {
+    if (locationCoords) {
+      fetchNearbyVendors(locationCoords.lat, locationCoords.lng);
+      fetchPopularProducts(locationCoords.lat, locationCoords.lng);
+    }
+  }, [locationCoords?.lat, locationCoords?.lng]);
+
+  // ── Auto-refresh store open/closed status (no manual refresh needed) ─────────
+  // Every 60s: force a re-render so the time-based OPEN/CLOSED check flips at the
+  // minute boundary, and lightly re-pull the vendor list (status fields only — no
+  // inventory re-fetch) to pick up toggle / hour changes from the vendor or admin.
+  const [, forceStatusRefresh] = useReducer((x) => x + 1, 0);
+  const refreshVendorStatus = useCallback(async () => {
+    if (!locationCoords) return;
+    try {
+      const res = await vendorsAPI.getNearby(
+        locationCoords.lat,
+        locationCoords.lng,
+        10,
+        selectedStoreCategory,
+      );
+      const fresh = res.data || [];
+      setVendors((prev) =>
+        prev.map((v) => {
+          const f = fresh.find((x) => x.id === v.id);
+          return f
+            ? {
+              ...v,
+              is_open: f.is_open,
+              opening_time: f.opening_time,
+              closing_time: f.closing_time,
+              is_currently_open: f.is_currently_open,
+            }
+            : v;
+        }),
+      );
+    } catch {
+      // keep current statuses; the local time check still re-runs each minute
+    }
+  }, [locationCoords, selectedStoreCategory]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      forceStatusRefresh();
+      refreshVendorStatus();
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [refreshVendorStatus]);
+
+  // ── Real-time store open/close updates ──────────────────────────────────────
+  // The backend broadcasts 'shop:statusChanged' (with is_open) whenever a vendor
+  // toggles their Store Status — for BOTH open and close directions. Update the
+  // matching vendor in local state immediately so no manual refresh is needed.
+  useEffect(() => {
+    let socket;
+    try {
+      socket = io(SOCKET_URL, {
+        auth: token ? { token } : {},
+        transports: ["websocket"],
+      });
+      socket.on("shop:statusChanged", ({ vendorId, is_open }) => {
+        if (vendorId == null || is_open === undefined) return;
+        setVendors((prev) =>
+          prev.map((v) =>
+            v.id === Number(vendorId) || String(v.id) === String(vendorId)
+              ? { ...v, is_open, is_currently_open: is_open }
+              : v,
+          ),
+        );
+      });
+    } catch {
+      // socket best-effort — the 60s status poll still covers sync
+    }
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [token]);
+
+  // ── Real-time product updates for Popular Items / Home screen ──────────────────
+  // The backend emits product:updated to ALL connected clients (global broadcast),
+  // so we receive events for ANY vendor without needing store:join rooms.
+  // We also join store:{vendorId} rooms as a belt-and-suspenders fallback.
+  // Uses vendorsRef to avoid stale closures — the ref always holds the latest
+  // vendors state without triggering effect re-runs on every state change.
+  useEffect(() => {
+    if (!token) return;
+    let socket;
+    const joinedRooms = new Set();
+
+    const setupSocket = () => {
+      try {
+        socket = io(SOCKET_URL, {
+          auth: { token },
+          transports: ["websocket"],
+        });
+
+        socket.on("connect", () => {
+          // Join store rooms for all vendors that currently have inventory
+          const cur = vendorsRef.current;
+          cur.forEach((v) => {
+            if (v._inventory?.length && v.id && !joinedRooms.has(v.id)) {
+              socket.emit("store:join", { storeId: v.id });
+              joinedRooms.add(v.id);
+            }
+          });
+        });
+
+        socket.on("product:updated", ({ productId, available, vendorId, ...changed }) => {
+          if (productId == null || vendorId == null) return;
+          const pid = Number(productId);
+          const vid = Number(vendorId);
+
+          setVendors((prev) =>
+            prev.map((vendor) => {
+              if (vendor.id !== vid) return vendor;
+              const inv = vendor._inventory || [];
+              return {
+                ...vendor,
+                _inventory: inv.map((item) => {
+                  const itemPid = Number(item.product_id || item.product?.id);
+                  if (itemPid !== pid) return item;
+                  const nextProduct = item.product ? { ...item.product } : { id: pid };
+                  Object.keys(changed).forEach((k) => {
+                    if (changed[k] !== undefined) nextProduct[k] = changed[k];
+                  });
+                  if (available !== undefined) {
+                    nextProduct.is_active = available;
+                    return { ...item, is_active: available, product: nextProduct };
+                  }
+                  return { ...item, product: nextProduct };
+                }),
+              };
+            }),
+          );
+        });
+
+        socket.on("product:deleted", ({ productId, vendorId }) => {
+          if (productId == null || vendorId == null) return;
+          const pid = Number(productId);
+          const vid = Number(vendorId);
+
+          setVendors((prev) =>
+            prev.map((vendor) => {
+              if (vendor.id !== vid) return vendor;
+              const inv = vendor._inventory || [];
+              return {
+                ...vendor,
+                _inventory: inv.filter(
+                  (item) =>
+                    Number(item.product_id || item.product?.id) !== pid,
+                ),
+              };
+            }),
+          );
+        });
+      } catch {
+        // socket best-effort — page load still fetches fresh inventory
+      }
+    };
+
+    setupSocket();
+
+    // Periodically join rooms for newly-loaded vendors (ref always has latest list)
+    const rejoinInterval = setInterval(() => {
+      if (socket?.connected) {
+        const cur = vendorsRef.current;
+        cur.forEach((v) => {
+          if (v._inventory?.length && v.id && !joinedRooms.has(v.id)) {
+            socket.emit("store:join", { storeId: v.id });
+            joinedRooms.add(v.id);
+          }
+        });
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(rejoinInterval);
+      if (socket) socket.disconnect();
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (token) fetchRecentOrders();
+  }, [token]);
+
+  // Fetch category hierarchy (public endpoint — no auth needed)
+  useEffect(() => {
+    categoriesAPI.getAll()
+      .then(res => setApiCategories(res.data?.categories || []))
+      .catch(() => setApiCategories([]));
+  }, []);
+
+  // Fetch store categories for filter chips
+  useEffect(() => {
+    vendorsAPI.getStoreCategories()
+      .then(res => setStoreCategories(res.data?.categories || []))
+      .catch(() => setStoreCategories([]));
+  }, []);
+
+  // ── Handled by addressStore ──────────────────────────────────────────────────
+
+
+  // ── Fetch popular products via api.js (respects BASE_URL + headers) ──────────
+  const fetchPopularProducts = async (lat, lng) => {
+    try {
+      const res = await fetch(
+        `${BASE_URL}/products/popular?lat=${lat}&lng=${lng}&radius_km=10&limit=12`,
+        token ? { headers: { Authorization: `Bearer ${token}` } } : {},
+      );
+      const data = await res.json();
+      const list = data.data || [];
+      setPopularFromAPI(
+        list.map((p) => ({
+          id: p.id,
+          name: p.name,
+          unit: p.unit || "1 pc",
+          price: p.price,
+          orig: p.mrp != null && p.mrp > p.price ? p.mrp : null,
+          img: p.image_url || null,
+          category: p.category?.name || "Other",
+          item_type: p.item_type,
+          weight_options: p.weight_options,
+        })),
+      );
+    } catch {
+      // Silently fail — inventory-based fallback handles it
+    }
+  };
+
+  // ── Fetch vendors then inventory — FIXED stale closure ───────────────────────
+  // We pass the fresh vendor list directly to fetchInventoryForVendors
+  // instead of reading from state (which hasn't updated yet)
+  const fetchNearbyVendors = async (lat, lng, storeCategory = null) => {
+    setLoadingVendors(true);
+    try {
+      const res = await vendorsAPI.getNearby(lat, lng, 10, storeCategory);
+      const list = res.data || [];
+
+      setVendors(list);
+      setLoadingVendors(false);
+
+      await fetchInventoryForVendors(list);
+    } catch {
+      setVendors([]);
+      setLoadingVendors(false);
+    }
+  };
+
+  const fetchInventoryForVendors = async (vendorList) => {
+    if (!vendorList.length) return;
+    setLoadingInventory(true);
+    try {
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const results = await Promise.all(
+        vendorList.map((v) =>
+          fetch(`${BASE_URL}/inventory/vendor/${v.id}?active_only=true`, { headers })
+            .then((r) => r.json())
+            .then((d) => {
+              // Handle both array and wrapped response shapes
+              const inv = Array.isArray(d) ? d : d.data || d.inventory || [];
+              return { vendorId: v.id, inventory: inv };
+            })
+            .catch(() => ({ vendorId: v.id, inventory: [] })),
+        ),
+      );
+
+      // Attach _inventory to each vendor — use functional updater
+      // so we always merge against the latest state
+      setVendors((prev) =>
+        prev.map((v) => {
+          const found = results.find((r) => r.vendorId === v.id);
+          return { ...v, _inventory: found?.inventory || [] };
+        }),
+      );
+    } finally {
+      setLoadingInventory(false);
+    }
+  };
+
+  const fetchRecentOrders = async () => {
+    try {
+      const res = await ordersAPI.getMyOrders(token, 1);
+      setRecentOrders(res.data?.orders?.slice(0, 3) || []);
+    } catch { }
+  };
+
+  // ── Derive categories from vendor inventories ──────────────────────────────
+  const allInventoryItems = useMemo(() => {
+    const items = [];
+    vendors.forEach((v) => {
+      const dist = parseFloat(v.distance_km);
+      if (!Number.isNaN(dist) && dist > NEARBY_RADIUS_KM) return;
+      (v._inventory || []).forEach((inv) => {
+        if ((inv.product?.is_active ?? true) && inv.product) {
+          items.push({ ...inv, _vendorId: v.id, _vendorName: v.shop_name });
+        }
+      });
+    });
+    return items;
+  }, [vendors]);
+
+  // ── Address Handlers ────────────────────────────────────────────────────────
+
+  const normalizeCatName = (name) => {
+    if (!name) return null;
+    const EXCLUDE = new Set(["Personal Care", "personal care", "PersonalCare"]);
+    if (EXCLUDE.has(name)) return null;
+    const MAP = {
+      Grocery: "Groceries",
+      Snack: "Snacks",
+      Beverage: "Beverages",
+      Fruit: "Fruits",
+      Medicine: "Medicines",
+    };
+    return MAP.hasOwnProperty(name) ? MAP[name] : name;
+  };
+
+  const getCategoryName = useCallback((inv) => {
+    const p = inv.product;
+    const cat = p?.category;
+    let raw;
+    if (cat && typeof cat === "object" && cat.name) raw = cat.name;
+    else if (typeof cat === "string" && cat) raw = cat;
+    else return null;
+    return normalizeCatName(raw);
+  }, []);
+
+  const dynamicCategories = useMemo(() => {
+    const seen = new Set();
+    const cats = [];
+
+    // Find all top-level categories (those without parent_id)
+    const topLevelCats = apiCategories.filter(c => !c.parent_id);
+
+    topLevelCats.forEach(c => {
+      if (c.name && !seen.has(c.name)) {
+        seen.add(c.name);
+
+        const accent = CAT_ACCENT[c.name] || CAT_ACCENT._default;
+        const fallbackImg = CAT_FALLBACK_IMGS[c.name] || CAT_FALLBACK_IMGS._default;
+
+        cats.push({
+          label: c.name,
+          tag: c.name,
+          img: c.image_url || fallbackImg,
+          bg: accent.bg,
+          accent: accent.accent,
+          icon: accent.icon
+        });
+      }
+    });
+    // Preserve the backend order (display_order ASC from /products/categories),
+    // NOT alphabetical — admin drag-and-drop reorder must show up here.
+    return cats;
+  }, [apiCategories]);
+
+  // ── 3-level hierarchy for CategoryBrowseSheet ─────────────────────────────
+  const categoryHierarchy = useMemo(
+    () => buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCategories),
+    [allInventoryItems, getCategoryName, apiCategories],
+  );
+
+  // ── Popular items — derived from live inventory only ────────────────────────
+  // Backend broadcasts product:updated globally, so _inventory is always current.
+  // No need for a separate popularFromAPI — it was stale after mount.
+  const popularItems = useMemo(() => {
+    const seenNames = new Set();
+    const items = [];
+
+    // Helper: Check if product has stock & active status in any nearby vendor
+    const isStockAvailable = (productName, productId) => {
+      return vendors.some((v) => {
+        return (v._inventory || []).some((inv) => {
+          if (!inv.product) return false;
+          const matchId = productId && Number(inv.product_id || inv.product.id) === Number(productId);
+          const matchName = productName && inv.product.name?.trim().toLowerCase() === productName.trim().toLowerCase();
+          if (!matchId && !matchName) return false;
+
+          const invActive = inv.is_active ?? true;
+          const prodActive = inv.product.is_active ?? true;
+          if (!invActive || !prodActive) return false;
+
+          if (inv.stock_qty !== undefined && inv.stock_qty !== null && Number(inv.stock_qty) <= 0) return false;
+
+          return true;
+        });
+      });
+    };
+
+    // First add all inventory items
+    allInventoryItems.forEach((inv) => {
+      const p = inv.product;
+      if (!p?.id || !p?.name) return;
+      const normName = p.name.trim().toLowerCase();
+      if (seenNames.has(normName)) return;
+      seenNames.add(normName);
+
+      const catName = getCategoryName(inv) || "Other";
+      const available = isStockAvailable(p.name, p.id);
+
+      items.push({
+        id: p.id,
+        name: p.name,
+        unit: p.unit || "1 pc",
+        price: p.price,
+        orig: p.mrp != null && p.mrp > p.price ? p.mrp : null,
+        img: p.image_url || null,
+        category: catName,
+        item_type: p.item_type,
+        weight_options: p.weight_options,
+        isAvailableNearby: available,
+      });
+    });
+
+    // Next add API products if available, marking whether available in nearby inventory
+    if (popularFromAPI.length > 0) {
+      popularFromAPI.forEach((p) => {
+        if (!p?.id || !p?.name) return;
+        const normName = p.name.trim().toLowerCase();
+        if (seenNames.has(normName)) return;
+        seenNames.add(normName);
+
+        const available = isStockAvailable(p.name, p.id);
+        items.push({
+          ...p,
+          isAvailableNearby: available,
+        });
+      });
+    }
+
+    return items;
+  }, [popularFromAPI, allInventoryItems, vendors, getCategoryName]);
+
+  // ── Address Handlers ────────────────────────────────────────────────────────
+  const openAddressPicker = () => {
+    // if (!selectedAddrId && addressStore?.addresses?.length > 0) {
+    //   setSelectedAddrId(addressStore.addresses[0].id);
+    // }
+    setAddrPickerVisible(true);
+  };
+
+  const handleSelectAddress = (addr) => {
+    setSelectedAddrId(addr.id);
+    addressStore?.setSelectedId?.(addr.id);
+    setAddrPickerVisible(false);
+    if (addr.lat && addr.lng) {
+      fetchNearbyVendors(addr.lat, addr.lng);
+      fetchPopularProducts(addr.lat, addr.lng);
+    }
+  };
+
+
+  // ── Cart helpers — reads from cartStore, no local qty state ───────────────
+  // In handleAdd — check if THIS item is in cart, not just whether vendorId exists
+  const handleAdd = useCallback(
+    (item, selectedWeight = null) => {
+      if (item.isAvailableNearby === false || item.product?.is_active === false) return;
+      if (isLooseItem(item) && !selectedWeight) {
+        setLoosePickerItem(item);
+        return;
+      }
+
+      const itemInCart = cartItems.some((i) => i.id === item.id);
+      const unitToUse = formatWeight(selectedWeight || item.unit);
+      const finalPrice = isLooseItem(item)
+        ? calculateProportionalPrice(item.price, unitToUse, item.unit || "1kg")
+        : item.price;
+
+      if (!itemInCart) {
+        // Item not in cart at all — always show store picker so user picks a vendor
+        setPickerItem({ ...item, selectedWeight: unitToUse, finalPrice });
+        setPickerVisible(true);
+        return;
+      }
+
+      // Item already in cart — just increment under the existing vendor
+      cart?.addItem?.(
+        {
+          id: item.id,
+          name: item.name,
+          price: finalPrice,
+          img: item.img,
+          unit: unitToUse,
+        },
+        cart?.vendorId,
+      );
+    },
+    [cart, cartItems],
+  );
+
+  const handleRemove = useCallback(
+    (item) => {
+      cart?.removeItem?.(item.id);
+    },
+    [cart],
+  );
+
+  const handleStoreSelect = useCallback(
+    (vendor, item) => {
+      setPickerVisible(false);
+      setCatSheetVisible(false);
+      cart?.addItem?.(
+        {
+          id: item.id,
+          name: item.name,
+          price: item.finalPrice || item.price,
+          img: item.img,
+          unit: item.selectedWeight || item.unit,
+        },
+        vendor.id,
+      );
+      navigation.navigate("VendorStore", {
+        vendorId: vendor.id,
+        vendorName: vendor.shop_name,
+      });
+    },
+    [cart, navigation],
+  );
+
+  // ── Utilities ──────────────────────────────────────────────────────────────
+  const getGreeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return t("home.goodMorning");
+    if (h < 17) return t("home.goodAfternoon");
+    if (h < 21) return t("home.goodEvening");
+    return t("home.goodNight");
+  };
+
+  const getStatusColor = (s) =>
+    ({
+      pending: "#D97706",
+      accepted: "#2563EB",
+      preparing: "#7C3AED",
+      ready: C.green,
+      delivered: C.greenDark,
+      cancelled: "#DC2626",
+    })[s] || C.gray400;
+
+  const firstName = user?.name?.trim().split(" ")[0] || null;
+
+  const hPad = winW >= 1024 ? 48 : winW >= 700 ? 28 : 16;
+  const cols = wide ? (winW > 1200 ? 6 : winW > 900 ? 5 : 4) : 3;
+  const cardW = Math.floor((winW - hPad * 2 - 12 * (cols - 1)) / cols);
+
+  const showCategories = !loadingInventory && dynamicCategories.length > 0;
+  const showPopular = !loadingInventory && popularItems.length > 0;
+  const openStoreCount = vendors.filter((vendor) => isStoreCurrentlyOpen(vendor)).length;
+  const nearestStoreDistance = vendors
+    .map((vendor) => Number(vendor.distance_km))
+    .filter((distance) => Number.isFinite(distance))
+    .sort((a, b) => a - b)[0];
+  const heroTitle = locationCoords
+    ? t("home.heroTitleLocation")
+    : t("home.heroTitleNoLocation");
+  const heroSub = locationCoords
+    ? t("home.heroSubLocation", { count: openStoreCount || vendors.length || t("home.local") })
+    : t("home.heroSubNoLocation");
+  const homeStats = [
+    {
+      icon: "storefront",
+      value: vendors.length ? `${vendors.length}` : "--",
+      label: t("home.nearbyStores"),
+    },
+    {
+      icon: "inventory-2",
+      value: popularItems.length ? `${popularItems.length}+` : "--",
+      label: t("home.popularPicks"),
+    },
+    {
+      icon: "near-me",
+      value: nearestStoreDistance ? t("home.kmDistance", { count: nearestStoreDistance.toFixed(1) }) : t("home.nearYou"),
+      label: t("home.closestStore"),
+    },
+  ];
+  const quickActions = [
+    { icon: "search", label: t("home.findStores"), onPress: goToSearch },
+    { icon: "shopping-bag", label: t("home.openStores"), onPress: goToSearch },
+  ];
+
+
+  return (
+    <View style={s.root}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.white} />
+
+      {/* ══ HEADER ══════════════════════════════════════════════════════════ */}
+      <Animated.View style={[s.headerWrap, { opacity: headerOpacity }]}>
+        {wide ? (
+          <View style={[s.headerRow, { paddingHorizontal: hPad }]}>
+            <TouchableOpacity
+              style={s.brandSection}
+              onPress={() => navigation.navigate("Home")}
+              activeOpacity={0.8}
+            >
+              <View style={s.miniLogoWrap}>
+                <LinearGradient
+                  colors={["#147538", "#0EE627"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={s.miniLogo}
+                >
+                  <MaterialIcons name="storefront" size={17} color={C.white} />
+                </LinearGradient>
+              </View>
+              {winW >= 900 && (
+                <Text style={s.brandName}>
+                  Kwik<Text style={s.brandAccent}>Pik</Text>
+                </Text>
+              )}
+            </TouchableOpacity>
+            <View style={s.headerDivider} />
+            {/* {winW >= 900 && (
+              <>
+                <View style={s.brandSection}>
+                  <View style={s.miniLogoWrap}>
+                    <LinearGradient
+                      colors={[C.orange, C.orangeDark]}
+                      style={s.miniLogo}
+                    >
+                      <MaterialIcons name="shopping-cart" size={15} color={C.white} />
+                    </LinearGradient>
+                  </View>
+                  <GradientText text="KwikPik" style={s.brandName} />
+                </View>
+                <View style={s.headerDivider} />
+              </>
+            )} */}
+            <TouchableOpacity
+              style={s.locationBtn}
+              onPress={openAddressPicker}
+              activeOpacity={0.75}
+            >
+              {locationLoading ? (
+                <View style={s.locLoadRow}>
+                  <ActivityIndicator
+                    size="small"
+                    color={C.green}
+                    style={{ transform: [{ scale: 0.7 }] }}
+                  />
+                  <Text style={s.locLoadText}>{t("home.locating")}</Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={s.locationTop}>{t("home.deliveringTo")}</Text>
+                  <View style={s.locationBottomRow}>
+                    <Text style={s.locationBottom} numberOfLines={1}>
+                      {locationShort || t("home.setLocation")}
+                    </Text>
+                    <MaterialIcons name="expand-more" size={13} color={C.gray500} />
+                  </View>
+                </>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.webSearch}
+              onPress={goToSearch}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="search" size={16} color={C.gray400} />
+              <Text style={s.webSearchText} numberOfLines={1}>
+                {winW < 850 ? t("home.searchShort") : t("home.searchPlaceholderWeb")}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.accountBtn}
+              onPress={() => navigation.navigate("Profile")}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="person" size={16} color={C.green} />
+              {winW >= 900 && (
+                <Text style={s.accountBtnText} numberOfLines={1}>
+                  {firstName || t("home.account")}
+                </Text>
+              )}
+              <MaterialIcons name="expand-more" size={13} color={C.gray500} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.accountBtn}
+              onPress={() => navigation.navigate("Wishlist")}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="favorite-border" size={16} color={C.red} />
+              {winW >= 900 && (
+                <Text style={s.accountBtnText}>Wishlist</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.cartBtn, cartCount > 0 && s.cartBtnActive]}
+              onPress={() => navigation.navigate("Cart")}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons
+                name="shopping-cart"
+                size={16}
+                color={cartCount > 0 ? C.white : C.green}
+              />
+              {winW >= 850 && (
+                <Text
+                  style={[s.cartBtnText, cartCount > 0 && { color: C.white }]}
+                >
+                  {cartCount > 0
+                    ? t("home.itemsInCart", { count: cartCount })
+                    : t("cart.title_short")}
+                </Text>
+              )}
+              {cartCount > 0 && (
+                <View style={s.cartBtnBadge}>
+                  <Text style={s.cartBtnBadgeText}>₹{cartTotal}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            {/* ── Mobile header row: location (left) + account (right) ── */}
+            <View style={[s.mobileRow1, { paddingHorizontal: hPad }]}>
+              <TouchableOpacity
+                style={s.mobileLocBtn}
+                onPress={openAddressPicker}
+                activeOpacity={0.75}
+              >
+                {locationLoading ? (
+                  <View style={s.locLoadRow}>
+                    <ActivityIndicator
+                      size="small"
+                      color={C.green}
+                      style={{ transform: [{ scale: 0.7 }] }}
+                    />
+                    <Text style={s.locLoadText}>{t("home.locating")}</Text>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <MaterialIcons name="location-on" size={20} color={C.green} />
+                    <View style={{ flexShrink: 1 }}>
+                      <Text style={s.locationTop}>{t("home.deliveringTo")}</Text>
+                      <View style={s.locationBottomRow}>
+                        <Text style={s.mobileLocBottom} numberOfLines={1}>
+                          {locationShort || t("home.setLocation")}
+                        </Text>
+                        <MaterialIcons
+                          name="expand-more"
+                          size={15}
+                          color={C.gray700}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </TouchableOpacity>
+              {/* Account icon — clean circle */}
+              <TouchableOpacity
+                style={s.mobileBrandBtn}
+                onPress={() => navigation.navigate("Home")}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={["#147538", "#0EE627"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={s.mobileBrandMark}
+                >
+                  <MaterialIcons name="storefront" size={18} color={C.white} />
+                </LinearGradient>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.mobileWishBtn}
+                onPress={() => navigation.navigate("Wishlist")}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="favorite-border" size={28} color={C.red} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.mobileProfileBtn}
+                onPress={() => navigation.navigate("Profile")}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="account-circle" size={36} color={C.green} />
+              </TouchableOpacity>
+            </View>
+
+            {/* ── Rounded pill search bar with mic ── */}
+            <TouchableOpacity
+              style={[s.mobileSearch, { marginHorizontal: hPad }]}
+              onPress={goToSearch}
+              activeOpacity={0.9}
+            >
+              <MaterialIcons name="search" size={18} color={C.gray400} />
+              <Text style={s.mobileSearchText}>{t("home.searchHint")}</Text>
+              <MaterialIcons name="mic" size={18} color={C.green} />
+            </TouchableOpacity>
+          </>
+        )}
+      </Animated.View>
+
+      {/* ══ BODY ════════════════════════════════════════════════════════════ */}
+      <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        style={{
+          opacity: contentOpacity,
+          transform: [{ translateY: contentY }],
+        }}
+        contentContainerStyle={s.scroll}
+      >
+        {/* 2. HERO BANNER */}
+        <View style={[s.bannerWrap, { paddingHorizontal: hPad }]}>
+          <View style={[s.heroIntro, wide && s.heroIntroWide]}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.heroIntroTitle}>
+                {firstName ? t("home.welcomeBack", { name: firstName }) : t("home.welcomeGuest")}
+              </Text>
+            </View>
+          </View>
+          <View style={[s.heroBanner, { minHeight: wide ? 260 : 250, position: "relative" }]}>
+            <Image
+              source={{
+                uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&q=85&sig=banner",
+              }}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: "100%",
+                height: "100%",
+              }}
+              resizeMode="cover"
+            />
+            <LinearGradient
+              colors={[
+                "rgba(17,24,39,0.86)",
+                "rgba(21,128,61,0.76)",
+                "rgba(249,115,22,0.38)",
+                "rgba(17,24,39,0.12)",
+              ]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: "100%",
+                height: "100%",
+              }}
+            />
+            <View style={[s.heroLeft, { width: wide ? "62%" : "100%" }]}>
+              <View style={s.heroBadge}>
+                <MaterialIcons name="verified" size={13} color={C.green} />
+                <Text style={s.heroBadgeText}>{t("home.freshFromNearby")}</Text>
+              </View>
+              <Text style={s.heroTitle}>{heroTitle}</Text>
+              <Text style={s.heroSub}>{heroSub}</Text>
+              {/* <View style={s.heroActions}>
+                <TouchableOpacity
+                  style={s.heroCTA}
+                  onPress={goToSearch}
+                  activeOpacity={0.85}
+                >
+                  <MaterialIcons name="search" size={16} color={C.white} />
+                  <Text style={s.heroCTAText}>Start Shopping</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.heroGhostCTA}
+                  onPress={openAddressPicker}
+                  activeOpacity={0.85}
+                >
+                  <MaterialIcons name="location-on" size={15} color={C.white} />
+                  <Text style={s.heroGhostText}>Change Address</Text>
+                </TouchableOpacity>
+              </View> */}
+              {wide && (
+                <View style={s.heroStats}>
+                  {homeStats.map((stat) => (
+                    <View key={stat.label} style={s.heroStat}>
+                      <MaterialIcons name={stat.icon} size={16} color={C.white} />
+                      <Text style={s.heroStatValue}>{stat.value}</Text>
+                      <Text style={s.heroStatLabel}>{stat.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* 3. CATEGORY ROW — mobile only (replaces stat boxes + quick actions on phones) */}
+        {!wide && dynamicCategories.length > 0 && (
+          <View style={s.mobileCatRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingLeft: hPad,
+                paddingRight: hPad,
+                paddingBottom: 8,
+                gap: 10,
+              }}
+            >
+              {dynamicCategories.map((cat) => (
+                <TouchableOpacity
+                  key={cat.label}
+                  style={s.mobileCatChip}
+                  onPress={() => {
+                    const root = navigation.getParent?.() || navigation;
+                    root.navigate("Search", { category: cat.label });
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <View style={[s.mobileCatIcon, { backgroundColor: cat.bg }]}>
+                    <Text style={{ fontSize: 16 }}>{cat.icon}</Text>
+                  </View>
+                  <Text style={s.mobileCatChipText} numberOfLines={1}>{cat.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Quick actions rail — desktop/tablet only */}
+        {wide && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingLeft: hPad,
+              paddingRight: hPad,
+              paddingBottom: 8,
+              gap: 10,
+            }}
+            style={s.quickActionRail}
+          >
+            {quickActions.map((action) => (
+              <TouchableOpacity
+                key={action.label}
+                style={s.quickAction}
+                onPress={action.onPress}
+                activeOpacity={0.85}
+              >
+                <View style={s.quickActionIcon}>
+                  <MaterialIcons name={action.icon} size={17} color={C.green} />
+                </View>
+                <Text style={s.quickActionText}>{action.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        <View style={[s.sectionHeader, { paddingHorizontal: hPad }]}>
+          <View>
+            <Text style={s.sectionTitle}>{t("home.nearbyStoresTitle")}</Text>
+            <Text style={s.sectionSub}>{t("home.deliveringToYourLocation")}</Text>
+          </View>
+          <TouchableOpacity onPress={() => goToSearch("stores")}>
+            <Text style={s.viewAll}>{t("home.explore")}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Store Category Filter Chips */}
+        {storeCategories.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: hPad, paddingBottom: 8, gap: 8 }}
+            style={{ marginBottom: 8 }}
+          >
+            {/* All chip */}
+            <TouchableOpacity
+              style={[
+                s.storeCatChip,
+                selectedStoreCategory === null && s.storeCatChipActive,
+              ]}
+              onPress={() => {
+                setSelectedStoreCategory(null);
+                if (locationCoords) fetchNearbyVendors(locationCoords.lat, locationCoords.lng, null);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={[
+                s.storeCatChipText,
+                selectedStoreCategory === null && s.storeCatChipTextActive,
+              ]}>
+                🏪 {t("home.all")}
+              </Text>
+            </TouchableOpacity>
+            {storeCategories.map(cat => {
+              const isActive = selectedStoreCategory === cat;
+              const catMeta = STORE_CATEGORY_META[cat] || STORE_CATEGORY_META._default;
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  style={[s.storeCatChip, isActive && s.storeCatChipActive]}
+                  onPress={() => {
+                    const newCat = isActive ? null : cat;
+                    setSelectedStoreCategory(newCat);
+                    if (locationCoords) fetchNearbyVendors(locationCoords.lat, locationCoords.lng, newCat);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.storeCatChipText, isActive && s.storeCatChipTextActive]}>
+                    {catMeta.icon} {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+
+        {loadingVendors ? (
+          <View style={[s.loadingRow, { paddingHorizontal: hPad }]}>
+            <ActivityIndicator size="small" color={C.green} />
+            <Text style={s.loadingText}>{t("home.findingStores")}</Text>
+          </View>
+        ) : vendors.length === 0 ? (
+          <View style={s.emptyBox}>
+            <View style={s.emptyIconWrap}>
+              <MaterialIcons name="location-on" size={26} color={C.green} />
+            </View>
+            <Text style={s.emptyTitle}>{t("home.noStoresNearby")}</Text>
+            <Text style={s.emptySub}>{t("home.tryUpdatingLocation")}</Text>
+          </View>
+        ) : (
+          <Animated.View style={{ opacity: vendorListAnim, transform: [{ translateY: vendorListY }] }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingLeft: hPad,
+                paddingRight: 8,
+                paddingBottom: 6,
+              }}
+            >
+              {vendors.map((vendor) => {
+                const isOpen = isStoreCurrentlyOpen(vendor);
+                return (
+                  <TouchableOpacity
+                    key={vendor.id}
+                    style={[s.storeCard, wide && s.storeCardWide]}
+                    disabled={!isOpen}
+                    onPress={isOpen ? () =>
+                      navigation.navigate("VendorStore", {
+                        vendorId: vendor.id,
+                        vendorName: vendor.shop_name,
+                      })
+                      : undefined}
+                    activeOpacity={isOpen ? 0.88 : 1}
+                  >
+                    {/* Everything except the CLOSED badge — dimmed when closed */}
+                    <View
+                      style={[
+                        s.cardContent,
+                        !isStoreCurrentlyOpen(vendor) && s.cardContentClosed,
+                      ]}
+                    >
+                      <View style={s.storeImgWrap}>
+                        <Image
+                          source={{
+                            uri:
+                              vendor.shop_image_url ||
+                              `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${vendor.id}`,
+                          }}
+                          style={s.storeImg}
+                        />
+                        <LinearGradient
+                          colors={["transparent", "rgba(0,0,0,0.5)"]}
+                          style={s.storeImgOverlay}
+                        />
+                        <View style={s.ratingBadge}>
+                          <MaterialIcons name="star" size={10} color="#FBBF24" />
+                          <Text style={s.ratingText}>
+                            {vendor.avg_rating
+                              ? parseFloat(vendor.avg_rating).toFixed(1)
+                              : t("home.new")}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={s.storeInfo}>
+                        <Text style={s.storeName} numberOfLines={1}>
+                          {vendor.shop_name}
+                        </Text>
+                        <View style={s.storeMetaRow}>
+                          <MaterialIcons name="location-on" size={10} color={C.green} />
+                          <Text style={s.storeMeta}>
+                            {vendor.distance_km
+                              ? t("home.kmDistance", { count: parseFloat(vendor.distance_km).toFixed(1) })
+                              : t("home.nearby")}
+                          </Text>
+                          <View style={s.metaDot} />
+                          <MaterialIcons name="access-time" size={10} color={C.gray400} />
+                          <Text style={s.storeMeta}>{t("home.deliveryTime")}</Text>
+                        </View>
+                        <View style={s.storeTagRow}>
+                          {/* Min order — orange pill */}
+                          <View style={[s.storeTag, { backgroundColor: C.orangeLight, borderColor: "#FED7AA" }]}>
+                            <Text style={[s.storeTagText, { color: C.orangeDark }]}>
+                              {t("home.minOrder", { min: vendor.min_order || 99 })}
+                            </Text>
+                          </View>
+                          {isStoreCurrentlyOpen(vendor) && (
+                            <View
+                              style={[
+                                s.storeTag,
+                                {
+                                  backgroundColor: C.greenLight,
+                                  borderColor: C.greenBorder,
+                                },
+                              ]}
+                            >
+                              <Text style={[s.storeTagText, { color: C.green }]}>
+                                {t("home.acceptingOrders")}
+                              </Text>
+                            </View>
+                          )}
+                          {vendor.vendor_type && vendor.vendor_type !== "all" &&
+                            VENDOR_TYPE_META[vendor.vendor_type] && (
+                              <View
+                                style={[
+                                  s.storeTag,
+                                  {
+                                    backgroundColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
+                                    borderColor: VENDOR_TYPE_META[vendor.vendor_type].bg,
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    s.storeTagText,
+                                    { color: VENDOR_TYPE_META[vendor.vendor_type].color },
+                                  ]}
+                                >
+                                  {VENDOR_TYPE_META[vendor.vendor_type].label}
+                                </Text>
+                              </View>
+                            )}
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* OPEN/CLOSED pill — solid, no dot. Kept OUTSIDE the dimmed
+                    wrapper so it always renders at full opacity and stays
+                    clearly legible even on a CLOSED (dimmed) card. */}
+                    <View
+                      style={[
+                        s.statusBadge,
+                        {
+                          backgroundColor: isStoreCurrentlyOpen(vendor)
+                            ? C.green
+                            : "rgba(0,0,0,0.72)",
+                        },
+                      ]}
+                    >
+                      <Text style={s.statusText}>
+                        {isStoreCurrentlyOpen(vendor) ? t("home.open") : t("home.closed")}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </Animated.View>
+        )}
+
+        {/* 4. SHOP BY CATEGORY */}
+        {showCategories && (
+          <>
+            <View
+              style={[
+                s.sectionHeader,
+                { marginTop: 24, paddingHorizontal: hPad },
+              ]}
+            >
+              <Text style={s.sectionTitle}>{t("home.shopByCategory")}</Text>
+              <TouchableOpacity onPress={() => goToSearch("categories")}>
+                <Text style={s.viewAll}>{t("home.viewAll")}</Text>
+              </TouchableOpacity>
+            </View>
+            {/* 4-column clean tile grid */}
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                paddingHorizontal: hPad,
+                paddingBottom: 8,
+                rowGap: 16,
+                columnGap: 0,
+              }}
+            >
+              {dynamicCategories.map((cat) => {
+                const catCols = winW >= 1024 ? 10 : winW >= 768 ? 6 : winW >= 480 ? 5 : 4;
+                const catItemW = (winW - (hPad * 2)) / catCols;
+                const tileSize = catItemW * 0.72;
+
+                return (
+                  <TouchableOpacity
+                    key={cat.label}
+                    style={[s.catCard, { width: catItemW }]}
+                    onPress={() => {
+                      setCatSheetCategory(cat.label);
+                      setCatSheetVisible(true);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    {/* Square tile with image */}
+                    <View
+                      style={[
+                        s.catTile,
+                        {
+                          width: tileSize,
+                          height: tileSize,
+                          backgroundColor: cat.bg,
+                        },
+                      ]}
+                    >
+                      <Image
+                        source={{ uri: cat.img }}
+                        style={{ width: tileSize * 0.72, height: tileSize * 0.72 }}
+                        resizeMode="contain"
+                      />
+                    </View>
+                    <Text style={s.catCardLabel} numberOfLines={2}>{cat.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
+
+        {loadingInventory && vendors.length > 0 && (
+          <View
+            style={[s.loadingRow, { paddingHorizontal: hPad, marginTop: 28 }]}
+          >
+            <ActivityIndicator size="small" color={C.green} />
+            <Text style={s.loadingText}>{t("home.loadingProducts")}</Text>
+          </View>
+        )}
+
+        {/* 5. POPULAR ITEMS — horizontal scroll like HTML reference */}
+        {showPopular && (
+          <>
+            <View
+              style={[
+                s.sectionHeader,
+                { marginTop: 28, paddingHorizontal: hPad },
+              ]}
+            >
+              <Text style={s.sectionTitle}>{t("home.popularItemsTitle")}</Text>
+              <TouchableOpacity onPress={() => goToSearch("items")}>
+                <Text style={s.viewAll}>{t("home.seeAll")}</Text>
+              </TouchableOpacity>
+            </View>
+            {/* Horizontal scroll cards */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingLeft: hPad,
+                paddingRight: 8,
+                paddingBottom: 8,
+                gap: 14,
+              }}
+            >
+              {popularItems.map((item) => (
+                <PopularItemCard
+                  key={item.id}
+                  item={item}
+                  qty={getCartQty(item.id)}
+                  onAdd={handleAdd}
+                  onRemove={handleRemove}
+                  onOpenWeightPicker={setLoosePickerItem}
+                  onPress={() => setPopularDetailItem(item)}
+                />
+              ))}
+            </ScrollView>
+          </>
+        )}
+
+        {/* 6. RECENT ORDERS */}
+        {recentOrders.length > 0 && (
+          <>
+            <View
+              style={[
+                s.sectionHeader,
+                { marginTop: 28, paddingHorizontal: hPad },
+              ]}
+            >
+              <Text style={s.sectionTitle}>{t("home.recentOrders")}</Text>
+              <TouchableOpacity onPress={() => navigation.navigate("Orders")}>
+                <Text style={s.viewAll}>{t("home.viewAll")}</Text>
+              </TouchableOpacity>
+            </View>
+            {recentOrders.map((order) => (
+              <TouchableOpacity
+                key={order.id}
+                style={[s.orderCard, { marginHorizontal: hPad }]}
+                onPress={() => navigation.navigate("Orders")}
+                activeOpacity={0.85}
+              >
+                <Image
+                  source={{
+                    uri:
+                      order.vendor?.shop_image_url ||
+                      `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=200&sig=${order.vendor_id}`,
+                  }}
+                  style={s.orderImg}
+                />
+                <View style={s.orderInfo}>
+                  <Text style={s.orderStore} numberOfLines={1}>
+                    {order.vendor?.shop_name || t("home.store")}
+                  </Text>
+                  <Text style={s.orderMeta}>
+                    {order.order_number} · ₹{order.total}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    s.statusPill,
+                    { backgroundColor: getStatusColor(order.status) + "18" },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      s.statusPillText,
+                      { color: getStatusColor(order.status) },
+                    ]}
+                  >
+                    {order.status.charAt(0).toUpperCase() +
+                      order.status.slice(1)}
+                  </Text>
+                </View>
+                <MaterialIcons
+                  name="chevron-right"
+                  size={15}
+                  color={C.gray300}
+                  style={{ marginLeft: 4 }}
+                />
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
+
+        <View style={{ height: wide ? 60 : 130 }} />
+      </Animated.ScrollView>
+
+      {/* ══ ADDRESS PICKER MODAL ═══════════════════════════════════════════ */}
+      <AddressPicker
+        visible={addrPickerVisible}
+        addresses={(addressStore?.addresses || []).filter(a => a.label !== "Current Location")}
+        selectedId={selectedAddrId}
+        initialCoords={locationCoords}
+        onClose={() => setAddrPickerVisible(false)}
+        onSelect={handleSelectAddress}
+        onDelete={(id) => addressStore.removeAddress(id, token)}
+        onUpdate={async (id, patch) => {
+          await addressStore.updateAddress(id, patch, token);
+        }}
+        onSaveNew={async (text, coords) => {
+          let lat = coords?.lat ?? null,
+            lng = coords?.lng ?? null;
+          if (!lat || !lng) {
+            try {
+              const encoded = encodeURIComponent(text);
+              const res = await fetch(
+                `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1`,
+                { headers: { "User-Agent": "KwikPik/1.0" } },
+              );
+              const results = await res.json();
+              if (results?.length > 0) {
+                lat = parseFloat(results[0].lat);
+                lng = parseFloat(results[0].lon);
+              }
+            } catch { }
+          }
+
+          // addAddress now returns the real ID
+          const newId = await addressStore?.addAddress?.({ address: text, lat, lng }, token);
+          if (newId) {
+            setSelectedAddrId(newId);
+            addressStore?.setSelectedId?.(newId);
+          }
+          if (lat && lng) {
+            fetchNearbyVendors(lat, lng);
+            fetchPopularProducts(lat, lng);
+          }
+          setAddrPickerVisible(false);
+        }}
+      />
+
+      {/* ══ WEIGHPICKER MODAL ═════════════════════════════════════════════ */}
+      <WeightPickerModal
+        item={loosePickerItem}
+        onClose={() => setLoosePickerItem(null)}
+        onAdd={handleAdd}
+      />
+
+      {/* ══ POPULAR ITEM DETAIL MODAL ══════════════════════════════════════ */}
+      <ItemDetailModal
+        item={popularDetailItem}
+        qty={popularDetailItem ? getCartQty(popularDetailItem.id) : 0}
+        onClose={() => setPopularDetailItem(null)}
+        onAdd={(item) => handleAdd(item)}
+        onRemove={(item) => handleRemove(item)}
+      />
+
+      {/* ══ CATEGORY ITEM DETAIL MODAL ══════════════════════════════════════ */}
+      <ItemDetailModal
+        item={catDetailItem}
+        qty={catDetailItem ? getCartQty(catDetailItem.id) : 0}
+        onClose={() => setCatDetailItem(null)}
+        onAdd={(item) => handleAdd(item)}
+        onRemove={(item) => handleRemove(item)}
+      />
+
+      {/* ══ STORE PICKER MODAL ═════════════════════════════════════════════ */}
+      <StorePicker
+        visible={pickerVisible}
+        item={pickerItem}
+        vendors={vendors}
+        onClose={() => setPickerVisible(false)}
+        onSelectStore={handleStoreSelect}
+      />
+
+      {/* ══ CATEGORY BROWSE SHEET ══════════════════════════════════════════ */}
+      <CategoryBrowseSheet
+        visible={catSheetVisible}
+        category={catSheetCategory}
+        hierarchy={categoryHierarchy}
+        allInventoryItems={allInventoryItems}
+        onClose={() => setCatSheetVisible(false)}
+        onAdd={handleAdd}
+        onRemove={handleRemove}
+        getCartQty={getCartQty}
+        onOpenWeightPicker={setLoosePickerItem}
+        vendors={vendors}
+        onStoreSelect={handleStoreSelect}
+        apiCategories={apiCategories}
+        onItemDetail={(item, product) => {
+          setCatSheetVisible(false);
+          setTimeout(() => {
+            setCatDetailItem({
+              id: product.id,
+              name: product.name,
+              price: product.price,
+              img: product.image_url || null,
+              unit: product.unit || "1 pc",
+              orig: product.mrp && product.mrp > product.price ? product.mrp : null,
+              description: product.description || null,
+              category: catSheetCategory,
+              item_type: product.item_type,
+              weight_options: product.weight_options,
+            });
+          }, 300);
+        }}
+      />
+
+      {/* <ChatWidget /> */}
+
+      {/* ══ FLOATING CART — mobile ══════════════════════════════════════════ */}
+      {!wide && cartCount > 0 && (
+        <Animated.View
+          style={[s.floatingCart, { transform: [{ translateY: floatingY }] }]}
+        >
+          <View style={s.floatingLeft}>
+            {/* Basket icon with orange count badge */}
+            <View style={{ position: "relative" }}>
+              <MaterialIcons name="shopping-basket" size={30} color={C.white} />
+              <View style={s.floatingCountBadge}>
+                <Text style={s.floatingCountBadgeText}>{cartCount}</Text>
+              </View>
+            </View>
+            <View>
+              <Text style={s.floatingItems}>
+                {t("home.itemsAdded", { count: cartCount })}
+              </Text>
+              <Text style={s.floatingTotal}>{t("home.totalAmount", { amount: cartTotal })}</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={s.floatingCTA}
+            onPress={() => navigation.navigate("Cart")}
+            activeOpacity={0.85}
+          >
+            <Text style={s.floatingCTAText}>{t("home.viewCart")}</Text>
+            <MaterialIcons name="arrow-forward" size={14} color={C.white} />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
+// ─── Styles (unchanged from your original) ────────────────────────────────────
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.bg },
+  headerWrap: {
+    backgroundColor: C.white,
+    paddingTop: Platform.OS === "android" ? 18 : 22,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray200,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 4,
+    zIndex: 10,
+  },
+  accentLine: { height: 0 },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingBottom: 20,
+    paddingTop: 4,
+    gap: 0,
+  },
+  brandSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexShrink: 0,
+  },
+  miniLogoWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    overflow: "hidden",
+    backgroundColor: C.white,
+    borderWidth: 1,
+    borderColor: C.greenBorder,
+  },
+  miniLogo: { flex: 1, alignItems: "center", justifyContent: "center" },
+  brandName: {
+    fontSize: 28,
+    fontWeight: "900",
+    letterSpacing: 0,
+    color: C.gray900,
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+  },
+  brandAccent: { color: "#0EE627" },
+  headerDivider: {
+    width: 1,
+    height: 38,
+    backgroundColor: C.gray200,
+    marginHorizontal: 16,
+    flexShrink: 0,
+  },
+  locationBtn: {
+    flexShrink: 0,
+    minWidth: 120,
+    maxWidth: 220,
+    justifyContent: "center",
+    marginRight: 16,
+  },
+  locLoadRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  locLoadText: { fontSize: 12, color: C.gray500 },
+  locationTop: {
+    fontSize: 12,
+    color: C.gray500,
+    fontWeight: "500",
+    lineHeight: 15,
+  },
+  locationBottomRow: { flexDirection: "row", alignItems: "center", gap: 3 },
+  locationBottom: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: C.gray900,
+    flexShrink: 1,
+  },
+  webSearch: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginRight: 10,
+    minWidth: 80,
+  },
+  webSearchText: { flex: 1, fontSize: 15, color: C.gray400 },
+  accountBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    marginRight: 8,
+    flexShrink: 0,
+  },
+  accountBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: C.gray700,
+    maxWidth: 90,
+  },
+  cartBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    backgroundColor: C.gray100,
+    flexShrink: 0,
+  },
+  cartBtnActive: { backgroundColor: C.green, borderColor: C.green },
+  cartBtnText: { fontSize: 14, fontWeight: "700", color: C.gray700 },
+  cartBtnBadge: {
+    backgroundColor: "rgba(255,255,255,0.25)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  cartBtnBadgeText: { fontSize: 11, fontWeight: "800", color: C.white },
+  mobileRow1: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingBottom: 14,
+    paddingTop: 4,
+  },
   mobileLocBtn: { flex: 1, marginRight: 8 },
   mobileLocBottom: { fontSize: 18, fontWeight: "700", color: C.gray900, flexShrink: 1 },
+  mobileWishBtn: { padding: 4 },
   mobileProfileBtn: {
     alignItems: "center",
     justifyContent: "center",

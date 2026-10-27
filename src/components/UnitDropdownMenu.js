@@ -1,26 +1,33 @@
-import React from 'react';
+import React, { useState, memo } from 'react';
 import { View, ScrollView, Text, Pressable, StyleSheet, Platform } from 'react-native';
 
 const PRIMARY = '#1ca049';
 const PRIMARY_LIGHT = '#e8f5e9';
 
-export default function UnitDropdownMenu({ listRef, options, value, hover, onHover, onSelect }) {
+const UnitDropdownMenu = memo(function UnitDropdownMenu({ listRef, options = [], value, onSelect }) {
+  const [localHover, setLocalHover] = useState(null);
+
   return (
     <View ref={listRef} style={styles.list}>
       <ScrollView style={styles.scroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-        {options.map(u => (
+        {options.map((u) => (
           <Pressable
             key={u}
-            onHoverIn={() => onHover(u)}
-            onHoverOut={() => onHover(null)}
+            onHoverIn={() => setLocalHover(u)}
+            onHoverOut={() => setLocalHover(null)}
             onPress={() => onSelect(u)}
             {...(Platform.OS === 'web'
-              ? { onMouseDown: (e) => { e.preventDefault(); onSelect(u); } }
+              ? {
+                  onMouseDown: (e) => {
+                    e.preventDefault();
+                    onSelect(u);
+                  },
+                }
               : null)}
             style={({ hovered }) => [
               styles.item,
               value === u && styles.itemActive,
-              (hover === u || hovered) && styles.itemHover,
+              (localHover === u || hovered) && styles.itemHover,
             ]}
           >
             <Text style={[styles.itemText, value === u && styles.itemTextActive]}>{u}</Text>
@@ -29,7 +36,9 @@ export default function UnitDropdownMenu({ listRef, options, value, hover, onHov
       </ScrollView>
     </View>
   );
-}
+});
+
+export default UnitDropdownMenu;
 
 const styles = StyleSheet.create({
   list: {

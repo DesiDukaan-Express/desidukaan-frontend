@@ -142,20 +142,38 @@ export default function LocationMapPicker({
   // ── Fly to a chosen suggestion (selection -> map + marker) ───────────────
   // Runs before the watcher effect so the echoed text change is recognised
   // and does not re-open the dropdown.
-  useEffect(() => {
-    if (!focusPoint || focusPoint.lat == null || focusPoint.lng == null) return;
-    if (lastFocusKeyRef.current === focusPoint.key) return;
-    lastFocusKeyRef.current = focusPoint.key;
-    const lat = focusPoint.lat;
-    const lng = focusPoint.lng;
-    setMarkerPos({ lat, lng });
-    lastPushedTextRef.current = focusPoint.displayName || null;
-    const map = mapApi.current;
-    if (map) {
-      suppressReverseTextRef.current = true; // don't overwrite the chosen label
-      map.flyTo([lat, lng], Math.max(map.getZoom(), 15), { duration: 0.6 });
-    }
-  }, [focusPoint]);
+// ── Fly to a chosen suggestion (selection -> map + marker) ──
+useEffect(() => {
+  if (
+    !focusPoint ||
+    !Number.isFinite(Number(focusPoint.lat)) ||
+    !Number.isFinite(Number(focusPoint.lng))
+  ) {
+    return;
+  }
+
+  const lat = Number(focusPoint.lat);
+  const lng = Number(focusPoint.lng);
+
+  // Use the coordinates as the key if the parent doesn't provide one.
+  const focusKey =
+    focusPoint.key ?? `${lat.toFixed(6)},${lng.toFixed(6)}`;
+
+  if (lastFocusKeyRef.current === focusKey) return;
+  lastFocusKeyRef.current = focusKey;
+
+  setMarkerPos({ lat, lng });
+  lastPushedTextRef.current = focusPoint.displayName || null;
+
+  const map = mapApi.current;
+
+  if (map) {
+    suppressReverseTextRef.current = true;
+    map.flyTo([lat, lng], Math.max(map.getZoom(), 15), {
+      duration: 0.6,
+    });
+  }
+}, [focusPoint]);
 
   // ── Forward search (typed text -> suggestions for the parent's dropdown) ──
   const runSearch = useCallback(

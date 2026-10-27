@@ -27,6 +27,7 @@ import ToastBanner from "../../components/common/ToastBanner";
 import BulkDeleteDialog from "../../components/inventory/BulkDeleteDialog";
 import ProductModal from "../../components/inventory/ProductModal";
 import CatalogueModal from "../../components/inventory/CatalogueModal";
+import ReorderProductsModal from "../../components/vendor/ReorderProductsModal";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COLORS
@@ -435,6 +436,7 @@ export default function InventoryScreen() {
   const [actionSheetProduct, setActionSheetProduct] = useState(null);
   const [productToDelete, setProductToDelete] = useState(null);
   const [showCatalogueModal, setShowCatalogueModal] = useState(false);
+  const [showReorder, setShowReorder] = useState(false);
 
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
@@ -626,14 +628,28 @@ export default function InventoryScreen() {
             <Text style={s.heading}>{t("vendor.inventoryTitle", "Inventory")}</Text>
             <Text style={s.subheading}>{t("vendor.manageCategoriesProducts", "Manage your products & categories")}</Text>
           </View>
-
-          <TouchableOpacity style={s.bellBtn} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Feather name="bell" size={20} color={TEXT} />
-            {notifCount > 0 && (
-              <View style={s.bellBadge}>
-                <Text style={s.bellBadgeText}>{notifCount > 9 ? "9+" : notifCount}</Text>
-              </View>
-            )}
+        )}
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={() => setShowReorder(true)}
+            style={[s.addBtn, { backgroundColor: '#F3F4F6' }]}
+            activeOpacity={0.85}
+          >
+            <Text style={[s.addBtnText, { color: '#1B6B35' }]}>⇅ {t('vendor.reorderProducts', 'Reorder')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setShowCatalogueModal(true)}
+            style={[s.addBtn, { backgroundColor: '#F97316' }]}
+            activeOpacity={0.85}
+          >
+            <Text style={s.addBtnText}>📦 Add from Catalogue</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setModal("add")}
+            style={s.addBtn}
+            activeOpacity={0.85}
+          >
+            <Text style={s.addBtnText}>+ {t('vendor.addProduct')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -981,6 +997,22 @@ export default function InventoryScreen() {
           </View>
         </View>
       )}
+
+      <ReorderProductsModal
+        visible={showReorder}
+        products={inv.rawProducts || []}
+        onClose={() => setShowReorder(false)}
+        saving={inv.saving}
+        onSaved={async (orderedItems) => {
+          try {
+            await inv.reorderProducts(orderedItems);
+            showToast("Product order saved");
+          } catch (e) {
+            showToast("Failed to save order", "error");
+          }
+          setShowReorder(false);
+        }}
+      />
 
       <ToastBanner message={toast.msg} visible={toast.show} type={toast.type} />
     </SafeAreaView>

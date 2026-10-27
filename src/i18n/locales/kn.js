@@ -26,7 +26,7 @@ export default {
     "selectLanguage": "ಭಾಷೆ ಆಯ್ಕೆ ಮಾಡಿ"
   },
   "auth": {
-    "welcomeBack": "ಮತ್ತೆ ಸ್ವಾಗತ",
+    "welcomeBack": "ಸ್ವಾಗತ",
     "loginSubtitle": "ನಿಮ್ಮ ಮೊಬೈಲ್ ಸಂಖ್ಯೆಯಿಂದ ಲಾಗಿನ್ ಮಾಡಿ",
     "mobileNumber": "ಮೊಬೈಲ್ ಸಂಖ್ಯೆ",
     "mobilePlaceholder": "10 ಅಂಕಿ ಸಂಖ್ಯೆ",
@@ -45,6 +45,10 @@ export default {
     "createAccount": "ಖಾತೆ ರಚಿಸಿ",
     "termsOfService": "ಸೇವಾ ನಿಯಮಗಳು",
     "privacyPolicy": "ಗೌಪ್ಯತಾ ನೀತಿ",
+    "dateOfBirth": "ಹುಟ್ಟಿದ ದಿನಾಂಕ",
+    "dobPlaceholder": "ದಿನ / ತಿಂಗಳು / ವರ್ಷ",
+    "mustBeAtleast16": "ನಿಮಗೆ ಕನಿಷ್ಠ 16 ವರ್ಷ ವಯಸ್ಸಾಗಿರಬೇಕು",
+    "invalidDob": "ದಯವಿಟ್ಟು ಮಾನ್ಯವಾದ ಹುಟ್ಟಿದ ದಿನಾಂಕವನ್ನು ನಮೂದಿಸಿ",
     "invalidOtp": "ಅಮಾನ್ಯ OTP",
     "failedToSendOtp": "OTP ಕಳುಹಿಸಲು ವಿಫಲವಾಗಿದೆ"
   },
@@ -86,7 +90,7 @@ export default {
     "goodAfternoon": "ಶುಭ ಮಧ್ಯಾಹ್ನ",
     "goodEvening": "ಶುಭ ಸಂಜೆ",
     "goodNight": "ಶುಭ ರಾತ್ರಿ",
-    "welcomeBack": "ಮತ್ತೆ ಸ್ವಾಗತ, {{name}}",
+    "welcomeBack": "ಸ್ವಾಗತ, {{name}}",
     "welcomeGuest": "KwikPik ಗೆ ಸ್ವಾಗತ",
     "heroSubHeader": "ತಾಜಾ ದಿನಸಿ ಮತ್ತು ದೈನಂದಿನ ಅಗತ್ಯಗಳು, ವೇಗದ ಡೆಲಿವರಿ.",
     "freshFromNearby": "ಸಮೀಪದ ಅಂಗಡಿಗಳಿಂದ ತಾಜಾ",
@@ -461,6 +465,9 @@ export default {
     "acceptOrder": "ಆರ್ಡರ್ ಸ್ವೀಕರಿಸಿ",
     "rejectOrder": "ಆರ್ಡರ್ ತಿರಸ್ಕರಿಸಿ",
     "markReady": "ಸಿದ್ಧ ಎಂದು ಗುರುತಿಸಿ",
+    "manageOrder": "ಆರ್ಡರ್ ನಿರ್ವಹಿಸಿ",
+    "manageOrderDeclinedSingle": "ಆರ್ಡರ್ ನಿರ್ವಹಿಸಿ — {{name}} ಡೆಲಿವರಿ ಪಾರ್ಟ್ನರ್ ತಿರಸ್ಕರಿಸಿದ್ದಾರೆ",
+    "manageOrderDeclinedMultiple": "ಆರ್ಡರ್ ನಿರ್ವಹಿಸಿ — {{count}} ಡೆಲಿವರಿ ಪಾರ್ಟ್ನರ್‌ಗಳು ತಿರಸ್ಕರಿಸಿದ್ದಾರೆ",
     "addProduct": "ಉತ್ಪನ್ನ ಸೇರಿಸಿ",
     "editProduct": "ಉತ್ಪನ್ನ ಸಂಪಾದಿಸಿ",
     "productName": "ಉತ್ಪನ್ನದ ಹೆಸರು",
@@ -806,5 +813,16 @@ export default {
     "placeholder": "ಉತ್ಪನ್ನಗಳು, ವರ್ಗಗಳು ಹುಡುಕಿ...",
     "noResults": "ಯಾವ ಫಲಿತಾಂಶಗಳೂ ಕಂಡುಬಂದಿಲ್ಲ",
     "results": "ಫಲಿತಾಂಶಗಳು"
+  },
+  "wishlist": {
+    "title": "मेरी विशलिस्ट",
+    "empty": "आपकी विशलिस्ट खाली है",
+    "emptySub": "उत्पाद ब्राउज़ करें और उन्हें यहां सहेजने के लिए दिल आइकन पर टैप करें",
+    "browse": "उत्पाद ब्राउज़ करें",
+    "added": "विशलिस्ट में जोड़ा गया",
+    "removed": "विशलिस्ट से हटाया गया",
+    "itemCount": "{{count}} आइटम",
+    "addToCart": "कार्ट में जोड़ें",
+    "remove": "हटाएं"
   }
 };

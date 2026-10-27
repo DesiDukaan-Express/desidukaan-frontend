@@ -47,6 +47,8 @@ const TABS = ['Today', 'This Week', 'This Month'];
 function HistoryCard({ delivery, onRate, onViewRating }) {
   const { t } = useTranslation();
   const isDelivered = delivery.status === 'delivered';
+  const isFailed = delivery.status === 'failed';
+  const isDeclined = delivery.status === 'declined' || delivery.action_type === 'declined';
   const earnings = delivery.partner_earnings || 0;
   const pickupName = delivery.order?.vendor?.shop_name || 'Unknown Store';
   const dropCity = delivery.order?.delivery_address?.city
@@ -60,19 +62,28 @@ function HistoryCard({ delivery, onRate, onViewRating }) {
     ? new Date(orderTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
     : '';
 
+  const cardColor = isDelivered ? C.greenLight : isDeclined ? '#FFF7ED' : C.redLight;
+  const iconColor = isDelivered ? C.greenText : isDeclined ? '#C2410C' : C.redText;
+  const iconChar = isDelivered ? '↓' : isDeclined ? '—' : '✕';
+  const statusLabel = isDelivered
+    ? t('delivery.delivered', 'Delivered')
+    : isDeclined
+      ? t('delivery.declined', 'Declined')
+      : t('delivery.failed', 'Failed');
+
   return (
     <View style={s.card}>
       <View style={s.cardLeft}>
-        <View style={[s.cardIcon, { backgroundColor: isDelivered ? C.greenLight : C.redLight }]}>
-          <Text style={[s.cardIconText, { color: isDelivered ? C.greenText : C.redText }]}>
-            {isDelivered ? '↓' : '✕'}
+        <View style={[s.cardIcon, { backgroundColor: cardColor }]}>
+          <Text style={[s.cardIconText, { color: iconColor }]}>
+            {iconChar}
           </Text>
         </View>
       </View>
       <View style={{ flex: 1 }}>
         <View style={s.cardRow}>
           <Text style={s.cardOrderId} numberOfLines={1}>
-            {delivery.order?.order_number || `#${delivery.id}`}
+            {delivery.order?.order_number || `#${delivery.order_id || delivery.id}`}
           </Text>
           <Text style={[s.cardEarnings, { color: isDelivered ? C.greenDark : C.gray400 }]}>
             {isDelivered ? `+₹${Math.round(earnings)}` : '—'}
@@ -104,7 +115,9 @@ function HistoryCard({ delivery, onRate, onViewRating }) {
                 activeOpacity={0.7}
               >
                 {delivery.has_rated_customer ? (() => {
-                  const ratingVal = delivery.partner_rating || (delivery.order?.reviews?.[0]?.partner_review_rating);
+                  const custRating = delivery.partner_rating || (delivery.order?.reviews?.[0]?.partner_review_rating);
+                  const storeRating = delivery.partner_store_rating || (delivery.order?.reviews?.[0]?.partner_to_vendor_rating);
+                  const ratingVal = custRating || storeRating;
                   const num = ratingVal ? parseInt(ratingVal, 10) || 5 : 5;
                   const starsText = "★".repeat(Math.max(1, Math.min(5, num)));
                   return (
@@ -141,10 +154,12 @@ export default function HistoryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Partner review customer state
+  // Partner review state
   const [partnerReviewOrder, setPartnerReviewOrder] = useState(null);
   const [partnerReviewRating, setPartnerReviewRating] = useState(0);
   const [partnerReviewComment, setPartnerReviewComment] = useState("");
+  const [partnerStoreRating, setPartnerStoreRating] = useState(0);
+  const [partnerStoreComment, setPartnerStoreComment] = useState("");
   const [partnerReviewLoading, setPartnerReviewLoading] = useState(false);
 
   // Partner view rating state & handler
@@ -155,9 +170,13 @@ export default function HistoryScreen() {
   const handleOpenViewPartnerRating = async (delivery) => {
     setViewPartnerRatingOrder(delivery);
     setViewPartnerRatingLoading(true);
-    const initialRating = delivery.partner_rating || (delivery.order?.reviews?.[0]?.partner_review_rating) || 5;
-    const initialComment = delivery.partner_review_comment || (delivery.order?.reviews?.[0]?.partner_review_comment) || (delivery.order?.reviews?.[0]?.comment) || "";
-    setFetchedPartnerRating({ rating: initialRating, comment: initialComment });
+    const initialRating = delivery.partner_rating || delivery.order?.reviews?.[0]?.partner_review_rating || null;
+    const initialComment = delivery.partner_review_comment || delivery.order?.reviews?.[0]?.partner_review_comment || delivery.order?.reviews?.[0]?.comment || "";
+    
+    const initialStoreRating = delivery.partner_store_rating || delivery.order?.reviews?.[0]?.partner_to_vendor_rating || null;
+    const initialStoreComment = delivery.order?.reviews?.[0]?.partner_to_vendor_comment || "";
+    
+    setFetchedPartnerRating({ rating: initialRating, comment: initialComment, storeRating: initialStoreRating, storeComment: initialStoreComment });
 
     const orderId = delivery.order?.id || delivery.order_id || delivery.id;
     try {
@@ -169,7 +188,9 @@ export default function HistoryScreen() {
       if (o) {
         setFetchedPartnerRating({
           rating: o.partner_rating ?? o.reviews?.[0]?.partner_review_rating ?? initialRating,
-          comment: o.partner_review_comment ?? o.reviews?.[0]?.partner_review_comment ?? o.reviews?.[0]?.comment ?? initialComment,
+          comment: o.partner_review_comment ?? o.reviews?.[0]?.partner_review_comment ?? initialComment,
+          storeRating: o.reviews?.[0]?.partner_to_vendor_rating ?? initialStoreRating,
+          storeComment: o.reviews?.[0]?.partner_to_vendor_comment ?? initialStoreComment,
         });
       }
     } catch (e) {
@@ -180,8 +201,8 @@ export default function HistoryScreen() {
   };
 
   const submitPartnerReview = async () => {
-    if (partnerReviewRating === 0) {
-      Alert.alert("Please select a rating");
+    if (partnerReviewRating === 0 && partnerStoreRating === 0) {
+      Alert.alert("Please provide at least one rating");
       return;
     }
     setPartnerReviewLoading(true);
@@ -196,20 +217,21 @@ export default function HistoryScreen() {
         body: JSON.stringify({
           partner_review_rating: partnerReviewRating,
           partner_review_comment: partnerReviewComment,
+          partner_to_vendor_rating: partnerStoreRating,
+          partner_to_vendor_comment: partnerStoreComment,
         }),
       });
       const data = await res.json();
       if (data.success) {
-        const submittedRating = partnerReviewRating;
-        const submittedComment = partnerReviewComment;
         setAllDeliveries((prev) =>
           prev.map((d) =>
             (d.id === partnerReviewOrder.id || d.order?.id === orderId)
               ? {
                   ...d,
                   has_rated_customer: true,
-                  partner_rating: submittedRating,
-                  partner_review_comment: submittedComment,
+                  partner_rating: partnerReviewRating > 0 ? partnerReviewRating : d.partner_rating,
+                  partner_store_rating: partnerStoreRating > 0 ? partnerStoreRating : d.partner_store_rating,
+                  partner_review_comment: partnerReviewComment || d.partner_review_comment,
                 }
               : d
           )
@@ -217,6 +239,8 @@ export default function HistoryScreen() {
         setPartnerReviewOrder(null);
         setPartnerReviewRating(0);
         setPartnerReviewComment("");
+        setPartnerStoreRating(0);
+        setPartnerStoreComment("");
         fetchData();
         Alert.alert("Thank you!", "Your rating has been submitted.");
       }
@@ -268,6 +292,7 @@ export default function HistoryScreen() {
   const filtered      = filterDeliveries();
   const deliveredCount = filtered.filter(d => d.status === 'delivered').length;
   const failedCount    = filtered.filter(d => d.status === 'failed').length;
+  const declinedCount  = filtered.filter(d => d.status === 'declined' || d.action_type === 'declined').length;
   const totalEarnings  = filtered.reduce((sum, d) =>
     sum + (d.status === 'delivered' ? (d.partner_earnings || 0) : 0), 0);
 
@@ -308,6 +333,11 @@ export default function HistoryScreen() {
           <View style={s.heroStat}>
             <Text style={[s.heroStatValue, { color: '#FCA5A5' }]}>{failedCount}</Text>
             <Text style={s.heroStatLabel}>{t('delivery.failed', 'Failed')}</Text>
+          </View>
+          <View style={s.heroStatDivider} />
+          <View style={s.heroStat}>
+            <Text style={[s.heroStatValue, { color: '#FDBA74' }]}>{declinedCount}</Text>
+            <Text style={s.heroStatLabel}>{t('delivery.declined', 'Declined')}</Text>
           </View>
           <View style={s.heroStatDivider} />
           <View style={s.heroStat}>
@@ -418,6 +448,7 @@ export default function HistoryScreen() {
               borderTopRightRadius: 24,
               padding: 24,
               paddingBottom: 40,
+              maxHeight: '90%',
             }}
             onPress={() => {}}
           >
@@ -431,68 +462,134 @@ export default function HistoryScreen() {
                 marginBottom: 20,
               }}
             />
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "900",
-                fontFamily: "PlusJakartaSans_800ExtraBold",
-                color: C.gray900,
-                marginBottom: 4,
-              }}
-            >
-              Rate Customer
-            </Text>
-            <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, marginBottom: 20 }}>
-              {partnerReviewOrder?.order?.customer?.name || partnerReviewOrder?.order?.order_number || "Customer"}
-            </Text>
-
-            {/* Star picker */}
-            <View
-              style={{
-                flexDirection: "row",
-                gap: 10,
-                marginBottom: 20,
-                justifyContent: "center",
-              }}
-            >
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity
-                  key={star}
-                  onPress={() => setPartnerReviewRating(star)}
+            
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 16 }}>
+              {/* ── Rate Customer ── */}
+              <View style={{ marginBottom: 24, backgroundColor: C.gray100, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: C.gray200 }}>
+                <Text
+                  style={{
+                    fontSize: 18,
+                    fontWeight: "900",
+                    fontFamily: "PlusJakartaSans_800ExtraBold",
+                    color: C.gray900,
+                    marginBottom: 4,
+                  }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 36,
-                      opacity: star <= partnerReviewRating ? 1 : 0.25,
-                    }}
-                  >
-                    ⭐
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                  Rate Customer
+                </Text>
+                <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, marginBottom: 16 }}>
+                  {partnerReviewOrder?.order?.customer?.name || partnerReviewOrder?.order?.order_number || "Customer"}
+                </Text>
 
-            {/* Comment input */}
-            <TextInput
-              style={{
-                backgroundColor: C.gray100,
-                borderRadius: 12,
-                padding: 14,
-                fontSize: 14,
-                fontFamily: "PlusJakartaSans_500Medium",
-                color: C.gray900,
-                minHeight: 80,
-                textAlignVertical: "top",
-                marginBottom: 20,
-                borderWidth: 1,
-                borderColor: C.gray200,
-              }}
-              placeholder="Tell us about the delivery experience (optional)"
-              placeholderTextColor={C.gray400}
-              multiline
-              value={partnerReviewComment}
-              onChangeText={setPartnerReviewComment}
-            />
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 10,
+                    marginBottom: 16,
+                    justifyContent: "center",
+                  }}
+                >
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => setPartnerReviewRating(star)}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 36,
+                          opacity: star <= partnerReviewRating ? 1 : 0.25,
+                        }}
+                      >
+                        ⭐
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <TextInput
+                  style={{
+                    backgroundColor: C.white,
+                    borderRadius: 12,
+                    padding: 14,
+                    fontSize: 14,
+                    fontFamily: "PlusJakartaSans_500Medium",
+                    color: C.gray900,
+                    minHeight: 80,
+                    textAlignVertical: "top",
+                    borderWidth: 1,
+                    borderColor: C.gray200,
+                  }}
+                  placeholder="Tell us about the customer (optional)"
+                  placeholderTextColor={C.gray400}
+                  multiline
+                  value={partnerReviewComment}
+                  onChangeText={setPartnerReviewComment}
+                />
+              </View>
+
+              {/* ── Rate Store ── */}
+              <View style={{ marginBottom: 24, backgroundColor: C.gray100, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: C.gray200 }}>
+                <Text
+                  style={{
+                    fontSize: 18,
+                    fontWeight: "900",
+                    fontFamily: "PlusJakartaSans_800ExtraBold",
+                    color: C.gray900,
+                    marginBottom: 4,
+                  }}
+                >
+                  Rate Store
+                </Text>
+                <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, marginBottom: 16 }}>
+                  {partnerReviewOrder?.order?.vendor?.shop_name || "Store"}
+                </Text>
+
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 10,
+                    marginBottom: 16,
+                    justifyContent: "center",
+                  }}
+                >
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => setPartnerStoreRating(star)}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 36,
+                          opacity: star <= partnerStoreRating ? 1 : 0.25,
+                        }}
+                      >
+                        ⭐
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <TextInput
+                  style={{
+                    backgroundColor: C.white,
+                    borderRadius: 12,
+                    padding: 14,
+                    fontSize: 14,
+                    fontFamily: "PlusJakartaSans_500Medium",
+                    color: C.gray900,
+                    minHeight: 80,
+                    textAlignVertical: "top",
+                    borderWidth: 1,
+                    borderColor: C.gray200,
+                  }}
+                  placeholder="Tell us about the pickup experience (optional)"
+                  placeholderTextColor={C.gray400}
+                  multiline
+                  value={partnerStoreComment}
+                  onChangeText={setPartnerStoreComment}
+                />
+              </View>
+            </ScrollView>
 
             <TouchableOpacity
               onPress={submitPartnerReview}
@@ -541,10 +638,10 @@ export default function HistoryScreen() {
               borderTopRightRadius: 24,
               padding: 24,
               paddingBottom: 40,
+              maxHeight: '90%',
             }}
             onPress={() => {}}
           >
-            {/* Handle */}
             <View
               style={{
                 width: 40,
@@ -556,98 +653,180 @@ export default function HistoryScreen() {
               }}
             />
 
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <Text style={{ fontSize: 18, fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray900 }}>
-                Your Submitted Rating
+                Your Submitted Ratings
               </Text>
               <TouchableOpacity onPress={() => setViewPartnerRatingOrder(null)} style={{ padding: 4 }}>
                 <Feather name="x" size={20} color={C.gray500} />
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, marginBottom: 20 }}>
-              {viewPartnerRatingOrder?.order?.customer?.name || viewPartnerRatingOrder?.order?.order_number || "Customer"} · {viewPartnerRatingOrder?.delivered_at ? new Date(viewPartnerRatingOrder.delivered_at).toLocaleDateString() : ""}
-            </Text>
-
-            {/* Rating Stars & Details Card */}
             {viewPartnerRatingLoading ? (
               <View style={{ padding: 30, alignItems: "center", justifyContent: "center" }}>
                 <ActivityIndicator color={C.greenDark} size="small" />
-                <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, marginTop: 10 }}>Fetching your review…</Text>
+                <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, marginTop: 10 }}>Fetching your reviews…</Text>
               </View>
-            ) : (() => {
-              const ratingVal = fetchedPartnerRating?.rating || viewPartnerRatingOrder?.partner_rating || 5;
-              const num = typeof ratingVal === "number" ? ratingVal : parseInt(ratingVal, 10) || 5;
-              const comment = fetchedPartnerRating?.comment || viewPartnerRatingOrder?.partner_review_comment || "";
+            ) : (
+              <>
+                <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 16 }}>
+                  {(() => {
+                    const custRating = fetchedPartnerRating?.rating;
+                    const custNum = custRating != null ? (typeof custRating === "number" ? custRating : parseInt(custRating, 10)) : null;
+                    const custComment = fetchedPartnerRating?.comment || "";
 
-              return (
-                <View
+                    const storeRating = fetchedPartnerRating?.storeRating;
+                    const storeNum = storeRating != null ? (typeof storeRating === "number" ? storeRating : parseInt(storeRating, 10)) : null;
+                    const storeComment = fetchedPartnerRating?.storeComment || "";
+
+                    return (
+                      <>
+                        {/* Customer Rating Section */}
+                        <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_700Bold", color: C.gray900, marginBottom: 8, marginLeft: 4 }}>
+                          Customer: {viewPartnerRatingOrder?.order?.customer?.name || viewPartnerRatingOrder?.order?.order_number || "Customer"}
+                        </Text>
+                        <View
+                          style={{
+                            backgroundColor: C.gray100,
+                            borderWidth: 1,
+                            borderColor: C.gray200,
+                            borderRadius: 16,
+                            padding: 20,
+                            alignItems: "center",
+                            marginBottom: 24,
+                          }}
+                        >
+                          {custNum !== null ? (
+                            <>
+                              <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Text
+                                    key={`c-${star}`}
+                                    style={{
+                                      fontSize: 36,
+                                      opacity: star <= custNum ? 1 : 0.25,
+                                    }}
+                                  >
+                                    ⭐
+                                  </Text>
+                                ))}
+                              </View>
+
+                              <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray900, marginBottom: custComment ? 12 : 0 }}>
+                                {custNum} out of 5 stars
+                              </Text>
+
+                              {custComment ? (
+                                <View
+                                  style={{
+                                    backgroundColor: C.white,
+                                    borderRadius: 12,
+                                    padding: 14,
+                                    borderWidth: 1,
+                                    borderColor: C.gray200,
+                                    width: "100%",
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 14, fontFamily: "PlusJakartaSans_500Medium", color: C.gray800, lineHeight: 20 }}>
+                                    {custComment}
+                                  </Text>
+                                </View>
+                              ) : (
+                                <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, fontStyle: "italic", marginTop: 4 }}>
+                                  No written comment provided
+                                </Text>
+                              )}
+                            </>
+                          ) : (
+                            <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray400 }}>
+                              Not Rated
+                            </Text>
+                          )}
+                        </View>
+
+                        {/* Store Rating Section */}
+                        <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_700Bold", color: C.gray900, marginBottom: 8, marginLeft: 4 }}>
+                          Store: {viewPartnerRatingOrder?.order?.vendor?.shop_name || "Store"}
+                        </Text>
+                        <View
+                          style={{
+                            backgroundColor: C.gray100,
+                            borderWidth: 1,
+                            borderColor: C.gray200,
+                            borderRadius: 16,
+                            padding: 20,
+                            alignItems: "center",
+                            marginBottom: 20,
+                          }}
+                        >
+                          {storeNum !== null ? (
+                            <>
+                              <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Text
+                                    key={`s-${star}`}
+                                    style={{
+                                      fontSize: 36,
+                                      opacity: star <= storeNum ? 1 : 0.25,
+                                    }}
+                                  >
+                                    ⭐
+                                  </Text>
+                                ))}
+                              </View>
+
+                              <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray900, marginBottom: storeComment ? 12 : 0 }}>
+                                {storeNum} out of 5 stars
+                              </Text>
+
+                              {storeComment ? (
+                                <View
+                                  style={{
+                                    backgroundColor: C.white,
+                                    borderRadius: 12,
+                                    padding: 14,
+                                    borderWidth: 1,
+                                    borderColor: C.gray200,
+                                    width: "100%",
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 14, fontFamily: "PlusJakartaSans_500Medium", color: C.gray800, lineHeight: 20 }}>
+                                    {storeComment}
+                                  </Text>
+                                </View>
+                              ) : (
+                                <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, fontStyle: "italic", marginTop: 4 }}>
+                                  No written comment provided
+                                </Text>
+                              )}
+                            </>
+                          ) : (
+                            <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray400 }}>
+                              Not Rated
+                            </Text>
+                          )}
+                        </View>
+                      </>
+                    );
+                  })()}
+                </ScrollView>
+
+                <TouchableOpacity
+                  onPress={() => setViewPartnerRatingOrder(null)}
                   style={{
-                    backgroundColor: C.gray100,
-                    borderWidth: 1,
-                    borderColor: C.gray200,
-                    borderRadius: 16,
-                    padding: 20,
+                    backgroundColor: C.greenDark,
+                    borderRadius: 14,
+                    padding: 16,
                     alignItems: "center",
-                    marginBottom: 20,
+                    justifyContent: "center",
                   }}
                 >
-                  <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Text
-                        key={star}
-                        style={{
-                          fontSize: 36,
-                          opacity: star <= num ? 1 : 0.25,
-                        }}
-                      >
-                        ⭐
-                      </Text>
-                    ))}
-                  </View>
-
-                  <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray900, marginBottom: comment ? 12 : 0 }}>
-                    {num} out of 5 stars
+                  <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.white }}>
+                    Close
                   </Text>
-
-                  {comment ? (
-                    <View
-                      style={{
-                        backgroundColor: C.white,
-                        borderRadius: 12,
-                        padding: 14,
-                        borderWidth: 1,
-                        borderColor: C.gray200,
-                        width: "100%",
-                      }}
-                    >
-                      <Text style={{ fontSize: 14, fontFamily: "PlusJakartaSans_500Medium", color: C.gray800, lineHeight: 20 }}>
-                        {comment}
-                      </Text>
-                    </View>
-                  ) : (
-                    <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, fontStyle: "italic", marginTop: 4 }}>
-                      No written comment provided
-                    </Text>
-                  )}
-                </View>
-              );
-            })()}
-
-            <TouchableOpacity
-              onPress={() => setViewPartnerRatingOrder(null)}
-              style={{
-                backgroundColor: C.greenDark,
-                borderRadius: 14,
-                padding: 16,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.white }}>
-                Close
-              </Text>
-            </TouchableOpacity>
+                </TouchableOpacity>
+              </>
+            )}
           </Pressable>
         </Pressable>
       </Modal>

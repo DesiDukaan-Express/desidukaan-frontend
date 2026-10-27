@@ -16,6 +16,8 @@ import {
   TextInput,
   ActivityIndicator,
   Animated,
+  LayoutAnimation,
+  UIManager,
   Platform,
   StatusBar,
   Keyboard,
@@ -28,6 +30,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import useAuthStore from "../../store/authStore";
 import useCartStore from "../../store/cartStore";
 import useAddressStore from "../../store/addressStore";
+import WishlistHeart from "../../components/WishlistHeart";
 import { calculateProportionalPrice } from "../../utils/weightUtils";
 import { isStoreCurrentlyOpen } from "../../utils/storeStatus";
 import { useTheme } from "../../theme/ThemeContext";
@@ -36,64 +39,51 @@ import {
   searchAPI,
   vendorsAPI,
   productsAPI,
+  productsExtendedAPI,
 } from "../../services/api";
+import { io } from "socket.io-client";
 
 import { dkBg, dkText, themeCfg } from "../../theme/darkTones";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+const SOCKET_URL =
+  process.env.EXPO_PUBLIC_SOCKET_URL ||
+  (BASE_URL.includes("/api") ? BASE_URL.split("/api")[0] : "http://localhost:3000");
 const NEARBY_RADIUS = 10; // km — stores within this are shown normally
 const FAR_RADIUS = 10; // km — backend validation max is 10
 const MAX_HISTORY = 8;
 
 // ─── Palette (matches app design system) ─────────────────────────────────────
-// ─── Theme palettes (light / dark) ─────────────────────────────────────────
-const LIGHT_COLORS = {
-  orange: "#F97316",
-  orangeDark: "#EA580C",
-  green: "#16A34A",
-  greenDark: "#15803D",
-  greenLight: "#F0FDF4",
-  greenMid: "#DCFCE7",
-  greenBorder: "#BBF7D0",
+
+const C = {
+  orange: "#F59E0B",
+  orangeDark: "#B45309",
+  orangeLight: "#FFFBEB",
+
+  green: "#22864B",
+  greenDark: "#14532D",
+  greenLight: "#F0F9F2",
+  greenBorder: "#D5E9D9",
+  greenMid: "#DDF2E2",
+
+  blue: "#22864B",
+  blueLight: "#EAF6ED",
+  purple: "#39865A",
+  purpleLight: "#EDF7EF",
+
   white: "#FFFFFF",
-  bg: "#F8FAFC",
-  gray100: "#F3F4F6",
-  gray200: "#E5E7EB",
-  gray300: "#D1D5DB",
-  gray400: "#9CA3AF",
-  gray500: "#6B7280",
-  gray600: "#4B5563",
-  gray700: "#374151",
-  gray900: "#111827",
-  amber: "#D97706",
-  amberLight: "#FEF3C7",
-  red: "#DC2626",
-  redLight: "#FEF2F2",
-  surface: "#FFFFFF",
-};
-const DARK_COLORS = {
-  orange: "#DB7A33",
-  orangeDark: "#C9691F",
-  green: "#2F9E68",
-  greenDark: "#3AA673",
-  greenLight: "#172720",
-  greenMid: "#1C3027",
-  greenBorder: "#2B4A3B",
-  white: "#FFFFFF",
-  bg: "#0F1216",
-  gray100: "#1F2329",
-  gray200: "#2E343C",
-  gray300: "#3D434C",
-  gray400: "#6A727E",
-  gray500: "#8A929E",
-  gray600: "#A4ABB6",
-  gray700: "#BFC5CE",
-  gray900: "#ECEFF3",
-  amber: "#D9A03F",
-  amberLight: "#292319",
-  red: "#DE5C5C",
-  redLight: "#2C1E20",
-  surface: "#171A1F",
+  bg: "#F5F8F5",
+  gray100: "#F1F5F1",
+  gray200: "#E1E9E2",
+  gray300: "#C8D4CA",
+  gray400: "#93A197",
+  gray500: "#68766B",
+  gray600: "#4C5B4F",
+  gray700: "#344638",
+  gray900: "#172D1E",
+
+  red: "#DC4545",
+  redLight: "#FFF1F0",
 };
 
 
@@ -458,6 +448,7 @@ function ProductCard({ product, vendorId, vendorName, onSeeStores }) {
           style={pc.img}
           resizeMode="cover"
         />
+        <WishlistHeart productId={product.id} size={18} style={{ position: "absolute", top: 5, right: 5 }} />
         {disc && !outOfStock && (
           <View style={pc.discBadge}>
             <Text style={pc.discText}>{disc}% off</Text>
@@ -656,10 +647,10 @@ function VendorCard({ vendor, distKm: dist, matchCount, onPress, tooFar }) {
   const isOpen = isStoreCurrentlyOpen(vendor);
   return (
     <TouchableOpacity
-      style={[vc.card, tooFar && vc.cardFar]}
-      onPress={onPress}
-      activeOpacity={0.88}
-      disabled={tooFar}
+      style={[vc.card, (tooFar || !isOpen) && vc.cardFar]}
+      onPress={isOpen && !tooFar ? onPress : undefined}
+      activeOpacity={isOpen && !tooFar ? 0.88 : 1}
+      disabled={tooFar || !isOpen}
     >
       <View style={vc.imgWrap}>
         <Image
@@ -989,6 +980,13 @@ export default function SearchScreen() {
   const addressStore = useAddressStore();
   const { isDesktop, isTablet } = useBreakpoint();
 
+  // ── Enable LayoutAnimation on Android ────────────────────────────────────
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      UIManager.setLayoutAnimationEnabledExperimental?.(true);
+    }
+  }, []);
+
   // ── State ─────────────────────────────────────────────────────────────────
   const [query, setQuery] = useState("");
   const [committed, setCommitted] = useState(false);
@@ -1045,14 +1043,19 @@ export default function SearchScreen() {
   const [focusedItems, setFocusedItems] = useState([]);
   const [focusLoading, setFocusLoading] = useState(false);
 
+  const vendorListAnim = useRef(new Animated.Value(0)).current;
+
   const handleStoreCatSelect = async (cat) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     const newCat = selectedStoreCategory === cat ? null : cat;
     setSelectedStoreCategory(newCat);
     if (!newCat || !userCoords) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setStoreCatVendors([]);
       return;
     }
     setLoadingStoreCat(true);
+    vendorListAnim.setValue(0);
     try {
       const res = await vendorsAPI.getNearby(
         userCoords.lat,
@@ -1060,8 +1063,15 @@ export default function SearchScreen() {
         10,
         newCat,
       );
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setStoreCatVendors(res.data || []);
+      Animated.timing(vendorListAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     } catch {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setStoreCatVendors([]);
     } finally {
       setLoadingStoreCat(false);
@@ -1089,7 +1099,9 @@ export default function SearchScreen() {
         });
       }
     });
-    return cats.sort((a, b) => a.label.localeCompare(b.label));
+    // Preserve the backend order (display_order ASC from /products/categories),
+    // NOT alphabetical — admin drag-and-drop reorder must show up here too.
+    return cats;
   }, [apiCategories]);
 
   const inputRef = useRef(null);
@@ -1131,11 +1143,51 @@ export default function SearchScreen() {
         : null;
 
   useEffect(() => {
-    productsAPI
+    productsExtendedAPI
       .getTrending(userCoords?.lat, userCoords?.lng, 10)
       .then((res) => setTrendingItems(res.data || []))
       .catch(() => setTrendingItems([]));
   }, [userCoords?.lat, userCoords?.lng]);
+
+  // ── Real-time product availability updates ──────────────────────────────────
+  // The backend broadcasts product:updated to ALL connected clients globally.
+  // Patch search results so toggled products reflect availability instantly.
+  useEffect(() => {
+    if (!token) return;
+    let socket;
+    try {
+      socket = io(SOCKET_URL, {
+        auth: { token },
+        transports: ["websocket"],
+      });
+      socket.on("product:updated", ({ productId, available, vendorId }) => {
+        if (productId == null) return;
+        const pid = Number(productId);
+        const vid = vendorId != null ? Number(vendorId) : null;
+        setProducts((prev) =>
+          prev.map((p) => {
+            if (Number(p.id) !== pid) return p;
+            // If this product is from the vendor that changed, update its stock flag
+            if (vid != null && Number(p.vendor_id) === vid) {
+              return { ...p, is_active: available, _inStock: !!available };
+            }
+            // Otherwise just update is_active (affects add-to-cart guard)
+            return { ...p, is_active: available };
+          }),
+        );
+      });
+      socket.on("product:deleted", ({ productId }) => {
+        if (productId == null) return;
+        const pid = Number(productId);
+        setProducts((prev) => prev.filter((p) => Number(p.id) !== pid));
+      });
+    } catch {
+      // socket best-effort
+    }
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [token]);
 
   // ── Handle category filter from HomeScreen ────────────────────────────────
   useEffect(() => {
@@ -1149,6 +1201,18 @@ export default function SearchScreen() {
       setTimeout(() => inputRef.current?.focus(), 300);
     }
   }, []);
+
+  // ── Sync focusField when route params change (e.g. re-navigated from Home) ─
+  useEffect(() => {
+    const newField = route.params?.focusField || null;
+    if (newField !== focusField) {
+      setFocusField(newField);
+      if (newField) {
+        setCommitted(false);
+        setQuery("");
+      }
+    }
+  }, [route.params?.focusField]);
 
   // ── Load focused data when navigated from HomeScreen section buttons ────
   useEffect(() => {
@@ -1168,7 +1232,7 @@ export default function SearchScreen() {
           const list = Array.isArray(d) ? d : d.data || d.vendors || [];
           setAllNearbyVendors(list);
         } else if (focusField === "items") {
-          const res = await productsAPI.getTrending(userCoords.lat, userCoords.lng, 50);
+          const res = await productsExtendedAPI.getTrending(userCoords.lat, userCoords.lng, 50);
           setFocusedItems(res.data || []);
         }
         // "categories" uses dbCategories which are already loaded
@@ -1323,7 +1387,7 @@ export default function SearchScreen() {
 
         const inventoryResults = await Promise.all(
           vendorList.map((v) =>
-            fetch(`${BASE_URL}/inventory/vendor/${v.id}`, { headers })
+            fetch(`${BASE_URL}/inventory/vendor/${v.id}?active_only=true`, { headers })
               .then((r) => r.json())
               .then((d) => {
                 const inv = Array.isArray(d) ? d : d.data || d.inventory || [];
@@ -2016,7 +2080,7 @@ export default function SearchScreen() {
                     </View>
                   )}
                 {!loadingStoreCat && storeCatVendors.length > 0 && (
-                  <View style={{ marginTop: 12 }}>
+                  <Animated.View style={{ marginTop: 12, opacity: vendorListAnim }}>
                     {storeCatVendors.map((v) => (
                       <VendorCard
                         key={v.id}
@@ -2036,7 +2100,7 @@ export default function SearchScreen() {
                         tooFar={false}
                       />
                     ))}
-                  </View>
+                  </Animated.View>
                 )}
               </View>
             )}
@@ -2044,7 +2108,19 @@ export default function SearchScreen() {
             {/* ── FOCUSED BROWSE VIEW (from HomeScreen section buttons) ── */}
             {isFocused && (
               <View style={{ paddingHorizontal: px, paddingTop: 16 }}>
-                {focusLoading && (
+                {!userCoords ? (
+                  <View style={s.emptyWrap}>
+                    <Feather name="map-pin" size={32} color={C.gray300} />
+                    <Text style={s.emptyTitle}>Location needed</Text>
+                    <Text style={s.emptySub}>
+                      {focusField === "items"
+                        ? "Please set your location to browse items."
+                        : focusField === "stores"
+                          ? "Please set your location to browse stores."
+                          : "Please set your location to browse categories."}
+                    </Text>
+                  </View>
+                ) : focusLoading ? (
                   <View style={s.loadingWrap}>
                     <ActivityIndicator size="large" color={C.green} />
                     <Text style={s.loadingText}>
@@ -2055,10 +2131,10 @@ export default function SearchScreen() {
                           : "Loading items…"}
                     </Text>
                   </View>
-                )}
+                ) : null}
 
                 {/* ── Focused: ALL STORES ── */}
-                {!focusLoading && focusField === "stores" && (
+                {!focusLoading && userCoords && focusField === "stores" && (
                   <>
                     <SectionHeading title="All Nearby Stores" />
                     {allNearbyVendors.length === 0 ? (
@@ -2097,7 +2173,7 @@ export default function SearchScreen() {
                 )}
 
                 {/* ── Focused: ALL CATEGORIES ── */}
-                {!focusLoading && focusField === "categories" && (
+                {!focusLoading && userCoords && focusField === "categories" && (
                   <>
                     <SectionHeading title="All Categories" />
                     {dbCategories.length === 0 ? (
@@ -2142,7 +2218,7 @@ export default function SearchScreen() {
                 )}
 
                 {/* ── Focused: ALL ITEMS ── */}
-                {!focusLoading && focusField === "items" && (
+                {!focusLoading && userCoords && focusField === "items" && (
                   <>
                     <SectionHeading title="Popular Items" />
                     {focusedItems.length === 0 ? (

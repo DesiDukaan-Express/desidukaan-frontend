@@ -76,7 +76,8 @@ export default function SignupScreen({ navigation, route }) {
 
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState(prefillPhone);
-  const [age, setAge] = useState("");
+  const [dob, setDob] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [gender, setGender] = useState("");
   const [focusedField, setFocusedField] = useState(null);
   const [agreed, setAgreed] = useState(false);
@@ -164,9 +165,23 @@ export default function SignupScreen({ navigation, route }) {
     setError("");
   };
 
-  const ageNum = parseInt(age, 10);
-  const isAgeValid = age.length > 0 && !isNaN(ageNum) && ageNum >= 16 && ageNum <= 100;
-  const isAgeError = age.length > 0 && !isAgeValid;
+  // DOB validation & age calculation helper
+  const calcAgeFromDob = (dobStr) => {
+    if (!dobStr) return null;
+    const parts = dobStr.split("-");
+    if (parts.length !== 3) return null;
+    const birth = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    const m = now.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+    return age;
+  };
+
+  const calculatedAge = calcAgeFromDob(dob);
+  const isAgeTooYoung = !!dob && calculatedAge !== null && calculatedAge < 16;
+  const isDobValid = !!dob && calculatedAge !== null && calculatedAge >= 16 && calculatedAge <= 120;
+  const isDobError = !!dob && !isDobValid;
   const isMobileReady = isValidIndianMobile(mobile);
   const mobileStartError =
     mobile.length > 0 && !["6", "7", "8", "9"].includes(mobile[0])
@@ -175,13 +190,11 @@ export default function SignupScreen({ navigation, route }) {
   const isFormValid =
     name.trim().length >= 2 &&
     isMobileReady &&
-    isAgeValid &&
+    isDobValid &&
     gender !== "" &&
     agreed;
 
   // Step 1: register → account saved to DB
-  // Testing:    tokens returned directly, navigate to app (no OTP step)
-  // Production: OTP sent, navigate to OTP step
   const handleSignup = async () => {
     if (!isFormValid) return;
     setLoading(true); setError("");
@@ -191,7 +204,8 @@ export default function SignupScreen({ navigation, route }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(), phone: mobile,
-          age: ageNum,
+          age: calculatedAge,
+          dob,
           gender,
         }),
       });
@@ -216,7 +230,7 @@ export default function SignupScreen({ navigation, route }) {
 
   // Step 2: verify OTP → issue JWT → navigate to dashboard
   const handleVerifyOtp = async () => {
-    if (otp.length !== 6) return;
+    if (otp.length !== 6 || loading) return;
     setLoading(true); setError("");
     try {
       const res = await fetch(`${BASE_URL}/auth/verify`, {
@@ -301,19 +315,29 @@ export default function SignupScreen({ navigation, route }) {
                         onPress={() => navigation.navigate("Login")}
                       >
                         <Feather name="arrow-left" size={15} color={C.gray700} />
-                        <Text style={s.backBtnText}>Back to Login</Text>
+                        <Text style={s.backBtnText}>
+  {t("common.back", { defaultValue: "Back" })} to Login
+</Text>
                       </TouchableOpacity>
 
-                      <Text style={[s.formHeading, { fontSize: headingSize }]}>Create account</Text>
-                      <Text style={s.formSubheading}>Tell us a little about yourself</Text>
+                      <Text style={[s.formHeading, { fontSize: headingSize }]}>
+  {t("auth.createAccount", { defaultValue: "Create Account" })}
+</Text>
+<Text style={s.formSubheading}>
+  {t("auth.signupSubtitle", {
+    defaultValue: "Tell us a little about yourself",
+  })}
+</Text>
 
 
                       {/* Full Name */}
-                      <Field label="Full Name">
+                     <Field label={t("profile.fullName", { defaultValue: t("auth.fullName", { defaultValue: "Full Name" }) })}>
                         <View style={[s.inputBox, focusedField === "name" && s.inputBoxFocused]}>
                           <IIcon name="user" focused={focusedField === "name"} />
                           <TextInput
-                            placeholder="Your full name"
+                            placeholder={t("auth.fullNamePlaceholder", {
+  defaultValue: "Your full name",
+})}
                             placeholderTextColor={C.gray400}
                             autoCapitalize="words"
                             value={name}
@@ -329,7 +353,7 @@ export default function SignupScreen({ navigation, route }) {
 
                       {/* Mobile */}
                       <Field
-                        label="Mobile Number"
+                        label={t("auth.mobileNumber", { defaultValue: "Mobile Number" })}
                         error={mobileStartError}
                         hint={
                           !mobileStartError && mobile.length > 0 && !isMobileReady && !prefillPhone
@@ -349,7 +373,9 @@ export default function SignupScreen({ navigation, route }) {
                             <View style={s.prefixDivider} />
                           </View>
                           <TextInput
-                            placeholder="10-digit number"
+                            placeholder={t("auth.mobilePlaceholder", {
+  defaultValue: "10-digit number",
+})}
                             placeholderTextColor={C.gray400}
                             keyboardType="phone-pad"
                             maxLength={10}
@@ -367,34 +393,68 @@ export default function SignupScreen({ navigation, route }) {
 
 
 
-                      {/* Age + Gender */}
+                      {/* DOB + Gender */}
                       <View style={tablet ? s.rowFields : s.colFields}>
-                        <View style={[s.fieldGroup, tablet ? { flex: 1, marginRight: 10 } : { width: "100%" }]}>
-                          <Text style={s.fieldLabel}>Age</Text>
+                        <View style={[s.fieldGroup, tablet ? { flex: 1.2, marginRight: 10 } : { width: "100%" }]}>
+                          <Text style={s.fieldLabel}>{t("auth.dateOfBirth", { defaultValue: "Date of Birth" })}</Text>
                           <View style={[
                             s.inputBox,
-                            focusedField === "age" && s.inputBoxFocused,
-                            isAgeError && s.inputBoxError,
+                            { paddingLeft: 14 },
+                            focusedField === "dob" && s.inputBoxFocused,
+                            isDobError && s.inputBoxError,
                           ]}>
-                            <IIcon name="calendar" focused={focusedField === "age"} error={isAgeError} />
-                            <TextInput
-                              placeholder="e.g. 24"
-                              placeholderTextColor={C.gray400}
-                              keyboardType="number-pad"
-                              maxLength={3}
-                              value={age}
-                              onChangeText={(t) => { setAge(t.replace(/\D/g, "")); setError(""); }}
-                              onFocus={() => setFocusedField("age")}
-                              onBlur={() => setFocusedField(null)}
-                              style={s.fieldInput}
-                              underlineColorAndroid="transparent"
-                            />
+                            {Platform.OS === "web" ? (
+                              <input
+                                type="date"
+                                value={dob}
+                                onChange={(e) => { setDob(e.target.value); setError(""); }}
+                                onFocus={() => setFocusedField("dob")}
+                                onClick={(e) => {
+                                  try {
+                                    if (e.target.showPicker) e.target.showPicker();
+                                  } catch (err) {}
+                                }}
+                                onBlur={() => setFocusedField(null)}
+                                style={{
+                                  flex: 1,
+                                  border: "none",
+                                  outline: "none",
+                                  background: "transparent",
+                                  fontSize: "14px",
+                                  fontWeight: "500",
+                                  color: dob ? C.gray900 : C.gray400,
+                                  fontFamily: "inherit",
+                                  padding: "13px 12px 13px 0",
+                                  cursor: "pointer",
+                                }}
+                              />
+                            ) : (
+                              <TextInput
+                                placeholder={t("auth.dobPlaceholder", { defaultValue: "YYYY-MM-DD" })}
+                                placeholderTextColor={C.gray400}
+                                value={dob}
+                                onChangeText={(t) => { setDob(t); setError(""); }}
+                                onFocus={() => setFocusedField("dob")}
+                                onBlur={() => setFocusedField(null)}
+                                style={s.fieldInput}
+                                underlineColorAndroid="transparent"
+                              />
+                            )}
+                            {isDobValid && <Check />}
                           </View>
-                          {isAgeError && <Text style={s.fieldError}>Must be 16–100</Text>}
+                          {isDobError && (
+                            <Text style={s.fieldError}>
+                              {isAgeTooYoung
+                                ? t("auth.mustBeAtleast16", { defaultValue: "Must be at least 16 years old" })
+                                : t("auth.invalidDob", { defaultValue: "Please enter a valid date of birth" })}
+                            </Text>
+                          )}
                         </View>
 
                         <View style={[s.fieldGroup, tablet ? { flex: 2 } : { width: "100%" }]}>
-                          <Text style={s.fieldLabel}>Gender</Text>
+                          <Text style={s.fieldLabel}>
+  {t("auth.gender", { defaultValue: "Gender" })}
+</Text>
                           <View style={s.genderRow}>
                             {GENDERS.map((g) => {
                               const active = gender === g.key;
@@ -407,7 +467,7 @@ export default function SignupScreen({ navigation, route }) {
                                 >
                                   <FontAwesome name={g.icon} size={15} color={active ? C.white : C.greenBright} />
                                   <Text style={[s.genderText, active && s.genderTextActive]}>
-                                    {g.label}
+                                    {t(`auth.genderOptions.${g.key}`, { defaultValue: g.label })}
                                   </Text>
                                 </TouchableOpacity>
                               );
@@ -417,28 +477,48 @@ export default function SignupScreen({ navigation, route }) {
                       </View>
 
                       {/* Terms */}
-                      <TouchableOpacity
-                        style={s.checkboxRow}
-                        onPress={() => setAgreed(!agreed)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={[s.checkbox, agreed && s.checkboxActive]}>
-                          {agreed && <Feather name="check" size={10} color={C.white} />}
-                        </View>
-                        <Text style={s.checkboxText}>
-                          I agree to the <Text style={s.checkboxLink}>Terms of Service</Text>
-                          {" "}and <Text style={s.checkboxLink}>Privacy Policy</Text>
-                        </Text>
-                      </TouchableOpacity>
+                      <View style={s.checkboxRow}>
+                        <TouchableOpacity
+                          onPress={() => setAgreed(!agreed)}
+                          activeOpacity={0.7}
+                          style={{ marginTop: 2 }}
+                        >
+                          <View style={[s.checkbox, agreed && s.checkboxActive]}>
+                            {agreed && <Feather name="check" size={10} color={C.white} />}
+                          </View>
+                        </TouchableOpacity>
+<Text style={s.checkboxText}>
+  {t("auth.agreeTo", { defaultValue: "I agree to the" })}{" "}
+  <Text
+    style={s.checkboxLink}
+    onPress={() => navigation.navigate("Terms")}
+  >
+    {t("auth.termsOfService", { defaultValue: "Terms of Service" })}
+  </Text>
+  {" "}{t("auth.and", { defaultValue: "and" })}{" "}
+  <Text
+    style={s.checkboxLink}
+    onPress={() => navigation.navigate("Privacy")}
+  >
+    {t("auth.privacyPolicy", { defaultValue: "Privacy Policy" })}
+  </Text>
+</Text>
+                      </View>
 
                       {error ? <ErrorBox msg={error} /> : null}
 
-                      <GreenCta
-                        label={IS_TESTING ? "Create Account" : "Create Account & Send OTP"}
-                        loading={loading}
-                        disabled={!isFormValid}
-                        onPress={handleSignup}
-                      />
+<GreenCta
+  label={
+    IS_TESTING
+      ? t("auth.createAccount", { defaultValue: "Create Account" })
+      : t("auth.createAccountSendOtp", {
+          defaultValue: "Create Account & Send OTP",
+        })
+  }
+  loading={loading}
+  disabled={!isFormValid}
+  onPress={handleSignup}
+/>
 
                       <View style={s.orRow}>
                         <View style={s.orLine} />
@@ -484,6 +564,7 @@ export default function SignupScreen({ navigation, route }) {
                             placeholder="6-digit code"
                             placeholderTextColor={C.gray400}
                             keyboardType="number-pad"
+                            returnKeyType="done"
                             maxLength={6}
                             value={otp}
                             onChangeText={(t) => { setOtp(t.replace(/\D/g, "")); setError(""); }}
@@ -533,8 +614,8 @@ export default function SignupScreen({ navigation, route }) {
               <View style={s.footer}>
                 <Text style={s.legalText}>
                   By creating an account you agree to our{" "}
-                  <Text style={s.legalLink}>Terms</Text> &{" "}
-                  <Text style={s.legalLink}>Privacy</Text>
+                  <Text style={s.legalLink} onPress={() => navigation.navigate("Terms")}>Terms</Text> &{" "}
+                  <Text style={s.legalLink} onPress={() => navigation.navigate("Privacy")}>Privacy</Text>
                 </Text>
               </View>
 

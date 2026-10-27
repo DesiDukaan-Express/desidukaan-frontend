@@ -29,6 +29,7 @@ if (
 import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTranslation } from "react-i18next";
+import { useNavigation } from "@react-navigation/native";
 import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
 import * as ImagePicker from "expo-image-picker";
@@ -66,6 +67,7 @@ const C = {
 
 export default function VendorProfileScreen({ navigation }) {
   const { token, logout, setActiveRole } = useAuthStore();
+  const navigation = useNavigation();
   const { t } = useTranslation();
   const { width: SCREEN_W } = useWindowDimensions();
 
@@ -134,6 +136,12 @@ export default function VendorProfileScreen({ navigation }) {
           setVendor((prev) => (prev ? { ...prev, ...changed } : prev));
         }
       });
+      // Broadcast open/close event — covers this screen's own toggle too, so
+      // the status reflects immediately even if the API response is delayed.
+      socket.on("shop:statusChanged", (data) => {
+        if (!data || Number(data.vendorId) !== Number(vendor.id)) return;
+        if (data.is_open !== undefined) setStoreOpen(data.is_open);
+      });
     } catch {
       // socket best-effort — polling/refresh still covers sync
     }
@@ -189,7 +197,11 @@ export default function VendorProfileScreen({ navigation }) {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (!data.success) setStoreOpen(prev);
+      if (data.success) {
+        // Reconcile with server truth (covers races between optimistic
+        // update, the socket broadcast and the actual DB value).
+        if (data.data?.is_open !== undefined) setStoreOpen(data.data.is_open);
+      } else setStoreOpen(prev);
     } catch {
       setStoreOpen(prev);
     }
@@ -557,7 +569,7 @@ export default function VendorProfileScreen({ navigation }) {
                 isWide={isWide}
                 t={t}
               />
-              <AccountSettingsCard rs={rs} isWide={isWide} />
+              <AccountSettingsCard rs={rs} isWide={isWide} navigation={navigation} />
               <LogoutButton onPress={() => setLogoutModal(true)} rs={rs} isWide={isWide} t={t} />
             </View>
           </View>
@@ -586,7 +598,7 @@ export default function VendorProfileScreen({ navigation }) {
               isWide={isWide}
               t={t}
             />
-            <AccountSettingsCard rs={rs} isWide={isWide} />
+            <AccountSettingsCard rs={rs} isWide={isWide} navigation={navigation} />
             <SwitchProfileButton onPress={async () => { await setActiveRole(null); }} rs={rs} isWide={isWide} t={t} />
             <LogoutButton onPress={() => setLogoutModal(true)} rs={rs} isWide={isWide} t={t} />
           </View>
@@ -1325,7 +1337,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
   );
 }
 
-function AccountSettingsCard({ rs, isWide }) {
+function AccountSettingsCard({ rs, isWide, navigation }) {
   const { t } = useTranslation();
   const [showLanguage, setShowLanguage] = React.useState(false);
 
@@ -1333,7 +1345,7 @@ function AccountSettingsCard({ rs, isWide }) {
     { icon: "account-balance", label: t('profile.bankAccount'), sub: t('profile.bankAccountSub'), color: C.primaryDark, bg: C.primaryDim },
     { icon: "payments", label: t('profile.payoutSettings'), sub: t('profile.payoutSettingsSub'), color: C.tealIcon, bg: C.tealDim },
     { icon: "verified-user", label: t('profile.kycVerification'), sub: t('profile.kycVerificationSub'), color: C.tealIcon, bg: C.tealDim, right: t('profile.verified') },
-    { icon: "help-outline", label: t('profile.helpSupport'), sub: t('profile.helpSupportSub'), color: C.primaryDark, bg: C.primaryDim },
+    { icon: "help-outline", label: t('profile.helpSupport'), sub: t('profile.helpSupportSub'), color: C.primaryDark, bg: C.primaryDim, onPress: () => navigation.getParent()?.getParent()?.navigate("Support") },
     { icon: "privacy-tip", label: t('auth.privacyPolicy'), sub: t('profile.privacySub'), color: C.textSub, bg: C.bg },
     { icon: "description", label: t('profile.termsConditions'), sub: t('profile.termsSub'), color: C.textSub, bg: C.bg },
   ];
@@ -1370,6 +1382,7 @@ function AccountSettingsCard({ rs, isWide }) {
         <TouchableOpacity
           key={item.label}
           style={[styles.settingRow, i === items.length - 1 && { borderBottomWidth: 0 }]}
+          onPress={item.onPress}
           activeOpacity={0.6}
         >
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>

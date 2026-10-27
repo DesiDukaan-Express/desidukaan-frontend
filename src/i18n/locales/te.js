@@ -26,7 +26,7 @@ export default {
     "selectLanguage": "భాష ఎంచుకోండి"
   },
   "auth": {
-    "welcomeBack": "తిరిగి స్వాగతం",
+    "welcomeBack": "స్వాగతం",
     "loginSubtitle": "మీ మొబైల్ నంబర్‌తో లాగిన్ అవ్వండి",
     "mobileNumber": "మొబైల్ నంబర్",
     "mobilePlaceholder": "10 అంకెల నంబర్",
@@ -45,6 +45,10 @@ export default {
     "createAccount": "ఖాతా తయారు చేయండి",
     "termsOfService": "సేవా నిబంధనలు",
     "privacyPolicy": "గోప్యతా విధానం",
+    "dateOfBirth": "పుట్టిన తేదీ",
+    "dobPlaceholder": "రోజు / నెల / సంవత్సరం",
+    "mustBeAtleast16": "మీకు కనీసం 16 సంవత్సరాలు ఉండాలి",
+    "invalidDob": "దయచేసి చెల్లుబాటు అయ్యే పుట్టిన తేదీని నమోదు చేయండి",
     "invalidOtp": "చెల్లని OTP",
     "failedToSendOtp": "OTP పంపించడంలో విఫలమైంది"
   },
@@ -461,6 +465,9 @@ export default {
     "acceptOrder": "అంగీకరించండి",
     "rejectOrder": "తిరస్కరించండి",
     "markReady": "సిద్ధంగా గుర్తించండి",
+    "manageOrder": "ఆర్డర్ నిర్వహించండి",
+    "manageOrderDeclinedSingle": "ఆర్డర్ నిర్వహించండి — {{name}} డెలివరీ పార్ట్నర్ తిరస్కరించారు",
+    "manageOrderDeclinedMultiple": "ఆర్డర్ నిర్వహించండి — {{count}} డెలివరీ పార్ట్నర్లు తిరస్కరించారు",
     "addProduct": "ఉత్పత్తి జోడించండి",
     "editProduct": "సవరించండి",
     "productName": "ఉత్పత్తి పేరు",
@@ -806,5 +813,16 @@ export default {
     "placeholder": "వెతకండి...",
     "noResults": "ఫలితాలు లేవు",
     "results": "ఫలితాలు"
+  },
+  "wishlist": {
+    "title": "मेरी विशलिस्ट",
+    "empty": "आपकी विशलिस्ट खाली है",
+    "emptySub": "उत्पाद ब्राउज़ करें और उन्हें यहां सहेजने के लिए दिल आइकन पर टैप करें",
+    "browse": "उत्पाद ब्राउज़ करें",
+    "added": "विशलिस्ट में जोड़ा गया",
+    "removed": "विशलिस्ट से हटाया गया",
+    "itemCount": "{{count}} आइटम",
+    "addToCart": "कार्ट में जोड़ें",
+    "remove": "हटाएं"
   }
 };

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-  Platform, StatusBar, Animated, ScrollView, Modal, Pressable, Linking
+  Platform, StatusBar, Animated, ScrollView, Modal, Pressable, Linking,
+  TextInput,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -444,6 +445,15 @@ export default function TrackOrderScreen() {
       refreshOrder();
     });
 
+    // Listen for delivery partner declining — order will be reassigned
+    socket.on("delivery:declined", (data) => {
+      console.log("[WS] delivery:declined received", data);
+      const oid = data.order_id || data.orderId;
+      if (oid && String(oid) !== String(orderId)) return;
+
+      refreshOrder();
+    });
+
     // Poll partner location every 15s as fallback
     const locationPoll = setInterval(async () => {
       try {
@@ -508,7 +518,7 @@ export default function TrackOrderScreen() {
     }
     if (s === "picked_up") return { icon: "truck", label: "OUT FOR DELIVERY", title: etaStr };
     if (s === "delivered") return { icon: "check-circle", label: "DELIVERED", title: "Order delivered successfully!" };
-    if (["cancelled", "rejected"].includes(s)) return { icon: "x-circle", label: s.toUpperCase(), title: `This order was ${s}` };
+    if (["cancelled", "rejected"].includes(s)) return { icon: "x-circle", label: s.toUpperCase(), title: order?.cancellation_reason ? `Decline Note: ${order.cancellation_reason}` : `This order was ${s}` };
     return { icon: "clock", label: s.replace("_", " ").toUpperCase(), title: "Processing…" };
   };
   const statusH = getStatusHeader();
@@ -600,55 +610,59 @@ export default function TrackOrderScreen() {
           </View>
         </View>
 
-        {/* ETA CARD — moved above map, uses live driver coords when available */}
-        {isActive && (
-          <View style={s.etaCard}>
-            <View style={s.etaCardHeader}>
-              <View style={s.etaIconBg}>
-                <Feather name="clock" size={20} color={C.orange} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.etaTitleText}>Estimated Arrival</Text>
-                <Text style={s.etaValueText}>
-                  {(() => {
-                    if (liveEtaMins < 60) return `~${liveEtaMins} mins`;
-                    const h = Math.floor(liveEtaMins / 60);
-                    const m = liveEtaMins % 60;
-                    return m > 0 ? `~${h}h ${m}m` : `~${h}h`;
-                  })()}
-                </Text>
-              </View>
-              {currentDistKm != null && (
-                <View style={s.etaBadge}>
-                  <Feather name="map-pin" size={12} color={C.gray500} />
-                  <Text style={s.etaBadgeText}>
-                    {partnerPos?.lat ? `${currentDistKm.toFixed(1)} km away` : `${currentDistKm} km away`}
-                  </Text>
+        {/* MAP — only show when delivery partner is assigned */}
+        {partner && (
+          <>
+            {/* ETA CARD — live driver distance/ETA, only when partner assigned */}
+            {isActive && (
+              <View style={s.etaCard}>
+                <View style={s.etaCardHeader}>
+                  <View style={s.etaIconBg}>
+                    <Feather name="clock" size={20} color={C.orange} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.etaTitleText}>Estimated Arrival</Text>
+                    <Text style={s.etaValueText}>
+                      {(() => {
+                        if (liveEtaMins < 60) return `~${liveEtaMins} mins`;
+                        const h = Math.floor(liveEtaMins / 60);
+                        const m = liveEtaMins % 60;
+                        return m > 0 ? `~${h}h ${m}m` : `~${h}h`;
+                      })()}
+                    </Text>
+                  </View>
+                  {currentDistKm != null && (
+                    <View style={s.etaBadge}>
+                      <Feather name="map-pin" size={12} color={C.gray500} />
+                      <Text style={s.etaBadgeText}>
+                        {partnerPos?.lat ? `${currentDistKm.toFixed(1)} km away` : `${currentDistKm} km away`}
+                      </Text>
+                    </View>
+                  )}
                 </View>
+              </View>
+            )}
+
+            <CustomerMapView
+              partnerPos={partnerPos}
+              destLat={destLat}
+              destLng={destLng}
+            />
+
+            {/* Connection status */}
+            <View style={s.connectionRow}>
+              <View style={[s.connDot, { backgroundColor: connected ? C.green : C.gray300 }]} />
+              <Text style={s.connText}>
+                {connected ? t('orders.connectedLive', 'Connected — live updates active') : t('orders.reconnecting', 'Reconnecting…')}
+              </Text>
+              {lastUpdate && (
+                <Text style={s.lastUpdate}>
+                  {t('orders.lastUpdate', 'Last')}: {lastUpdate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </Text>
               )}
             </View>
-          </View>
+          </>
         )}
-
-        {/* MAP — uses CustomerMapView for smooth Leaflet markers on web, react-native-maps on native */}
-        <CustomerMapView
-          partnerPos={partnerPos}
-          destLat={destLat}
-          destLng={destLng}
-        />
-
-        {/* Connection status */}
-        <View style={s.connectionRow}>
-          <View style={[s.connDot, { backgroundColor: connected ? C.green : C.gray300 }]} />
-          <Text style={s.connText}>
-            {connected ? t('orders.connectedLive', 'Connected — live updates active') : t('orders.reconnecting', 'Reconnecting…')}
-          </Text>
-          {lastUpdate && (
-            <Text style={s.lastUpdate}>
-              {t('orders.lastUpdate', 'Last')}: {lastUpdate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-            </Text>
-          )}
-        </View>
 
         {/* ETA CARD */}
         {isActive && (
@@ -876,7 +890,160 @@ function OrderDetailModal({ visible, order, onClose }) {
     fontWeight: "600",
     color: C.gray600,
   },
-}), [C]);
+
+  // ── Tip & Feedback Card ──
+  tipFeedbackCard: {
+    backgroundColor: C.white,
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    marginBottom: 16,
+  },
+  tfHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 14,
+  },
+  tfIconBg: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#FFF7ED",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tfTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: C.gray900,
+  },
+  tfSubtitle: {
+    fontSize: 12,
+    color: C.gray500,
+    marginTop: 1,
+  },
+  tipPresets: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
+  },
+  tipPresetBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: C.greenLight,
+    borderWidth: 2,
+    borderColor: C.greenBorder,
+  },
+  tipPresetBtnActive: {
+    backgroundColor: C.green,
+    borderColor: C.green,
+  },
+  tipPresetRupee: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.green,
+  },
+  tipPresetRupeeActive: {
+    color: "rgba(255,255,255,0.8)",
+  },
+  tipPresetAmount: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: C.greenDark,
+    marginTop: 2,
+  },
+  tipPresetAmountActive: {
+    color: C.white,
+  },
+  tipCustomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  tipCustomInputWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 48,
+  },
+  tipCurrency: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: C.gray500,
+    marginRight: 4,
+  },
+  tipCustomInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+    color: C.gray900,
+    paddingVertical: 0,
+  },
+  tipSendBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: C.green,
+    paddingHorizontal: 20,
+    height: 48,
+    borderRadius: 14,
+  },
+  tipSendBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: C.white,
+  },
+  tipSuccess: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 20,
+  },
+  tipSuccessText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: C.green,
+  },
+  tfDivider: {
+    height: 1,
+    backgroundColor: C.gray100,
+    marginVertical: 16,
+  },
+  feedbackRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  feedbackInput: {
+    flex: 1,
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    fontSize: 14,
+    color: C.gray900,
+  },
+  feedbackSendBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: C.green,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});
+
+// ─── Order Detail Modal Helper ───────────────────────────────────────────────
+function OrderDetailModal({ visible, order, onClose }) {
   const { t } = useTranslation();
   if (!order) return null;
   const items = order.items || order.order_items || [];
