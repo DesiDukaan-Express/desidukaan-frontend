@@ -9,7 +9,7 @@ import './src/i18n';
 import useAuthStore from './src/store/authStore';
 import useAddressStore from './src/store/addressStore';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-
+import { ThemeProvider } from './src/theme/ThemeContext';
 export default function App() {
   const hydrate = useAuthStore((state) => state.hydrate);
   const fetchLocation = useAddressStore((state) => state.fetchLocation);
@@ -34,11 +34,13 @@ export default function App() {
     );
   }
 
-  return (
+return (
+  <ThemeProvider>
     <SafeAreaProvider style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         <Navigation />
       </SafeAreaView>
     </SafeAreaProvider>
-  );
+  </ThemeProvider>
+);
 }

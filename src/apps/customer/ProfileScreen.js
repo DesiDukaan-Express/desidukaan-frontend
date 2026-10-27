@@ -17,6 +17,7 @@ import useAddressStore from "../../store/addressStore";
 import AddressMapView from "../../components/AddressMapView";
 import LanguageSwitcher from "../../components/common/LanguageSwitcher";
 import { uploadAPI } from "../../services/api";
+import { useTheme } from "../../theme/ThemeContext";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -504,6 +505,8 @@ export default function ProfileScreen() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const addresses = addressStore?.addresses || [];
+  const { mode, setMode } = useTheme();
+const [showThemes, setShowThemes] = useState(false);
 
   // Load notification preference
   useEffect(() => {
@@ -930,6 +933,14 @@ export default function ProfileScreen() {
             }
           />
 
+<MenuItem
+  icon="moon"
+  label="Themes"
+  sub={`Current theme: ${mode === "default" ? "System" : mode === "dark" ? "Dark" : "Light"}`}
+  tint="orange"
+  onPress={() => setShowThemes(true)}
+/>
+
           <SectionLabel title={t("profile.accountSection")} />
           <MenuItem
             icon="shuffle"
@@ -991,6 +1002,103 @@ export default function ProfileScreen() {
           >
             <View style={{ width: 44, height: 5, backgroundColor: C.gray200, borderRadius: 3, alignSelf: "center", marginBottom: 16 }} />
             <LanguageSwitcher inline onClose={() => setShowLanguage(false)} />
+          </Pressable>
+        </Pressable>
+      </Modal>
+            {/* Theme picker */}
+      <Modal
+        visible={showThemes}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowThemes(false)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.55)",
+            justifyContent: "flex-end",
+          }}
+          onPress={() => setShowThemes(false)}
+        >
+          <Pressable
+            onPress={() => {}}
+            style={{
+              backgroundColor: C.white,
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              padding: 24,
+              paddingBottom: 40,
+            }}
+          >
+            <View
+              style={{
+                width: 44,
+                height: 5,
+                backgroundColor: C.gray200,
+                borderRadius: 3,
+                alignSelf: "center",
+                marginBottom: 20,
+              }}
+            />
+
+            <Text style={{ fontSize: 21, fontWeight: "900", color: C.gray900, marginBottom: 6 }}>
+              Choose Theme
+            </Text>
+            <Text style={{ fontSize: 13, color: C.gray500, marginBottom: 16 }}>
+              Select how DesiDukaan looks.
+            </Text>
+
+            {[
+              { label: "Light Mode", value: "light", icon: "sun" },
+              { label: "Dark Mode", value: "dark", icon: "moon" },
+              { label: "System Default", value: "default", icon: "smartphone" },
+            ].map((option) => (
+              <TouchableOpacity
+                key={option.value}
+                onPress={async () => {
+                  try {
+                    await setMode(option.value);
+                    setShowThemes(false);
+                  } catch (error) {
+                    console.error("Failed to change theme:", error);
+                  }
+                }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 16,
+                  paddingHorizontal: 14,
+                  marginBottom: 10,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: mode === option.value ? C.green : C.gray200,
+                  backgroundColor: mode === option.value ? C.greenLight : C.white,
+                }}
+              >
+                <Feather name={option.icon} size={20} color={C.green} />
+
+                <Text style={{ flex: 1, marginLeft: 14, fontSize: 15, fontWeight: "700", color: C.gray900 }}>
+                  {option.label}
+                </Text>
+
+                {mode === option.value && (
+                  <Feather name="check-circle" size={20} color={C.green} />
+                )}
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity
+              onPress={() => setShowThemes(false)}
+              style={{
+                paddingVertical: 13,
+                alignItems: "center",
+                marginTop: 4,
+              }}
+            >
+              <Text style={{ fontSize: 14, fontWeight: "700", color: C.gray500 }}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
           </Pressable>
         </Pressable>
       </Modal>
