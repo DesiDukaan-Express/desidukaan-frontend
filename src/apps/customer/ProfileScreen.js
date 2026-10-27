@@ -5,7 +5,7 @@ import {
   SafeAreaView, Modal, Pressable, ActivityIndicator,
   Switch, useWindowDimensions, Image,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -83,9 +83,40 @@ function Avatar({ name, imageUrl, size = 64 }) {
         justifyContent: "center",
       }}
     >
-      <Text style={{ color: C.white, fontWeight: "900", fontSize: size * 0.36, letterSpacing: 1 }}>
+      <Text style={{ color: C.white, fontWeight: "800", fontSize: size * 0.42 }}>
         {initials}
       </Text>
+      {editable && (
+        <View style={{
+          position: "absolute", bottom: -2, left: -2,
+          width: size * 0.32, height: size * 0.32, borderRadius: size * 0.16,
+          backgroundColor: isDark ? C.gray100 : C.overlayDark, borderWidth: 2, borderColor: isDark ? C.gray200 : C.white,
+          alignItems: "center", justifyContent: "center",
+        }}>
+          <Feather name="camera" size={size * 0.15} color={C.white} />
+        </View>
+      )}
+    </View>
+  );
+  if (!editable) return content;
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel="Change profile photo"
+    >
+      {content}
+    </TouchableOpacity>
+  );
+}
+
+// ─── Hero background: gradient in light, flat in dark ─────────────────────
+function HeroBg({ isDark, colors, style, children }) {
+  if (isDark) return <View style={style}>{children}</View>;
+  return (
+    <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={style}>
+      {children}
     </LinearGradient>
   );
 }
@@ -134,20 +165,6 @@ function EditModal({ visible, label, value, keyboardType = "default", onSave, on
     </Modal>
   );
 }
-const em = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
-  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
-  title: { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 16 },
-  inputBox: { backgroundColor: C.gray100, borderRadius: 14, borderWidth: 1.5, borderColor: C.greenBorder, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 20 },
-  input: { fontSize: 16, color: C.gray900, fontWeight: "600", ...Platform.select({ web: { outlineStyle: "none" } }) },
-  btns: { flexDirection: "row", gap: 12 },
-  cancel: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: C.gray100, alignItems: "center" },
-  cancelText: { fontSize: 15, fontWeight: "700", color: C.gray600 },
-  save: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: C.green, alignItems: "center" },
-  saveOff: { backgroundColor: C.greenMid },
-  saveText: { fontSize: 15, fontWeight: "800", color: C.white },
-});
 
 // ─── Info row ─────────────────────────────────────────────────────────────
 function InfoRow({ label, value, onEdit, editable = true, icon = "user", last = false }) {
@@ -230,9 +247,9 @@ function MenuItem({ icon, label, onPress, danger, right, sub, tint }) {
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[mi.label, danger && mi.labelDanger]}>{label}</Text>
-        {sub ? <Text style={mi.sub}>{sub}</Text> : null}
+        {sub ? <Text style={[mi.sub, danger && mi.subDanger]}>{sub}</Text> : null}
       </View>
-      {right !== undefined ? right : <Feather name="chevron-right" size={15} color={danger ? "#FECACA" : C.gray300} />}
+      {right !== undefined ? right : <Feather name="chevron-right" size={15} color={danger ? "#FCA5A5" : C.gray300} />}
     </TouchableOpacity>
   );
 }
@@ -259,6 +276,28 @@ const mi = StyleSheet.create({
 
 // ─── Address detail modal ─────────────────────────────────────────────────
 function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
+  const C = useProfileColors();
+  const isDark = C.mode === "dark";
+  const adm = useMemo(() => StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, borderTopWidth: isDark ? 1 : 0, borderColor: C.line },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
+  title: { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 20 },
+  mapWrapper: { height: 160, borderRadius: 16, overflow: "hidden", marginBottom: 16, borderWidth: 1, borderColor: C.gray200 },
+  addrBox: { flexDirection: "row", alignItems: "flex-start", gap: 14, backgroundColor: C.gray100, borderRadius: 14, padding: 16, marginBottom: 12 },
+  addrIcon: { width: 38, height: 38, borderRadius: 11, backgroundColor: C.gray200, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  addrIconActive: { backgroundColor: C.primary },
+  addrText: { flex: 1, fontSize: 15, color: C.gray900, fontWeight: "500", lineHeight: 22 },
+  coordRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, marginBottom: 12 },
+  coordText: { fontSize: 12, color: C.gray400, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
+  activeBadge: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.greenLight, borderRadius: 12, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: C.greenBorder },
+  activeBadgeText: { fontSize: 13, color: C.green, fontWeight: "600", flex: 1 },
+  actions: { gap: 10 },
+  selectBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.primary, paddingVertical: 15, borderRadius: 14 },
+  selectBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
+  removeBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.redLight, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: C.mode === "dark" ? "#4A3336" : "#FECACA" },
+  removeBtnText: { fontSize: 14, fontWeight: "700", color: C.red },
+}), [C, isDark]);
   const [region, setRegion] = useState({
     latitude: 28.6139,
     longitude: 77.209,
@@ -269,10 +308,8 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
   useEffect(() => {
     if (addr?.lat && addr?.lng) {
       setRegion({
-        latitude: parseFloat(addr.lat),
-        longitude: parseFloat(addr.lng),
-        latitudeDelta: 0.005,
-        longitudeDelta: 0.005,
+        latitude: parseFloat(addr.lat), longitude: parseFloat(addr.lng),
+        latitudeDelta: 0.005, longitudeDelta: 0.005,
       });
     }
   }, [addr]);
@@ -345,9 +382,14 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
     </Modal>
   );
 }
-const adm = StyleSheet.create({
+
+// ─── Manage Addresses modal ────────────────────────────────────────────────
+function AddressesModal({ visible, addresses, selectedId, onSelect, onClose, onOpenDetail }) {
+  const C = useProfileColors();
+  const isDark = C.mode === "dark";
+  const am = useMemo(() => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  sheet: { backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, borderTopWidth: isDark ? 1 : 0, borderColor: C.line },
   handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
   title: { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 20 },
   mapWrapper: { height: 160, borderRadius: 16, overflow: "hidden", marginBottom: 16, borderWidth: 1, borderColor: C.gray200 },
@@ -383,11 +425,25 @@ const sec = StyleSheet.create({
 
 // ─── Logout modal ─────────────────────────────────────────────────────────
 function LogoutModal({ visible, onConfirm, onCancel }) {
+  const C = useProfileColors();
+  const isDark = C.mode === "dark";
+  const lm = useMemo(() => StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },
+  card: { backgroundColor: C.surface, borderRadius: 24, padding: 28, width: "82%", alignItems: "center", gap: 8 },
+  iconWrap: { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  title: { fontSize: 20, fontWeight: "900", color: C.gray900 },
+  sub: { fontSize: 13, color: C.gray400, textAlign: "center", lineHeight: 20 },
+  btns: { flexDirection: "row", gap: 10, marginTop: 12, width: "100%" },
+  cancel: { flex: 1, paddingVertical: 14, borderRadius: 13, backgroundColor: C.gray100, alignItems: "center" },
+  cancelText: { fontSize: 15, fontWeight: "700", color: C.gray700 },
+  confirm: { flex: 1, paddingVertical: 14, borderRadius: 13, backgroundColor: C.red, alignItems: "center" },
+  confirmText: { fontSize: 15, fontWeight: "700", color: C.white },
+}), [C, isDark]);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable style={lm.backdrop} onPress={onCancel}>
         <Pressable style={lm.card} onPress={() => { }}>
-          <LinearGradient colors={["#FEF2F2", "#FFF"]} style={lm.iconWrap}>
+          <LinearGradient colors={C.mode === "dark" ? [C.redLight, C.surface] : ["#FEF2F2", "#FFF"]} style={lm.iconWrap}>
             <Feather name="log-out" size={26} color={C.red} />
           </LinearGradient>
           <Text style={lm.title}>Log out?</Text>
@@ -420,6 +476,19 @@ const lm = StyleSheet.create({
 
 // ─── Payment modal ────────────────────────────────────────────────────────
 function PaymentModal({ visible, onClose }) {
+  const C = useProfileColors();
+  const isDark = C.mode === "dark";
+  const pm2 = useMemo(() => StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, borderTopWidth: isDark ? 1 : 0, borderColor: C.line },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
+  title: { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 20 },
+  placeholder: { alignItems: "center", paddingVertical: 32, gap: 10, backgroundColor: C.gray100, borderRadius: 16, marginBottom: 20 },
+  placeholderTitle: { fontSize: 16, fontWeight: "800", color: C.gray500 },
+  placeholderSub: { fontSize: 13, color: C.gray400, textAlign: "center", paddingHorizontal: 24 },
+  closeBtn: { backgroundColor: C.gray100, paddingVertical: 14, borderRadius: 14, alignItems: "center" },
+  closeBtnText: { fontSize: 15, fontWeight: "700", color: C.gray600 },
+}), [C, isDark]);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={pm.backdrop} onPress={onClose}>
@@ -486,7 +555,7 @@ export default function ProfileScreen() {
   const navigation = useNavigation();
   const { t } = useTranslation();
   const { user, token, logout, updateUser, setActiveRole } = useAuthStore();
-  const { clearCart } = useCartStore();
+  const cartStore = useCartStore();
   const addressStore = useAddressStore();
 
   const { width: winW } = useWindowDimensions();
@@ -498,6 +567,7 @@ export default function ProfileScreen() {
   const [showLanguage, setShowLanguage] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
   const [showPayments, setShowPayments] = useState(false);
+  const [showAddresses, setShowAddresses] = useState(false);
   const [editField, setEditField] = useState(null);
   const [saving, setSaving] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
@@ -617,7 +687,7 @@ const [showThemes, setShowThemes] = useState(false);
 
   // ── Logout ──────────────────────────────────────────────────────────────
   const handleLogout = () => {
-    clearCart();
+    cartStore.clearCart?.();
     addressStore.clearAddresses?.();
     logout();
     setShowLogout(false);
@@ -872,7 +942,6 @@ const [showThemes, setShowThemes] = useState(false);
                 last
               />
             </View>
-          </View>
 
           {/* Right column — tabs + panel */}
           <View style={[s.rightColumn, isDesktop && { flex: 2 }]}>
@@ -967,6 +1036,14 @@ const [showThemes, setShowThemes] = useState(false);
         onRemove={(a) => { addressStore.removeAddress(a.id, token); setDetailAddr(null); }}
         onClose={() => setDetailAddr(null)}
       />
+      <AddressesModal
+        visible={showAddresses}
+        addresses={addresses}
+        selectedId={addressStore.selectedId}
+        onSelect={(a) => addressStore.setSelectedId(a.id)}
+        onOpenDetail={(a) => { setShowAddresses(false); setDetailAddr(a); }}
+        onClose={() => setShowAddresses(false)}
+      />
       <EditModal
         visible={!!editField}
         label={editField?.label}
@@ -1023,7 +1100,7 @@ const [showThemes, setShowThemes] = useState(false);
           <Pressable
             onPress={() => {}}
             style={{
-              backgroundColor: C.white,
+              backgroundColor: C.surface,
               borderTopLeftRadius: 28,
               borderTopRightRadius: 28,
               padding: 24,
@@ -1099,6 +1176,66 @@ const [showThemes, setShowThemes] = useState(false);
                 Cancel
               </Text>
             </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+      <Modal
+        visible={showTheme}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTheme(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}
+          onPress={() => setShowTheme(false)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: C.surface,
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              padding: 24,
+              paddingBottom: 40,
+            }}
+            onPress={(e) => e.stopPropagation?.()}
+          >
+            <View style={{ width: 44, height: 5, backgroundColor: C.gray200, borderRadius: 3, alignSelf: 'center', marginBottom: 16 }} />
+            <Text style={{ fontSize: 18, fontWeight: '900', color: C.gray900, marginBottom: 4 }}>Theme</Text>
+            <Text style={{ fontSize: 13, color: C.gray400, marginBottom: 18 }}>Choose how DesiDukaan looks on this device.</Text>
+            {[
+              { key: 'light', icon: 'sun', title: 'Light', sub: 'Always use light mode' },
+              { key: 'dark', icon: 'moon', title: 'Dark', sub: 'Always use dark mode' },
+              { key: 'default', icon: 'smartphone', title: 'Default', sub: "Match your device's system setting" },
+            ].map((opt, idx) => {
+              const selected = mode === opt.key;
+              return (
+                <TouchableOpacity
+                  key={opt.key}
+                  onPress={() => { setMode(opt.key); setShowTheme(false); }}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${opt.title} theme${selected ? ', selected' : ''}`}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 14,
+                    paddingVertical: 14,
+                    borderBottomWidth: idx < 2 ? 1 : 0, borderBottomColor: C.gray100,
+                  }}
+                >
+                  <View style={{
+                    width: 40, height: 40, borderRadius: 12,
+                    backgroundColor: selected ? C.greenMid : C.gray100,
+                    alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Feather name={opt.icon} size={18} color={selected ? C.greenDark : C.gray500} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14.5, fontWeight: '700', color: C.gray900 }}>{opt.title}</Text>
+                    <Text style={{ fontSize: 12, color: C.gray400, marginTop: 2 }}>{opt.sub}</Text>
+                  </View>
+                  {selected && <Feather name="check-circle" size={20} color={C.green} />}
+                </TouchableOpacity>
+              );
+            })}
           </Pressable>
         </Pressable>
       </Modal>

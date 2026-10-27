@@ -47,7 +47,8 @@ const SOCKET_URL =
   (BASE_URL.includes("/api") ? BASE_URL.split("/api")[0] : "http://localhost:3000");
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
-const C = {
+// ─── Theme palettes (light / dark) ─────────────────────────────────────────
+const LIGHT_COLORS = {
   orange: "#F97316",
   orangeDark: "#EA580C",
   orangeLight: "#FFF7ED",
@@ -72,7 +73,36 @@ const C = {
   cyanLight: "#ECFEFF",
   red: "#DC2626",
   redLight: "#FEF2F2",
+  surface: "#FFFFFF",
 };
+const DARK_COLORS = {
+  orange: "#DB7A33",
+  orangeDark: "#C9691F",
+  orangeLight: "#2A2019",
+  green: "#2F9E68",
+  greenDark: "#3AA673",
+  greenDeep: "#1B3A2B",
+  greenLight: "#172720",
+  greenMid: "#1C3027",
+  greenBorder: "#2B4A3B",
+  white: "#FFFFFF",
+  bg: "#0F1216",
+  gray100: "#1F2329",
+  gray200: "#2E343C",
+  gray300: "#3D434C",
+  gray400: "#6A727E",
+  gray500: "#8A929E",
+  gray600: "#A4ABB6",
+  gray700: "#BFC5CE",
+  gray800: "#D3D8DF",
+  gray900: "#ECEFF3",
+  cyan: "#4DA8C0",
+  cyanLight: "#172529",
+  red: "#DE5C5C",
+  redLight: "#2C1E20",
+  surface: "#171A1F",
+};
+
 
 // ─── Loose item helper ─────────────────────────────────────────────────────────
 function parseWeightOptions(p) {
@@ -100,6 +130,8 @@ function formatWeight(w) {
 
 // ─── Gradient Text ─────────────────────────────────────────────────────────────
 function GradientText({ text, style }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
   if (Platform.OS === "web") {
     return (
       <Text
@@ -138,6 +170,231 @@ function AddressPicker({
   onDelete,
   initialCoords,
 }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const ap = useMemo(() => StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.50)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: C.surface,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 40,
+  },
+  handle: {
+    width: 48,
+    height: 5,
+    backgroundColor: C.gray200,
+    borderRadius: 3,
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  title: { fontSize: 20, fontWeight: "800", color: C.gray900 },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: C.gray100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyWrap: { alignItems: "center", paddingVertical: 36, gap: 10 },
+  emptyText: { fontSize: 14, color: C.gray400 },
+  // New card-style address row
+  addrCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+    padding: 14,
+    borderRadius: 20,
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    backgroundColor: C.surface,
+  },
+  addrCardActive: {
+    borderColor: C.green,
+    borderWidth: 2,
+    backgroundColor: C.greenLight,
+  },
+  addrIconBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: C.gray100,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    marginTop: 2,
+  },
+  addrIconBadgeActive: { backgroundColor: C.green },
+  addrCardTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  addrLabel: { fontSize: 15, fontWeight: "700", color: C.gray900, textTransform: "capitalize" },
+  addrLabelActive: { color: C.green },
+  radioCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: C.gray300,
+  },
+  checkCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: C.green,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addrText: { fontSize: 13, color: C.gray500, lineHeight: 18 },
+  addrActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 10,
+  },
+  editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: C.gray100,
+  },
+  editBtnText: { fontSize: 12, fontWeight: "600", color: C.gray700 },
+  deleteBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: C.redLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // Add new button (dashed)
+  addNewBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 6,
+    paddingVertical: 16,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: C.green,
+    backgroundColor: C.greenLight,
+  },
+  addNewText: { fontSize: 15, fontWeight: "700", color: C.green },
+  // Form
+  formWrap: { paddingTop: 4 },
+  formLabel: { fontSize: 12, fontWeight: "700", color: C.gray700, marginBottom: 8, letterSpacing: 0.2 },
+  locBtn: { marginBottom: 12 },
+  locErrorText: { fontSize: 12, color: C.red, marginTop: 6, marginBottom: 4, lineHeight: 16 },
+  inputBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    minHeight: 90,
+    paddingVertical: 12,
+    paddingRight: 14,
+  },
+  inputBoxError: { borderColor: "#FCA5A5", backgroundColor: dkBg("#FEF2F2", isDark) },
+  input: {
+    flex: 1,
+    fontSize: 14,
+    color: C.gray900,
+    paddingLeft: 10,
+    paddingTop: 0,
+    fontWeight: "500",
+    textAlignVertical: "top",
+    lineHeight: 22,
+    ...Platform.select({ web: { outlineStyle: "none" } }),
+  },
+  inputErr: { fontSize: 12, color: C.red, marginTop: 6, fontWeight: "500" },
+  // Autocomplete suggestions dropdown
+  suggestWrap: {
+    marginTop: 8,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    backgroundColor: C.surface,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 6,
+    overflow: "hidden",
+  },
+  suggestHeader: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    backgroundColor: C.gray100,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray200,
+  },
+  suggestHeaderText: { fontSize: 11, fontWeight: "700", color: C.gray500, letterSpacing: 0.3 },
+  suggestRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+  },
+  suggestRowActive: { backgroundColor: C.greenLight },
+  suggestRowLast: { borderBottomWidth: 0 },
+  suggestIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: C.greenLight,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    marginTop: 1,
+  },
+  suggestText: { flex: 1, fontSize: 13, color: C.gray800, fontWeight: "500", lineHeight: 18 },
+  saveBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 15,
+    borderRadius: 14,
+    backgroundColor: C.green,
+  },
+  saveBtnDisabled: { backgroundColor: C.greenMid },
+  saveBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
+  // Single-line input box for label field in edit mode
+  inputBoxSingle: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingRight: 14,
+  },
+}), [C]);
   const { t } = useTranslation();
   // mode: 'list' | 'add' | 'edit'
   const [mode, setMode] = React.useState("list");
@@ -814,10 +1071,16 @@ const canSaveAddress =
 }
 
 
-const ap = StyleSheet.create({
+
+
+// ─── Store Picker Modal ────────────────────────────────────────────────────────
+function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const sp = useMemo(() => StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.50)",
+    backgroundColor: "rgba(0,0,0,0.45)",
     justifyContent: "flex-end",
   },
   sheet: {
@@ -831,108 +1094,50 @@ const ap = StyleSheet.create({
     flexShrink: 1,
   },
   handle: {
-    width: 48,
-    height: 5,
+    width: 40,
+    height: 4,
     backgroundColor: C.gray200,
-    borderRadius: 3,
+    borderRadius: 2,
     alignSelf: "center",
-    marginBottom: 16,
-  },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     marginBottom: 20,
   },
-  title: { fontSize: 20, fontWeight: "800", color: C.gray900 },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: C.gray100,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptyWrap: { alignItems: "center", paddingVertical: 36, gap: 10 },
-  emptyText: { fontSize: 14, color: C.gray400 },
-  // New card-style address row
-  addrCard: {
+  sheetTitle: { fontSize: 20, fontWeight: "900", color: C.gray900 },
+  sheetSub: { fontSize: 14, color: C.gray500, marginTop: 4 },
+  itemName: { fontWeight: "700", color: C.gray800 },
+  emptyWrap: { alignItems: "center", paddingVertical: 40, gap: 12 },
+  emptyText: { fontSize: 14, color: C.gray400, textAlign: "center" },
+  storeRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
     gap: 14,
-    padding: 14,
-    borderRadius: 20,
-    marginBottom: 12,
-    borderWidth: 1.5,
-    borderColor: C.gray200,
-    backgroundColor: C.white,
   },
-  addrCardActive: {
-    borderColor: C.green,
-    borderWidth: 2,
-    backgroundColor: C.greenLight,
-  },
-  addrIconBadge: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+  storeImg: {
+    width: 54,
+    height: 54,
+    borderRadius: 14,
     backgroundColor: C.gray100,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-    marginTop: 2,
   },
-  addrIconBadgeActive: { backgroundColor: C.green },
-  addrCardTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  storeInfo: { flex: 1 },
+  storeName: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: C.gray900,
     marginBottom: 4,
   },
-  addrLabel: { fontSize: 15, fontWeight: "700", color: C.gray900, textTransform: "capitalize" },
-  addrLabelActive: { color: C.green },
-  radioCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: C.gray300,
-  },
-  checkCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: C.green,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addrText: { fontSize: 13, color: C.gray500, lineHeight: 18 },
-  addrActions: {
+  storeMeta: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    marginTop: 10,
+    gap: 4,
+    marginBottom: 4,
   },
-  editBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: C.gray100,
-  },
-  editBtnText: { fontSize: 12, fontWeight: "600", color: C.gray700 },
-  deleteBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: C.redLight,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  // Add new button (dashed)
-  addNewBtn: {
+  storeMetaText: { fontSize: 12, color: C.gray500 },
+  dot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: C.gray300 },
+  storePrice: { fontSize: 14, fontWeight: "700", color: C.gray900 },
+  storeUnit: { color: C.gray400, fontWeight: "400" },
+  addStoreBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -1023,27 +1228,13 @@ const ap = StyleSheet.create({
     flexShrink: 0,
     marginTop: 1,
   },
-  suggestText: { flex: 1, fontSize: 13, color: C.gray800, fontWeight: "500", lineHeight: 18 },
-  saveBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
+  addStoreBtnText: { fontSize: 14, fontWeight: "800", color: C.white },
+  cancelBtn: {
     marginTop: 16,
-    paddingVertical: 15,
-    borderRadius: 14,
-    backgroundColor: C.green,
-  },
-  saveBtnDisabled: { backgroundColor: C.greenMid },
-  saveBtnText: { fontSize: 15, fontWeight: "800", color: C.white },
-  // Single-line input box for label field in edit mode
-  inputBoxSingle: {
-    flexDirection: "row",
+    paddingVertical: 14,
     alignItems: "center",
-    backgroundColor: C.gray100,
     borderRadius: 14,
-    paddingVertical: 12,
-    paddingRight: 14,
+    backgroundColor: C.gray100,
   },
   sectionHeaderRow: {
     flexDirection: "row",
@@ -1178,84 +1369,7 @@ function StorePicker({ visible, item, vendors, onClose, onSelectStore }) {
   );
 }
 
-const sp = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end",
-  },
-  sheet: {
-    backgroundColor: C.white,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 36,
-    maxHeight: "80%",
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: C.gray200,
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 20,
-  },
-  sheetTitle: { fontSize: 20, fontWeight: "900", color: C.gray900 },
-  sheetSub: { fontSize: 14, color: C.gray500, marginTop: 4 },
-  itemName: { fontWeight: "700", color: C.gray800 },
-  emptyWrap: { alignItems: "center", paddingVertical: 40, gap: 12 },
-  emptyText: { fontSize: 14, color: C.gray400, textAlign: "center" },
-  storeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: C.gray100,
-    gap: 14,
-  },
-  storeImg: {
-    width: 54,
-    height: 54,
-    borderRadius: 14,
-    backgroundColor: C.gray100,
-  },
-  storeInfo: { flex: 1 },
-  storeName: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: C.gray900,
-    marginBottom: 4,
-  },
-  storeMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginBottom: 4,
-  },
-  storeMetaText: { fontSize: 12, color: C.gray500 },
-  dot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: C.gray300 },
-  storePrice: { fontSize: 14, fontWeight: "700", color: C.gray900 },
-  storeUnit: { color: C.gray400, fontWeight: "400" },
-  addStoreBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: C.green,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 12,
-  },
-  addStoreBtnText: { fontSize: 14, fontWeight: "800", color: C.white },
-  cancelBtn: {
-    marginTop: 16,
-    paddingVertical: 14,
-    alignItems: "center",
-    borderRadius: 14,
-    backgroundColor: C.gray100,
-  },
-  cancelText: { fontSize: 15, fontWeight: "700", color: C.gray600 },
-});
+
 
 const NEARBY_RADIUS_KM = 10;
 
@@ -1388,6 +1502,183 @@ function CategoryBrowseSheet({
   onAdd, onRemove, getCartQty, onOpenWeightPicker, vendors,
   onStoreSelect, apiCategories, onItemDetail, allInventoryItems,
 }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const cbs = useMemo(() => StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  sheet: {
+    backgroundColor: C.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 12,
+    maxHeight: "88%",
+    flex: 1,
+  },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 2,
+    marginBottom: 0,
+  },
+  catIconWrap: {
+    width: 48, height: 48, borderRadius: 12,
+    alignItems: "center", justifyContent: "center",
+    overflow: "hidden",
+  },
+  catHeaderImg: { width: "100%", height: "100%" },
+  catIconEmoji: { fontSize: 24 },
+  headerCat: { fontSize: 11, color: C.gray400, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
+  headerTitle: { fontSize: 20, fontWeight: "900", color: C.gray900 },
+  closeBtn: {
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: C.gray100, alignItems: "center", justifyContent: "center",
+  },
+
+  // Sub-category pills
+  subCatRow: { paddingHorizontal: 16, paddingVertical: 12, gap: 6, flexDirection: "row" },
+  subCatChip: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: 16, borderWidth: 1, borderColor: C.gray200,
+    backgroundColor: C.surface,
+  },
+  subCatChipText: { fontSize: 11, fontWeight: "700", color: C.gray700 },
+  subCatCount: {
+    paddingHorizontal: 5, paddingVertical: 1,
+    borderRadius: 8, backgroundColor: C.gray100,
+  },
+  subCatCountText: { fontSize: 9, fontWeight: "800", color: C.gray500 },
+
+  // Table header
+  tableHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: C.gray100,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: C.gray200,
+  },
+  thCell: { fontSize: 10, fontWeight: "800", color: C.gray400, textTransform: "uppercase", letterSpacing: 0.4 },
+
+  // Product rows
+  productRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minHeight: 72,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+    gap: 8,
+  },
+  productRowAlt: { backgroundColor: dkBg("#FAFAFA", isDark) },
+  productCell: { justifyContent: "center" },
+  productImgWrap: { width: 52, height: 52, borderRadius: 10, overflow: "hidden", backgroundColor: C.gray100, flexShrink: 0, position: "relative" },
+  productImg: { width: "100%", height: "100%" },
+  eyeBtn: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
+  },
+  discPill: {
+    position: "absolute", bottom: 0, left: 0, right: 0,
+    backgroundColor: C.orange,
+    paddingVertical: 1,
+    alignItems: "center",
+  },
+  discPillText: { fontSize: 8, color: C.white, fontWeight: "800" },
+  productName: { fontSize: 13, fontWeight: "700", color: C.gray900, lineHeight: 18 },
+  productDesc: { fontSize: 11, color: C.gray400, marginTop: 2 },
+  brandText: { fontSize: 12, fontWeight: "600", color: C.green, textAlign: "center" },
+  unitText: { fontSize: 13, fontWeight: "700", color: C.gray700, textAlign: "center" },
+  priceText: { fontSize: 14, fontWeight: "900", color: C.gray900 },
+  mrpText: { fontSize: 10, color: C.gray400, textDecorationLine: "line-through", marginTop: 1 },
+  addBtn: {
+    marginTop: 4,
+    backgroundColor: C.green, borderRadius: 7,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  addBtnText: { fontSize: 11, fontWeight: "800", color: C.white },
+  qtyRow: {
+    marginTop: 4,
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: C.green, borderRadius: 7, overflow: "hidden",
+  },
+  qtyBtn: { paddingHorizontal: 7, paddingVertical: 5 },
+  qtyNum: { fontSize: 11, fontWeight: "800", color: C.white, minWidth: 18, textAlign: "center" },
+  emptyWrap: { alignItems: "center", paddingVertical: 40, gap: 12 },
+  emptyText: { fontSize: 14, color: C.gray400 },
+
+  // Custom subcategory grid
+  subCatGridContainer: { paddingHorizontal: 20, paddingVertical: 16, paddingBottom: 40 },
+  subCatGridTitle: { fontSize: 13, fontWeight: "600", color: C.gray500, marginBottom: 16 },
+  subCatGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  subCatCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    backgroundColor: C.surface,
+    gap: 12,
+    flexGrow: 1,
+    flexBasis: "46%",
+    minWidth: 140,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  subCatCardIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  subCatCardImg: { width: "100%", height: "100%" },
+  subCatCardEmoji: { fontSize: 20 },
+  subCatCardInfo: { flex: 1 },
+  subCatCardName: { fontSize: 13, fontWeight: "800", color: C.gray900, lineHeight: 16 },
+  subCatCardCount: { fontSize: 11, color: C.gray400, marginTop: 2, fontWeight: "600" },
+
+  // Back row styles
+  backRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+    justifyContent: "space-between",
+  },
+  backToSubCatsBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  backToSubCatsText: { fontSize: 12, fontWeight: "800" },
+  activeSubCatTitle: { fontSize: 15, fontWeight: "800", color: C.gray800 },
+}), [C]);
   const { t } = useTranslation();
   const [subCatPath, setSubCatPath] = React.useState([]);
 
@@ -1397,7 +1688,7 @@ function CategoryBrowseSheet({
     }
   }, [visible, category]);
 
-  const catAccent = category ? (CAT_ACCENT[category] || CAT_ACCENT._default) : CAT_ACCENT._default;
+  const catAccent = themeCfg(category ? (CAT_ACCENT[category] || CAT_ACCENT._default) : CAT_ACCENT._default, isDark);
   const apiCat = category && apiCategories ? apiCategories.find(c => c.name === category) : null;
 
   // Active subcategory at the end of current path
@@ -1788,108 +2079,69 @@ function CategoryBrowseSheet({
   );
 }
 
-const cbs = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  sheet: {
-    backgroundColor: C.white,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingTop: 12,
-    maxHeight: "88%",
-    flex: 1,
-  },
-  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 2,
-    marginBottom: 0,
-  },
-  catIconWrap: {
-    width: 48, height: 48, borderRadius: 12,
-    alignItems: "center", justifyContent: "center",
+
+
+// ─── Vendor type display config ──────────────────────────────────────────────
+const VENDOR_TYPE_META = {
+  ration: { label: "Ration Store", bg: "#FEF9C3", color: "#92400E" },
+  vegetables: { label: "Vegetables", bg: "#DCFCE7", color: "#14532D" },
+  fruits: { label: "Fruits", bg: "#ECFDF5", color: "#065F46" },
+};
+
+// ─── Item Card (grid, used inside CategoryBrowseSheet) ────────────────────────
+function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const ic = useMemo(() => StyleSheet.create({
+  card: {
+    backgroundColor: C.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.05)",
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  catHeaderImg: { width: "100%", height: "100%" },
-  catIconEmoji: { fontSize: 24 },
-  headerCat: { fontSize: 11, color: C.gray400, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
-  headerTitle: { fontSize: 20, fontWeight: "900", color: C.gray900 },
-  closeBtn: {
-    width: 32, height: 32, borderRadius: 10,
-    backgroundColor: C.gray100, alignItems: "center", justifyContent: "center",
-  },
-
-  // Sub-category pills
-  subCatRow: { paddingHorizontal: 16, paddingVertical: 12, gap: 6, flexDirection: "row" },
-  subCatChip: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 10, paddingVertical: 6,
-    borderRadius: 16, borderWidth: 1, borderColor: C.gray200,
-    backgroundColor: C.white,
-  },
-  subCatChipText: { fontSize: 11, fontWeight: "700", color: C.gray700 },
-  subCatCount: {
-    paddingHorizontal: 5, paddingVertical: 1,
-    borderRadius: 8, backgroundColor: C.gray100,
-  },
-  subCatCountText: { fontSize: 9, fontWeight: "800", color: C.gray500 },
-
-  // Table header
-  tableHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: C.gray100,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: C.gray200,
-  },
-  thCell: { fontSize: 10, fontWeight: "800", color: C.gray400, textTransform: "uppercase", letterSpacing: 0.4 },
-
-  // Product rows
-  productRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minHeight: 72,
-    borderBottomWidth: 1,
-    borderBottomColor: C.gray100,
-    gap: 8,
-  },
-  productRowAlt: { backgroundColor: "#FAFAFA" },
-  productCell: { justifyContent: "center" },
-  productImgWrap: { width: 52, height: 52, borderRadius: 10, overflow: "hidden", backgroundColor: C.gray100, flexShrink: 0, position: "relative" },
-  productImg: { width: "100%", height: "100%" },
-  eyeBtn: {
-    position: "absolute",
-    bottom: 2,
-    right: 2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "rgba(0,0,0,0.55)",
+  imgWrap: {
+    padding: 8,
+    paddingBottom: 0,
+    position: "relative",
     alignItems: "center",
     justifyContent: "center",
+  },
+  badge: {
+    position: "absolute",
     zIndex: 2,
-  },
-  discPill: {
-    position: "absolute", bottom: 0, left: 0, right: 0,
     backgroundColor: C.orange,
-    paddingVertical: 1,
-    alignItems: "center",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  discPillText: { fontSize: 8, color: C.white, fontWeight: "800" },
-  productName: { fontSize: 13, fontWeight: "700", color: C.gray900, lineHeight: 18 },
-  productDesc: { fontSize: 11, color: C.gray400, marginTop: 2 },
-  brandText: { fontSize: 12, fontWeight: "600", color: C.green, textAlign: "center" },
-  unitText: { fontSize: 13, fontWeight: "700", color: C.gray700, textAlign: "center" },
-  priceText: { fontSize: 14, fontWeight: "900", color: C.gray900 },
-  mrpText: { fontSize: 10, color: C.gray400, textDecorationLine: "line-through", marginTop: 1 },
+  badgeText: { fontSize: 9, color: C.white, fontWeight: "800" },
+  img: {
+    borderRadius: 14,
+    backgroundColor: C.gray100,
+  },
+  info: { padding: 10, paddingTop: 6 },
+  name: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.gray900,
+    lineHeight: 17,
+    marginBottom: 3,
+  },
+  unit: { fontSize: 11, color: C.gray400, marginBottom: 6, fontWeight: "500" },
+  priceRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 5,
+    marginBottom: 8,
+  },
+  price: { fontSize: 15, fontWeight: "900", color: C.gray900 },
+  orig: { fontSize: 10, color: C.gray400, textDecorationLine: "line-through" },
   addBtn: {
     marginTop: 4,
     backgroundColor: C.green, borderRadius: 7,
@@ -1921,66 +2173,26 @@ const cbs = StyleSheet.create({
   subCatCard: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 12,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    backgroundColor: C.white,
-    gap: 12,
-    flexGrow: 1,
-    flexBasis: "46%",
-    minWidth: 140,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  subCatCardIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: "center",
     justifyContent: "center",
+    gap: 5,
+    backgroundColor: C.surface,
+    borderRadius: 10,
+    paddingVertical: 8,
+    borderWidth: 1.5,
+    borderColor: C.green,
+  },
+  addText: { fontSize: 12, fontWeight: "800", color: C.green },
+  qtyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: C.green,
+    borderRadius: 10,
     overflow: "hidden",
   },
-  subCatCardImg: { width: "100%", height: "100%" },
-  subCatCardEmoji: { fontSize: 20 },
-  subCatCardInfo: { flex: 1 },
-  subCatCardName: { fontSize: 13, fontWeight: "800", color: C.gray900, lineHeight: 16 },
-  subCatCardCount: { fontSize: 11, color: C.gray400, marginTop: 2, fontWeight: "600" },
-
-  // Back row styles
-  backRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: C.gray100,
-    justifyContent: "space-between",
-  },
-  backToSubCatsBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  backToSubCatsText: { fontSize: 12, fontWeight: "800" },
-  activeSubCatTitle: { fontSize: 15, fontWeight: "800", color: C.gray800 },
-});
-
-// ─── Vendor type display config ──────────────────────────────────────────────
-const VENDOR_TYPE_META = {
-  ration: { label: "Ration Store", bg: "#FEF9C3", color: "#92400E" },
-  vegetables: { label: "Vegetables", bg: "#DCFCE7", color: "#14532D" },
-  fruits: { label: "Fruits", bg: "#ECFDF5", color: "#065F46" },
-};
-
-// ─── Item Card (grid, used inside CategoryBrowseSheet) ────────────────────────
-function ItemCard({ item, onAdd, onRemove, qty, cardWidth, onOpenWeightPicker }) {
+  qtyBtn: { paddingHorizontal: 10, paddingVertical: 8 },
+  qtyNum: { fontSize: 12, fontWeight: "800", color: C.white },
+}), [C]);
   const { t } = useTranslation();
   const size = cardWidth || 130;
   const imgUri =
@@ -2169,7 +2381,7 @@ function PopularItemCard({ item, onAdd, onRemove, qty, onOpenWeightPicker, onPre
 const pic = StyleSheet.create({
   card: {
     width: 160,
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: C.gray200,
@@ -2265,85 +2477,132 @@ const pic = StyleSheet.create({
   },
   qtyBtn: { paddingHorizontal: 7, paddingVertical: 7 },
   qtyNum: { fontSize: 12, fontWeight: '800', color: C.white, minWidth: 18, textAlign: 'center' },
-});
+}), [C]);
+  const { t } = useTranslation();
+  const CARD_W = 160;
+  const IMG_H = 100;
 
-const ic = StyleSheet.create({
-  card: {
-    backgroundColor: C.white,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.05)",
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  imgWrap: {
-    padding: 8,
-    paddingBottom: 0,
-    position: "relative",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  badge: {
-    position: "absolute",
-    zIndex: 2,
-    backgroundColor: C.orange,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  badgeText: { fontSize: 9, color: C.white, fontWeight: "800" },
-  img: {
-    borderRadius: 14,
-    backgroundColor: C.gray100,
-  },
-  info: { padding: 10, paddingTop: 6 },
-  name: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: C.gray900,
-    lineHeight: 17,
-    marginBottom: 3,
-  },
-  unit: { fontSize: 11, color: C.gray400, marginBottom: 6, fontWeight: "500" },
-  priceRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 5,
-    marginBottom: 8,
-  },
-  price: { fontSize: 15, fontWeight: "900", color: C.gray900 },
-  orig: { fontSize: 10, color: C.gray400, textDecorationLine: "line-through" },
-  addBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    backgroundColor: C.white,
-    borderRadius: 10,
-    paddingVertical: 8,
-    borderWidth: 1.5,
-    borderColor: C.green,
-  },
-  addText: { fontSize: 12, fontWeight: "800", color: C.green },
-  qtyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: C.green,
-    borderRadius: 10,
-    overflow: "hidden",
-  },
-  qtyBtn: { paddingHorizontal: 10, paddingVertical: 8 },
-  qtyNum: { fontSize: 12, fontWeight: "800", color: C.white },
-});
+  const imgUri =
+    item.img ||
+    item.image_url ||
+    CAT_FALLBACK_IMGS[item.category] ||
+    CAT_FALLBACK_IMGS._default;
+  const hasMrp = item.orig && item.orig > item.price;
+  const discPct = hasMrp ? Math.round((1 - item.price / item.orig) * 100) : 0;
+  const loose = isLooseItem(item);
+
+  return (
+    <TouchableOpacity style={pic.card} onPress={onPress} activeOpacity={0.85}>
+      {/* ── Image section ── */}
+      <View style={[pic.imgWrap, { height: IMG_H }]}>
+        {/* Discount badge – top-left */}
+        {hasMrp && (
+          <View style={pic.discBadge}>
+            <Text style={pic.discBadgeText}>{t("home.discountOffUpper", { count: discPct })}</Text>
+          </View>
+        )}
+        {/* Loose badge – top-right */}
+        {loose && (
+          <View style={[pic.discBadge, { right: 32, left: 'auto', backgroundColor: C.cyan }]}>
+            <Text style={pic.discBadgeText}>{t("home.loose")}</Text>
+          </View>
+        )}
+        <TouchableOpacity
+          style={pic.eyeBtn}
+          onPress={(e) => { e.stopPropagation?.(); onPress?.(); }}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons name="visibility" size={14} color={C.white} />
+        </TouchableOpacity>
+        <Image
+          source={{ uri: imgUri }}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="cover"
+        />
+      </View>
+
+      {/* ── Info section ── */}
+      <View style={pic.info}>
+        <Text style={pic.name} numberOfLines={1}>{item.name}</Text>
+        <Text style={pic.unit}>{item.unit}</Text>
+
+        {/* Price + Add button row */}
+        <View style={pic.priceRow}>
+          <View>
+            <Text style={pic.price}>₹{item.price}</Text>
+            {hasMrp && <Text style={pic.orig}>₹{item.orig}</Text>}
+          </View>
+
+          {qty === 0 ? (
+            <TouchableOpacity
+              style={pic.addBtn}
+              onPress={() => {
+                if (loose) onOpenWeightPicker && onOpenWeightPicker(item);
+                else onAdd(item);
+              }}
+              activeOpacity={0.85}
+            >
+              <MaterialIcons
+                name={loose ? 'tune' : 'add'}
+                size={18}
+                color={C.white}
+              />
+            </TouchableOpacity>
+          ) : (
+            <View style={pic.qtyRow}>
+              <TouchableOpacity
+                style={pic.qtyBtn}
+                onPress={() => onRemove(item)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <MaterialIcons name="remove" size={12} color={C.white} />
+              </TouchableOpacity>
+              <Text style={pic.qtyNum}>{qty}</Text>
+              <TouchableOpacity
+                style={pic.qtyBtn}
+                onPress={() => onAdd(item)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <MaterialIcons name="add" size={12} color={C.white} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+
+
+
 
 // ─── Weight Picker Modal ───────────────────────────────────────────────────
 // ─── Weight Picker Modal ───────────────────────────────────────────────────
 function WeightPickerModal({ item, onClose, onAdd }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const wp = useMemo(() => StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: C.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 36, zIndex: 9999 },
+  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
+  header: { flexDirection: "row", gap: 14, marginBottom: 24, alignItems: "center" },
+  thumb: { width: 72, height: 72, borderRadius: 14, backgroundColor: C.gray100 },
+  looseBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.cyanLight || dkBg("#ECFEFF", isDark), paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, alignSelf: "flex-start", marginBottom: 6 },
+  looseBadgeText: { fontSize: 11, fontWeight: "700", color: C.cyan },
+  productName: { fontSize: 16, fontWeight: "800", color: C.gray900, lineHeight: 21, marginBottom: 4 },
+  basePriceText: { fontSize: 15, fontWeight: "700", color: C.green },
+  perUnit: { fontSize: 12, fontWeight: "400", color: C.gray400 },
+  pickLabel: { fontSize: 12, fontWeight: "700", color: C.gray500, marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
+  optionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 },
+  chip: { paddingHorizontal: 18, paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: C.gray200, backgroundColor: C.gray100 },
+  chipActive: { borderColor: C.green, backgroundColor: C.greenLight },
+  chipText: { fontSize: 14, fontWeight: "700", color: C.gray600 },
+  chipTextActive: { color: C.green },
+  addBtn: { borderRadius: 16, overflow: "hidden", marginTop: 10 },
+  addBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16 },
+  addBtnText: { fontSize: 16, fontWeight: "800", color: C.white },
+}), [C]);
   const { t } = useTranslation();
   const safeItem = item || {};
   const weightOptions = parseWeightOptions(safeItem) || [safeItem.unit || "1 pc"];
@@ -2432,32 +2691,104 @@ function WeightPickerModal({ item, onClose, onAdd }) {
     </Modal>
   );
 }
-const wp = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: C.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 36, zIndex: 9999 },
-  handle: { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
-  header: { flexDirection: "row", gap: 14, marginBottom: 24, alignItems: "center" },
-  thumb: { width: 72, height: 72, borderRadius: 14, backgroundColor: C.gray100 },
-  looseBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.cyanLight || "#ECFEFF", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, alignSelf: "flex-start", marginBottom: 6 },
-  looseBadgeText: { fontSize: 11, fontWeight: "700", color: C.cyan },
-  productName: { fontSize: 16, fontWeight: "800", color: C.gray900, lineHeight: 21, marginBottom: 4 },
-  basePriceText: { fontSize: 15, fontWeight: "700", color: C.green },
-  perUnit: { fontSize: 12, fontWeight: "400", color: C.gray400 },
-  pickLabel: { fontSize: 12, fontWeight: "700", color: C.gray500, marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
-  optionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 },
-  chip: { paddingHorizontal: 18, paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: C.gray200, backgroundColor: C.gray100 },
-  chipActive: { borderColor: C.green, backgroundColor: C.greenLight },
-  chipText: { fontSize: 14, fontWeight: "700", color: C.gray600 },
-  chipTextActive: { color: C.green },
-  addBtn: { borderRadius: 16, overflow: "hidden", marginTop: 10 },
-  addBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16 },
-  addBtnText: { fontSize: 16, fontWeight: "800", color: C.white },
-});
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ─── Item Detail Modal (animated slide-up + blurred backdrop) ─────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
 function ItemDetailModal({ item, onClose, onAdd, onRemove, qty }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const dm = useMemo(() => StyleSheet.create({
+  /* ── Blur backdrop layers ──────────────────────────────────────── */
+  blurLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  blurLayer1: {
+    backgroundColor: "rgba(180, 190, 210, 0.28)",
+  },
+  blurLayer2: {
+    backgroundColor: "rgba(120, 130, 160, 0.22)",
+  },
+  blurLayer3: {
+    backgroundColor: "rgba(80, 90, 120, 0.18)",
+  },
+  darkOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(10, 10, 25, 0.65)",
+  },
+  backdropPress: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  centerWrap: {
+    ...StyleSheet.absoluteFillObject, justifyContent: "center", alignItems: "center", padding: 24,
+  },
+  card: {
+    width: "100%", maxWidth: 380, maxHeight: "82%", backgroundColor: C.surface,
+    borderRadius: 26, overflow: "hidden",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.38, shadowRadius: 40, elevation: 24,
+  },
+  imgWrap: { width: "100%", height: 210, backgroundColor: dkBg("#F3F4F5", isDark), position: "relative", overflow: "hidden" },
+  img: { width: "100%", height: "100%" },
+  closeBtn: {
+    position: "absolute", top: 12, right: 12, width: 34, height: 34, borderRadius: 17,
+    backgroundColor: "rgba(0,0,0,0.5)", borderWidth: 1.2, borderColor: "rgba(255,255,255,0.25)",
+    alignItems: "center", justifyContent: "center",
+  },
+  discBadge: {
+    position: "absolute", top: 12, left: 12, backgroundColor: C.orange,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10,
+    shadowColor: C.orange, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 6, elevation: 5,
+  },
+  discBadgeText: { fontSize: 11, color: C.white, fontWeight: "800" },
+  priceOnImg: { position: "absolute", bottom: 12, left: 16, flexDirection: "row", alignItems: "baseline", gap: 6 },
+  priceOnImgText: {
+    fontSize: 30, fontWeight: "900", color: C.white,
+    textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10,
+  },
+  mrpOnImgText: { fontSize: 14, color: "rgba(255,255,255,0.55)", textDecorationLine: "line-through" },
+  body: { padding: 20 },
+  name: { fontSize: 20, fontWeight: "900", color: C.gray900, lineHeight: 26, marginBottom: 4 },
+  unit: { fontSize: 13, color: C.gray400, fontWeight: "500", marginBottom: 14 },
+  descBox: {
+    backgroundColor: C.greenLight, borderRadius: 14, padding: 14, marginBottom: 14,
+    borderLeftWidth: 3.5, borderLeftColor: C.green,
+  },
+  descIconRow: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 },
+  descLabel: { fontSize: 10, fontWeight: "800", color: C.green, textTransform: "uppercase", letterSpacing: 0.6 },
+  descText: { fontSize: 13.5, color: C.gray600, lineHeight: 20 },
+  savingsPill: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: dkBg("#FEF3C7", isDark), borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 16,
+  },
+  savingsText: { fontSize: 12.5, color: dkText("#92400E", isDark), fontWeight: "700" },
+  dividerRow: {
+    flexDirection: "row", alignItems: "center", marginBottom: 16, gap: 8,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: C.gray100 },
+  dividerDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: C.gray200 },
+  actionRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+  },
+  totalLabel: { fontSize: 10, color: C.gray400, fontWeight: "600", marginBottom: 2 },
+  totalPrice: { fontSize: 26, fontWeight: "900", color: C.green },
+  addBtn: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: C.green, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14,
+    shadowColor: C.green, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
+  },
+  addBtnText: { fontSize: 15, fontWeight: "800", color: "#fff" },
+  qtyRow: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: C.green, borderRadius: 14, overflow: "hidden",
+    shadowColor: C.green, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
+  },
+  qtyBtn: { paddingHorizontal: 18, paddingVertical: 13 },
+  qtyNum: { fontSize: 16, fontWeight: "900", color: "#fff", minWidth: 34, textAlign: "center" },
+  handleWrap: { alignItems: "center", paddingBottom: 8, paddingTop: 2 },
+  handleBar: { width: 36, height: 4, borderRadius: 2, backgroundColor: C.gray200 },
+}), [C]);
   const { t } = useTranslation();
   const { width: W, height: H } = Dimensions.get("window");
 
@@ -2605,7 +2936,7 @@ function ItemDetailModal({ item, onClose, onAdd, onRemove, qty }) {
 
               {hasDiscount && (
                 <View style={dm.savingsPill}>
-                  <MaterialIcons name="savings" size={14} color="#D97706" />
+                  <MaterialIcons name="savings" size={14} color={dkText("#D97706", isDark)} />
                   <Text style={dm.savingsText}>{t("home.youSave", { amount: mrp - price })}</Text>
                 </View>
               )}
@@ -2652,84 +2983,147 @@ function ItemDetailModal({ item, onClose, onAdd, onRemove, qty }) {
   );
 }
 
-const dm = StyleSheet.create({
-  /* ── Blur backdrop layers ──────────────────────────────────────── */
-  blurLayer: {
-    ...StyleSheet.absoluteFillObject,
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+export default function HomeScreen() {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const s = useMemo(() => StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.bg },
+  headerWrap: {
+    backgroundColor: C.surface,
+    paddingTop: Platform.OS === "android" ? 18 : 22,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray200,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 4,
+    zIndex: 10,
   },
-  blurLayer1: {
-    backgroundColor: "rgba(180, 190, 210, 0.28)",
+  accentLine: { height: 0 },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingBottom: 20,
+    paddingTop: 4,
+    gap: 0,
   },
-  blurLayer2: {
-    backgroundColor: "rgba(120, 130, 160, 0.22)",
+  brandSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexShrink: 0,
   },
-  blurLayer3: {
-    backgroundColor: "rgba(80, 90, 120, 0.18)",
+  miniLogoWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    overflow: "hidden",
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.greenBorder,
   },
-  darkOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(10, 10, 25, 0.65)",
+  miniLogo: { flex: 1, alignItems: "center", justifyContent: "center" },
+  brandName: {
+    fontSize: 28,
+    fontWeight: "900",
+    letterSpacing: 0,
+    color: C.gray900,
+    fontFamily: "PlusJakartaSans_800ExtraBold",
   },
-  backdropPress: {
-    ...StyleSheet.absoluteFillObject,
+  brandAccent: { color: isDark ? C.greenDark : "#0EE627" },
+  headerDivider: {
+    width: 1,
+    height: 38,
+    backgroundColor: C.gray200,
+    marginHorizontal: 16,
+    flexShrink: 0,
   },
-  centerWrap: {
-    ...StyleSheet.absoluteFillObject, justifyContent: "center", alignItems: "center", padding: 24,
+  locationBtn: {
+    flexShrink: 0,
+    minWidth: 120,
+    maxWidth: 220,
+    justifyContent: "center",
+    marginRight: 16,
   },
-  card: {
-    width: "100%", maxWidth: 380, maxHeight: "82%", backgroundColor: C.white,
-    borderRadius: 26, overflow: "hidden",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.38, shadowRadius: 40, elevation: 24,
+  locLoadRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  locLoadText: { fontSize: 12, color: C.gray500 },
+  locationTop: {
+    fontSize: 12,
+    color: C.gray500,
+    fontWeight: "500",
+    lineHeight: 15,
   },
-  imgWrap: { width: "100%", height: 210, backgroundColor: "#F3F4F5", position: "relative", overflow: "hidden" },
-  img: { width: "100%", height: "100%" },
-  closeBtn: {
-    position: "absolute", top: 12, right: 12, width: 34, height: 34, borderRadius: 17,
-    backgroundColor: "rgba(0,0,0,0.5)", borderWidth: 1.2, borderColor: "rgba(255,255,255,0.25)",
-    alignItems: "center", justifyContent: "center",
+  locationBottomRow: { flexDirection: "row", alignItems: "center", gap: 3 },
+  locationBottom: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: C.gray900,
+    flexShrink: 1,
   },
-  discBadge: {
-    position: "absolute", top: 12, left: 12, backgroundColor: C.orange,
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10,
-    shadowColor: C.orange, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 6, elevation: 5,
+  webSearch: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: C.gray100,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginRight: 10,
+    minWidth: 80,
   },
-  discBadgeText: { fontSize: 11, color: C.white, fontWeight: "800" },
-  priceOnImg: { position: "absolute", bottom: 12, left: 16, flexDirection: "row", alignItems: "baseline", gap: 6 },
-  priceOnImgText: {
-    fontSize: 30, fontWeight: "900", color: C.white,
-    textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10,
+  webSearchText: { flex: 1, fontSize: 15, color: C.gray400 },
+  accountBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    marginRight: 8,
+    flexShrink: 0,
   },
-  mrpOnImgText: { fontSize: 14, color: "rgba(255,255,255,0.55)", textDecorationLine: "line-through" },
-  body: { padding: 20 },
-  name: { fontSize: 20, fontWeight: "900", color: C.gray900, lineHeight: 26, marginBottom: 4 },
-  unit: { fontSize: 13, color: C.gray400, fontWeight: "500", marginBottom: 14 },
-  descBox: {
-    backgroundColor: C.greenLight, borderRadius: 14, padding: 14, marginBottom: 14,
-    borderLeftWidth: 3.5, borderLeftColor: C.green,
+  accountBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: C.gray700,
+    maxWidth: 90,
   },
-  descIconRow: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 },
-  descLabel: { fontSize: 10, fontWeight: "800", color: C.green, textTransform: "uppercase", letterSpacing: 0.6 },
-  descText: { fontSize: 13.5, color: C.gray600, lineHeight: 20 },
-  savingsPill: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: "#FEF3C7", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 16,
+  cartBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: C.gray200,
+    backgroundColor: C.gray100,
+    flexShrink: 0,
   },
-  savingsText: { fontSize: 12.5, color: "#92400E", fontWeight: "700" },
-  dividerRow: {
-    flexDirection: "row", alignItems: "center", marginBottom: 16, gap: 8,
+  cartBtnActive: { backgroundColor: C.green, borderColor: C.green },
+  cartBtnText: { fontSize: 14, fontWeight: "700", color: C.gray700 },
+  cartBtnBadge: {
+    backgroundColor: "rgba(255,255,255,0.25)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
-  dividerLine: { flex: 1, height: 1, backgroundColor: C.gray100 },
-  dividerDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: C.gray200 },
-  actionRow: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-  },
-  totalLabel: { fontSize: 10, color: C.gray400, fontWeight: "600", marginBottom: 2 },
-  totalPrice: { fontSize: 26, fontWeight: "900", color: C.green },
-  addBtn: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: C.green, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14,
-    shadowColor: C.green, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
+  cartBtnBadgeText: { fontSize: 11, fontWeight: "800", color: C.white },
+  mobileRow1: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingBottom: 14,
+    paddingTop: 4,
   },
   addBtnText: { fontSize: 15, fontWeight: "800", color: "#fff" },
   qtyRow: {
@@ -4663,7 +5057,7 @@ const s = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: C.orangeLight,
     borderWidth: 1,
-    borderColor: "#FED7AA",
+    borderColor: dkBorder("#FED7AA", isDark),
   },
   deliveryPromiseText: {
     fontSize: 11,
@@ -4776,7 +5170,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     minWidth: 128,
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: C.gray200,
@@ -4806,7 +5200,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: C.gray200,
@@ -4952,7 +5346,7 @@ const s = StyleSheet.create({
     width: 280,
     marginRight: 18,
     marginBottom: 4,
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: C.gray200,
@@ -5000,7 +5394,7 @@ const s = StyleSheet.create({
     marginBottom: 6,
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.05)',
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     padding: 9,
   },
   catCardEmojiWrap: {
@@ -5050,7 +5444,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
     padding: 13,
-    backgroundColor: C.white,
+    backgroundColor: C.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: C.gray200,
@@ -5139,6 +5533,1447 @@ const s = StyleSheet.create({
   storeCatChipTextActive: {
     color: C.green,
   },
-});
+}), [C]);
+  const { t } = useTranslation();
+  const { token, user } = useAuthStore();
+  const navigation = useNavigation();
+  const goToSearch = (focusField) => {
+    const validFields = ["stores", "categories", "items"];
+    const field = validFields.includes(focusField) ? focusField : null;
+    const root = navigation.getParent?.() || navigation;
+    root.navigate('Search', field ? { focusField: field } : undefined);
+  };
+  const addressStore = useAddressStore();
+  const cart = useCartStore();
+
+  const { currentLocation } = addressStore;
+
+  const [selectedAddrId, setSelectedAddrId] = useState(addressStore.selectedId || null);
+
+
+  // Derive locationShort label from selected address or GPS detecting
+  const locationShort = useMemo(() => {
+    if (selectedAddrId) {
+      const found = addressStore?.addresses?.find((a) => a.id === selectedAddrId);
+      if (found) {
+        const addrText = found.address_line || found.address || "";
+        const parts = addrText.split(",");
+        return (
+          [parts[0]?.trim(), parts[1]?.trim()].filter(Boolean).join(", ") ||
+          addrText
+        );
+      }
+    }
+    return currentLocation.displayName || t("home.setLocation");
+  }, [selectedAddrId, addressStore.addresses, currentLocation.displayName, t]);
+
+  // Address picker state moved up to avoid ReferenceError in locationCoords
+
+  const locationCoords = useMemo(() => {
+    // If a specific address is selected, use its coordinates
+    if (selectedAddrId) {
+      const found = addressStore?.addresses?.find(a => a.id === selectedAddrId);
+      if (found?.lat && found?.lng) return { lat: found.lat, lng: found.lng };
+    }
+    // Fallback to GPS detection
+    return currentLocation.lat
+      ? { lat: currentLocation.lat, lng: currentLocation.lng }
+      : null;
+  }, [currentLocation.lat, currentLocation.lng, selectedAddrId, addressStore.addresses]);
+  const locationLoading = currentLocation.loading;
+
+  const [vendors, setVendors] = useState([]);
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [popularFromAPI, setPopularFromAPI] = useState([]);
+  const [loadingVendors, setLoadingVendors] = useState(false);
+  const [loadingInventory, setLoadingInventory] = useState(false);
+
+  // Store category filter
+  const [selectedStoreCategory, setSelectedStoreCategory] = useState(null);
+  const [storeCategories, setStoreCategories] = useState([]);
+
+  // Category hierarchy from API
+  const [apiCategories, setApiCategories] = useState([]);
+
+  // Category browse sheet
+  const [catSheetVisible, setCatSheetVisible] = useState(false);
+  const [catSheetCategory, setCatSheetCategory] = useState(null);
+
+  // Store picker
+  const [pickerItem, setPickerItem] = useState(null);
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [loosePickerItem, setLoosePickerItem] = useState(null);
+  const [popularDetailItem, setPopularDetailItem] = useState(null);
+  const [catDetailItem, setCatDetailItem] = useState(null);
+
+  // Address picker
+  const [addrPickerVisible, setAddrPickerVisible] = useState(false);
+
+  // Responsive
+  const [winW, setWinW] = useState(() =>
+    Platform.OS === "web" && typeof window !== "undefined"
+      ? window.innerWidth
+      : Dimensions.get("window").width,
+  );
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const h = () => setWinW(window.innerWidth);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+  const wide = winW > 700;
+
+  // ── Single source of truth for cart — read directly from cartStore ──────────
+  // Do NOT maintain local itemQtys — it diverges from VendorStoreScreen changes
+  const cartItems = cart?.items || [];
+  const cartCount = cartItems.reduce((s, i) => s + (i.qty || 0), 0);
+  const cartTotal = cartItems.reduce((s, i) => s + i.price * (i.qty || 0), 0);
+  const getCartQty = useCallback(
+    (itemId) => cartItems.find((i) => i.id === itemId)?.qty || 0,
+    [cartItems],
+  );
+
+  // Sync with addressStore
+  useEffect(() => {
+    if (addressStore.selectedId) {
+      setSelectedAddrId(addressStore.selectedId);
+    }
+  }, [addressStore.selectedId]);
+
+  // ── Animations ───────────────────────────────────────────────────────────────
+  const headerOpacity = useRef(new Animated.Value(0)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const contentY = useRef(new Animated.Value(16)).current;
+  const floatingY = useRef(new Animated.Value(120)).current;
+
+  useEffect(() => {
+    Animated.stagger(100, [
+      Animated.timing(headerOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.parallel([
+        Animated.timing(contentOpacity, {
+          toValue: 1,
+          duration: 350,
+          useNativeDriver: true,
+        }),
+        Animated.spring(contentY, {
+          toValue: 0,
+          tension: 60,
+          friction: 9,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+  }, []);
+
+  useEffect(() => {
+    if (wide) return;
+    Animated.spring(floatingY, {
+      toValue: cartCount > 0 ? 0 : 120,
+      tension: 70,
+      friction: 12,
+      useNativeDriver: true,
+    }).start();
+  }, [cartCount, wide]);
+
+  useEffect(() => {
+    if (locationCoords) {
+      fetchNearbyVendors(locationCoords.lat, locationCoords.lng);
+      fetchPopularProducts(locationCoords.lat, locationCoords.lng);
+    }
+  }, [locationCoords?.lat, locationCoords?.lng]);
+
+  // ── Auto-refresh store open/closed status (no manual refresh needed) ─────────
+  // Every 60s: force a re-render so the time-based OPEN/CLOSED check flips at the
+  // minute boundary, and lightly re-pull the vendor list (status fields only — no
+  // inventory re-fetch) to pick up toggle / hour changes from the vendor or admin.
+  const [, forceStatusRefresh] = useReducer((x) => x + 1, 0);
+  const refreshVendorStatus = useCallback(async () => {
+    if (!locationCoords) return;
+    try {
+      const res = await vendorsAPI.getNearby(
+        locationCoords.lat,
+        locationCoords.lng,
+        10,
+        selectedStoreCategory,
+      );
+      const fresh = res.data || [];
+      setVendors((prev) =>
+        prev.map((v) => {
+          const f = fresh.find((x) => x.id === v.id);
+          return f
+            ? {
+                ...v,
+                is_open: f.is_open,
+                opening_time: f.opening_time,
+                closing_time: f.closing_time,
+                is_currently_open: f.is_currently_open,
+              }
+            : v;
+        }),
+      );
+    } catch {
+      // keep current statuses; the local time check still re-runs each minute
+    }
+  }, [locationCoords, selectedStoreCategory]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      forceStatusRefresh();
+      refreshVendorStatus();
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [refreshVendorStatus]);
+
+  useEffect(() => {
+    if (token) fetchRecentOrders();
+  }, [token]);
+
+  // Fetch category hierarchy (public endpoint — no auth needed)
+  useEffect(() => {
+    categoriesAPI.getAll()
+      .then(res => setApiCategories(res.data?.categories || []))
+      .catch(() => setApiCategories([]));
+  }, []);
+
+  // Fetch store categories for filter chips
+  useEffect(() => {
+    vendorsAPI.getStoreCategories()
+      .then(res => setStoreCategories(res.data?.categories || []))
+      .catch(() => setStoreCategories([]));
+  }, []);
+
+  // ── Handled by addressStore ──────────────────────────────────────────────────
+
+
+  // ── Fetch popular products via api.js (respects BASE_URL + headers) ──────────
+  const fetchPopularProducts = async (lat, lng) => {
+    try {
+      const res = await fetch(
+        `${BASE_URL}/products/popular?lat=${lat}&lng=${lng}&radius_km=10&limit=12`,
+        token ? { headers: { Authorization: `Bearer ${token}` } } : {},
+      );
+      const data = await res.json();
+      const list = data.data || [];
+      setPopularFromAPI(
+        list.map((p) => ({
+          id: p.id,
+          name: p.name,
+          unit: p.unit || "1 pc",
+          price: p.price,
+          orig: p.mrp != null && p.mrp > p.price ? p.mrp : null,
+          img: p.image_url || null,
+          category: p.category?.name || "Other",
+          item_type: p.item_type,
+          weight_options: p.weight_options,
+        })),
+      );
+    } catch {
+      // Silently fail — inventory-based fallback handles it
+    }
+  };
+
+  // ── Fetch vendors then inventory — FIXED stale closure ───────────────────────
+  // We pass the fresh vendor list directly to fetchInventoryForVendors
+  // instead of reading from state (which hasn't updated yet)
+  const fetchNearbyVendors = async (lat, lng, storeCategory = null) => {
+    setLoadingVendors(true);
+    try {
+      const res = await vendorsAPI.getNearby(lat, lng, 10, storeCategory);
+      const list = res.data || [];
+      // ── TEMP DEBUG — remove after checking terminal ──
+      setVendors(list);
+      // Pass list directly — state update is async, list is synchronous
+      await fetchInventoryForVendors(list);
+    } catch {
+      setVendors([]);
+    } finally {
+      setLoadingVendors(false);
+    }
+  };
+
+  const fetchInventoryForVendors = async (vendorList) => {
+    if (!vendorList.length) return;
+    setLoadingInventory(true);
+    try {
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const results = await Promise.all(
+        vendorList.map((v) =>
+          fetch(`${BASE_URL}/inventory/vendor/${v.id}`, { headers })
+            .then((r) => r.json())
+            .then((d) => {
+              // Handle both array and wrapped response shapes
+              const inv = Array.isArray(d) ? d : d.data || d.inventory || [];
+              return { vendorId: v.id, inventory: inv };
+            })
+            .catch(() => ({ vendorId: v.id, inventory: [] })),
+        ),
+      );
+
+      // Attach _inventory to each vendor — use functional updater
+      // so we always merge against the latest state
+      setVendors((prev) =>
+        prev.map((v) => {
+          const found = results.find((r) => r.vendorId === v.id);
+          return { ...v, _inventory: found?.inventory || [] };
+        }),
+      );
+    } finally {
+      setLoadingInventory(false);
+    }
+  };
+
+  const fetchRecentOrders = async () => {
+    try {
+      const res = await ordersAPI.getMyOrders(token, 1);
+      setRecentOrders(res.data?.orders?.slice(0, 3) || []);
+    } catch { }
+  };
+
+  // ── Derive categories from vendor inventories ──────────────────────────────
+  const allInventoryItems = useMemo(() => {
+    const items = [];
+    vendors.forEach((v) => {
+      (v._inventory || []).forEach((inv) => {
+        if ((inv.is_active ?? true) && inv.product) {
+          items.push({ ...inv, _vendorId: v.id, _vendorName: v.shop_name });
+        }
+      });
+    });
+    return items;
+  }, [vendors]);
+
+  // ── Address Handlers ────────────────────────────────────────────────────────
+
+  // In normalizeCatName — add Personal Care to the exclusion list
+  const normalizeCatName = (name) => {
+    if (!name) return null;
+    const EXCLUDE = new Set(["Personal Care", "personal care", "PersonalCare"]);
+    if (EXCLUDE.has(name)) return null;
+    const MAP = {
+      Grocery: "Groceries",
+      Snack: "Snacks",
+      Beverage: "Beverages",
+      Fruit: "Fruits",
+      Medicine: "Medicines",
+    };
+    return MAP.hasOwnProperty(name) ? MAP[name] : name;
+  };
+
+  const getCategoryName = useCallback((inv) => {
+    const p = inv.product;
+    const cat = p?.category;
+    let raw;
+    if (cat && typeof cat === "object" && cat.name) raw = cat.name;
+    else if (typeof cat === "string" && cat) raw = cat;
+    else return null;
+    return normalizeCatName(raw);
+  }, []);
+
+  const dynamicCategories = useMemo(() => {
+    const seen = new Set();
+    const cats = [];
+
+    // Find all top-level categories (those without parent_id)
+    const topLevelCats = apiCategories.filter(c => !c.parent_id);
+
+    topLevelCats.forEach(c => {
+      if (c.name && !seen.has(c.name)) {
+        seen.add(c.name);
+
+        const accent = themeCfg(CAT_ACCENT[c.name] || CAT_ACCENT._default, isDark);
+        const fallbackImg = CAT_FALLBACK_IMGS[c.name] || CAT_FALLBACK_IMGS._default;
+
+        cats.push({
+          label: c.name,
+          tag: c.name,
+          img: c.image_url || fallbackImg,
+          bg: accent.bg,
+          accent: accent.accent,
+          icon: accent.icon
+        });
+      }
+    });
+    return cats.sort((a, b) => a.label.localeCompare(b.label));
+  }, [apiCategories]);
+
+  // ── 3-level hierarchy for CategoryBrowseSheet ─────────────────────────────
+  const categoryHierarchy = useMemo(
+    () => buildHierarchyFromInventory(allInventoryItems, getCategoryName, apiCategories),
+    [allInventoryItems, getCategoryName, apiCategories],
+  );
+
+  // ── Popular items — API-based with inventory fallback ─────────────────────
+  const popularItems = useMemo(() => {
+    if (popularFromAPI.length > 0) return popularFromAPI;
+
+    // Fallback: derive from inventory, deduplicate by product ID
+    const seen = new Set();
+    const vendorCount = {};
+    const itemMap = {};
+
+    allInventoryItems.forEach((inv) => {
+      const p = inv.product;
+      if (!p?.id) return;
+      const catName = getCategoryName(inv) || "Other";
+      vendorCount[p.id] = (vendorCount[p.id] || 0) + 1;
+      if (!seen.has(p.id)) {
+        seen.add(p.id);
+        itemMap[p.id] = {
+          id: p.id,
+          name: p.name,
+          unit: p.unit || "1 pc",
+          price: p.price,
+          orig: p.mrp != null && p.mrp > p.price ? p.mrp : null,
+          img: p.image_url || null,
+          category: catName,
+          item_type: p.item_type,
+          weight_options: p.weight_options,
+        };
+      }
+    });
+
+    return Object.entries(vendorCount)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 12)
+      .map(([id]) => itemMap[Number(id)])
+      .filter(Boolean);
+  }, [popularFromAPI, allInventoryItems, getCategoryName]);
+
+  // ── Address Handlers ────────────────────────────────────────────────────────
+  const openAddressPicker = () => {
+    // if (!selectedAddrId && addressStore?.addresses?.length > 0) {
+    //   setSelectedAddrId(addressStore.addresses[0].id);
+    // }
+    setAddrPickerVisible(true);
+  };
+
+  const handleSelectAddress = (addr) => {
+    setSelectedAddrId(addr.id);
+    addressStore?.setSelectedId?.(addr.id);
+    setAddrPickerVisible(false);
+    if (addr.lat && addr.lng) {
+      fetchNearbyVendors(addr.lat, addr.lng);
+      fetchPopularProducts(addr.lat, addr.lng);
+    }
+  };
+
+
+  // ── Cart helpers — reads from cartStore, no local qty state ───────────────
+  // In handleAdd — check if THIS item is in cart, not just whether vendorId exists
+  const handleAdd = useCallback(
+    (item, selectedWeight = null) => {
+      if (isLooseItem(item) && !selectedWeight) {
+        setLoosePickerItem(item);
+        return;
+      }
+
+      const itemInCart = cartItems.some((i) => i.id === item.id);
+      const unitToUse = formatWeight(selectedWeight || item.unit);
+      const finalPrice = isLooseItem(item)
+        ? calculateProportionalPrice(item.price, unitToUse, item.unit || "1kg")
+        : item.price;
+
+      if (!itemInCart) {
+        // Item not in cart at all — always show store picker so user picks a vendor
+        setPickerItem({ ...item, selectedWeight: unitToUse, finalPrice });
+        setPickerVisible(true);
+        return;
+      }
+
+      // Item already in cart — just increment under the existing vendor
+      cart?.addItem?.(
+        {
+          id: item.id,
+          name: item.name,
+          price: finalPrice,
+          img: item.img,
+          unit: unitToUse,
+        },
+        cart?.vendorId,
+      );
+    },
+    [cart, cartItems],
+  );
+
+  const handleRemove = useCallback(
+    (item) => {
+      cart?.removeItem?.(item.id);
+    },
+    [cart],
+  );
+
+  const handleStoreSelect = useCallback(
+    (vendor, item) => {
+      setPickerVisible(false);
+      cart?.addItem?.(
+        {
+          id: item.id,
+          name: item.name,
+          price: item.finalPrice || item.price,
+          img: item.img,
+          unit: item.selectedWeight || item.unit,
+        },
+        vendor.id,
+      );
+      navigation.navigate("VendorStore", {
+        vendorId: vendor.id,
+        vendorName: vendor.shop_name,
+      });
+    },
+    [cart, navigation],
+  );
+
+  // ── Utilities ──────────────────────────────────────────────────────────────
+  const getGreeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return t("home.goodMorning");
+    if (h < 17) return t("home.goodAfternoon");
+    if (h < 21) return t("home.goodEvening");
+    return t("home.goodNight");
+  };
+
+  const getStatusColor = (s) =>
+    ({
+      pending: "#D97706",
+      accepted: "#2563EB",
+      preparing: "#7C3AED",
+      ready: C.green,
+      delivered: C.greenDark,
+      cancelled: "#DC2626",
+    })[s] || C.gray400;
+
+  const firstName = user?.name?.trim().split(" ")[0] || null;
+
+  const hPad = winW >= 1024 ? 48 : winW >= 700 ? 28 : 16;
+  const cols = wide ? (winW > 1200 ? 6 : winW > 900 ? 5 : 4) : 3;
+  const cardW = Math.floor((winW - hPad * 2 - 12 * (cols - 1)) / cols);
+
+  const showCategories = !loadingInventory && dynamicCategories.length > 0;
+  const showPopular = !loadingInventory && popularItems.length > 0;
+  const openStoreCount = vendors.filter((vendor) => isStoreCurrentlyOpen(vendor)).length;
+  const nearestStoreDistance = vendors
+    .map((vendor) => Number(vendor.distance_km))
+    .filter((distance) => Number.isFinite(distance))
+    .sort((a, b) => a - b)[0];
+  const heroTitle = locationCoords
+    ? t("home.heroTitleLocation")
+    : t("home.heroTitleNoLocation");
+  const heroSub = locationCoords
+    ? t("home.heroSubLocation", { count: openStoreCount || vendors.length || t("home.local") })
+    : t("home.heroSubNoLocation");
+  const homeStats = [
+    {
+      icon: "storefront",
+      value: vendors.length ? `${vendors.length}` : "--",
+      label: t("home.nearbyStores"),
+    },
+    {
+      icon: "inventory-2",
+      value: popularItems.length ? `${popularItems.length}+` : "--",
+      label: t("home.popularPicks"),
+    },
+    {
+      icon: "near-me",
+      value: nearestStoreDistance ? t("home.kmDistance", { count: nearestStoreDistance.toFixed(1) }) : t("home.nearYou"),
+      label: t("home.closestStore"),
+    },
+  ];
+  const quickActions = [
+    { icon: "search", label: t("home.findStores"), onPress: goToSearch },
+    { icon: "shopping-bag", label: t("home.openStores"), onPress: goToSearch },
+  ];
+
+
+  return (
+    <View style={s.root}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? C.surface : C.white} />
+
+      {/* ══ HEADER ══════════════════════════════════════════════════════════ */}
+      <Animated.View style={[s.headerWrap, { opacity: headerOpacity }]}>
+        {wide ? (
+          <View style={[s.headerRow, { paddingHorizontal: hPad }]}>
+            <TouchableOpacity
+              style={s.brandSection}
+              onPress={() => navigation.navigate("Home")}
+              activeOpacity={0.8}
+            >
+              <View style={s.miniLogoWrap}>
+                <LinearGradient
+                  colors={isDark ? [C.green, C.greenDark] : ["#147538", "#0EE627"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={s.miniLogo}
+                >
+                  <MaterialIcons name="storefront" size={17} color={C.white} />
+                </LinearGradient>
+              </View>
+              {winW >= 900 && (
+                <Text style={s.brandName}>
+                  Kwik<Text style={s.brandAccent}>Pik</Text>
+                </Text>
+              )}
+            </TouchableOpacity>
+            <View style={s.headerDivider} />
+            {/* {winW >= 900 && (
+              <>
+                <View style={s.brandSection}>
+                  <View style={s.miniLogoWrap}>
+                    <LinearGradient
+                      colors={[C.orange, C.orangeDark]}
+                      style={s.miniLogo}
+                    >
+                      <MaterialIcons name="shopping-cart" size={15} color={C.white} />
+                    </LinearGradient>
+                  </View>
+                  <GradientText text="KwikPik" style={s.brandName} />
+                </View>
+                <View style={s.headerDivider} />
+              </>
+            )} */}
+            <TouchableOpacity
+              style={s.locationBtn}
+              onPress={openAddressPicker}
+              activeOpacity={0.75}
+            >
+              {locationLoading ? (
+                <View style={s.locLoadRow}>
+                  <ActivityIndicator
+                    size="small"
+                    color={C.green}
+                    style={{ transform: [{ scale: 0.7 }] }}
+                  />
+                  <Text style={s.locLoadText}>{t("home.locating")}</Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={s.locationTop}>{t("home.deliveringTo")}</Text>
+                  <View style={s.locationBottomRow}>
+                    <Text style={s.locationBottom} numberOfLines={1}>
+                      {locationShort || t("home.setLocation")}
+                    </Text>
+                    <MaterialIcons name="expand-more" size={13} color={C.gray500} />
+                  </View>
+                </>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.webSearch}
+              onPress={goToSearch}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="search" size={16} color={C.gray400} />
+              <Text style={s.webSearchText} numberOfLines={1}>
+                {winW < 850 ? t("home.searchShort") : t("home.searchPlaceholderWeb")}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.accountBtn}
+              onPress={() => navigation.navigate("Profile")}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="person" size={16} color={C.green} />
+              {winW >= 900 && (
+                <Text style={s.accountBtnText} numberOfLines={1}>
+                  {firstName || t("home.account")}
+                </Text>
+              )}
+              <MaterialIcons name="expand-more" size={13} color={C.gray500} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.cartBtn, cartCount > 0 && s.cartBtnActive]}
+              onPress={() => navigation.navigate("Cart")}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons
+                name="shopping-cart"
+                size={16}
+                color={cartCount > 0 ? C.white : C.green}
+              />
+              {winW >= 850 && (
+                <Text
+                  style={[s.cartBtnText, cartCount > 0 && { color: C.white }]}
+                >
+                  {cartCount > 0
+                    ? t("home.itemsInCart", { count: cartCount })
+                    : t("cart.title_short")}
+                </Text>
+              )}
+              {cartCount > 0 && (
+                <View style={s.cartBtnBadge}>
+                  <Text style={s.cartBtnBadgeText}>₹{cartTotal}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            {/* ── Mobile header row: location (left) + account (right) ── */}
+            <View style={[s.mobileRow1, { paddingHorizontal: hPad }]}>
+              <TouchableOpacity
+                style={s.mobileLocBtn}
+                onPress={openAddressPicker}
+                activeOpacity={0.75}
+              >
+                {locationLoading ? (
+                  <View style={s.locLoadRow}>
+                    <ActivityIndicator
+                      size="small"
+                      color={C.green}
+                      style={{ transform: [{ scale: 0.7 }] }}
+                    />
+                    <Text style={s.locLoadText}>{t("home.locating")}</Text>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <MaterialIcons name="location-on" size={20} color={C.green} />
+                    <View style={{ flexShrink: 1 }}>
+                      <Text style={s.locationTop}>{t("home.deliveringTo")}</Text>
+                      <View style={s.locationBottomRow}>
+                        <Text style={s.mobileLocBottom} numberOfLines={1}>
+                          {locationShort || t("home.setLocation")}
+                        </Text>
+                        <MaterialIcons
+                          name="expand-more"
+                          size={15}
+                          color={C.gray700}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </TouchableOpacity>
+              {/* Account icon — clean circle */}
+              <TouchableOpacity
+                style={s.mobileBrandBtn}
+                onPress={() => navigation.navigate("Home")}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={isDark ? [C.green, C.greenDark] : ["#147538", "#0EE627"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={s.mobileBrandMark}
+                >
+                  <MaterialIcons name="storefront" size={18} color={C.white} />
+                </LinearGradient>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.mobileProfileBtn}
+                onPress={() => navigation.navigate("Profile")}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="account-circle" size={36} color={C.green} />
+              </TouchableOpacity>
+            </View>
+
+            {/* ── Rounded pill search bar with mic ── */}
+            <TouchableOpacity
+              style={[s.mobileSearch, { marginHorizontal: hPad }]}
+              onPress={goToSearch}
+              activeOpacity={0.9}
+            >
+              <MaterialIcons name="search" size={18} color={C.gray400} />
+              <Text style={s.mobileSearchText}>{t("home.searchHint")}</Text>
+              <MaterialIcons name="mic" size={18} color={C.green} />
+            </TouchableOpacity>
+          </>
+        )}
+      </Animated.View>
+
+      {/* ══ BODY ════════════════════════════════════════════════════════════ */}
+      <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        style={{
+          opacity: contentOpacity,
+          transform: [{ translateY: contentY }],
+        }}
+        contentContainerStyle={s.scroll}
+      >
+        {/* 1. GREETING */}
+        <View style={s.legacyGreetingRow}>
+          <Text style={s.greetingLine}>
+            {getGreeting()}{firstName ? "," : "!"}
+            {firstName ? (
+              <Text style={s.greetingName}> {firstName}</Text>
+            ) : null}
+          </Text>
+          <Text style={s.greetingEmoji}>👋</Text>
+          <Text style={s.greetingSub}>
+            {t("home.heroSubHeader")}
+          </Text>
+        </View>
+
+        {/* 2. HERO BANNER */}
+        <View style={[s.bannerWrap, { paddingHorizontal: hPad }]}>
+          <View style={[s.heroIntro, wide && s.heroIntroWide]}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.greetingKicker}>{getGreeting()}</Text>
+              <Text style={s.heroIntroTitle}>
+                {firstName ? t("home.welcomeBack", { name: firstName }) : t("home.welcomeGuest")}
+              </Text>
+            </View>
+          </View>
+          <View style={[s.heroBanner, { minHeight: wide ? 260 : 250 }]}>
+            <Image
+              source={{
+                uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&q=85&sig=banner",
+              }}
+              style={StyleSheet.absoluteFillObject}
+              resizeMode="cover"
+            />
+            <LinearGradient
+              colors={[
+                "rgba(17,24,39,0.86)",
+                "rgba(21,128,61,0.76)",
+                "rgba(249,115,22,0.38)",
+                "rgba(17,24,39,0.12)",
+              ]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View style={[s.heroLeft, { width: wide ? "62%" : "100%" }]}>
+              <View style={s.heroBadge}>
+                <MaterialIcons name="verified" size={13} color={C.green} />
+                <Text style={s.heroBadgeText}>{t("home.freshFromNearby")}</Text>
+              </View>
+              <Text style={s.heroTitle}>{heroTitle}</Text>
+              <Text style={s.heroSub}>{heroSub}</Text>
+              {/* <View style={s.heroActions}>
+                <TouchableOpacity
+                  style={s.heroCTA}
+                  onPress={goToSearch}
+                  activeOpacity={0.85}
+                >
+                  <MaterialIcons name="search" size={16} color={C.white} />
+                  <Text style={s.heroCTAText}>Start Shopping</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.heroGhostCTA}
+                  onPress={openAddressPicker}
+                  activeOpacity={0.85}
+                >
+                  <MaterialIcons name="location-on" size={15} color={C.white} />
+                  <Text style={s.heroGhostText}>Change Address</Text>
+                </TouchableOpacity>
+              </View> */}
+              {wide && (
+                <View style={s.heroStats}>
+                  {homeStats.map((stat) => (
+                    <View key={stat.label} style={s.heroStat}>
+                      <MaterialIcons name={stat.icon} size={16} color={C.white} />
+                      <Text style={s.heroStatValue}>{stat.value}</Text>
+                      <Text style={s.heroStatLabel}>{stat.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* 3. CATEGORY ROW — mobile only (replaces stat boxes + quick actions on phones) */}
+        {!wide && dynamicCategories.length > 0 && (
+          <View style={s.mobileCatRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingLeft: hPad,
+                paddingRight: hPad,
+                paddingBottom: 8,
+                gap: 10,
+              }}
+            >
+              {dynamicCategories.map((cat) => (
+                <TouchableOpacity
+                  key={cat.label}
+                  style={s.mobileCatChip}
+                  onPress={() => {
+                    const root = navigation.getParent?.() || navigation;
+                    root.navigate("Search", { category: cat.label });
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <View style={[s.mobileCatIcon, { backgroundColor: cat.bg }]}>
+                    <MaterialIcons name={cat.icon} size={17} color={cat.accent} />
+                  </View>
+                  <Text style={s.mobileCatChipText} numberOfLines={1}>{cat.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Quick actions rail — desktop/tablet only */}
+        {wide && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingLeft: hPad,
+              paddingRight: hPad,
+              paddingBottom: 8,
+              gap: 10,
+            }}
+            style={s.quickActionRail}
+          >
+            {quickActions.map((action) => (
+              <TouchableOpacity
+                key={action.label}
+                style={s.quickAction}
+                onPress={action.onPress}
+                activeOpacity={0.85}
+              >
+                <View style={s.quickActionIcon}>
+                  <MaterialIcons name={action.icon} size={17} color={C.green} />
+                </View>
+                <Text style={s.quickActionText}>{action.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        <View style={[s.sectionHeader, { paddingHorizontal: hPad }]}>
+          <View>
+            <Text style={s.sectionTitle}>{t("home.nearbyStoresTitle")}</Text>
+            <Text style={s.sectionSub}>{t("home.deliveringToYourLocation")}</Text>
+          </View>
+          <TouchableOpacity onPress={() => goToSearch("stores")}>
+            <Text style={s.viewAll}>{t("home.explore")}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Store Category Filter Chips */}
+        {storeCategories.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: hPad, paddingBottom: 8, gap: 8 }}
+            style={{ marginBottom: 8 }}
+          >
+            {/* All chip */}
+            <TouchableOpacity
+              style={[
+                s.storeCatChip,
+                selectedStoreCategory === null && s.storeCatChipActive,
+              ]}
+              onPress={() => {
+                setSelectedStoreCategory(null);
+                if (locationCoords) fetchNearbyVendors(locationCoords.lat, locationCoords.lng, null);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={[
+                s.storeCatChipText,
+                selectedStoreCategory === null && s.storeCatChipTextActive,
+              ]}>
+                🏪 {t("home.all")}
+              </Text>
+            </TouchableOpacity>
+            {storeCategories.map(cat => {
+              const isActive = selectedStoreCategory === cat;
+              const catMeta = themeCfg(STORE_CATEGORY_META[cat] || STORE_CATEGORY_META._default, isDark);
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  style={[s.storeCatChip, isActive && s.storeCatChipActive]}
+                  onPress={() => {
+                    const newCat = isActive ? null : cat;
+                    setSelectedStoreCategory(newCat);
+                    if (locationCoords) fetchNearbyVendors(locationCoords.lat, locationCoords.lng, newCat);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.storeCatChipText, isActive && s.storeCatChipTextActive]}>
+                    {catMeta.icon} {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+
+        {loadingVendors ? (
+          <View style={[s.loadingRow, { paddingHorizontal: hPad }]}>
+            <ActivityIndicator size="small" color={C.green} />
+            <Text style={s.loadingText}>{t("home.findingStores")}</Text>
+          </View>
+        ) : vendors.length === 0 ? (
+          <View style={s.emptyBox}>
+            <View style={s.emptyIconWrap}>
+              <MaterialIcons name="location-on" size={26} color={C.green} />
+            </View>
+            <Text style={s.emptyTitle}>{t("home.noStoresNearby")}</Text>
+            <Text style={s.emptySub}>{t("home.tryUpdatingLocation")}</Text>
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingLeft: hPad,
+              paddingRight: 8,
+              paddingBottom: 6,
+            }}
+          >
+            {vendors.map((vendor) => (
+              <TouchableOpacity
+                key={vendor.id}
+                style={[s.storeCard, wide && s.storeCardWide]}
+                onPress={() =>
+                  navigation.navigate("VendorStore", {
+                    vendorId: vendor.id,
+                    vendorName: vendor.shop_name,
+                  })
+                }
+                activeOpacity={0.88}
+              >
+                {/* Everything except the CLOSED badge — dimmed when closed */}
+                <View
+                  style={[
+                    s.cardContent,
+                    !isStoreCurrentlyOpen(vendor) && s.cardContentClosed,
+                  ]}
+                >
+                <View style={s.storeImgWrap}>
+                  <Image
+                    source={{
+                      uri:
+                        vendor.shop_image_url ||
+                        `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&sig=${vendor.id}`,
+                    }}
+                    style={s.storeImg}
+                  />
+                  <LinearGradient
+                    colors={["transparent", "rgba(0,0,0,0.5)"]}
+                    style={s.storeImgOverlay}
+                  />
+                  <View style={s.ratingBadge}>
+                    <MaterialIcons name="star" size={10} color="#FBBF24" />
+                    <Text style={s.ratingText}>
+                      {vendor.avg_rating
+                        ? parseFloat(vendor.avg_rating).toFixed(1)
+                        : t("home.new")}
+                    </Text>
+                  </View>
+                </View>
+                <View style={s.storeInfo}>
+                  <Text style={s.storeName} numberOfLines={1}>
+                    {vendor.shop_name}
+                  </Text>
+                  <View style={s.storeMetaRow}>
+                    <MaterialIcons name="location-on" size={10} color={C.green} />
+                    <Text style={s.storeMeta}>
+                      {vendor.distance_km
+                        ? t("home.kmDistance", { count: parseFloat(vendor.distance_km).toFixed(1) })
+                        : t("home.nearby")}
+                    </Text>
+                    <View style={s.metaDot} />
+                    <MaterialIcons name="access-time" size={10} color={C.gray400} />
+                    <Text style={s.storeMeta}>{t("home.deliveryTime")}</Text>
+                  </View>
+                  <View style={s.storeTagRow}>
+                    {/* Min order — orange pill */}
+                    <View style={[s.storeTag, { backgroundColor: C.orangeLight, borderColor: dkBorder("#FED7AA", isDark) }]}>
+                      <Text style={[s.storeTagText, { color: C.orangeDark }]}>
+                        {t("home.minOrder", { min: vendor.min_order || 99 })}
+                      </Text>
+                    </View>
+                    {isStoreCurrentlyOpen(vendor) && (
+                      <View
+                        style={[
+                          s.storeTag,
+                          {
+                            backgroundColor: C.greenLight,
+                            borderColor: C.greenBorder,
+                          },
+                        ]}
+                      >
+                        <Text style={[s.storeTagText, { color: C.green }]}>
+                          {t("home.acceptingOrders")}
+                        </Text>
+                      </View>
+                    )}
+                    {vendor.vendor_type && vendor.vendor_type !== "all" &&
+                      VENDOR_TYPE_META[vendor.vendor_type] && (
+                        <View
+                          style={[
+                            s.storeTag,
+                            {
+                              backgroundColor: themeCfg(VENDOR_TYPE_META[vendor.vendor_type], isDark).bg,
+                              borderColor: themeCfg(VENDOR_TYPE_META[vendor.vendor_type], isDark).bg,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              s.storeTagText,
+                              { color: themeCfg(VENDOR_TYPE_META[vendor.vendor_type], isDark).color },
+                            ]}
+                          >
+                            {themeCfg(VENDOR_TYPE_META[vendor.vendor_type], isDark).label}
+                          </Text>
+                        </View>
+                      )}
+                  </View>
+                </View>
+                </View>
+
+                {/* OPEN/CLOSED pill — solid, no dot. Kept OUTSIDE the dimmed
+                    wrapper so it always renders at full opacity and stays
+                    clearly legible even on a CLOSED (dimmed) card. */}
+                <View
+                  style={[
+                    s.statusBadge,
+                    {
+                      backgroundColor: isStoreCurrentlyOpen(vendor)
+                        ? C.green
+                        : "rgba(0,0,0,0.72)",
+                    },
+                  ]}
+                >
+                  <Text style={s.statusText}>
+                    {isStoreCurrentlyOpen(vendor) ? t("home.open") : t("home.closed")}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* 4. SHOP BY CATEGORY */}
+        {showCategories && (
+          <>
+            <View
+              style={[
+                s.sectionHeader,
+                { marginTop: 24, paddingHorizontal: hPad },
+              ]}
+            >
+              <Text style={s.sectionTitle}>{t("home.shopByCategory")}</Text>
+              <TouchableOpacity onPress={() => goToSearch("categories")}>
+                <Text style={s.viewAll}>{t("home.viewAll")}</Text>
+              </TouchableOpacity>
+            </View>
+            {/* 4-column clean tile grid */}
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                paddingHorizontal: hPad,
+                paddingBottom: 8,
+                rowGap: 16,
+                columnGap: 0,
+              }}
+            >
+              {dynamicCategories.map((cat) => {
+                const catCols = winW >= 1024 ? 10 : winW >= 768 ? 6 : winW >= 480 ? 5 : 4;
+                const catItemW = (winW - (hPad * 2)) / catCols;
+                const tileSize = catItemW * 0.72;
+
+                return (
+                  <TouchableOpacity
+                    key={cat.label}
+                    style={[s.catCard, { width: catItemW }]}
+                    onPress={() => {
+                      setCatSheetCategory(cat.label);
+                      setCatSheetVisible(true);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    {/* Square tile with image */}
+                    <View
+                      style={[
+                        s.catTile,
+                        {
+                          width: tileSize,
+                          height: tileSize,
+                          backgroundColor: cat.bg,
+                        },
+                      ]}
+                    >
+                      <Image
+                        source={{ uri: cat.img }}
+                        style={{ width: tileSize * 0.72, height: tileSize * 0.72 }}
+                        resizeMode="contain"
+                      />
+                    </View>
+                    <Text style={s.catCardLabel} numberOfLines={2}>{cat.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
+
+        {loadingInventory && vendors.length > 0 && (
+          <View
+            style={[s.loadingRow, { paddingHorizontal: hPad, marginTop: 28 }]}
+          >
+            <ActivityIndicator size="small" color={C.green} />
+            <Text style={s.loadingText}>{t("home.loadingProducts")}</Text>
+          </View>
+        )}
+
+        {/* 5. POPULAR ITEMS — horizontal scroll like HTML reference */}
+        {showPopular && (
+          <>
+            <View
+              style={[
+                s.sectionHeader,
+                { marginTop: 28, paddingHorizontal: hPad },
+              ]}
+            >
+              <Text style={s.sectionTitle}>{t("home.popularItemsTitle")}</Text>
+              <TouchableOpacity onPress={() => goToSearch("items")}>
+                <Text style={s.viewAll}>{t("home.seeAll")}</Text>
+              </TouchableOpacity>
+            </View>
+            {/* Horizontal scroll cards */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingLeft: hPad,
+                paddingRight: 8,
+                paddingBottom: 8,
+                gap: 14,
+              }}
+            >
+              {popularItems.map((item) => (
+                <PopularItemCard
+                  key={item.id}
+                  item={item}
+                  qty={getCartQty(item.id)}
+                  onAdd={handleAdd}
+                  onRemove={handleRemove}
+                  onOpenWeightPicker={setLoosePickerItem}
+                  onPress={() => setPopularDetailItem(item)}
+                />
+              ))}
+            </ScrollView>
+          </>
+        )}
+
+        {/* 6. RECENT ORDERS */}
+        {recentOrders.length > 0 && (
+          <>
+            <View
+              style={[
+                s.sectionHeader,
+                { marginTop: 28, paddingHorizontal: hPad },
+              ]}
+            >
+              <Text style={s.sectionTitle}>{t("home.recentOrders")}</Text>
+              <TouchableOpacity onPress={() => navigation.navigate("Orders")}>
+                <Text style={s.viewAll}>{t("home.viewAll")}</Text>
+              </TouchableOpacity>
+            </View>
+            {recentOrders.map((order) => (
+              <TouchableOpacity
+                key={order.id}
+                style={[s.orderCard, { marginHorizontal: hPad }]}
+                onPress={() => navigation.navigate("Orders")}
+                activeOpacity={0.85}
+              >
+                <Image
+                  source={{
+                    uri:
+                      order.vendor?.shop_image_url ||
+                      `https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=200&sig=${order.vendor_id}`,
+                  }}
+                  style={s.orderImg}
+                />
+                <View style={s.orderInfo}>
+                  <Text style={s.orderStore} numberOfLines={1}>
+                    {order.vendor?.shop_name || t("home.store")}
+                  </Text>
+                  <Text style={s.orderMeta}>
+                    {order.order_number} · ₹{order.total}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    s.statusPill,
+                    { backgroundColor: getStatusColor(order.status) + "18" },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      s.statusPillText,
+                      { color: getStatusColor(order.status) },
+                    ]}
+                  >
+                    {order.status.charAt(0).toUpperCase() +
+                      order.status.slice(1)}
+                  </Text>
+                </View>
+                <MaterialIcons
+                  name="chevron-right"
+                  size={15}
+                  color={C.gray300}
+                  style={{ marginLeft: 4 }}
+                />
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
+
+        <View style={{ height: wide ? 60 : 130 }} />
+      </Animated.ScrollView>
+
+      {/* ══ ADDRESS PICKER MODAL ═══════════════════════════════════════════ */}
+      <AddressPicker
+        visible={addrPickerVisible}
+        addresses={(addressStore?.addresses || []).filter(a => a.label !== "Current Location")}
+        selectedId={selectedAddrId}
+        initialCoords={locationCoords}
+        onClose={() => setAddrPickerVisible(false)}
+        onSelect={handleSelectAddress}
+        onDelete={(id) => addressStore.removeAddress(id, token)}
+        onUpdate={async (id, patch) => {
+          await addressStore.updateAddress(id, patch, token);
+        }}
+        onSaveNew={async (text, coords) => {
+          let lat = coords?.lat ?? null,
+            lng = coords?.lng ?? null;
+          if (!lat || !lng) {
+            try {
+              const encoded = encodeURIComponent(text);
+              const res = await fetch(
+                `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1`,
+                { headers: { "User-Agent": "KwikPik/1.0" } },
+              );
+              const results = await res.json();
+              if (results?.length > 0) {
+                lat = parseFloat(results[0].lat);
+                lng = parseFloat(results[0].lon);
+              }
+            } catch { }
+          }
+
+          // addAddress now returns the real ID
+          const newId = await addressStore?.addAddress?.({ address: text, lat, lng }, token);
+          if (newId) {
+            setSelectedAddrId(newId);
+            addressStore?.setSelectedId?.(newId);
+          }
+          if (lat && lng) {
+            fetchNearbyVendors(lat, lng);
+            fetchPopularProducts(lat, lng);
+          }
+          setAddrPickerVisible(false);
+        }}
+      />
+
+      {/* ══ WEIGHPICKER MODAL ═════════════════════════════════════════════ */}
+      <WeightPickerModal
+        item={loosePickerItem}
+        onClose={() => setLoosePickerItem(null)}
+        onAdd={handleAdd}
+      />
+
+      {/* ══ POPULAR ITEM DETAIL MODAL ══════════════════════════════════════ */}
+      <ItemDetailModal
+        item={popularDetailItem}
+        qty={popularDetailItem ? getCartQty(popularDetailItem.id) : 0}
+        onClose={() => setPopularDetailItem(null)}
+        onAdd={(item) => handleAdd(item)}
+        onRemove={(item) => handleRemove(item)}
+      />
+
+      {/* ══ CATEGORY ITEM DETAIL MODAL ══════════════════════════════════════ */}
+      <ItemDetailModal
+        item={catDetailItem}
+        qty={catDetailItem ? getCartQty(catDetailItem.id) : 0}
+        onClose={() => setCatDetailItem(null)}
+        onAdd={(item) => handleAdd(item)}
+        onRemove={(item) => handleRemove(item)}
+      />
+
+      {/* ══ STORE PICKER MODAL ═════════════════════════════════════════════ */}
+      <StorePicker
+        visible={pickerVisible}
+        item={pickerItem}
+        vendors={vendors}
+        onClose={() => setPickerVisible(false)}
+        onSelectStore={handleStoreSelect}
+      />
+
+      {/* ══ CATEGORY BROWSE SHEET ══════════════════════════════════════════ */}
+      <CategoryBrowseSheet
+        visible={catSheetVisible}
+        category={catSheetCategory}
+        hierarchy={categoryHierarchy}
+        onClose={() => setCatSheetVisible(false)}
+        onAdd={handleAdd}
+        onRemove={handleRemove}
+        getCartQty={getCartQty}
+        onOpenWeightPicker={setLoosePickerItem}
+        vendors={vendors}
+        onStoreSelect={handleStoreSelect}
+        apiCategories={apiCategories}
+        onItemDetail={(item, product) => {
+          setCatSheetVisible(false);
+          setTimeout(() => {
+            setCatDetailItem({
+              id: product.id,
+              name: product.name,
+              price: product.price,
+              img: product.image_url || null,
+              unit: product.unit || "1 pc",
+              orig: product.mrp && product.mrp > product.price ? product.mrp : null,
+              description: product.description || null,
+              category: catSheetCategory,
+              item_type: product.item_type,
+              weight_options: product.weight_options,
+            });
+          }, 300);
+        }}
+      />
+
+      {/* <ChatWidget /> */}
+
+      {/* ══ FLOATING CART — mobile ══════════════════════════════════════════ */}
+      {!wide && cartCount > 0 && (
+        <Animated.View
+          style={[s.floatingCart, { transform: [{ translateY: floatingY }] }]}
+        >
+          <View style={s.floatingLeft}>
+            {/* Basket icon with orange count badge */}
+            <View style={{ position: "relative" }}>
+              <MaterialIcons name="shopping-basket" size={30} color={C.white} />
+              <View style={s.floatingCountBadge}>
+                <Text style={s.floatingCountBadgeText}>{cartCount}</Text>
+              </View>
+            </View>
+            <View>
+              <Text style={s.floatingItems}>
+                {t("home.itemsAdded", { count: cartCount })}
+              </Text>
+              <Text style={s.floatingTotal}>{t("home.totalAmount", { amount: cartTotal })}</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={s.floatingCTA}
+            onPress={() => navigation.navigate("Cart")}
+            activeOpacity={0.85}
+          >
+            <Text style={s.floatingCTAText}>{t("home.viewCart")}</Text>
+            <MaterialIcons name="arrow-forward" size={14} color={C.white} />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
+// ─── Styles (unchanged from your original) ────────────────────────────────────
+
 
 

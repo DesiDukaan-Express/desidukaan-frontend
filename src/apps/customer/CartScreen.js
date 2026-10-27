@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Image,
   TouchableOpacity, TextInput, Platform, StatusBar,
@@ -61,6 +61,7 @@ const DARK_COLORS = {
   redLight: "#2C1E20",
 };
 
+
 // ─── Local time parser (fallback so button always works) ──────────────────────
 function parseSlotLocally(input) {
   if (!input?.trim()) return null;
@@ -110,57 +111,119 @@ const C = LIGHT_COLORS;
 
 // Modals removed to consolidate features in Checkout screen.
 
-const sm = StyleSheet.create({
-  backdrop:           { flex: 1, backgroundColor: "rgba(0,0,0,0.48)", justifyContent: "flex-end" },
-  sheet:              { backgroundColor: C.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 36 },
-  handle:             { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
-  title:              { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 4 },
-  sub:                { fontSize: 13, color: C.gray400, marginBottom: 16 },
-  subBold:            { fontWeight: "700", color: C.greenDark },
-  inputBox:           { flexDirection: "row", alignItems: "center", backgroundColor: C.gray100, borderRadius: 14, borderWidth: 1.5, borderColor: "transparent", minHeight: 52, paddingRight: 4 },
-  inputBoxError:      { borderColor: C.red, backgroundColor: C.redLight },
-  inputBoxValid:      { borderColor: C.green, backgroundColor: C.greenLight },
-  input:              { flex: 1, fontSize: 15, color: C.gray900, paddingLeft: 10, paddingVertical: 14, ...Platform.select({ web: { outlineStyle: "none" } }) },
-  hints:              { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
-  hintChip:           { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: C.gray100, borderWidth: 1, borderColor: C.gray200 },
-  hintText:           { fontSize: 13, color: C.gray600, fontWeight: "600" },
-  preview:            { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14, padding: 12, borderRadius: 12 },
-  previewValid:       { backgroundColor: C.greenLight },
-  previewInvalid:     { backgroundColor: C.redLight },
-  previewText:        { fontSize: 14, color: C.greenDark },
-  previewBold:        { fontWeight: "800" },
-  previewTextErr:     { fontSize: 13, color: C.red, flex: 1 },
-  confirmBtn:         { marginTop: 18, backgroundColor: C.green, paddingVertical: 16, borderRadius: 14, alignItems: "center" },
-  confirmBtnDisabled: { backgroundColor: C.greenMid },
-  confirmBtnText:     { fontSize: 15, fontWeight: "800", color: C.white },
-});
 
 // Fee modality removed...
 
-const fm = StyleSheet.create({
-  backdrop:           { flex: 1, backgroundColor: "rgba(0,0,0,0.48)", justifyContent: "flex-end" },
-  sheet:              { backgroundColor: C.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 36 },
-  handle:             { width: 40, height: 4, backgroundColor: C.gray200, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
-  title:              { fontSize: 18, fontWeight: "900", color: C.gray900, marginBottom: 4 },
-  sub:                { fontSize: 13, color: C.gray400, marginBottom: 16 },
-  subBold:            { fontWeight: "700", color: C.gray700 },
-  inputBox:           { flexDirection: "row", alignItems: "center", backgroundColor: C.gray100, borderRadius: 14, borderWidth: 1.5, borderColor: "transparent", minHeight: 56, paddingHorizontal: 18 },
-  inputBoxValid:      { borderColor: C.green, backgroundColor: C.greenLight },
-  rupee:              { fontSize: 22, fontWeight: "900", color: C.gray700, marginRight: 6 },
-  input:              { flex: 1, fontSize: 28, fontWeight: "900", color: C.gray900, ...Platform.select({ web: { outlineStyle: "none" } }) },
-  hints:              { flexDirection: "row", gap: 8, marginTop: 14 },
-  hintChip:           { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 12, backgroundColor: C.gray100, borderWidth: 1, borderColor: C.gray200 },
-  hintText:           { fontSize: 13, fontWeight: "700", color: C.gray600 },
-  preview:            { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14, padding: 12, borderRadius: 12, backgroundColor: C.greenLight },
-  previewText:        { fontSize: 13, color: C.greenDark },
-  previewBold:        { fontWeight: "800" },
-  confirmBtn:         { marginTop: 18, backgroundColor: C.green, paddingVertical: 16, borderRadius: 14, alignItems: "center" },
-  confirmBtnDisabled: { backgroundColor: C.greenMid },
-  confirmBtnText:     { fontSize: 15, fontWeight: "800", color: C.white },
-});
 
 // ═══════════════════════════════════════════════════════════════════════════ //
 export default function CartScreen() {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const s = useMemo(() => StyleSheet.create({
+  root:         { flex: 1, backgroundColor: C.bg },
+
+  // Header
+  header:          { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: C.surface, paddingTop: Platform.OS === "android" ? 28 : 36, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  backBtn:         { width: 38, height: 38, borderRadius: 12, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
+  headerMid:       { flex: 1 },
+  headerTitle:     { fontSize: 20, fontWeight: "900", color: C.gray900, lineHeight: 24 },
+  headerSub:       { fontSize: 12, color: C.gray400, marginTop: 1 },
+  headerBadge:     { width: 28, height: 28, borderRadius: 14, backgroundColor: C.green, alignItems: "center", justifyContent: "center" },
+  headerBadgeText: { fontSize: 12, fontWeight: "800", color: C.white },
+
+  // Page layout
+  pageBody:         { flex: 1, flexDirection: "row" },
+  pageBodyDesktop:  { /* side-by-side enforced by children widths */ },
+
+  // Main column
+  mainCol:          { flex: 1, flexDirection: "column" },
+  mainColTablet:    { /* flex:1 fills remaining space */ },
+  mainColDesktop:   { flex: 1 /* sidebar is fixed width, this fills rest */ },
+
+  // Sidebar (desktop)
+  sideCol:          { width: 360, backgroundColor: C.bg, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 24, gap: 16, borderLeftWidth: 1, borderLeftColor: C.gray200 },
+
+  // Delivery strip
+  vendorHeader: { height: 70, overflow: "hidden", marginBottom: 12 },
+  vendorGrad:   { flex: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 20 },
+  vendorInfo:   { flexDirection: "row", alignItems: "center", gap: 12 },
+  vendorIcon:   { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
+  orderingFrom: { fontSize: 11, fontWeight: "700", color: "rgba(255,255,255,0.8)", textTransform: "uppercase", letterSpacing: 0.5 },
+  vendorNameText: { fontSize: 18, fontWeight: "900", color: C.white },
+
+  deliveryStrip:    { height: 64, overflow: "hidden", marginBottom: 12 },
+  deliveryGrad:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
+  deliveryLeft:     { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
+  deliveryIconWrap: { width: 34, height: 34, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
+  deliveryEta:      { fontSize: 14, fontWeight: "800", color: C.white },
+  deliveryDist:     { fontSize: 11, color: "rgba(255,255,255,0.72)", marginTop: 2 },
+  slotPickBtn:      { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.surface, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
+  slotPickText:     { fontSize: 12, fontWeight: "800", color: C.green },
+  slotConfirmed:    { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 10, paddingVertical: 7, borderRadius: 20 },
+  slotConfirmedText:{ fontSize: 12, fontWeight: "700", color: C.white },
+
+  // Counter banners
+  counterBanner:     { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: dkBg("#FEF3C7", isDark), marginBottom: 8, padding: 14, borderWidth: 1, borderColor: dkBorder("#FDE68A", isDark) },
+  counterTitle:      { fontSize: 13, fontWeight: "700", color: dkText("#92400E", isDark) },
+  counterSub:        { fontSize: 11, color: dkText("#B45309", isDark), marginTop: 2 },
+  counterAccept:     { backgroundColor: C.green, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
+  counterAcceptText: { fontSize: 13, fontWeight: "700", color: C.white },
+  counterReject:     { width: 30, height: 30, borderRadius: 9, backgroundColor: C.redLight, alignItems: "center", justifyContent: "center" },
+
+  // Items
+  itemsScroll:   { flex: 1 },
+  itemsCard:     { backgroundColor: C.surface, borderWidth: 1, borderColor: C.gray200, overflow: "hidden" },
+  itemsTitle:    { fontSize: 13, fontWeight: "700", color: C.green, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  itemRow:       { flexDirection: "row", alignItems: "center", gap: 12 },
+  itemRowBorder: { borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  itemImg:       { backgroundColor: C.gray100 },
+  itemMid:       { flex: 1 },
+  itemName:      { fontSize: 14, fontWeight: "700", color: C.gray900 },
+  itemUnit:      { fontSize: 12, color: C.gray400, marginTop: 2 },
+  itemPrice:     { fontSize: 15, fontWeight: "800", color: C.gray900, marginTop: 4 },
+  qtyRow:        { flexDirection: "row", alignItems: "center", borderWidth: 1.5, borderColor: C.green, overflow: "hidden" },
+  qtyBtn:        {},
+  qtyNum:        { fontWeight: "800", color: C.gray900, textAlign: "center" },
+
+  // Phone strip
+  phoneStrip:    { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.surface, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: C.gray200 },
+  phoneText:     { flex: 1, fontSize: 12, color: C.gray600 },
+  phoneBtn:      { backgroundColor: C.greenLight, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9 },
+  phoneBtnText:  { fontSize: 12, fontWeight: "700", color: C.green },
+
+  // Bill card (shared container)
+  billCard:      { backgroundColor: C.surface, borderWidth: 1, borderColor: C.gray200, padding: 16 },
+  billCardSide:  { borderRadius: 18, padding: 20 },
+
+  // Sidebar elements
+  sideCardTitle:    { fontSize: 17, fontWeight: "900", color: C.gray900, marginBottom: 14 },
+  proceedBtnSide:   { borderRadius: 16, overflow: "hidden" },
+  proceedGradSide:  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 18 },
+  proceedTextSide:  { fontSize: 17, fontWeight: "900", color: C.white },
+  slotSideCard:     { flexDirection: "row", alignItems: "flex-start", gap: 12, backgroundColor: C.greenLight, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: C.greenBorder },
+  slotSideTitle:    { fontSize: 13, fontWeight: "700", color: C.green },
+  slotSideTime:     { fontSize: 16, fontWeight: "900", color: C.greenDark, marginTop: 3 },
+  slotSideCTA:      { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: C.surface, borderRadius: 14, padding: 16, borderWidth: 1.5, borderColor: C.green, ...Platform.select({ web: { borderStyle: "dashed" }, default: { borderStyle: "solid" } }) },
+  slotSideCTATitle: { fontSize: 14, fontWeight: "700", color: C.green },
+  slotSideCTASub:   { fontSize: 12, color: C.gray400, marginTop: 2 },
+
+  // Proceed bar (mobile/tablet)
+  proceedBar:   { flexDirection: "row", alignItems: "center", backgroundColor: C.surface, paddingTop: 12, paddingBottom: Platform.OS === "ios" ? 28 : 14, borderTopWidth: 1, borderTopColor: C.gray100, gap: 14 },
+  proceedTotal: { fontSize: 20, fontWeight: "900", color: C.gray900 },
+  proceedSub:   { fontSize: 10, color: C.gray400, fontWeight: "600" },
+  proceedBtn:   { },
+  proceedGrad:  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 15 },
+  proceedText:  { fontSize: 15, fontWeight: "900", color: C.white },
+
+  // Empty cart
+  emptyWrap:  { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
+  emptyEmoji: { fontSize: 54, marginBottom: 4 },
+  emptyTitle: { fontSize: 20, fontWeight: "800", color: C.gray900 },
+  emptySub:   { fontSize: 14, color: C.gray400 },
+  shopBtn:    { marginTop: 14, borderRadius: 14, overflow: "hidden" },
+  shopBtnGrad:{ paddingHorizontal: 28, paddingVertical: 14 },
+  shopBtnText:{ fontSize: 15, fontWeight: "800", color: C.white },
+}), [C]);
   const { t }        = useTranslation();
   const navigation   = useNavigation();
   const cart         = useCartStore();
@@ -512,6 +575,23 @@ style={[s.itemImg, themedStyles.itemImg, {
 
 // ─── BillSummary (shared between inline and sidebar) ──────────────────────────
 function BillSummary({ subtotal, activeFee, grandTotal, fs = 1 }) {
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const bs = useMemo(() => StyleSheet.create({
+  row:              { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 5 },
+  label:            { fontSize: 14, color: C.gray600 },
+  value:            { fontSize: 14, fontWeight: "600", color: C.gray900 },
+  divider:          { height: 1, backgroundColor: C.gray100, marginVertical: 8 },
+  grandLabel:       { fontSize: 16, fontWeight: "900", color: C.gray900 },
+  negotiateBtn:     { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: C.greenLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  negotiateBtnText: { fontSize: 10, fontWeight: "700", color: C.green },
+  pendingBadge:     { backgroundColor: dkBg("#FEF3C7", isDark), paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  pendingBadgeText: { fontSize: 10, fontWeight: "700", color: dkText("#D97706", isDark) },
+  agreedBadge:      { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: C.greenMid, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  agreedBadgeText:  { fontSize: 10, fontWeight: "700", color: C.green },
+  freeHint:         { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.greenLight, borderRadius: 8, padding: 8, marginTop: 4 },
+  freeHintText:     { fontSize: 11, color: C.green, fontWeight: "600", flex: 1 },
+}), [C]);
   const { t } = useTranslation();
   const { isDark } = useTheme();
   const C = isDark ? DARK_COLORS : LIGHT_COLORS;
@@ -617,108 +697,3 @@ function useBreakpoint() {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const s = StyleSheet.create({
-  root:         { flex: 1, backgroundColor: C.bg },
-
-  // Header
-  header:          { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: C.white, paddingTop: Platform.OS === "android" ? 28 : 36, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  backBtn:         { width: 38, height: 38, borderRadius: 12, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
-  headerMid:       { flex: 1 },
-  headerTitle:     { fontSize: 20, fontWeight: "900", color: C.gray900, lineHeight: 24 },
-  headerSub:       { fontSize: 12, color: C.gray400, marginTop: 1 },
-  headerBadge:     { width: 28, height: 28, borderRadius: 14, backgroundColor: C.green, alignItems: "center", justifyContent: "center" },
-  headerBadgeText: { fontSize: 12, fontWeight: "800", color: C.white },
-
-  // Page layout
-  pageBody:         { flex: 1, flexDirection: "row" },
-  pageBodyDesktop:  { /* side-by-side enforced by children widths */ },
-
-  // Main column
-  mainCol:          { flex: 1, flexDirection: "column" },
-  mainColTablet:    { /* flex:1 fills remaining space */ },
-  mainColDesktop:   { flex: 1 /* sidebar is fixed width, this fills rest */ },
-
-  // Sidebar (desktop)
-  sideCol:          { width: 360, backgroundColor: C.bg, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 24, gap: 16, borderLeftWidth: 1, borderLeftColor: C.gray200 },
-
-  // Delivery strip
-  vendorHeader: { height: 70, overflow: "hidden", marginBottom: 12 },
-  vendorGrad:   { flex: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 20 },
-  vendorInfo:   { flexDirection: "row", alignItems: "center", gap: 12 },
-  vendorIcon:   { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
-  orderingFrom: { fontSize: 11, fontWeight: "700", color: "rgba(255,255,255,0.8)", textTransform: "uppercase", letterSpacing: 0.5 },
-  vendorNameText: { fontSize: 18, fontWeight: "900", color: C.white },
-
-  deliveryStrip:    { height: 64, overflow: "hidden", marginBottom: 12 },
-  deliveryGrad:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
-  deliveryLeft:     { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
-  deliveryIconWrap: { width: 34, height: 34, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
-  deliveryEta:      { fontSize: 14, fontWeight: "800", color: C.white },
-  deliveryDist:     { fontSize: 11, color: "rgba(255,255,255,0.72)", marginTop: 2 },
-  slotPickBtn:      { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.white, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
-  slotPickText:     { fontSize: 12, fontWeight: "800", color: C.green },
-  slotConfirmed:    { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 10, paddingVertical: 7, borderRadius: 20 },
-  slotConfirmedText:{ fontSize: 12, fontWeight: "700", color: C.white },
-
-  // Counter banners
-  counterBanner:     { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FEF3C7", marginBottom: 8, padding: 14, borderWidth: 1, borderColor: "#FDE68A" },
-  counterTitle:      { fontSize: 13, fontWeight: "700", color: "#92400E" },
-  counterSub:        { fontSize: 11, color: "#B45309", marginTop: 2 },
-  counterAccept:     { backgroundColor: C.green, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
-  counterAcceptText: { fontSize: 13, fontWeight: "700", color: C.white },
-  counterReject:     { width: 30, height: 30, borderRadius: 9, backgroundColor: C.redLight, alignItems: "center", justifyContent: "center" },
-
-  // Items
-  itemsScroll:   { flex: 1 },
-  itemsCard:     { backgroundColor: C.white, borderWidth: 1, borderColor: C.gray200, overflow: "hidden" },
-  itemsTitle:    { fontSize: 13, fontWeight: "700", color: C.green, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  itemRow:       { flexDirection: "row", alignItems: "center", gap: 12 },
-  itemRowBorder: { borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  itemImg:       { backgroundColor: C.gray100 },
-  itemMid:       { flex: 1 },
-  itemName:      { fontSize: 14, fontWeight: "700", color: C.gray900 },
-  itemUnit:      { fontSize: 12, color: C.gray400, marginTop: 2 },
-  itemPrice:     { fontSize: 15, fontWeight: "800", color: C.gray900, marginTop: 4 },
-  qtyRow:        { flexDirection: "row", alignItems: "center", borderWidth: 1.5, borderColor: C.green, overflow: "hidden" },
-  qtyBtn:        {},
-  qtyNum:        { fontWeight: "800", color: C.gray900, textAlign: "center" },
-
-  // Phone strip
-  phoneStrip:    { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.white, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: C.gray200 },
-  phoneText:     { flex: 1, fontSize: 12, color: C.gray600 },
-  phoneBtn:      { backgroundColor: C.greenLight, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9 },
-  phoneBtnText:  { fontSize: 12, fontWeight: "700", color: C.green },
-
-  // Bill card (shared container)
-  billCard:      { backgroundColor: C.white, borderWidth: 1, borderColor: C.gray200, padding: 16 },
-  billCardSide:  { borderRadius: 18, padding: 20 },
-
-  // Sidebar elements
-  sideCardTitle:    { fontSize: 17, fontWeight: "900", color: C.gray900, marginBottom: 14 },
-  proceedBtnSide:   { borderRadius: 16, overflow: "hidden" },
-  proceedGradSide:  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 18 },
-  proceedTextSide:  { fontSize: 17, fontWeight: "900", color: C.white },
-  slotSideCard:     { flexDirection: "row", alignItems: "flex-start", gap: 12, backgroundColor: C.greenLight, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: C.greenBorder },
-  slotSideTitle:    { fontSize: 13, fontWeight: "700", color: C.green },
-  slotSideTime:     { fontSize: 16, fontWeight: "900", color: C.greenDark, marginTop: 3 },
-  slotSideCTA:      { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: C.white, borderRadius: 14, padding: 16, borderWidth: 1.5, borderColor: C.green, ...Platform.select({ web: { borderStyle: "dashed" }, default: { borderStyle: "solid" } }) },
-  slotSideCTATitle: { fontSize: 14, fontWeight: "700", color: C.green },
-  slotSideCTASub:   { fontSize: 12, color: C.gray400, marginTop: 2 },
-
-  // Proceed bar (mobile/tablet)
-  proceedBar:   { flexDirection: "row", alignItems: "center", backgroundColor: C.white, paddingTop: 12, paddingBottom: Platform.OS === "ios" ? 28 : 14, borderTopWidth: 1, borderTopColor: C.gray100, gap: 14 },
-  proceedTotal: { fontSize: 20, fontWeight: "900", color: C.gray900 },
-  proceedSub:   { fontSize: 10, color: C.gray400, fontWeight: "600" },
-  proceedBtn:   { },
-  proceedGrad:  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 15 },
-  proceedText:  { fontSize: 15, fontWeight: "900", color: C.white },
-
-  // Empty cart
-  emptyWrap:  { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
-  emptyEmoji: { fontSize: 54, marginBottom: 4 },
-  emptyTitle: { fontSize: 20, fontWeight: "800", color: C.gray900 },
-  emptySub:   { fontSize: 14, color: C.gray400 },
-  shopBtn:    { marginTop: 14, borderRadius: 14, overflow: "hidden" },
-  shopBtnGrad:{ paddingHorizontal: 28, paddingVertical: 14 },
-  shopBtnText:{ fontSize: 15, fontWeight: "800", color: C.white },
-});

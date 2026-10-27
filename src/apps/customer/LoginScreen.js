@@ -18,6 +18,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useTranslation } from "react-i18next";
 import useAuthStore from "../../store/authStore";
 import useAddressStore from "../../store/addressStore";
+import useWishlistStore from "../../store/wishlistStore";
 import LanguageSwitcher from "../../components/common/LanguageSwitcher";
 
 const { width } = Dimensions.get("window");
@@ -173,6 +174,7 @@ export default function LoginScreen({ navigation }) {
         await login(data.user, data.accessToken, data.refreshToken);
         const addrStore = useAddressStore.getState();
         await addrStore.loadAddresses(data.accessToken);
+        useWishlistStore.getState().loadIds(data.accessToken);
         return; // Navigation auto-updates via auth store state change
       }
 
@@ -200,6 +202,7 @@ export default function LoginScreen({ navigation }) {
       const addrStore = useAddressStore.getState();
       await login(data.user, data.accessToken, data.refreshToken);
       await addrStore.loadAddresses(data.accessToken);
+      useWishlistStore.getState().loadIds(data.accessToken);
       // Navigation auto-updates — RolePickerScreen shows (activeRole is null)
     } catch (e) { setError(e.message); shakeError(); }
     finally { setLoading(false); }
