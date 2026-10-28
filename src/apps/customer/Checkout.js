@@ -476,13 +476,16 @@ function NegotiationBanner({ status, countdown, vendorName, onDismiss }) {
     alignItems: "center",
     justifyContent: "center",
   },
-  negotiatedNoteText: { flex: 1, fontSize: 12, color: '#15803D', fontWeight: '600' },
-});
-
-
-// ─── Negotiation Banner (Shown while waiting or after response) ──────────────
-function NegotiationBanner({ status, countdown, vendorName, onDismiss, declineReason }) {
+  timer: { fontSize: 13, fontWeight: "900" },
+  title: { fontSize: 15, fontWeight: "900" },
+  sub: { fontSize: 12, color: C.gray500, marginTop: 1 },
+}), [C]);
   const { t } = useTranslation();
+
+  const { isDark } = useTheme();
+  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const nb = useMemo(() => makeNegotiationBannerStyles(C), [C]);
+  
   const configs = {
     pending: {
       title: t('checkout.waitingForStore', 'Waiting for Store...'),
