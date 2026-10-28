@@ -455,31 +455,31 @@ function OrderSummaryCard({ items, subtotal, deliveryFee, baseFee, total, onNego
 
 
 
-// ─── Negotiation Banner (Shown while waiting or after response) ──────────────
+// ─── Negotiation Banner styles ──────────────────────────────────────────────
+const makeNegotiationBannerStyles = (C) =>
+  StyleSheet.create({
+    wrap: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      padding: 16,
+      borderRadius: 16,
+      borderWidth: 1.5,
+      marginVertical: 10,
+    },
+    iconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    timer: { fontSize: 13, fontWeight: "900" },
+    title: { fontSize: 15, fontWeight: "900" },
+    sub: { fontSize: 12, color: C.gray500, marginTop: 1 },
+  });
+
 function NegotiationBanner({ status, countdown, vendorName, onDismiss }) {
-  const { isDark } = useTheme();
-  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
-  const nb = useMemo(() => StyleSheet.create({
-  wrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    marginVertical: 10,
-  },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  timer: { fontSize: 13, fontWeight: "900" },
-  title: { fontSize: 15, fontWeight: "900" },
-  sub: { fontSize: 12, color: C.gray500, marginTop: 1 },
-}), [C]);
   const { t } = useTranslation();
 
   const { isDark } = useTheme();
