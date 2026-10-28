@@ -1,20 +1,21 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View,
   Text,
   ScrollView,
   TextInput,
   TouchableOpacity,
+  Alert,
   StyleSheet,
   SafeAreaView,
   StatusBar,
   Image,
   Platform,
-  Modal,
+  Animated,
 } from "react-native";
 import { useTranslation } from "react-i18next";
 
-import { Feather, MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather, MaterialIcons } from "@expo/vector-icons";
 
 // ── Hooks & Services ──────────────────────────────────────────────────────────
 import useInventory from "../../hooks/useInventory";
@@ -22,6 +23,8 @@ import useInventory from "../../hooks/useInventory";
 // ── Common Components ─────────────────────────────────────────────────────────
 import Spinner from "../../components/common/Spinner";
 import ToastBanner from "../../components/common/ToastBanner";
+import Pagination from "../../components/common/Pagination";
+import { T } from "../../components/common/tokens";
 
 // ── Inventory Components ──────────────────────────────────────────────────────
 import BulkDeleteDialog from "../../components/inventory/BulkDeleteDialog";
@@ -30,204 +33,86 @@ import CatalogueModal from "../../components/inventory/CatalogueModal";
 import ReorderProductsModal from "../../components/vendor/ReorderProductsModal";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COLORS
+// HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const GREEN = "#15803D";
-const GREEN_DARK = "#166534";
+const GREEN = "#1B6B35";
 const GREEN_LIGHT = "#E8F5EC";
 const ORANGE = "#F97316";
-const ORANGE_LIGHT = "#FFF3E8";
+const ORANGE_LIGHT = "#FFF7ED";
 const RED = "#EF4444";
-const RED_LIGHT = "#FEE9E9";
-const GRAY_BG = "#F4F5F7";
+const RED_LIGHT = "#FEF2F2";
+const GRAY_BG = "#F4F4F5";
 const BORDER = "#E4E4E7";
 const TEXT = "#18181B";
 const TEXT_LIGHT = "#71717A";
 const TEXT_XLIGHT = "#A1A1AA";
-const WHITE = "#FFFFFF";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FILTER CONSTANTS
-// ─────────────────────────────────────────────────────────────────────────────
 
-const STOCK_STATUS_OPTIONS = [
-  { value: "All", label: "All", icon: null },
-  { value: "In Stock", label: "In Stock", icon: "check-circle", color: GREEN },
-  { value: "Low Stock", label: "Low Stock", icon: "alert-triangle", color: ORANGE },
-  { value: "Out of Stock", label: "Out of Stock", icon: "x-square", color: RED },
-];
-
-const PRICE_PRESETS = [
-  { id: "u50", label: "Under ₹50", min: null, max: 50 },
-  { id: "50-100", label: "₹50 – ₹100", min: 50, max: 100 },
-  { id: "100-250", label: "₹100 – ₹250", min: 100, max: 250 },
-  { id: "250-500", label: "₹250 – ₹500", min: 250, max: 500 },
-  { id: "500+", label: "₹500+", min: 500, max: null },
-];
-
-const SORT_OPTIONS = ["Newest First", "Price: Low to High", "Price: High to Low", "Name: A-Z"];
-
-const DEFAULT_FILTERS = {
-  stockStatus: "All",
-  availability: null, // null | "Available" | "Unavailable"
-  priceRange: null, // preset id | null
-  minPrice: "",
-  maxPrice: "",
-  sortBy: "Newest First",
+const getCategoryIcon = (catName) => {
+  const name = String(catName || "").toLowerCase();
+  if (name.includes("fruit") || name.includes("vegetable") || name.includes("organic")) return "eco";
+  if (name.includes("milk") || name.includes("dairy") || name.includes("egg") || name.includes("cheese")) return "local-cafe";
+  if (name.includes("bakery") || name.includes("bread") || name.includes("cake")) return "bakery-dining";
+  if (name.includes("beverage") || name.includes("drink") || name.includes("juice") || name.includes("soda")) return "local-drink";
+  if (name.includes("snack") || name.includes("munch") || name.includes("chip") || name.includes("biscuit")) return "fastfood";
+  if (name.includes("meat") || name.includes("chicken") || name.includes("fish") || name.includes("mutton")) return "restaurant";
+  if (name.includes("grocery") || name.includes("staple") || name.includes("rice") || name.includes("dal") || name.includes("flour") || name.includes("oil")) return "grain";
+  if (name.includes("personal") || name.includes("beauty") || name.includes("soap") || name.includes("shampoo")) return "face";
+  if (name.includes("household") || name.includes("clean") || name.includes("detergent")) return "cleaning-services";
+  if (name.includes("baby")) return "child-care";
+  return "folder";
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GENERIC DROPDOWN (opens its option list on press)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function Dropdown({ label, value, options, onSelect }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <View style={[s.dropdownWrap, open && { zIndex: 100 }]}>
-      {!!label && <Text style={s.fieldLabel}>{label}</Text>}
-      <TouchableOpacity style={s.dropdownField} onPress={() => setOpen((o) => !o)} activeOpacity={0.75}>
-        <Text style={s.dropdownFieldText} numberOfLines={1}>
-          {value}
-        </Text>
-        <Feather name={open ? "chevron-up" : "chevron-down"} size={16} color={TEXT_LIGHT} />
-      </TouchableOpacity>
-
-      {open && (
-        <>
-          <TouchableOpacity style={s.dropdownBackdrop} activeOpacity={1} onPress={() => setOpen(false)} />
-          <View style={s.dropdownList}>
-            <ScrollView style={{ maxHeight: 230 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-              {options.map((opt) => {
-                const active = opt === value;
-                return (
-                  <TouchableOpacity
-                    key={opt}
-                    style={[s.dropdownListItem, active && s.dropdownListItemActive]}
-                    onPress={() => {
-                      onSelect(opt);
-                      setOpen(false);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[s.dropdownListItemText, active && s.dropdownListItemTextActive]}>{opt}</Text>
-                    {active && <Feather name="check" size={14} color={GREEN} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </>
-      )}
-    </View>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STAT CARD
 // ─────────────────────────────────────────────────────────────────────────────
 
-function StatCard({ iconSet, iconName, iconColor, iconBg, label, value, sub, subColor }) {
-  const IconComp = iconSet === "MI" ? MaterialIcons : Feather;
+function StatCard({ icon, label, value, accentColor, badge }) {
   return (
-    <View style={s.statCard}>
-      <View style={s.statTopRow}>
-        <View style={[s.statIconWrap, { backgroundColor: iconBg }]}>
-          <IconComp name={iconName} size={18} color={iconColor} />
-        </View>
-        <Text style={s.statLabel}>{label}</Text>
+    <View style={[s.statCard, { borderLeftColor: accentColor }]}>
+      <Text style={s.statIcon}>{icon}</Text>
+      <Text style={s.statLabel}>{label}</Text>
+      <View style={s.statValueRow}>
+        <Text style={s.statValue}>{value ?? 0}</Text>
+        {!!badge && badge > 0 && (
+          <View style={[s.statBadge, { backgroundColor: accentColor }]}>
+            <Text style={s.statBadgeText}>{badge}</Text>
+          </View>
+        )}
       </View>
-      <Text style={s.statValue}>{value ?? 0}</Text>
-      {!!sub && <Text style={[s.statSub, subColor && { color: subColor }]}>{sub}</Text>}
     </View>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PRODUCT ROW (list view — matches reference: thumbnail left, details right)
+// PRODUCT CARD  (replaces old ProductRow)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ProductRow({ product, onToggleAvailability, onPressMenu, onPress }) {
-  const { t } = useTranslation();
-  const isAvailable = product.is_active ?? true;
-  const qty = product.stock_quantity ?? product.stock;
-
-  return (
-    <TouchableOpacity
-      style={[s.row, !isAvailable && s.rowUnavailable]}
-      activeOpacity={0.8}
-      onPress={() => onPress(product)}
-    >
-      <View style={[s.rowImageWrap, !isAvailable && s.rowImageWrapDim]}>
-        {product.image_url ? (
-          <Image
-            source={{ uri: product.image_url }}
-            style={[s.rowImage, !isAvailable && { opacity: 0.5 }]}
-            resizeMode="cover"
-          />
-        ) : (
-          <MaterialIcons name="shopping-cart" size={26} color="#9CA3AF" style={!isAvailable && { opacity: 0.4 }} />
-        )}
-      </View>
-
-      <View style={s.rowContent}>
-        <View style={s.rowTopLine}>
-          <Text style={[s.rowName, !isAvailable && s.rowNameDim]} numberOfLines={1}>
-            {product.name}
-          </Text>
-          <TouchableOpacity
-            onPress={() => onPressMenu(product)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={s.rowMenuBtn}
-          >
-            <Text style={s.rowMenuDots}>•••</Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={[s.rowPrice, !isAvailable && { color: TEXT_XLIGHT }]}>
-          ₹{product.price} / {product.unit}
-        </Text>
-        <Text style={s.rowStock}>
-          Stock: {qty ?? "—"} {product.unit}
-        </Text>
-
-        <TouchableOpacity
-          onPress={() => onToggleAvailability(product)}
-          activeOpacity={0.8}
-          style={[s.rowBadge, isAvailable ? s.rowBadgeActive : s.rowBadgeInactive]}
-        >
-          <Text style={[s.rowBadgeText, isAvailable ? s.rowBadgeTextActive : s.rowBadgeTextInactive]}>
-            {isAvailable ? t("vendor.available") : t("vendor.unavailable")}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <Feather name="chevron-right" size={18} color={TEXT_XLIGHT} style={s.rowChevron} />
-    </TouchableOpacity>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PRODUCT CARD (grid view)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function ProductCard({ product, onToggleAvailability, onPressMenu, onPress }) {
+function ProductCard({
+  product,
+  onEdit,
+  onDelete,
+  onToggleAvailability,
+  onPressMenu,
+}) {
   const { t } = useTranslation();
   const isAvailable = product.is_active ?? true;
 
   return (
-    <TouchableOpacity
-      style={[s.card, !isAvailable && s.cardUnavailable]}
-      activeOpacity={0.85}
-      onPress={() => onPress(product)}
-    >
-      <TouchableOpacity onPress={() => onPressMenu(product)} style={s.cardMenuBtn} activeOpacity={0.7}>
+    <View style={[s.card, !isAvailable && s.cardUnavailable]}>
+      {/* 3-dots Actions Button */}
+      <TouchableOpacity
+        onPress={() => onPressMenu(product)}
+        style={s.cardMenuBtn}
+        activeOpacity={0.7}
+      >
         <Text style={s.cardMenuDots}>•••</Text>
       </TouchableOpacity>
 
       <View style={s.cardContent}>
-        <View style={[s.cardImageWrap, !isAvailable && s.rowImageWrapDim]}>
+        {/* Product Image */}
+        <View style={[s.cardImageWrap, !isAvailable && s.productImageWrapDim]}>
           {product.image_url ? (
             <Image
               source={{ uri: product.image_url }}
@@ -239,186 +124,35 @@ function ProductCard({ product, onToggleAvailability, onPressMenu, onPress }) {
           )}
         </View>
 
-        <Text style={[s.cardName, !isAvailable && s.rowNameDim]} numberOfLines={2}>
+        {/* Product Name */}
+        <Text style={[s.cardName, !isAvailable && s.productNameDim]} numberOfLines={2}>
           {product.name}
         </Text>
+        {product.brand ? (
+          <Text style={s.cardBrand} numberOfLines={1}>
+            {product.brand}
+          </Text>
+        ) : null}
 
+        {/* Price & Unit */}
         <Text style={[s.cardPrice, !isAvailable && { color: TEXT_XLIGHT }]}>
           ₹{product.price} / {product.unit}
         </Text>
 
-        <TouchableOpacity
-          onPress={() => onToggleAvailability(product)}
-          activeOpacity={0.8}
-          style={[s.rowBadge, { width: "100%" }, isAvailable ? s.rowBadgeActive : s.rowBadgeInactive]}
-        >
-          <Text style={[s.rowBadgeText, isAvailable ? s.rowBadgeTextActive : s.rowBadgeTextInactive]}>
-            {isAvailable ? t("vendor.available") : t("vendor.unavailable")}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FILTER & SORT BOTTOM SHEET (matches reference screenshot)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function FilterSortSheet({ visible, filters, setFilter, onReset, onApply, onClose, activeChips }) {
-  const selectedPreset = PRICE_PRESETS.find((p) => p.id === filters.priceRange);
-
-  const selectPreset = (preset) => {
-    if (filters.priceRange === preset.id) {
-      setFilter("priceRange", null);
-    } else {
-      setFilter("priceRange", preset.id);
-      setFilter("minPrice", "");
-      setFilter("maxPrice", "");
-    }
-  };
-
-  const setCustom = (key, value) => {
-    setFilter(key, value);
-    if (filters.priceRange) setFilter("priceRange", null);
-  };
-
-  return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={s.sheetOverlay}>
-        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
-        <View style={s.filterSheetCard}>
-          <View style={s.sheetHandle} />
-
-          <View style={s.filterSheetHeader}>
-            <Text style={s.filterSheetTitle}>Filter & Sort</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Feather name="x" size={22} color={TEXT} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
-            {/* Stock Status */}
-            <Text style={s.filterSectionTitle}>Stock Status</Text>
-            <View style={{ gap: 2, marginBottom: 18 }}>
-              {STOCK_STATUS_OPTIONS.map((opt) => {
-                const active = filters.stockStatus === opt.value;
-                return (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={s.radioRow}
-                    activeOpacity={0.7}
-                    onPress={() => setFilter("stockStatus", opt.value)}
-                  >
-                    <View style={[s.radioCircle, active && s.radioCircleActive]}>
-                      {active && <View style={s.radioDot} />}
-                    </View>
-                    <Text style={s.radioLabel}>{opt.label}</Text>
-                    {opt.icon && (
-                      <Feather name={opt.icon} size={18} color={opt.color} style={{ marginLeft: "auto" }} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Availability */}
-            <Text style={s.filterSectionTitle}>Availability</Text>
-            <View style={s.availRow}>
-              {["Available", "Unavailable"].map((val) => {
-                const active = filters.availability === val;
-                return (
-                  <TouchableOpacity
-                    key={val}
-                    style={[s.availBtn, active && s.availBtnActive]}
-                    activeOpacity={0.8}
-                    onPress={() => setFilter("availability", active ? null : val)}
-                  >
-                    <Text style={[s.availBtnText, active && s.availBtnTextActive]}>{val}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Price Range */}
-            <Text style={[s.filterSectionTitle, { marginTop: 18 }]}>Price Range</Text>
-            <View style={s.priceChipWrap}>
-              {PRICE_PRESETS.map((preset) => {
-                const active = filters.priceRange === preset.id;
-                return (
-                  <TouchableOpacity
-                    key={preset.id}
-                    style={[s.priceChip, active && s.priceChipActive]}
-                    activeOpacity={0.8}
-                    onPress={() => selectPreset(preset)}
-                  >
-                    <Text style={[s.priceChipText, active && s.priceChipTextActive]}>{preset.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Custom Range */}
-            <Text style={[s.filterSectionTitle, { marginTop: 14 }]}>Custom Range</Text>
-            <View style={s.customRangeRow}>
-              <View style={s.customInputWrap}>
-                <Text style={s.rupeeSign}>₹</Text>
-                <TextInput
-                  style={s.customInput}
-                  placeholder="Min"
-                  placeholderTextColor={TEXT_XLIGHT}
-                  keyboardType="numeric"
-                  value={filters.minPrice}
-                  onChangeText={(v) => setCustom("minPrice", v)}
-                />
-              </View>
-              <Text style={{ color: TEXT_LIGHT }}>–</Text>
-              <View style={s.customInputWrap}>
-                <Text style={s.rupeeSign}>₹</Text>
-                <TextInput
-                  style={s.customInput}
-                  placeholder="Max"
-                  placeholderTextColor={TEXT_XLIGHT}
-                  keyboardType="numeric"
-                  value={filters.maxPrice}
-                  onChangeText={(v) => setCustom("maxPrice", v)}
-                />
-              </View>
-            </View>
-
-            {/* Sort By */}
-            <View style={{ marginTop: 18 }}>
-              <Dropdown
-                label="Sort By"
-                value={filters.sortBy}
-                options={SORT_OPTIONS}
-                onSelect={(v) => setFilter("sortBy", v)}
-              />
-            </View>
-
-            {/* Footer buttons */}
-            <View style={s.filterSheetFooter}>
-              <TouchableOpacity style={s.resetBtn} onPress={onReset} activeOpacity={0.8}>
-                <Text style={s.resetBtnText}>Reset</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.applyBtn} onPress={onApply} activeOpacity={0.85}>
-                <Text style={s.applyBtnText}>Apply Filters</Text>
-              </TouchableOpacity>
-            </View>
-
-            {activeChips.length > 0 && (
-              <View style={s.appliedSummaryBox}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Feather name="filter" size={13} color={GREEN_DARK} />
-                  <Text style={s.appliedSummaryTitle}>{activeChips.length} filters applied</Text>
-                </View>
-                <Text style={s.appliedSummaryDesc}>{activeChips.map((c) => c.label).join("  •  ")}</Text>
-              </View>
-            )}
-          </ScrollView>
+        {/* Toggle Availability Switch */}
+        <View style={s.cardToggleRow}>
+          <TouchableOpacity
+            onPress={() => onToggleAvailability(product)}
+            activeOpacity={0.8}
+            style={[s.toggleBtn, isAvailable ? s.toggleBtnActive : s.toggleBtnInactive]}
+          >
+            <Text style={[s.toggleBtnText, isAvailable ? s.toggleBtnTextActive : s.toggleBtnTextInactive]}>
+              {isAvailable ? t('vendor.available') : t('vendor.unavailable')}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
-    </Modal>
+    </View>
   );
 }
 
@@ -429,31 +163,34 @@ function FilterSortSheet({ visible, filters, setFilter, onReset, onApply, onClos
 export default function InventoryScreen() {
   const { t } = useTranslation();
   const inv = useInventory();
-
+  const [selected, setSelected] = useState(new Set());
   const [modal, setModal] = useState(null); // null | 'add' | product object
   const [toast, setToast] = useState({ msg: "", show: false, type: "success" });
-  const [confirmSheet, setConfirmSheet] = useState(null);
+  const [bulkDel, setBulkDel] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [confirmSheet, setConfirmSheet] = useState(null); // { product, makingAvailable }
   const [actionSheetProduct, setActionSheetProduct] = useState(null);
   const [productToDelete, setProductToDelete] = useState(null);
   const [showCatalogueModal, setShowCatalogueModal] = useState(false);
   const [showReorder, setShowReorder] = useState(false);
 
-  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
-  const [viewMode, setViewMode] = useState("list"); // 'list' | 'grid'
-  const [showAddOptions, setShowAddOptions] = useState(false);
+  // Clear selection on page change
+  const productIdStr = inv.products.map((p) => p.id).join(",");
+  useEffect(() => {
+    setSelected(new Set());
+  }, [productIdStr]);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, show: true, type });
-    setTimeout(() => setToast((tt) => ({ ...tt, show: false })), 2500);
+    setTimeout(() => setToast((t) => ({ ...t, show: false })), 2500);
   };
 
-  const setFilter = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
-
-  const clearAll = () => {
-    setFilters(DEFAULT_FILTERS);
-    inv.setSearch("");
-  };
+  const toggleOne = (id) =>
+    setSelected((prev) => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
 
   const handleSave = async (form) => {
     if (modal === "add") {
@@ -466,7 +203,38 @@ export default function InventoryScreen() {
     setModal(null);
   };
 
-  const handleDelete = (id) => setProductToDelete(id);
+  const handleDelete = (id) => {
+    setProductToDelete(id);
+  };
+
+  const handleDeleteCategory = (catName) => {
+    Alert.alert(
+      t('vendor.deleteCategory'),
+      t('vendor.deleteCategoryDesc', { category: catName }).replace('{{category}}', catName),
+      [
+        { text: t('vendor.cancel'), style: "cancel" },
+        {
+          text: t('vendor.deleteEntireCategory'),
+          style: "destructive",
+          onPress: async () => {
+            const matchingProd = (inv.rawProducts || []).find((p) => {
+              const pCat = typeof p.category === "object" ? p.category?.name : p.category;
+              return String(pCat).toLowerCase() === String(catName).toLowerCase();
+            });
+
+            try {
+              if (matchingProd && matchingProd.category_id) {
+                await inv.deleteCategoryProducts(matchingProd.category_id);
+              }
+              showToast(`Category "${catName}" and its products deleted`);
+            } catch (err) {
+              showToast("Failed to delete category products", "error");
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const handleToggleAvailability = (product) => {
     const isCurrentlyAvailable = product.is_active ?? true;
@@ -480,7 +248,9 @@ export default function InventoryScreen() {
     try {
       await inv.toggleAvailability(product.id, makingAvailable);
       showToast(
-        makingAvailable ? `"${product.name}" is now available` : `"${product.name}" marked unavailable`,
+        makingAvailable
+          ? `"${product.name}" is now available`
+          : `"${product.name}" marked unavailable`,
         makingAvailable ? "success" : "error"
       );
     } catch (e) {
@@ -488,145 +258,152 @@ export default function InventoryScreen() {
     }
   };
 
-  const handleProductPress = (product) => setActionSheetProduct(product);
+  const handleBulkDelete = async () => {
+    const ids = [...selected];
+    await inv.deleteProducts(ids);
+    setSelected(new Set());
+    setBulkDel(false);
+    showToast(`${ids.length} product${ids.length !== 1 ? "s" : ""} deleted`);
+  };
 
-  // ── Derived data ──────────────────────────────────────────────────────────
+  // Stack-based category path for recursive subcategory drill-down
+  const [catPath, setCatPath] = useState([]);
+  const activeCategoryNode = catPath.length > 0 ? catPath[catPath.length - 1] : null;
 
-  const allProducts = inv.rawProducts || [];
-  const allCategories = inv.globalCategories || [];
+  const handlePushCategory = (cat) => {
+    setCatPath(prev => [...prev, cat]);
+  };
 
-  const lowStockCount = useMemo(
-    () =>
-      allProducts.filter((p) => {
-        const qty = p.stock_quantity ?? p.stock;
-        const threshold = p.low_stock_threshold ?? 5;
-        return (p.is_active ?? true) && qty != null && qty > 0 && qty <= threshold;
-      }).length,
-    [allProducts]
-  );
+  const handlePopCategory = () => {
+    setCatPath(prev => prev.slice(0, -1));
+  };
 
-  const outOfStockCount = useMemo(
-    () =>
-      allProducts.filter((p) => {
-        const qty = p.stock_quantity ?? p.stock;
-        return qty === 0 || (p.is_active ?? true) === false;
-      }).length,
-    [allProducts]
-  );
+  const handleResetCategory = () => {
+    setCatPath([]);
+  };
 
-  const effectivePriceRange = useMemo(() => {
-    const preset = PRICE_PRESETS.find((p) => p.id === filters.priceRange);
-    if (preset) return { min: preset.min, max: preset.max };
-    const min = filters.minPrice !== "" ? parseFloat(filters.minPrice) : null;
-    const max = filters.maxPrice !== "" ? parseFloat(filters.maxPrice) : null;
-    return { min: isNaN(min) ? null : min, max: isNaN(max) ? null : max };
-  }, [filters.priceRange, filters.minPrice, filters.maxPrice]);
+  // Helper function to recursively collect descendant category IDs
+  const getSubTreeCatIds = useCallback((catId) => {
+    if (!catId) return [];
+    let ids = [catId];
+    const children = (inv.globalCategories || []).filter(c => c.parent_id === catId);
+    children.forEach(c => {
+      ids = ids.concat(getSubTreeCatIds(c.id));
+    });
+    return ids;
+  }, [inv.globalCategories]);
 
-  const filteredProducts = useMemo(() => {
-    let data = allProducts;
-
-    if (inv.search && inv.search.trim() !== "") {
-      data = data.filter((p) => String(p.name).toLowerCase().includes(inv.search.toLowerCase()));
+  // Direct child subcategories under activeCategoryNode
+  const currentChildCategories = useMemo(() => {
+    if (!activeCategoryNode) {
+      return (inv.globalCategories || []).filter(c => c.parent_id === null);
     }
+    return (inv.globalCategories || []).filter(c => c.parent_id === activeCategoryNode.id);
+  }, [activeCategoryNode, inv.globalCategories]);
 
-    if (filters.stockStatus !== "All") {
-      data = data.filter((p) => {
-        const qty = p.stock_quantity ?? p.stock;
-        const threshold = p.low_stock_threshold ?? 5;
-        const isActive = p.is_active ?? true;
-        if (filters.stockStatus === "In Stock") return isActive && (qty == null || qty > threshold);
-        if (filters.stockStatus === "Low Stock") return qty != null && qty > 0 && qty <= threshold;
-        if (filters.stockStatus === "Out of Stock") return qty === 0 || !isActive;
-        return true;
-      });
-    }
+  // Folder cards list for current active level with recursive item counts
+  const currentFolderList = useMemo(() => {
+    return currentChildCategories.map((cat) => {
+      const subTreeIds = getSubTreeCatIds(cat.id);
+      const count = (inv.rawProducts || []).filter((p) => {
+        if (p.category_id && subTreeIds.includes(p.category_id)) return true;
+        const pCat = typeof p.category === "object" ? p.category?.name : p.category;
+        return String(pCat).toLowerCase() === String(cat.name).toLowerCase();
+      }).length;
+      return {
+        ...cat,
+        count,
+      };
+    });
+  }, [currentChildCategories, inv.rawProducts, getSubTreeCatIds]);
 
-    if (filters.availability) {
-      data = data.filter((p) => {
-        const isActive = p.is_active ?? true;
-        return filters.availability === "Available" ? isActive : !isActive;
-      });
-    }
+  const searchedProducts = useMemo(() => {
+    if (!inv.search || inv.search.trim() === "") return [];
+    let data = inv.rawProducts || [];
+    data = data.filter(p => String(p.name).toLowerCase().includes(inv.search.toLowerCase()));
 
-    const { min, max } = effectivePriceRange;
-    if (min != null) data = data.filter((p) => Number(p.price) >= min);
-    if (max != null) data = data.filter((p) => Number(p.price) <= max);
-
-    const sortMap = {
-      "Price: Low to High": { key: "price", dir: "asc" },
-      "Price: High to Low": { key: "price", dir: "desc" },
-      "Name: A-Z": { key: "name", dir: "asc" },
-    };
-    const cfg = sortMap[filters.sortBy];
-    if (cfg) {
+    // Sort
+    if (inv.sortKey) {
       data = [...data].sort((a, b) => {
-        const av = a[cfg.key];
-        const bv = b[cfg.key];
+        let av = a[inv.sortKey];
+        let bv = b[inv.sortKey];
+
         if (typeof av === "number" && typeof bv === "number") {
-          return cfg.dir === "asc" ? av - bv : bv - av;
+          return inv.sortDir === "asc" ? av - bv : bv - av;
         }
-        return cfg.dir === "asc"
+        return inv.sortDir === "asc"
           ? String(av ?? "").localeCompare(String(bv ?? ""), undefined, { numeric: true })
           : String(bv ?? "").localeCompare(String(av ?? ""), undefined, { numeric: true });
       });
-    } else {
-      data = [...data].sort((a, b) => (b.id ?? 0) - (a.id ?? 0)); // Newest First
     }
-
     return data;
-  }, [allProducts, inv.search, filters, effectivePriceRange]);
+  }, [inv.rawProducts, inv.search, inv.sortKey, inv.sortDir]);
 
-  // Chips describing which filters are active (used for the "Active Filters" row and the sheet footer)
-  const activeChips = useMemo(() => {
-    const chips = [];
-    if (filters.stockStatus !== "All") {
-      chips.push({ key: "stockStatus", label: filters.stockStatus, clear: () => setFilter("stockStatus", "All") });
+  const categoryProducts = useMemo(() => {
+    if (!activeCategoryNode) return [];
+
+    const subTreeIds = getSubTreeCatIds(activeCategoryNode.id);
+
+    let data = (inv.rawProducts || []).filter(p => {
+      if (p.category_id && subTreeIds.includes(p.category_id)) return true;
+      const pCat = typeof p.category === "object" ? p.category?.name : p.category;
+      return String(pCat).toLowerCase() === String(activeCategoryNode.name).toLowerCase() || subTreeIds.includes(p.category_id);
+    });
+
+    // Filter by search
+    if (inv.search && inv.search.trim() !== "") {
+      data = data.filter(p => String(p.name).toLowerCase().includes(inv.search.toLowerCase()));
     }
-    if (filters.availability) {
-      chips.push({ key: "availability", label: filters.availability, clear: () => setFilter("availability", null) });
-    }
-    const preset = PRICE_PRESETS.find((p) => p.id === filters.priceRange);
-    if (preset) {
-      chips.push({
-        key: "price",
-        label: preset.label,
-        clear: () => setFilter("priceRange", null),
-      });
-    } else if (filters.minPrice || filters.maxPrice) {
-      const label =
-        filters.minPrice && filters.maxPrice
-          ? `₹${filters.minPrice} – ₹${filters.maxPrice}`
-          : filters.minPrice
-          ? `Min ₹${filters.minPrice}`
-          : `Max ₹${filters.maxPrice}`;
-      chips.push({
-        key: "price",
-        label,
-        clear: () => {
-          setFilter("minPrice", "");
-          setFilter("maxPrice", "");
-        },
+
+    // Sort
+    if (inv.sortKey) {
+      data = [...data].sort((a, b) => {
+        let av = a[inv.sortKey];
+        let bv = b[inv.sortKey];
+
+        if (typeof av === "number" && typeof bv === "number") {
+          return inv.sortDir === "asc" ? av - bv : bv - av;
+        }
+        return inv.sortDir === "asc"
+          ? String(av ?? "").localeCompare(String(bv ?? ""), undefined, { numeric: true })
+          : String(bv ?? "").localeCompare(String(av ?? ""), undefined, { numeric: true });
       });
     }
-    return chips;
-  }, [filters]);
+    return data;
+  }, [inv.rawProducts, activeCategoryNode, getSubTreeCatIds, inv.search, inv.sortKey, inv.sortDir]);
 
-  const notifCount = lowStockCount + outOfStockCount;
+  const handleProductPress = (product) => {
+    setActionSheetProduct(product);
+  };
 
   return (
     <SafeAreaView style={s.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
+      <StatusBar barStyle="light-content" backgroundColor={GREEN} />
 
-      <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* ── Header ── */}
-        <View style={s.headerTopRow}>
-          <TouchableOpacity style={s.iconBtn} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Feather name="menu" size={22} color={TEXT} />
-          </TouchableOpacity>
-
+      {/* ── Header ── */}
+      <View style={s.header}>
+        {activeCategoryNode ? (
+          <>
+            <TouchableOpacity
+              onPress={handlePopCategory}
+              style={s.backBtn}
+              activeOpacity={0.8}
+            >
+              <Text style={s.backBtnText}>
+                ← {catPath.length > 1 ? catPath[catPath.length - 2].name : t('vendor.categories', 'Categories')}
+              </Text>
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={s.heading} numberOfLines={1}>
+                {activeCategoryNode.name}
+              </Text>
+              <Text style={s.subheading}>{t('vendor.productsInCategory')}</Text>
+            </View>
+          </>
+        ) : (
           <View style={{ flex: 1 }}>
-            <Text style={s.heading}>{t("vendor.inventoryTitle", "Inventory")}</Text>
-            <Text style={s.subheading}>{t("vendor.manageCategoriesProducts", "Manage your products & categories")}</Text>
+            <Text style={s.heading}>{t('vendor.inventoryTitle')}</Text>
+            <Text style={s.subheading}>{t('vendor.manageCategoriesProducts')}</Text>
           </View>
         )}
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
@@ -652,30 +429,13 @@ export default function InventoryScreen() {
             <Text style={s.addBtnText}>+ {t('vendor.addProduct')}</Text>
           </TouchableOpacity>
         </View>
+      </View>
 
-        {/* ── Stat Cards ── */}
-        <View style={s.statsGrid}>
-          <StatCard
-            iconSet="MI"
-            iconName="inventory-2"
-            iconColor={GREEN}
-            iconBg={GREEN_LIGHT}
-            label="Total Products"
-            value={allProducts.length}
-            sub="↑ 12 this week"
-            subColor={GREEN}
-          />
-          <StatCard
-            iconSet="F"
-            iconName="folder"
-            iconColor={GREEN}
-            iconBg={GREEN_LIGHT}
-            label="Categories"
-            value={allCategories.length}
-            sub="All categories"
-          />
-        </View>
-
+      <ScrollView
+        style={s.scroll}
+        contentContainerStyle={s.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* ── Search ── */}
         <View style={s.searchWrap}>
           <Feather name="search" size={16} color={TEXT_LIGHT} style={{ marginRight: 6 }} />
@@ -683,130 +443,83 @@ export default function InventoryScreen() {
             style={s.searchInput}
             value={inv.search}
             onChangeText={inv.setSearch}
-            placeholder="Search product or category…"
+            placeholder={
+              activeCategoryNode
+                ? `${t('vendor.searchInCategoryPlaceholder')} ${activeCategoryNode.name}…`
+                : t('vendor.searchPlaceholderInventory')
+            }
             placeholderTextColor={TEXT_XLIGHT}
             returnKeyType="search"
           />
           {inv.search.length > 0 && (
-            <TouchableOpacity onPress={() => inv.setSearch("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity
+              onPress={() => inv.setSearch("")}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
               <Feather name="x" size={16} color={TEXT_LIGHT} />
             </TouchableOpacity>
           )}
         </View>
 
-        {/* ── Filter & Sort trigger ── */}
-        <TouchableOpacity
-          style={[s.filterSortBtn, filterSheetOpen && s.filterSortBtnActive]}
-          onPress={() => setFilterSheetOpen(true)}
-          activeOpacity={0.8}
-        >
-          <Feather name="filter" size={15} color={TEXT} />
-          <Text style={s.filterSortBtnText}>Filter & Sort</Text>
-          {activeChips.length > 0 && (
-            <View style={s.filterBadge}>
-              <Text style={s.filterBadgeText}>{activeChips.length}</Text>
-            </View>
-          )}
-          <Feather name="chevron-down" size={16} color={TEXT_LIGHT} style={{ marginLeft: "auto" }} />
-        </TouchableOpacity>
-
-        {/* ── Active Filters ── */}
-        {activeChips.length > 0 && (
-          <View>
-            <View style={s.activeFiltersHeader}>
-              <Text style={s.activeFiltersTitle}>Active Filters</Text>
-              <TouchableOpacity onPress={clearAll} activeOpacity={0.7}>
-                <Text style={s.clearAllText}>Clear All</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={s.activeChipsRow}>
-              {activeChips.map((chip) => (
-                <View key={chip.key} style={s.activeChip}>
-                  <Text style={s.activeChipText}>{chip.label}</Text>
-                  <TouchableOpacity onPress={chip.clear} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                    <Feather name="x" size={13} color={GREEN_DARK} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* ── Product List / Empty State ── */}
-        {inv.loading ? (
-          <View style={s.centered}>
-            <Spinner size={32} color={GREEN} />
-            <Text style={s.loadingText}>{t("vendor.loadingProducts", "Loading products…")}</Text>
-          </View>
-        ) : filteredProducts.length === 0 ? (
-          allProducts.length === 0 ? (
-            <View style={s.emptyStateBox}>
-              <View style={s.emptyIllustration}>
-                <MaterialCommunityIcons name="package-variant" size={64} color={GREEN} />
-              </View>
-              <Text style={s.emptyTitle}>Your inventory is empty</Text>
-              <Text style={s.emptySub}>Add your first product or browse our catalogue to get started.</Text>
-              <View style={s.emptyBtnRow}>
-                <TouchableOpacity onPress={() => setModal("add")} style={s.primaryBtn} activeOpacity={0.85}>
-                  <Feather name="plus" size={15} color={WHITE} />
-                  <Text style={s.primaryBtnText}>Add Product</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setShowCatalogueModal(true)} style={s.outlineBtn} activeOpacity={0.8}>
-                  <MaterialIcons name="menu-book" size={15} color={TEXT} />
-                  <Text style={s.outlineBtnText}>Add from Catalogue</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <View style={s.centered}>
-              <Feather name="search" size={40} color="#9CA3AF" style={{ marginBottom: 10 }} />
-              <Text style={s.emptyText}>No products match your filters</Text>
-              <Text style={s.emptySubText}>Try adjusting or clearing your filters.</Text>
-            </View>
-          )
-        ) : (
+        {/* ── Products Search (If catPath is empty but search is NOT empty) ── */}
+        {!activeCategoryNode && inv.search.length > 0 && (
           <>
+            {/* Sort Options Bar */}
+            <Text style={s.filterSectionTitle}>⇅ {t('vendor.sortProducts')}</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.filterRow}
+            >
+              {[
+                { label: t('vendor.priceLowHigh'), key: "price", dir: "asc" },
+                { label: t('vendor.priceHighLow'), key: "price", dir: "desc" },
+
+              ].map((opt) => {
+                const active = inv.sortKey === opt.key && inv.sortDir === opt.dir;
+                return (
+                  <TouchableOpacity
+                    key={opt.label}
+                    onPress={() => {
+                      inv.setSortKey(opt.key);
+                      inv.setSortDir(opt.dir);
+                    }}
+                    style={[s.chip, active && s.chipActive]}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[s.chipText, active && s.chipTextActive]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
             <View style={s.listHeader}>
-              <Text style={s.listTitle}>Products ({filteredProducts.length})</Text>
-              <View style={s.viewToggleRow}>
-                <TouchableOpacity
-                  style={[s.viewToggleBtn, viewMode === "grid" && s.viewToggleBtnActive]}
-                  onPress={() => setViewMode("grid")}
-                  activeOpacity={0.75}
-                >
-                  <Feather name="grid" size={14} color={viewMode === "grid" ? GREEN_DARK : TEXT_LIGHT} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[s.viewToggleBtn, viewMode === "list" && s.viewToggleBtnActive]}
-                  onPress={() => setViewMode("list")}
-                  activeOpacity={0.75}
-                >
-                  <Feather name="list" size={14} color={viewMode === "list" ? GREEN_DARK : TEXT_LIGHT} />
-                </TouchableOpacity>
-              </View>
+              <Text style={s.listTitle}>{t('vendor.matchingProducts')}</Text>
+              <Text style={s.listCount}>{t('vendor.showingItems')} {searchedProducts.length} {t('vendor.items')}</Text>
             </View>
 
-            {viewMode === "list" ? (
-              <View style={{ gap: 12 }}>
-                {filteredProducts.map((product) => (
-                  <ProductRow
-                    key={product.id}
-                    product={product}
-                    onToggleAvailability={handleToggleAvailability}
-                    onPressMenu={handleProductPress}
-                    onPress={() => {}}
-                  />
-                ))}
+            {inv.loading ? (
+              <View style={s.centered}>
+                <Spinner size={32} color={GREEN} />
+                <Text style={s.loadingText}>{t('vendor.loadingProducts')}</Text>
+              </View>
+            ) : searchedProducts.length === 0 ? (
+              <View style={s.centered}>
+                <MaterialIcons name="search-off" size={48} color="#9CA3AF" style={{ marginBottom: 10 }} />
+                <Text style={s.emptyText}>{t('vendor.noMatchingProducts')}</Text>
               </View>
             ) : (
               <View style={s.gridContainer}>
-                {filteredProducts.map((product) => (
+                {searchedProducts.map((product) => (
                   <ProductCard
                     key={product.id}
                     product={product}
+                    onEdit={(p) => setModal(p)}
+                    onDelete={handleDelete}
                     onToggleAvailability={handleToggleAvailability}
                     onPressMenu={handleProductPress}
-                    onPress={() => {}}
                   />
                 ))}
               </View>
@@ -814,79 +527,127 @@ export default function InventoryScreen() {
           </>
         )}
 
-        <View style={{ height: 100 }} />
+        {/* ── Category Folders Grid (If child categories exist and search is empty) ── */}
+        {!inv.search && currentFolderList.length > 0 && (
+          <>
+            <View style={s.listHeader}>
+              <Text style={s.listTitle}>
+                {activeCategoryNode ? `Subcategories of ${activeCategoryNode.name}` : t('vendor.categories')}
+              </Text>
+              <Text style={s.listCount}>{currentFolderList.length} {t('vendor.foldersCount')}</Text>
+            </View>
+
+            <View style={s.gridContainer}>
+              {currentFolderList.map((cat) => (
+                <TouchableOpacity
+                  key={cat.id || cat.name}
+                  onPress={() => handlePushCategory(cat)}
+                  onLongPress={() => handleDeleteCategory(cat.name)}
+                  style={s.folderCard}
+                  activeOpacity={0.8}
+                >
+                  <View style={s.folderIconWrap}>
+                    <MaterialIcons name={getCategoryIcon(cat.name)} size={28} color={GREEN} />
+                  </View>
+                  <Text style={s.folderName} numberOfLines={1}>
+                    {cat.name}
+                  </Text>
+                  <Text style={s.folderCount}>
+                    {cat.count} {cat.count === 1 ? t('vendor.product', 'product') : t('vendor.products', 'products')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* ── Products Inside Active Category ── */}
+        {activeCategoryNode && (
+          <>
+            {/* Sort Options Bar */}
+            <Text style={s.filterSectionTitle}>⇅ {t('vendor.sortProducts')}</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.filterRow}
+            >
+              {[
+                { label: t('vendor.priceLowHigh'), key: "price", dir: "asc" },
+                { label: t('vendor.priceHighLow'), key: "price", dir: "desc" },
+
+              ].map((opt) => {
+                const active = inv.sortKey === opt.key && inv.sortDir === opt.dir;
+                return (
+                  <TouchableOpacity
+                    key={opt.label}
+                    onPress={() => {
+                      inv.setSortKey(opt.key);
+                      inv.setSortDir(opt.dir);
+                    }}
+                    style={[s.chip, active && s.chipActive]}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[s.chipText, active && s.chipTextActive]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <View style={s.listHeader}>
+              <Text style={s.listTitle}>Products in {activeCategoryNode.name}</Text>
+              <Text style={s.listCount}>{t('vendor.showingItems')} {categoryProducts.length} {t('vendor.items')}</Text>
+            </View>
+
+            {inv.loading ? (
+              <View style={s.centered}>
+                <Spinner size={32} color={GREEN} />
+                <Text style={s.loadingText}>{t('vendor.loadingProducts')}</Text>
+              </View>
+            ) : categoryProducts.length === 0 && currentFolderList.length === 0 ? (
+              <View style={s.centered}>
+                <Feather name="inbox" size={48} color="#9CA3AF" style={{ marginBottom: 12 }} />
+                <Text style={s.emptyText}>{t('vendor.noProductsInCategory')}</Text>
+                <Text style={s.emptySubText}>{t('vendor.tapToAddProduct')}</Text>
+              </View>
+            ) : (
+              <View style={s.gridContainer}>
+                {categoryProducts.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    onEdit={(p) => setModal(p)}
+                    onDelete={handleDelete}
+                    onToggleAvailability={handleToggleAvailability}
+                    onPressMenu={handleProductPress}
+                  />
+                ))}
+              </View>
+            )}
+          </>
+        )}
+
+        <View style={{ height: 80 }} />
       </ScrollView>
-
-      {/* ── Floating Add Button ── */}
-      <TouchableOpacity style={s.fab} onPress={() => setShowAddOptions(true)} activeOpacity={0.85}>
-        <Feather name="plus" size={26} color={WHITE} />
-      </TouchableOpacity>
-
-      {/* ── Add Options Sheet (Add Product vs Add from Catalogue) ── */}
-      {showAddOptions && (
-        <View style={s.sheetOverlay}>
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowAddOptions(false)} />
-          <View style={s.sheetCard}>
-            <Text style={s.sheetTitle}>Add New</Text>
-            <Text style={s.sheetSub}>Choose how you'd like to add a product</Text>
-
-            <TouchableOpacity
-              style={s.addOptionRow}
-              activeOpacity={0.8}
-              onPress={() => {
-                setShowAddOptions(false);
-                setModal("add");
-              }}
-            >
-              <View style={[s.addOptionIcon, { backgroundColor: GREEN_LIGHT }]}>
-                <Feather name="plus" size={20} color={GREEN} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.addOptionTitle}>Add Product</Text>
-                <Text style={s.addOptionSub}>Create a new product manually</Text>
-              </View>
-              <Feather name="chevron-right" size={18} color={TEXT_XLIGHT} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={s.addOptionRow}
-              activeOpacity={0.8}
-              onPress={() => {
-                setShowAddOptions(false);
-                setShowCatalogueModal(true);
-              }}
-            >
-              <View style={[s.addOptionIcon, { backgroundColor: "#EAF1FE" }]}>
-                <MaterialIcons name="menu-book" size={20} color="#3B82F6" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.addOptionTitle}>Add from Catalogue</Text>
-                <Text style={s.addOptionSub}>Pick ready-made products from our catalogue</Text>
-              </View>
-              <Feather name="chevron-right" size={18} color={TEXT_XLIGHT} />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={s.sheetCancelBtn} onPress={() => setShowAddOptions(false)} activeOpacity={0.8}>
-              <Text style={s.sheetCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {/* ── Filter & Sort Sheet ── */}
-      <FilterSortSheet
-        visible={filterSheetOpen}
-        filters={filters}
-        setFilter={setFilter}
-        onReset={() => setFilters(DEFAULT_FILTERS)}
-        onApply={() => setFilterSheetOpen(false)}
-        onClose={() => setFilterSheetOpen(false)}
-        activeChips={activeChips}
-      />
 
       {/* ── Modals ── */}
       {modal !== null && (
-        <ProductModal editing={modal !== "add" ? modal : null} onClose={() => setModal(null)} onSave={handleSave} saving={inv.saving} />
+        <ProductModal
+          editing={modal !== "add" ? modal : (selectedCategory ? { category: selectedCategory } : null)}
+          onClose={() => setModal(null)}
+          onSave={handleSave}
+          saving={inv.saving}
+        />
+      )}
+
+      {bulkDel && (
+        <BulkDeleteDialog
+          count={selected.size}
+          onConfirm={handleBulkDelete}
+          onCancel={() => setBulkDel(false)}
+          saving={inv.saving}
+        />
       )}
 
       {productToDelete && (
@@ -902,6 +663,7 @@ export default function InventoryScreen() {
         />
       )}
 
+
       <CatalogueModal
         visible={showCatalogueModal}
         onClose={() => setShowCatalogueModal(false)}
@@ -912,15 +674,26 @@ export default function InventoryScreen() {
         }}
       />
 
+
+
       {/* ── Action Sheet ── */}
       {actionSheetProduct && (
         <View style={s.sheetOverlay}>
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setActionSheetProduct(null)} />
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setActionSheetProduct(null)}
+          />
           <View style={s.sheetCard}>
+            {/* Icon */}
             <View style={[s.sheetIconBox, { backgroundColor: GRAY_BG }]}>
               <Feather name="settings" size={28} color={TEXT} />
             </View>
+
+            {/* Text */}
             <Text style={s.sheetTitle}>{actionSheetProduct.name}</Text>
+
+            {/* Buttons */}
             <View style={s.sheetBtnRow}>
               <TouchableOpacity
                 onPress={() => {
@@ -928,10 +701,10 @@ export default function InventoryScreen() {
                   setActionSheetProduct(null);
                   handleDelete(productId);
                 }}
-                style={[s.sheetCancelBtn, { backgroundColor: RED }]}
+                style={[ s.sheetCancelBtn, {backgroundColor: RED }]}
                 activeOpacity={0.8}
               >
-                <Text style={[s.sheetCancelText, { color: "#fff" }]}>{t("vendor.delete")}</Text>
+                <Text style={[s.sheetCancelText, {color: "#fff"} ]}>{t('vendor.delete')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
@@ -942,7 +715,7 @@ export default function InventoryScreen() {
                 style={[s.sheetConfirmBtn, { backgroundColor: GREEN }]}
                 activeOpacity={0.85}
               >
-                <Text style={s.sheetConfirmText}>{t("vendor.editProduct")}</Text>
+                <Text style={s.sheetConfirmText}>{t('vendor.editProduct')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -952,45 +725,53 @@ export default function InventoryScreen() {
       {/* ── Confirm Sheet ── */}
       {confirmSheet && (
         <View style={s.sheetOverlay}>
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setConfirmSheet(null)} />
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setConfirmSheet(null)}
+          />
           <View style={s.sheetCard}>
-            <View
-              style={[
-                s.sheetIconBox,
-                {
-                  backgroundColor: confirmSheet.makingAvailable ? GREEN_LIGHT : RED_LIGHT,
-                  alignItems: "center",
-                  justifyContent: "center",
-                },
-              ]}
-            >
-              <Feather name={confirmSheet.makingAvailable ? "check-circle" : "slash"} size={28} color={confirmSheet.makingAvailable ? GREEN : RED} />
+            {/* Icon */}
+            <View style={[s.sheetIconBox, {
+              backgroundColor: confirmSheet.makingAvailable ? GREEN_LIGHT : RED_LIGHT,
+              alignItems: "center",
+              justifyContent: "center",
+            }]}>
+              <Feather
+                name={confirmSheet.makingAvailable ? "check-circle" : "slash"}
+                size={28}
+                color={confirmSheet.makingAvailable ? GREEN : RED}
+              />
             </View>
+
+            {/* Text */}
             <Text style={s.sheetTitle}>
-              {confirmSheet.makingAvailable ? t("vendor.markAsAvailable") : t("vendor.markAsUnavailable")}
+              {confirmSheet.makingAvailable ? t('vendor.markAsAvailable') : t('vendor.markAsUnavailable')}
             </Text>
             <Text style={s.sheetSub}>
               {confirmSheet.makingAvailable
-                ? t("vendor.markAsAvailableDesc", { productName: confirmSheet.product.name }).replace(
-                    "{{productName}}",
-                    confirmSheet.product.name
-                  )
-                : t("vendor.markAsUnavailableDesc", { productName: confirmSheet.product.name }).replace(
-                    "{{productName}}",
-                    confirmSheet.product.name
-                  )}
+                ? t('vendor.markAsAvailableDesc', { productName: confirmSheet.product.name }).replace('{{productName}}', confirmSheet.product.name)
+                : t('vendor.markAsUnavailableDesc', { productName: confirmSheet.product.name }).replace('{{productName}}', confirmSheet.product.name)}
             </Text>
+
+            {/* Buttons */}
             <View style={s.sheetBtnRow}>
-              <TouchableOpacity onPress={() => setConfirmSheet(null)} style={s.sheetCancelBtn} activeOpacity={0.8}>
-                <Text style={s.sheetCancelText}>{t("vendor.cancel")}</Text>
+              <TouchableOpacity
+                onPress={() => setConfirmSheet(null)}
+                style={s.sheetCancelBtn}
+                activeOpacity={0.8}
+              >
+                <Text style={s.sheetCancelText}>{t('vendor.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={confirmToggle}
-                style={[s.sheetConfirmBtn, { backgroundColor: confirmSheet.makingAvailable ? GREEN : RED }]}
+                style={[s.sheetConfirmBtn, {
+                  backgroundColor: confirmSheet.makingAvailable ? GREEN : RED
+                }]}
                 activeOpacity={0.85}
               >
                 <Text style={s.sheetConfirmText}>
-                  {confirmSheet.makingAvailable ? t("vendor.yesMakeAvailable") : t("vendor.yesMarkUnavailable")}
+                  {confirmSheet.makingAvailable ? t('vendor.yesMakeAvailable') : t('vendor.yesMarkUnavailable')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1024,248 +805,347 @@ export default function InventoryScreen() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: GRAY_BG },
-  scroll: { flex: 1 },
-  scrollContent: { padding: 14, gap: 12 },
+  safe: {
+    flex: 1,
+    backgroundColor: GRAY_BG,
+  },
+
+  addFromSearchBtn: {
+    marginTop: 12,
+    backgroundColor: GREEN,
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+  },
+  addFromSearchBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
 
   // ── Header ──
-  headerTopRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    paddingTop: Platform.OS === "ios" ? 4 : 8,
-  },
-  iconBtn: { padding: 4, marginTop: 2 },
-  bellBtn: { padding: 4, marginTop: 2, position: "relative" },
-  bellBadge: {
-    position: "absolute",
-    top: -2,
-    right: -2,
-    backgroundColor: RED,
-    borderRadius: 9,
-    minWidth: 18,
-    height: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-    borderWidth: 1.5,
-    borderColor: WHITE,
-  },
-  bellBadgeText: { color: WHITE, fontSize: 9, fontWeight: "800" },
-  heading: { fontSize: 24, fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: TEXT },
-  subheading: { fontSize: 13, color: TEXT_LIGHT, marginTop: 2 },
-  headerBtnRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  header: {
+    paddingTop: Platform.OS === "ios" ? 8 : 12,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
 
-  outlineBtn: {
+    backgroundColor: "#147538",
+
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    borderWidth: 1.5,
-    borderColor: BORDER,
-    backgroundColor: WHITE,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    justifyContent: "space-between",
+
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.1)",
   },
-  outlineBtnText: { fontSize: 12, fontWeight: "700", color: TEXT },
-  primaryBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: GREEN_DARK,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    flexGrow: 1,
+  heading: {
+    fontSize: 24,
+    fontWeight: "900",
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+    color: "#FFFFFF",
+  },
+  subheading: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.7)",
+    marginTop: 2,
+  },
+  addBtn: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+
     shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  addBtnText: {
+    color: "#147538",
+    fontSize: 13,
+    fontWeight: "800",
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+  },
+
+  // ── Scroll ──
+  scroll: { flex: 1 },
+  scrollContent: {
+    padding: 14,
+    gap: 12,
+  },
+
+  // ── Stats ──
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    minWidth: "45%",
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 14,
+    borderLeftWidth: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+    gap: 4,
   },
-  primaryBtnText: { color: WHITE, fontSize: 13, fontWeight: "800" },
-
-  // ── Stat cards (2x2 grid) ──
-  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  statCard: {
-    width: "47.5%",
-    backgroundColor: WHITE,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: 14,
+  statIcon: { fontSize: 20 },
+  statLabel: {
+    fontSize: 11,
+    color: TEXT_LIGHT,
+    fontWeight: "500",
+    fontFamily: "PlusJakartaSans_500Medium",
+    marginTop: 2,
+  },
+  statValueRow: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
+    marginTop: 2,
   },
-  statTopRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  statIconWrap: { width: 34, height: 34, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  statLabel: { fontSize: 12, color: TEXT_LIGHT, fontWeight: "600", flexShrink: 1 },
-  statValue: { fontSize: 26, fontWeight: "800", color: TEXT, letterSpacing: -0.5 },
-  statSub: { fontSize: 11, color: TEXT_LIGHT, fontWeight: "600" },
+  statValue: {
+    fontSize: 28,
+    fontWeight: "800",
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+    color: TEXT,
+    letterSpacing: -0.5,
+  },
+  statBadge: {
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    minWidth: 22,
+    alignItems: "center",
+  },
+  statBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+  },
+
+  // ── Alert Banner ──
+  alertBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1C2331",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    gap: 12,
+  },
+  alertIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: "rgba(249,115,22,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  alertText: { flex: 1 },
+  alertTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+    color: "#fff",
+  },
+  alertSub: { fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 2 },
+  alertViewBtn: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  alertViewBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+    color: "#1C2331",
+  },
 
   // ── Search ──
   searchWrap: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: WHITE,
+    backgroundColor: "#fff",
     borderWidth: 1.5,
     borderColor: BORDER,
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingVertical: 10,
     gap: 8,
   },
-  searchInput: { flex: 1, fontSize: 14, color: TEXT, paddingVertical: 0 },
+  searchIconText: { fontSize: 14 },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: TEXT,
+    paddingVertical: 0,
+  },
 
-  // ── Filter & Sort trigger ──
-  filterSortBtn: {
+  // ── Filter Chips ──
+  filterRow: {
     flexDirection: "row",
-    alignItems: "center",
     gap: 8,
+    paddingVertical: 2,
+  },
+  chip: {
+    borderRadius: 20,
     borderWidth: 1.5,
     borderColor: BORDER,
-    backgroundColor: WHITE,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    backgroundColor: "#fff",
+  },
+  chipActive: {
+    backgroundColor: GREEN,
+    borderColor: GREEN,
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    fontFamily: "PlusJakartaSans_600SemiBold",
+    color: TEXT_LIGHT,
+  },
+  chipTextActive: {
+    color: "#fff",
+  },
+
+  // ── Bulk Bar ──
+  bulkBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#EFF6FF",
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 13,
-  },
-  filterSortBtnActive: { borderColor: GREEN, backgroundColor: GREEN_LIGHT },
-  filterSortBtnText: { fontSize: 14, fontWeight: "700", color: TEXT },
-  filterBadge: {
-    backgroundColor: GREEN,
-    borderRadius: 9,
-    minWidth: 18,
-    height: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-  },
-  filterBadgeText: { color: WHITE, fontSize: 10, fontWeight: "800" },
-
-  // ── Active filters ──
-  activeFiltersHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
-  activeFiltersTitle: { fontSize: 13, fontWeight: "700", color: GREEN_DARK },
-  clearAllText: { fontSize: 13, fontWeight: "700", color: GREEN },
-  activeChipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  activeChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: GREEN_LIGHT,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  activeChipText: { fontSize: 12, fontWeight: "700", color: GREEN_DARK },
-
-  // ── Dropdown ──
-  dropdownWrap: { position: "relative" },
-  fieldLabel: { fontSize: 13, fontWeight: "800", color: TEXT, marginBottom: 8 },
-  dropdownField: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: 1.5,
-    borderColor: BORDER,
-    backgroundColor: WHITE,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  dropdownFieldText: { fontSize: 13, color: TEXT, fontWeight: "600", flexShrink: 1 },
-  dropdownBackdrop: { position: "absolute", top: -1000, left: -1000, right: -1000, bottom: -1000, zIndex: 90 },
-  dropdownList: {
-    position: "absolute",
-    top: "100%",
-    left: 0,
-    right: 0,
-    marginTop: 4,
-    backgroundColor: WHITE,
-    borderRadius: 12,
+    paddingVertical: 10,
     borderWidth: 1,
-    borderColor: BORDER,
-    shadowColor: "#000",
-    shadowOpacity: 0.14,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 10,
-    zIndex: 100,
+    borderColor: "#BFDBFE",
   },
-  dropdownListItem: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 11 },
-  dropdownListItemActive: { backgroundColor: GREEN_LIGHT },
-  dropdownListItemText: { fontSize: 13, color: TEXT, fontWeight: "500" },
-  dropdownListItemTextActive: { color: GREEN, fontWeight: "700" },
-
-  // ── List header ──
-  listHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 },
-  listTitle: { fontSize: 15, fontWeight: "800", color: TEXT },
-  viewToggleRow: { flexDirection: "row", gap: 6 },
-  viewToggleBtn: {
-    width: 30,
-    height: 30,
+  bulkCount: {
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+    color: "#1D4ED8",
+  },
+  bulkDeleteBtn: {
+    backgroundColor: RED,
     borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: BORDER,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: WHITE,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
-  viewToggleBtnActive: { borderColor: GREEN, backgroundColor: GREEN_LIGHT },
+  bulkDeleteBtnText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+  },
 
-  // ── Product row (list view) ──
-  row: {
+  // ── List Header ──
+  listHeader: {
     flexDirection: "row",
-    backgroundColor: WHITE,
-    borderRadius: 14,
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 2,
+  },
+  listTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+    color: TEXT,
+  },
+  listCount: { fontSize: 12, color: TEXT_LIGHT },
+
+  // ── Product Card ──
+  gridContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    paddingHorizontal: 2,
+    marginTop: 8,
+  },
+
+  folderCard: {
+    width: "48%",
+    backgroundColor: "#fff",
+    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: BORDER,
-    padding: 12,
-    gap: 12,
+    padding: 16,
+    marginBottom: 12,
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  rowUnavailable: { opacity: 0.75, borderColor: "#F0F0F0" },
-  rowImageWrap: {
-    width: 68,
-    height: 68,
-    borderRadius: 12,
-    backgroundColor: GRAY_BG,
+  folderIconWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: GREEN_LIGHT,
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
+    marginBottom: 12,
   },
-  rowImageWrapDim: { backgroundColor: "#EFEFEF" },
-  rowImage: { width: 68, height: 68 },
-  rowContent: { flex: 1, gap: 3 },
-  rowTopLine: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  rowName: { fontSize: 15, fontWeight: "800", color: TEXT, flexShrink: 1, marginRight: 6 },
-  rowNameDim: { color: TEXT_LIGHT },
-  rowMenuBtn: { padding: 4 },
-  rowMenuDots: { fontSize: 13, color: TEXT_LIGHT, fontWeight: "bold" },
-  rowPrice: { fontSize: 13, fontWeight: "700", color: TEXT },
-  rowStock: { fontSize: 12, color: TEXT_LIGHT },
-  rowBadge: { alignSelf: "flex-start", borderRadius: 7, paddingHorizontal: 10, paddingVertical: 4, marginTop: 4 },
-  rowBadgeActive: { backgroundColor: GREEN_LIGHT, borderWidth: 1, borderColor: GREEN },
-  rowBadgeInactive: { backgroundColor: RED_LIGHT, borderWidth: 1, borderColor: RED },
-  rowBadgeText: { fontSize: 11, fontWeight: "700" },
-  rowBadgeTextActive: { color: GREEN },
-  rowBadgeTextInactive: { color: RED },
-  rowChevron: { marginLeft: 2 },
+  folderEmoji: {
+    fontSize: 28,
+  },
+  folderName: {
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+    color: TEXT,
+    textAlign: "center",
+    marginBottom: 4,
+    width: "100%",
+  },
+  folderCount: {
+    fontSize: 11,
+    color: TEXT_LIGHT,
+    fontWeight: "600",
+  },
 
-  // ── Product card (grid view) ──
-  gridContainer: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginTop: 4 },
   card: {
     width: "48%",
-    backgroundColor: WHITE,
+    backgroundColor: "#fff",
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: BORDER,
     padding: 10,
     marginBottom: 12,
     position: "relative",
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  cardMenuBtn: { position: "absolute", top: 8, right: 8, padding: 6, zIndex: 10 },
-  cardMenuDots: { fontSize: 12, color: TEXT_LIGHT, fontWeight: "bold" },
-  cardContent: { alignItems: "center", width: "100%" },
+  cardMenuBtn: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    padding: 6,
+    zIndex: 10,
+  },
+  cardMenuDots: {
+    fontSize: 12,
+    color: TEXT_LIGHT,
+    fontWeight: "bold",
+  },
+  cardContent: {
+    alignItems: "center",
+    width: "100%",
+  },
   cardImageWrap: {
     width: 74,
     height: 74,
@@ -1276,56 +1156,380 @@ const s = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 10,
   },
-  cardImage: { width: 74, height: 74 },
-  cardName: { fontSize: 13, fontWeight: "700", color: TEXT, textAlign: "center", height: 36, lineHeight: 18, marginBottom: 2, width: "100%" },
-  cardPrice: { fontSize: 12, fontWeight: "700", color: TEXT, textAlign: "center", marginBottom: 8 },
-  cardUnavailable: { opacity: 0.75, borderColor: "#F0F0F0" },
+  cardImage: {
+    width: 74,
+    height: 74,
+  },
+  cardImagePlaceholder: {
+    fontSize: 30,
+  },
+  cardName: {
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+    color: TEXT,
+    textAlign: "center",
+    height: 36,
+    lineHeight: 18,
+    marginBottom: 2,
+    width: "100%",
+  },
+  cardBrand: {
+    fontSize: 10,
+    color: TEXT_XLIGHT,
+    textAlign: "center",
+    marginBottom: 4,
+    width: "100%",
+  },
+  cardPrice: {
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+    color: TEXT,
+    textAlign: "center",
+    marginBottom: 2,
+  },
+  cardStock: {
+    fontSize: 10,
+    color: TEXT_LIGHT,
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  cardToggleRow: {
+    width: "100%",
+    alignItems: "center",
+  },
+  toggleBtn: {
+    width: "100%",
+    borderRadius: 8,
+    paddingVertical: 6,
+    alignItems: "center",
+  },
+  toggleBtnActive: {
+    backgroundColor: GREEN_LIGHT,
+    borderWidth: 1,
+    borderColor: GREEN,
+  },
+  toggleBtnInactive: {
+    backgroundColor: RED_LIGHT,
+    borderWidth: 1,
+    borderColor: RED,
+  },
+  toggleBtnText: {
+    fontSize: 10,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+  },
+  toggleBtnTextActive: {
+    color: GREEN,
+  },
+  toggleBtnTextInactive: {
+    color: RED,
+  },
 
-  // ── Empty state ──
-  emptyStateBox: {
-    backgroundColor: WHITE,
+  backBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: GRAY_BG,
+    borderRadius: 10,
     borderWidth: 1.5,
     borderColor: BORDER,
-    borderStyle: "dashed",
-    borderRadius: 18,
-    paddingVertical: 40,
-    paddingHorizontal: 24,
-    alignItems: "center",
-    gap: 6,
   },
-  emptyIllustration: { width: 110, height: 110, borderRadius: 55, backgroundColor: GREEN_LIGHT, alignItems: "center", justifyContent: "center", marginBottom: 10 },
-  emptyTitle: { fontSize: 17, fontWeight: "800", color: TEXT, marginTop: 4 },
-  emptySub: { fontSize: 13, color: TEXT_LIGHT, textAlign: "center", marginBottom: 14, lineHeight: 19 },
-  emptyBtnRow: { flexDirection: "row", gap: 10, flexWrap: "wrap", justifyContent: "center" },
+  backBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: TEXT,
+  },
 
-  // ── Loading / generic empty ──
-  centered: { alignItems: "center", paddingVertical: 48, gap: 8, backgroundColor: WHITE, borderRadius: 14, borderWidth: 1, borderColor: BORDER },
-  loadingText: { fontSize: 14, color: TEXT_LIGHT, marginTop: 8 },
-  emptyText: { fontSize: 16, fontWeight: "700", color: TEXT },
-  emptySubText: { fontSize: 13, color: TEXT_LIGHT, textAlign: "center", paddingHorizontal: 32 },
-
-  // ── Floating Add button ──
-  fab: {
+  // Modal custom overlay
+  modalOverlay: {
     position: "absolute",
-    right: 18,
-    bottom: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: GREEN_DARK,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2000,
+  },
+  modalContainer: {
+    width: "80%",
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    padding: 22,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: TEXT,
+    marginBottom: 16,
+  },
+  modalInput: {
+    width: "100%",
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: TEXT,
+    marginBottom: 20,
+    backgroundColor: "#fff",
+  },
+  modalBtnRow: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
+  },
+  modalCancelBtn: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  modalCancelText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: TEXT_LIGHT,
+  },
+  modalConfirmBtn: {
+    flex: 1,
+    backgroundColor: GREEN,
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: "center",
+  },
+  modalConfirmText: {
+    fontSize: 13,
+    fontWeight: "850",
+    color: "#fff",
+  },
+
+  // Image
+  productImageWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: GRAY_BG,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+  },
+  productImage: { width: 52, height: 52 },
+  productImagePlaceholder: { fontSize: 24 },
+
+  // Info
+  productInfo: { flex: 1, gap: 2 },
+  productName: {
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+    color: TEXT,
+    letterSpacing: -0.2,
+  },
+  productCategory: { fontSize: 12, color: TEXT_LIGHT },
+  productMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 3,
+  },
+  productPrice: { fontSize: 13, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: TEXT },
+  statusPill: {
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  statusPillText: { fontSize: 11, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" },
+
+  // Actions
+  cardActions: { alignItems: "flex-end", gap: 6 },
+  editBtn: {
+    backgroundColor: GREEN,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  editBtnText: { color: "#fff", fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold" },
+  menuBtn: {
+    width: 30,
+    height: 26,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: BORDER,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+  },
+  menuDots: { fontSize: 11, color: TEXT_LIGHT, letterSpacing: 1 },
+
+  // Progress
+  // progressSection: { gap: 4 },
+  // progressBar: {
+  //   height: 5,
+  //   backgroundColor: GRAY_BG,
+  //   borderRadius: 3,
+  //   overflow: "hidden",
+  // },
+  // progressFill: {
+  //   height: 5,
+  //   borderRadius: 3,
+  // },
+  // stockQtyText: { fontSize: 11, color: TEXT_LIGHT },
+
+  // Dropdown
+  dropdownMenu: {
+    position: "absolute",
+    right: 0,
+    top: 30,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: BORDER,
     shadowColor: "#000",
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.12,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
+    zIndex: 999,
+    minWidth: 140,
+  },
+  dropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  dropdownItemText: { fontSize: 14, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: TEXT },
+  // dropdownDivider: { height: 1, backgroundColor: BORDER },
+
+  // ── Availability Toggle ──
+  toggleSection: {
+    alignItems: "center",
+    gap: 4,
+    marginRight: 4,
+  },
+  toggleTrack: {
+    width: 46,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: "center",
+    position: "relative",
+  },
+  toggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    position: "absolute",
+    top: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 3,
+  },
+  toggleLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  productBrand: {
+    fontSize: 11,
+    color: TEXT_XLIGHT,
+    marginBottom: 1,
+  },
+  // ── Category Group Header ──
+  categoryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+    backgroundColor: GREEN_LIGHT,
+    borderRadius: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: GREEN,
+  },
+  categoryHeaderText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: GREEN,
+    flex: 1,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  categoryHeaderCount: {
+    fontSize: 11,
+    color: GREEN,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    fontWeight: "700",
+    overflow: "hidden",
+  },
+  categoryDivider: {
+    height: 1,
+    backgroundColor: BORDER,
+    marginBottom: 8,
   },
 
-  // ── Bottom sheets (generic: action sheet / confirm sheet) ──
-  sheetOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end", zIndex: 1000 },
+  cardUnavailable: {
+    opacity: 0.75,
+    borderColor: "#F0F0F0",
+  },
+  productImageWrapDim: {
+    backgroundColor: "#EFEFEF",
+  },
+  productNameDim: {
+    color: TEXT_LIGHT,
+  },
+  dropdownItemText: { fontSize: 14, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold", color: TEXT },
+  dropdownDivider: { height: 1, backgroundColor: BORDER },
+
+  // Loading / Empty
+  centered: {
+    alignItems: "center",
+    paddingVertical: 48,
+    gap: 8,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  loadingText: { fontSize: 14, color: TEXT_LIGHT, marginTop: 8 },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: "700",
+    fontFamily: "PlusJakartaSans_700Bold",
+    color: TEXT,
+  },
+  emptySubText: {
+    fontSize: 13,
+    color: TEXT_LIGHT,
+    textAlign: "center",
+    paddingHorizontal: 32,
+  },
+  // ── Confirm Sheet ──
+  sheetOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+    zIndex: 1000,
+  },
   sheetCard: {
-    backgroundColor: WHITE,
+    backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 24,
@@ -1339,119 +1543,99 @@ const s = StyleSheet.create({
     shadowOffset: { width: 0, height: -4 },
     elevation: 16,
   },
-  sheetIconBox: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", marginBottom: 4 },
-  sheetTitle: { fontSize: 18, fontWeight: "800", color: TEXT, textAlign: "center" },
-  sheetSub: { fontSize: 13, color: TEXT_LIGHT, textAlign: "center", lineHeight: 20, paddingHorizontal: 8 },
-  sheetBtnRow: { flexDirection: "row", gap: 10, marginTop: 8, width: "100%" },
-  sheetCancelBtn: { flex: 1, borderWidth: 1.5, borderColor: BORDER, borderRadius: 14, paddingVertical: 14, alignItems: "center", backgroundColor: WHITE },
-  sheetCancelText: { fontSize: 14, fontWeight: "700", color: TEXT_LIGHT },
-  sheetConfirmBtn: { flex: 2, borderRadius: 14, paddingVertical: 14, alignItems: "center" },
-  sheetConfirmText: { fontSize: 14, fontWeight: "800", color: "#fff" },
-
-  // ── Add options sheet (Add Product vs Add from Catalogue) ──
-  addOptionRow: {
-    flexDirection: "row",
+  sheetIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: "center",
-    gap: 12,
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: TEXT,
+    textAlign: "center",
+  },
+  sheetSub: {
+    fontSize: 13,
+    color: TEXT_LIGHT,
+    textAlign: "center",
+    lineHeight: 20,
+    paddingHorizontal: 8,
+  },
+  sheetBtnRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 8,
     width: "100%",
+  },
+  sheetCancelBtn: {
+    flex: 1,
     borderWidth: 1.5,
     borderColor: BORDER,
     borderRadius: 14,
-    padding: 12,
-    marginTop: 6,
-  },
-  addOptionIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  addOptionTitle: { fontSize: 14, fontWeight: "800", color: TEXT },
-  addOptionSub: { fontSize: 12, color: TEXT_LIGHT, marginTop: 1 },
-
-  // ── Filter & Sort sheet ──
-  filterSheetCard: {
-    backgroundColor: WHITE,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: Platform.OS === "ios" ? 34 : 20,
-    maxHeight: "88%",
-  },
-  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: "center", marginBottom: 14 },
-  filterSheetHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  filterSheetTitle: { fontSize: 19, fontWeight: "800", color: TEXT },
-  filterSectionTitle: { fontSize: 14, fontWeight: "800", color: TEXT, marginBottom: 10 },
-
-  radioRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 9 },
-  radioCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: BORDER,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  radioCircleActive: { borderColor: GREEN },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: GREEN },
-  radioLabel: { fontSize: 14, color: TEXT, fontWeight: "600" },
-
-  availRow: { flexDirection: "row", gap: 10, marginBottom: 4 },
-  availBtn: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: BORDER,
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: "center",
-    backgroundColor: WHITE,
-  },
-  availBtnActive: { borderColor: GREEN, backgroundColor: GREEN_LIGHT },
-  availBtnText: { fontSize: 14, fontWeight: "700", color: TEXT },
-  availBtnTextActive: { color: GREEN_DARK },
-
-  priceChipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  priceChip: { borderWidth: 1.5, borderColor: BORDER, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: WHITE },
-  priceChipActive: { borderColor: GREEN, backgroundColor: GREEN_LIGHT },
-  priceChipText: { fontSize: 13, fontWeight: "600", color: TEXT },
-  priceChipTextActive: { color: GREEN_DARK, fontWeight: "800" },
-
-  customRangeRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 },
-  customInputWrap: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: BORDER,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    gap: 4,
-    backgroundColor: WHITE,
-  },
-  rupeeSign: { fontSize: 13, color: TEXT_LIGHT, fontWeight: "600" },
-  customInput: { flex: 1, fontSize: 13, color: TEXT, padding: 0 },
-
-  filterSheetFooter: { flexDirection: "row", gap: 10, marginTop: 22 },
-  resetBtn: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-    borderColor: BORDER,
-    borderRadius: 12,
     paddingVertical: 14,
-    backgroundColor: WHITE,
+    alignItems: "center",
+    backgroundColor: "#fff",
   },
-  resetBtnText: { fontSize: 14, fontWeight: "700", color: TEXT },
-  applyBtn: {
+  sheetCancelText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: TEXT_LIGHT,
+  },
+  sheetConfirmBtn: {
     flex: 2,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: GREEN_DARK,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingVertical: 14,
+    alignItems: "center",
   },
-  applyBtnText: { fontSize: 14, fontWeight: "800", color: WHITE },
+  sheetConfirmText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#fff",
+  },
 
-  appliedSummaryBox: { backgroundColor: GREEN_LIGHT, borderRadius: 12, padding: 12, marginTop: 14, gap: 4 },
-  appliedSummaryTitle: { fontSize: 13, fontWeight: "800", color: GREEN_DARK },
-  appliedSummaryDesc: { fontSize: 12, color: GREEN_DARK, opacity: 0.85 },
+  // Added Custom Styles
+  filterSectionTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: GREEN,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginTop: 12,
+    marginBottom: 6,
+    paddingHorizontal: 4,
+  },
+  filterSectionSubTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: TEXT_LIGHT,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginTop: 8,
+    marginBottom: 4,
+    paddingHorizontal: 6,
+  },
+  subChip: {
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#fff",
+    marginRight: 6,
+  },
+  subChipActive: {
+    backgroundColor: GREEN,
+    borderColor: GREEN,
+  },
+  subChipText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: TEXT_LIGHT,
+  },
+  subChipTextActive: {
+    color: "#fff",
+  },
 });

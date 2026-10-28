@@ -20,6 +20,7 @@ export default function App() {
     PlusJakartaSans_700Bold,
     PlusJakartaSans_800ExtraBold,
   });
+
   useEffect(() => {
     hydrate();
     fetchLocation();

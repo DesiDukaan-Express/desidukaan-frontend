@@ -16,16 +16,7 @@ import {
   Platform,
   useWindowDimensions,
   StatusBar,
-  LayoutAnimation,
-  UIManager,
 } from "react-native";
-
-if (
-  Platform.OS === "android" &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTranslation } from "react-i18next";
@@ -65,7 +56,7 @@ const C = {
   redDim: "#FEF2F2",
 };
 
-export default function VendorProfileScreen({ navigation }) {
+export default function VendorProfileScreen() {
   const { token, logout, setActiveRole } = useAuthStore();
   const navigation = useNavigation();
   const { t } = useTranslation();
@@ -276,18 +267,6 @@ export default function VendorProfileScreen({ navigation }) {
     setDistanceModal(true);
   };
 
-  const handlePreviewStore = () => {
-    if (navigation?.navigate) {
-      try {
-        navigation.navigate("VendorStorePreview", { vendorId: vendor?.id });
-        return;
-      } catch {
-        // fall through to placeholder
-      }
-    }
-    Alert.alert(t('vendor.previewStore') || "Preview Store", t('vendor.previewStoreComingSoon') || "Store preview is coming soon.");
-  };
-
   const saveDistance = (km) => {
     handleUpdateField("delivery_base_km", String(km));
     setDistanceModal(false);
@@ -353,7 +332,7 @@ export default function VendorProfileScreen({ navigation }) {
     <>
       {/* ── HERO HEADER ──────────────────────────────────── */}
       <LinearGradient
-        colors={["#0F3D2E", "#0A2C22"]}
+        colors={["#1B1F2B", "#12141C"]}
         style={[
           styles.hero,
           {
@@ -363,27 +342,14 @@ export default function VendorProfileScreen({ navigation }) {
           },
         ]}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Text
-            style={[
-              styles.heroOverline,
-              { fontSize: isWide ? 11 : rs(10, 11, 11) },
-            ]}
-          >
-            {t('vendor.myProfile').toUpperCase()}
-          </Text>
-
-          <TouchableOpacity
-            onPress={handlePreviewStore}
-            activeOpacity={0.8}
-            style={styles.previewStoreBtn}
-          >
-            <MaterialIcons name="visibility" size={14} color="#fff" />
-            <Text style={styles.previewStoreBtnText}>
-              {t('preview Store') || "Preview Store"}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <Text
+          style={[
+            styles.heroOverline,
+            { fontSize: isWide ? 11 : rs(10, 11, 11) },
+          ]}
+        >
+          {t('vendor.myProfile').toUpperCase()}
+        </Text>
 
         <View
           style={[
@@ -446,43 +412,41 @@ export default function VendorProfileScreen({ navigation }) {
               </Text>
             </View>
 
-            <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 2 }}>
-              <Text
-                style={[
-                  styles.heroSince,
-                  { fontSize: isWide ? 12 : rs(10, 11, 12) },
-                ]}
-              >
-                {t('vendor.vendorSince', { date: memberSince })}
-              </Text>
+            <Text
+              style={[
+                styles.heroSince,
+                { fontSize: isWide ? 12 : rs(10, 11, 12) },
+              ]}
+            >
+              {t('vendor.vendorSince', { date: memberSince })}
+            </Text>
+          </View>
 
-              {/* Status badge — inline next to Vendor since */}
-              <View
-                style={[
-                  styles.statusBadge,
-                  {
-                    backgroundColor: storeOpen
-                      ? "rgba(22,163,74,0.16)"
-                      : "rgba(255,255,255,0.1)",
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.statusDot,
-                    { backgroundColor: storeOpen ? C.green : "#94a3b8" },
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.statusText,
-                    { color: storeOpen ? "#4ADE80" : "#94a3b8", fontSize: rs(11, 12, 12) },
-                  ]}
-                >
-                  {storeOpen ? t('vendor.storeOpen') : t('vendor.storeClosed')}
-                </Text>
-              </View>
-            </View>
+          {/* Status badge — right side */}
+          <View
+            style={[
+              styles.statusBadge,
+              {
+                backgroundColor: storeOpen
+                  ? "rgba(22,163,74,0.16)"
+                  : "rgba(255,255,255,0.1)",
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: storeOpen ? C.green : "#94a3b8" },
+              ]}
+            />
+            <Text
+              style={[
+                styles.statusText,
+                { color: storeOpen ? "#4ADE80" : "#94a3b8", fontSize: rs(11, 12, 12) },
+              ]}
+            >
+              {storeOpen ? t('vendor.storeOpen') : t('vendor.storeClosed')}
+            </Text>
           </View>
         </View>
 
@@ -914,55 +878,20 @@ function StatStripItem({ value, label, color, rs, isWide }) {
   );
 }
 
-function SectionCard({
-  title,
-  overline,
-  children,
-  rs,
-  isWide,
-  icon,
-  iconBg = C.primaryDim,
-  iconColor = C.primaryDark,
-  defaultExpanded = true,
-}) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
-
-  const toggle = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpanded((prev) => !prev);
-  };
-
+function SectionCard({ title, overline, children, rs, isWide }) {
   return (
     <View style={styles.sectionCard}>
-      <TouchableOpacity
-        style={styles.sectionCardHeader}
-        onPress={toggle}
-        activeOpacity={0.7}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", flex: 1, gap: 12 }}>
-          {icon && (
-            <View style={[styles.sectionIconWrap, { backgroundColor: iconBg }]}>
-              <MaterialIcons name={icon} size={18} color={iconColor} />
-            </View>
-          )}
-          <View style={{ flex: 1 }}>
-            {overline && (
-              <Text style={[styles.sectionOverline, { fontSize: isWide ? 10 : rs(9, 10, 10) }]}>
-                {overline}
-              </Text>
-            )}
-            <Text style={[styles.sectionTitle, { fontSize: isWide ? 16 : rs(14, 15, 16) }]}>
-              {title}
-            </Text>
-          </View>
-        </View>
-        <MaterialIcons
-          name={expanded ? "expand-less" : "expand-more"}
-          size={24}
-          color={C.textSub}
-        />
-      </TouchableOpacity>
-      {expanded && children}
+      <View style={styles.sectionCardHeader}>
+        {overline && (
+          <Text style={[styles.sectionOverline, { fontSize: isWide ? 10 : rs(9, 10, 10) }]}>
+            {overline}
+          </Text>
+        )}
+        <Text style={[styles.sectionTitle, { fontSize: isWide ? 16 : rs(14, 15, 16) }]}>
+          {title}
+        </Text>
+      </View>
+      {children}
     </View>
   );
 }
@@ -996,15 +925,7 @@ function InfoRow({ icon, label, value, onEdit, editable = true, rs, isWide }) {
 
 function PersonalInfoCard({ vendor, onEdit, rs, isWide, t }) {
   return (
-    <SectionCard
-      title={t('profile.personalInfo')}
-      overline={t('profile.account').toUpperCase()}
-      icon="person"
-      iconBg={C.tealDim}
-      iconColor={C.tealIcon}
-      rs={rs}
-      isWide={isWide}
-    >
+    <SectionCard title={t('profile.personalInfo')} overline={t('profile.account').toUpperCase()} rs={rs} isWide={isWide}>
       <InfoRow
         label={t('profile.shopName')}
         value={vendor.shop_name}
@@ -1039,15 +960,7 @@ function PersonalInfoCard({ vendor, onEdit, rs, isWide, t }) {
 
 function StoreInfoCard({ vendor, onEdit, onCategoryPress, rs, isWide, t }) {
   return (
-    <SectionCard
-      title={t('vendor.storeInfo')}
-      overline={t('vendor.storeDetails').toUpperCase()}
-      icon="storefront"
-      iconBg={C.primaryDim}
-      iconColor={C.primaryDark}
-      rs={rs}
-      isWide={isWide}
-    >
+    <SectionCard title={t('vendor.storeInfo')} overline={t('vendor.storeDetails').toUpperCase()} rs={rs} isWide={isWide}>
       <InfoRow
         label={t('profile.address')}
         value={`${vendor.address_line}${vendor.pincode ? ", " + vendor.pincode : ""}`}
@@ -1096,15 +1009,7 @@ function StoreInfoCard({ vendor, onEdit, onCategoryPress, rs, isWide, t }) {
 
 function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBadWeather, onEdit, onTimePress, onDistancePress, onDeliveryPress, rs, isWide, t }) {
   return (
-    <SectionCard
-      title={t('vendor.storeSettings')}
-      overline={t('vendor.operations').toUpperCase()}
-      icon="settings"
-      iconBg={C.amberDim}
-      iconColor={C.amber}
-      rs={rs}
-      isWide={isWide}
-    >
+    <SectionCard title={t('vendor.storeSettings')} overline={t('vendor.operations').toUpperCase()} rs={rs} isWide={isWide}>
       {/* Store toggle */}
       <View style={styles.settingRow}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -1351,15 +1256,7 @@ function AccountSettingsCard({ rs, isWide, navigation }) {
   ];
 
   return (
-    <SectionCard
-      title={t('profile.accountSettings')}
-      overline="SETTINGS"
-      icon="manage-accounts"
-      iconBg="#EDE9FE"
-      iconColor="#7C3AED"
-      rs={rs}
-      isWide={isWide}
-    >
+    <SectionCard title={t('profile.accountSettings')} overline="SETTINGS" rs={rs} isWide={isWide}>
       {/* Language row */}
       <TouchableOpacity
         style={styles.settingRow}
@@ -1484,23 +1381,6 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.55)",
     fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", letterSpacing: 1.2,
   },
-  previewStoreBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.14)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.22)",
-  },
-  previewStoreBtnText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "700",
-    fontFamily: "PlusJakartaSans_700Bold",
-  },
   heroRow: { flexDirection: "row", alignItems: "center" },
   avatarRing: {
     borderWidth: 3,
@@ -1543,8 +1423,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.15)",
@@ -1581,20 +1461,11 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   sectionCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingTop: 16,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
-  },
-  sectionIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
   },
   sectionOverline: {
     color: C.textLight,

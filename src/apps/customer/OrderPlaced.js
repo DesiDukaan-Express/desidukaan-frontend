@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, Animated, TouchableOpacity,
   Platform, StatusBar, Dimensions, ActivityIndicator,
@@ -9,90 +9,26 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { io } from "socket.io-client";
 import useAuthStore from "../../store/authStore";
 import { useTranslation } from "react-i18next";
-import { useTheme } from "../../theme/ThemeContext";
-
-import { dkBg, dkBorder } from "../../theme/darkTones";
 
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 
-// ─── Theme palettes (light / dark) ─────────────────────────────────────────
-const LIGHT_COLORS = {
-  green: "#16A34A",
-  greenDark: "#15803D",
-  greenLight: "#F0FDF4",
-  greenMid: "#DCFCE7",
-  greenBorder: "#BBF7D0",
-  orange: "#F97316",
-  orangeDark: "#EA580C",
-  red: "#EF4444",
-  redLight: "#FEF2F2",
-  white: "#FFFFFF",
-  bg: "#F8FAFC",
-  gray100: "#F3F4F6",
-  gray200: "#E5E7EB",
-  gray400: "#9CA3AF",
-  gray500: "#6B7280",
-  gray600: "#4B5563",
-  gray900: "#111827",
-  surface: "#FFFFFF",
+const C = {
+  green:      "#16A34A", greenDark:  "#15803D",
+  greenLight: "#F0FDF4", greenMid:   "#DCFCE7",
+  greenBorder:"#BBF7D0",
+  orange:     "#F97316", orangeDark: "#EA580C",
+  red:        "#EF4444", redLight:   "#FEF2F2",
+  white:      "#FFFFFF", bg:         "#F8FAFC",
+  gray100:    "#F3F4F6", gray200:    "#E5E7EB",
+  gray400:    "#9CA3AF", gray500:    "#6B7280",
+  gray600:    "#4B5563", gray900:    "#111827",
 };
-const DARK_COLORS = {
-  green: "#2F9E68",
-  greenDark: "#3AA673",
-  greenLight: "#172720",
-  greenMid: "#1C3027",
-  greenBorder: "#2B4A3B",
-  orange: "#DB7A33",
-  orangeDark: "#C9691F",
-  red: "#DE5C5C",
-  redLight: "#2C1E20",
-  white: "#FFFFFF",
-  bg: "#0F1216",
-  gray100: "#1F2329",
-  gray200: "#2E343C",
-  gray400: "#6A727E",
-  gray500: "#8A929E",
-  gray600: "#A4ABB6",
-  gray900: "#ECEFF3",
-  surface: "#171A1F",
-};
-
 
 // Countdown ring component removed
 
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function OrderPlaced() {
-  const { isDark } = useTheme();
-  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
-  const s = useMemo(() => StyleSheet.create({
-  root:    { flex: 1, backgroundColor: C.surface },
-  content: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28, gap: 20 },
-  circleWrap:  { alignItems: "center", justifyContent: "center", marginBottom: 4 },
-  ring:        { position: "absolute", width: 160, height: 160, borderRadius: 80, backgroundColor: C.surface, borderWidth: 2 },
-  circle:      { width: 120, height: 120, borderRadius: 60, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10, elevation: 8 },
-  circleGrad:  { flex: 1, alignItems: "center", justifyContent: "center" },
-  textWrap:    { alignItems: "center", gap: 8 },
-  title:       { fontSize: 30, fontWeight: "900", color: C.gray900, letterSpacing: -0.5, textAlign: "center" },
-  orderNumWrap:{ flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
-  orderNum:    { fontSize: 13, fontWeight: "800" },
-  subtitle:    { fontSize: 15, color: C.gray500, textAlign: "center", lineHeight: 22 },
-  subtitleBold:{ fontWeight: "700", color: C.gray900 },
-  timerRow:    { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: dkBg("#FFF7ED", isDark), paddingHorizontal: 16, paddingVertical: 10, borderRadius: 25, borderWidth: 1, borderColor: dkBorder("#FFEDD5", isDark) },
-  timerText:   { fontSize: 13, fontWeight: "700", color: C.orange },
-  infoCard:    { width: "100%", backgroundColor: C.surface, borderRadius: 20, borderWidth: 1.5, borderColor: C.gray200, padding: 18, gap: 4, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 12, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
-  infoRow:     { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 6 },
-  infoIconWrap:{ width: 36, height: 36, borderRadius: 10, backgroundColor: C.greenLight, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  infoLabel:   { fontSize: 11, color: C.gray400, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.3 },
-  infoValue:   { fontSize: 15, fontWeight: "800", color: C.gray900, marginTop: 1 },
-  infoDivider: { height: 1, backgroundColor: C.gray100, marginVertical: 4 },
-  actions:     { width: "100%", gap: 10 },
-  trackBtn:    { borderRadius: 16, overflow: "hidden" },
-  trackGrad:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16 },
-  trackText:   { fontSize: 16, fontWeight: "900", color: C.white },
-  homeBtn:     { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 16, backgroundColor: C.gray100 },
-  homeBtnText: { fontSize: 15, fontWeight: "700", color: C.gray600 },
-}), [C]);
   const { t }       = useTranslation();
   const navigation  = useNavigation();
   const route       = useRoute();
@@ -194,7 +130,7 @@ export default function OrderPlaced() {
 
   return (
     <View style={s.root}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? C.surface : C.white} />
+      <StatusBar barStyle="dark-content" backgroundColor={C.white} />
 
       <LinearGradient
         colors={[cfg.bg, C.white, C.white]}
@@ -289,3 +225,31 @@ export default function OrderPlaced() {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  root:    { flex: 1, backgroundColor: C.white },
+  content: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28, gap: 20 },
+  circleWrap:  { alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  ring:        { position: "absolute", width: 160, height: 160, borderRadius: 80, backgroundColor: C.white, borderWidth: 2 },
+  circle:      { width: 120, height: 120, borderRadius: 60, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10, elevation: 8 },
+  circleGrad:  { flex: 1, alignItems: "center", justifyContent: "center" },
+  textWrap:    { alignItems: "center", gap: 8 },
+  title:       { fontSize: 30, fontWeight: "900", color: C.gray900, letterSpacing: -0.5, textAlign: "center" },
+  orderNumWrap:{ flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
+  orderNum:    { fontSize: 13, fontWeight: "800" },
+  subtitle:    { fontSize: 15, color: C.gray500, textAlign: "center", lineHeight: 22 },
+  subtitleBold:{ fontWeight: "700", color: C.gray900 },
+  timerRow:    { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#FFF7ED", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 25, borderWidth: 1, borderColor: "#FFEDD5" },
+  timerText:   { fontSize: 13, fontWeight: "700", color: C.orange },
+  infoCard:    { width: "100%", backgroundColor: C.white, borderRadius: 20, borderWidth: 1.5, borderColor: C.gray200, padding: 18, gap: 4, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 12, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  infoRow:     { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 6 },
+  infoIconWrap:{ width: 36, height: 36, borderRadius: 10, backgroundColor: C.greenLight, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  infoLabel:   { fontSize: 11, color: C.gray400, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.3 },
+  infoValue:   { fontSize: 15, fontWeight: "800", color: C.gray900, marginTop: 1 },
+  infoDivider: { height: 1, backgroundColor: C.gray100, marginVertical: 4 },
+  actions:     { width: "100%", gap: 10 },
+  trackBtn:    { borderRadius: 16, overflow: "hidden" },
+  trackGrad:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16 },
+  trackText:   { fontSize: 16, fontWeight: "900", color: C.white },
+  homeBtn:     { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 16, backgroundColor: C.gray100 },
+  homeBtnText: { fontSize: 15, fontWeight: "700", color: C.gray600 },
+});
