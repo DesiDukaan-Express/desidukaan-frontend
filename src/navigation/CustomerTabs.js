@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
@@ -9,7 +9,6 @@ import { useTranslation } from 'react-i18next';
 import useCartStore from '../store/cartStore';
 import useAuthStore from '../store/authStore';
 import useOrderStore from '../store/orderStore';
-import { useTheme } from '../theme/ThemeContext';
 
 import HomeScreen from '../apps/customer/HomeScreen';
 import SearchScreen from '../apps/customer/SearchScreen';
@@ -25,8 +24,8 @@ const Stack = createNativeStackNavigator();
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3000';
 
-// ─── Palette matching the app (light / dark) ────────────────────────────────
-const LIGHT_COLORS = {
+// ─── Palette matching the app ──────────────────────────────────────────────────
+const C = {
   green:       '#16A34A',
   greenLight:  '#F0FDF4',
   orange:      '#F97316',
@@ -41,21 +40,6 @@ const LIGHT_COLORS = {
   greenDark:   '#15803D',
   red:         '#DC2626',
 };
-const DARK_COLORS = {
-  green:       '#27E26C',
-  greenLight:  '#0A481D',
-  orange:      '#F97316',
-  orangeDark:  '#F36216',
-  purple:      '#9F7AEA',
-  surface:     '#14212F',
-  surfaceLow:  '#0D161F',
-  border:      '#383E49',
-  gray400:     '#6D7787',
-  gray600:     '#9EA8B6',
-  gray900:     '#EDF0F7',
-  greenDark:   '#2DDC6E',
-  red:         '#EF4444',
-};
 
 const TAB_ICONS = {
   Home:    'home',
@@ -67,8 +51,6 @@ const TAB_ICONS = {
 
 // ─── Tab icon component ────────────────────────────────────────────────────────
 const TabIcon = ({ iconName, label, focused, cartCount }) => {
-  const { isDark } = useTheme();
-  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
   const isCart = label === 'Cart';
   return (
     <View
@@ -132,8 +114,6 @@ function CartTabIcon({ focused, label }) {
 // ─── Bottom tab navigator ──────────────────────────────────────────────────────
 function CustomerTabNavigator() {
   const { t } = useTranslation();
-  const { isDark } = useTheme();
-  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
 
   const TAB_LABELS = {
     Home:    t('home.tab'),
@@ -153,27 +133,22 @@ function CustomerTabNavigator() {
           if (route.name === 'Cart') return <CartTabIcon focused={focused} label={label} />;
           return <TabIcon iconName={TAB_ICONS[route.name]} label={label} focused={focused} />;
         },
-        // ProfileScreen renders its own custom bottom nav, so hide this
-        // navigator's built-in tab bar just for that route to avoid a
-        // duplicate nav bar. All other tabs keep the normal styled bar.
-        tabBarStyle: route.name === 'Profile'
-          ? { display: 'none' }
-          : {
-            backgroundColor: C.surface,
-            borderTopWidth: 1,
-            borderTopColor: C.border,
-            height: Platform.OS === 'ios' ? 82 : 64,
-            paddingBottom: Platform.OS === 'ios' ? 20 : 4,
-            paddingTop: 4,
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: -3 },
-            shadowOpacity: 0.06,
-            shadowRadius: 10,
-            elevation: 16,
-            overflow: Platform.OS === 'android' ? 'hidden' : 'visible',
-          },
+        tabBarStyle: {
+          backgroundColor: C.surface,
+          borderTopWidth: 1,
+          borderTopColor: C.border,
+          height: Platform.OS === 'ios' ? 82 : 64,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 4,
+          paddingTop: 4,
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: 0.06,
+          shadowRadius: 10,
+          elevation: 16,
+          overflow: Platform.OS === 'android' ? 'hidden' : 'visible',
+        },
         tabBarIconStyle: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
         tabBarItemStyle: { justifyContent: 'center', alignItems: 'center', height: '100%' },
         tabBarActiveTintColor: C.green,
@@ -194,9 +169,6 @@ function CustomerTabNavigator() {
 // Shows a live countdown. Tap → back to Checkout (re-opens modal).
 function PendingOrderMonitor() {
   const { t } = useTranslation();
-  const { isDark } = useTheme();
-  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
-  const ms = useMemo(() => makeMs(C), [C]);
   const navigation = useNavigation();
   const { token } = useAuthStore();
   const pendingOrder  = useOrderStore((s) => s.pendingOrder);
@@ -520,7 +492,6 @@ export default function CustomerTabs() {
         <Stack.Screen name="Wishlist"    component={WishlistScreen}    />
         <Stack.Screen name="TrackOrder"  component={TrackOrderScreen}  />
         <Stack.Screen name="Search"      component={SearchScreen}      />
-        <Stack.Screen name="Wishlist"    component={WishlistScreen}    />
       </Stack.Navigator>
       <PendingOrderMonitor />
     </View>
@@ -530,7 +501,7 @@ export default function CustomerTabs() {
 // ─── Styles ────────────────────────────────────────────────────────────────────
 const BOTTOM = Platform.OS === 'ios' ? 98 : 76;
 
-const makeMs = (C) => StyleSheet.create({
+const ms = StyleSheet.create({
   // Persistent banner
   banner: {
     position:        'absolute',

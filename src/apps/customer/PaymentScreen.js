@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, ActivityIndicator, Linking, Alert, Platform, TextInput,
@@ -9,64 +9,21 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import useOrderStore from "../../store/orderStore";
 import useAuthStore from "../../store/authStore";
 import { useTranslation } from "react-i18next";
-import { useTheme } from "../../theme/ThemeContext";
-
-import { dkBg, dkText } from "../../theme/darkTones";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
-// ─── Theme palettes (light / dark) ─────────────────────────────────────────
-const LIGHT_COLORS = {
-  orange: "#F97316",
-  orangeDark: "#EA580C",
-  green: "#16A34A",
-  greenDark: "#15803D",
-  greenLight: "#F0FDF4",
-  greenBorder: "#BBF7D0",
-  greenMid: "#DCFCE7",
-  white: "#FFFFFF",
-  bg: "#F8FAFC",
-  gray100: "#F3F4F6",
-  gray200: "#E5E7EB",
-  gray300: "#D1D5DB",
-  gray400: "#9CA3AF",
-  gray500: "#6B7280",
-  gray600: "#4B5563",
-  gray700: "#374151",
-  gray900: "#111827",
-  red: "#EF4444",
-  redLight: "#FEF2F2",
-  amber: "#D97706",
-  amberLight: "#FEF3C7",
+const C = {
+  orange: "#F97316", orangeDark: "#EA580C",
+  green: "#16A34A", greenDark: "#15803D",
+  greenLight: "#F0FDF4", greenBorder: "#BBF7D0", greenMid: "#DCFCE7",
+  white: "#FFFFFF", bg: "#F8FAFC",
+  gray100: "#F3F4F6", gray200: "#E5E7EB", gray300: "#D1D5DB",
+  gray400: "#9CA3AF", gray500: "#6B7280", gray600: "#4B5563",
+  gray700: "#374151", gray900: "#111827",
+  red: "#EF4444", redLight: "#FEF2F2",
+  amber: "#D97706", amberLight: "#FEF3C7",
   purple: "#7C3AED",
-  surface: "#FFFFFF",
 };
-const DARK_COLORS = {
-  orange: "#DB7A33",
-  orangeDark: "#C9691F",
-  green: "#2F9E68",
-  greenDark: "#3AA673",
-  greenLight: "#172720",
-  greenBorder: "#2B4A3B",
-  greenMid: "#1C3027",
-  white: "#FFFFFF",
-  bg: "#0F1216",
-  gray100: "#1F2329",
-  gray200: "#2E343C",
-  gray300: "#3D434C",
-  gray400: "#6A727E",
-  gray500: "#8A929E",
-  gray600: "#A4ABB6",
-  gray700: "#BFC5CE",
-  gray900: "#ECEFF3",
-  red: "#DE5C5C",
-  redLight: "#2C1E20",
-  amber: "#D9A03F",
-  amberLight: "#292319",
-  purple: "#8A7CCB",
-  surface: "#171A1F",
-};
-
 
 const PAYMENT_METHODS = [
   { id: "upi",  label: "UPI",                sub: "Google Pay, PhonePe, Paytm & more", icon: "smartphone", color: "#7C3AED" },
@@ -88,77 +45,6 @@ function fmtSlot(slot) {
 }
 
 export default function PaymentScreen() {
-  const { isDark } = useTheme();
-  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
-  const st = useMemo(() => StyleSheet.create({
-  root:        { flex: 1, backgroundColor: C.bg },
-  header:      { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16,
-                 paddingTop: Platform.OS === "ios" ? 52 : 16, paddingBottom: 14,
-                 backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  backBtn:     { width: 38, height: 38, borderRadius: 12, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
-  headerTitle: { fontSize: 20, fontWeight: "900", color: C.orange },
-  headerSub:   { fontSize: 12, color: C.gray500, marginTop: 1 },
-  totalChip:   { backgroundColor: C.greenLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: C.greenBorder },
-  totalChipText: { fontSize: 14, fontWeight: "900", color: C.greenDark },
-
-  confirmedBanner: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: C.greenLight,
-                     borderRadius: 16, padding: 16, borderWidth: 1.5, borderColor: C.greenBorder },
-  confirmedIconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: C.greenMid, alignItems: "center", justifyContent: "center" },
-  confirmedTitle: { fontSize: 15, fontWeight: "900", color: C.greenDark },
-  confirmedSub:   { fontSize: 12, color: C.green, marginTop: 2 },
-
-  card:       { backgroundColor: C.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: C.gray200 },
-  cardHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14,
-                paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.gray100 },
-  cardTitle:  { fontSize: 15, fontWeight: "800", color: C.gray900 },
-
-  slotRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.greenLight,
-             borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.greenBorder },
-  slotText: { fontSize: 15, fontWeight: "800", color: C.greenDark, flex: 1 },
-
-  itemRow:   { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8 },
-  itemDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green, flexShrink: 0 },
-  itemName:  { flex: 1, fontSize: 13, color: C.gray700, fontWeight: "500" },
-  itemQty:   { fontSize: 12, color: C.gray400 },
-  itemPrice: { fontSize: 13, fontWeight: "700", color: C.gray900, minWidth: 44, textAlign: "right" },
-  divider:   { height: 1, backgroundColor: C.gray200, marginVertical: 10 },
-  summaryRow:  { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
-  summaryLabel:{ fontSize: 13, color: C.gray500 },
-  summaryVal:  { fontSize: 13, fontWeight: "700", color: C.gray900 },
-
-  phoneRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.greenLight,
-              borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.greenBorder },
-  phoneNum: { flex: 1, fontSize: 16, fontWeight: "800", color: C.greenDark },
-  callBtn:  { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.green,
-              paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
-  callBtnText: { fontSize: 12, fontWeight: "800", color: C.white },
-
-  payOption:       { flexDirection: "row", alignItems: "center", gap: 12, padding: 14,
-                     borderRadius: 12, borderWidth: 1.5, borderColor: C.gray200, marginBottom: 8, backgroundColor: dkBg("#FAFAFA", isDark) },
-  payOptionActive: { borderColor: C.green, backgroundColor: C.greenLight },
-  payIcon:         { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  payLabel:        { fontSize: 14, fontWeight: "700", color: C.gray900 },
-  paySub:          { fontSize: 11, color: C.gray400, marginTop: 2 },
-  radioOuter:      { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: C.gray300,
-                     alignItems: "center", justifyContent: "center" },
-  radioDot:        { width: 10, height: 10, borderRadius: 5, backgroundColor: C.green },
-
-  upiPanel:     { backgroundColor: C.gray100, borderRadius: 12, padding: 14, marginBottom: 8 },
-  upiFieldLabel:{ fontSize: 11, fontWeight: "700", color: C.gray600, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 },
-  upiInputRow:  { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.surface,
-                  borderRadius: 10, borderWidth: 1.5, borderColor: C.gray200, paddingHorizontal: 12, height: 46 },
-  upiInput:     { flex: 1, fontSize: 14, color: C.gray900 },
-  verifyBtn:    { marginTop: 10, backgroundColor: C.green, borderRadius: 10, paddingVertical: 10, alignItems: "center" },
-  verifyBtnText:{ fontSize: 13, fontWeight: "800", color: C.white },
-
-  footer:     { position: "absolute", bottom: 0, left: 0, right: 0, padding: 16,
-                backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.gray100,
-                paddingBottom: Platform.OS === "ios" ? 30 : 16 },
-  payBtn:     { borderRadius: 16, overflow: "hidden" },
-  payBtnInner:{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12,
-                paddingVertical: 16, paddingHorizontal: 24 },
-  payBtnText: { fontSize: 17, fontWeight: "900", color: C.white },
-}), [C]);
   const { t } = useTranslation();
   const navigation = useNavigation();
   const route      = useRoute();
@@ -201,7 +87,7 @@ export default function PaymentScreen() {
 
   return (
     <View style={st.root}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? C.surface : C.white} />
+      <StatusBar barStyle="dark-content" backgroundColor={C.white} />
 
       {/* Header */}
       <View style={st.header}>
@@ -299,8 +185,7 @@ export default function PaymentScreen() {
             <Feather name="credit-card" size={15} color={C.green} />
             <Text style={st.cardTitle}>{t('payment.paymentMethod')}</Text>
           </View>
-          {PAYMENT_METHODS.map((pm0) => {
-            const pm = { ...pm0, color: dkText(pm0.color, isDark) };
+          {PAYMENT_METHODS.map((pm) => {
             const active = selectedPay === pm.id;
             return (
               <View key={pm.id}>
@@ -433,4 +318,72 @@ export default function PaymentScreen() {
   );
 }
 
+const st = StyleSheet.create({
+  root:        { flex: 1, backgroundColor: C.bg },
+  header:      { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16,
+                 paddingTop: Platform.OS === "ios" ? 52 : 16, paddingBottom: 14,
+                 backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  backBtn:     { width: 38, height: 38, borderRadius: 12, backgroundColor: C.gray100, alignItems: "center", justifyContent: "center" },
+  headerTitle: { fontSize: 20, fontWeight: "900", color: C.orange },
+  headerSub:   { fontSize: 12, color: C.gray500, marginTop: 1 },
+  totalChip:   { backgroundColor: C.greenLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: C.greenBorder },
+  totalChipText: { fontSize: 14, fontWeight: "900", color: C.greenDark },
 
+  confirmedBanner: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: C.greenLight,
+                     borderRadius: 16, padding: 16, borderWidth: 1.5, borderColor: C.greenBorder },
+  confirmedIconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: C.greenMid, alignItems: "center", justifyContent: "center" },
+  confirmedTitle: { fontSize: 15, fontWeight: "900", color: C.greenDark },
+  confirmedSub:   { fontSize: 12, color: C.green, marginTop: 2 },
+
+  card:       { backgroundColor: C.white, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: C.gray200 },
+  cardHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14,
+                paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.gray100 },
+  cardTitle:  { fontSize: 15, fontWeight: "800", color: C.gray900 },
+
+  slotRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.greenLight,
+             borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.greenBorder },
+  slotText: { fontSize: 15, fontWeight: "800", color: C.greenDark, flex: 1 },
+
+  itemRow:   { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8 },
+  itemDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green, flexShrink: 0 },
+  itemName:  { flex: 1, fontSize: 13, color: C.gray700, fontWeight: "500" },
+  itemQty:   { fontSize: 12, color: C.gray400 },
+  itemPrice: { fontSize: 13, fontWeight: "700", color: C.gray900, minWidth: 44, textAlign: "right" },
+  divider:   { height: 1, backgroundColor: C.gray200, marginVertical: 10 },
+  summaryRow:  { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
+  summaryLabel:{ fontSize: 13, color: C.gray500 },
+  summaryVal:  { fontSize: 13, fontWeight: "700", color: C.gray900 },
+
+  phoneRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.greenLight,
+              borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.greenBorder },
+  phoneNum: { flex: 1, fontSize: 16, fontWeight: "800", color: C.greenDark },
+  callBtn:  { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.green,
+              paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
+  callBtnText: { fontSize: 12, fontWeight: "800", color: C.white },
+
+  payOption:       { flexDirection: "row", alignItems: "center", gap: 12, padding: 14,
+                     borderRadius: 12, borderWidth: 1.5, borderColor: C.gray200, marginBottom: 8, backgroundColor: "#FAFAFA" },
+  payOptionActive: { borderColor: C.green, backgroundColor: C.greenLight },
+  payIcon:         { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  payLabel:        { fontSize: 14, fontWeight: "700", color: C.gray900 },
+  paySub:          { fontSize: 11, color: C.gray400, marginTop: 2 },
+  radioOuter:      { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: C.gray300,
+                     alignItems: "center", justifyContent: "center" },
+  radioDot:        { width: 10, height: 10, borderRadius: 5, backgroundColor: C.green },
+
+  upiPanel:     { backgroundColor: C.gray100, borderRadius: 12, padding: 14, marginBottom: 8 },
+  upiFieldLabel:{ fontSize: 11, fontWeight: "700", color: C.gray600, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 },
+  upiInputRow:  { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.white,
+                  borderRadius: 10, borderWidth: 1.5, borderColor: C.gray200, paddingHorizontal: 12, height: 46 },
+  upiInput:     { flex: 1, fontSize: 14, color: C.gray900 },
+  verifyBtn:    { marginTop: 10, backgroundColor: C.green, borderRadius: 10, paddingVertical: 10, alignItems: "center" },
+  verifyBtnText:{ fontSize: 13, fontWeight: "800", color: C.white },
+
+  footer:     { position: "absolute", bottom: 0, left: 0, right: 0, padding: 16,
+                backgroundColor: C.white, borderTopWidth: 1, borderTopColor: C.gray100,
+                paddingBottom: Platform.OS === "ios" ? 30 : 16 },
+  payBtn:     { borderRadius: 16, overflow: "hidden" },
+  payBtnInner:{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12,
+                paddingVertical: 16, paddingHorizontal: 24 },
+  payBtnText: { fontSize: 17, fontWeight: "900", color: C.white },
+});

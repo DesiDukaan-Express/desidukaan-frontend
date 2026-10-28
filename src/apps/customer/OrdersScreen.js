@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import {
   Linking,
   Dimensions,
 } from "react-native";
-import { Feather, FontAwesome, MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather, FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import { io } from "socket.io-client";
@@ -34,9 +34,6 @@ const SOCKET_URL =
 import { downloadInvoice } from "../../utils/invoiceGenerator";
 import useDriverLocation from "../../hooks/useDriverLocation";
 import CustomerMapView from "../../components/CustomerMapView";
-import { useTheme } from "../../theme/ThemeContext";
-
-import { dkBg, dkBorder, themeCfg } from "../../theme/darkTones";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -61,7 +58,6 @@ gray800: "#243629",
 gray900: "#172D1E",
 
 };
-
 
 // ─── Status config — matches backend OrderStatus enum exactly ─────────────────
 // Backend: pending | accepted | preparing | ready | picked_up | delivered | cancelled | rejected
@@ -105,7 +101,7 @@ const STATUS = {
     icon: "x-circle",
   },
 };
-const getStatus = (s, isDark) => themeCfg(STATUS[s] || STATUS.pending, isDark);
+const getStatus = (s) => STATUS[s] || STATUS.pending;
 
 // ─── Order lifecycle steps — matches backend transitions ─────────────────────
 const TRACK_STEPS = [
@@ -202,116 +198,6 @@ const getETALabel = (status, mins) => {
 };
 
 function DriverLocationMap({ order, token, partnerPos: externalPos, connected: externalConnected, lastUpdate: externalLastUpdate }) {
-  const { isDark } = useTheme();
-  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
-  const dlm = useMemo(() => StyleSheet.create({
-  card: {
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: C.greenBorder,
-    marginBottom: 20,
-    shadowColor: C.green,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderBottomWidth: 1,
-    borderBottomColor: C.gray100,
-    backgroundColor: C.greenLight,
-  },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  mapIconBg: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
-    backgroundColor: C.greenMid,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: C.gray900,
-  },
-  liveBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: C.green,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#FFFFFF",
-  },
-  liveText: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    letterSpacing: 1,
-  },
-  mapWrap: {
-    position: "relative",
-  },
-  locatingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(248,250,252,0.88)",
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
-    zIndex: 10,
-    minHeight: 220,
-  },
-  locatingText: {
-    fontSize: 13,
-    color: C.gray500,
-    fontWeight: "600",
-  },
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderTopWidth: 1,
-    borderTopColor: C.gray100,
-    backgroundColor: C.surface,
-  },
-  connDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-  },
-  connText: {
-    flex: 1,
-    fontSize: 11,
-    color: C.gray500,
-    fontWeight: "500",
-  },
-  lastUpdate: {
-    fontSize: 10,
-    color: C.gray400,
-    fontWeight: "500",
-  },
-}), [C]);
   const hasDriver = !!(
     order?.delivery_partner_id ||
     order?.delivery_partner ||
@@ -560,94 +446,77 @@ function DriverLocationMap({ order, token, partnerPos: externalPos, connected: e
   );
 }
 
-
-
-// ─── Order Detail Modal ───────────────────────────────────────────────────────
-function OrderDetailModal({ order, onClose }) {
-  const { isDark } = useTheme();
-  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
-  const od = useMemo(() => StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
-  sheet: {
-    backgroundColor: C.bg,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    maxHeight: "92%",
+const dlm = StyleSheet.create({
+  card: {
+    backgroundColor: C.white,
+    borderRadius: 16,
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: C.greenBorder,
+    marginBottom: 20,
+    shadowColor: C.green,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: C.gray300,
-    borderRadius: 2,
-    alignSelf: "center",
-    marginTop: 10,
-  },
-  // Polished status header (colored banner)
-  statusCard: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  statusCardDelivered: {
-    backgroundColor: C.green,
-  },
-  statusRow: {
+  header: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+    backgroundColor: C.greenLight,
   },
-  statusIconBg: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.18)",
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  mapIconBg: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: C.greenMid,
     alignItems: "center",
     justifyContent: "center",
   },
-  statusIconGreen: { backgroundColor: "rgba(255,255,255,0.18)" },
-  statusIconBlue: { backgroundColor: "rgba(255,255,255,0.18)" },
-  statusIconRed: { backgroundColor: "rgba(255,255,255,0.18)" },
-  statusLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.75)",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-    marginBottom: 3,
+  headerTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: C.gray900,
   },
-  statusTitle: {
-    fontSize: 16,
-    fontWeight: "900",
-    color: C.white,
-    lineHeight: 21,
-  },
-  statusLivePill: {
+  liveBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    paddingHorizontal: 11,
-    paddingVertical: 5,
+    backgroundColor: C.green,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 20,
   },
-  statusLiveDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: C.surface,
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#FFFFFF",
   },
-  statusLiveText: {
+  liveText: {
     fontSize: 10,
     fontWeight: "800",
-    color: C.white,
-    letterSpacing: 0.8,
+    color: "#FFFFFF",
+    letterSpacing: 1,
   },
-  // Compact order number row
-  orderNumRow: {
+  mapWrap: {
+    position: "relative",
+  },
+  locatingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(248,250,252,0.88)",
+    alignItems: "center",
+    justifyContent: "center",
     flexDirection: "row",
     gap: 8,
     zIndex: 10,
@@ -662,313 +531,36 @@ function OrderDetailModal({ order, onClose }) {
     gap: 8,
     zIndex: 10,
   },
-  orderNumCompact: {
+  locatingText: {
     fontSize: 13,
-    fontWeight: "700",
-    color: C.gray600,
-  },
-  orderDateCompact: {
-    fontSize: 11,
-    color: C.gray400,
-    marginLeft: "auto",
-  },
-  // Partner info card
-  partnerInfoCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: C.greenBorder,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  partnerAvatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: C.green,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  partnerInfoName: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: C.gray900,
-    marginBottom: 3,
-  },
-  partnerInfoMsg: {
-    fontSize: 12,
     color: C.gray500,
-    lineHeight: 17,
-  },
-  partnerCallBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: C.green,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 8,
-  },
-  body: { padding: 20 },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: C.gray900,
-    marginBottom: 14,
-    marginTop: 4,
-  },
-
-  // Tracking
-  trackBox: {
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: C.gray100,
-  },
-  stepRow: { flexDirection: "row", gap: 14, minHeight: 40 },
-  stepLeft: { alignItems: "center", width: 28 },
-  stepConnector: { width: 2, height: 14, marginBottom: 2 },
-  stepConnectorBelow: { width: 2, flex: 1, minHeight: 14, marginTop: 2 },
-  stepDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-  },
-  stepDotDone: { backgroundColor: C.green, borderColor: C.green },
-  stepDotCurrent: {
-    backgroundColor: C.surface,
-    borderColor: C.green,
-    shadowColor: C.green,
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  stepDotFuture: { backgroundColor: C.gray100, borderColor: C.gray200 },
-  stepContent: { flex: 1, paddingTop: 4, paddingBottom: 12 },
-  stepLabel: { fontSize: 14, fontWeight: "500" },
-  stepCurrentBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginTop: 3,
-  },
-  stepCurrentDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: C.green,
-  },
-  stepCurrentText: { fontSize: 11, color: C.green, fontWeight: "600" },
-
-  // Failed
-  failedBox: {
-    alignItems: "center",
-    backgroundColor: C.redLight,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#FCA5A5",
-  },
-  failedIcon: { marginBottom: 10 },
-  failedTitle: { fontSize: 17, fontWeight: "800", color: C.red },
-  failedReason: {
-    fontSize: 13,
-    color: C.gray600,
-    marginTop: 6,
-    textAlign: "center",
-  },
-
-  // Items
-  itemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: C.gray100,
-  },
-  itemImg: {
-    width: 48,
-    height: 48,
-    borderRadius: 10,
-    backgroundColor: C.gray100,
-  },
-  itemName: { fontSize: 14, fontWeight: "600", color: C.gray900 },
-  itemUnit: { fontSize: 12, color: C.gray400, marginTop: 2 },
-  itemQty: { fontSize: 12, color: C.gray500, fontWeight: "600" },
-  itemPrice: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: C.gray900,
-    marginTop: 2,
-  },
-
-  // Bill
-  billBox: {
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 20,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: C.gray100,
-  },
-  billRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 7,
-  },
-  billLbl: { fontSize: 14, color: C.gray500 },
-  billVal: { fontSize: 14, fontWeight: "600", color: C.gray900 },
-  billTotal: {
-    borderTopWidth: 1,
-    borderTopColor: C.gray200,
-    marginTop: 4,
-    paddingTop: 12,
-  },
-  billTotalLbl: { fontSize: 15, fontWeight: "800", color: C.gray900 },
-  billTotalVal: { fontSize: 17, fontWeight: "900", color: C.gray900 },
-
-  // Address
-  addressBox: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    backgroundColor: C.greenLight,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: C.greenBorder,
-  },
-  addressIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: C.greenMid,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addressLbl: {
-    fontSize: 11,
-    color: C.green,
-    fontWeight: "700",
-    marginBottom: 2,
-  },
-  addressVal: {
-    fontSize: 13,
-    color: C.gray700,
-    fontWeight: "500",
-    lineHeight: 18,
-  },
-
-  // Payment
-  paymentRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 10,
-  },
-  paymentText: { fontSize: 13, color: C.gray500, fontWeight: "500" },
-
-  // Track button
-  trackBtn: { borderRadius: 14, overflow: "hidden", marginTop: 16 },
-  trackBtnGrad: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    paddingVertical: 15,
-  },
-  trackBtnText: { fontSize: 15, fontWeight: "800", color: "#fff" },
-
-  // Invoice button
-  invoiceBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: C.green,
-    marginTop: 10,
-    backgroundColor: C.surface,
-  },
-  invoiceBtnText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: C.green,
-  },
-
-  // ETA Banner (inside detail modal)
-  etaBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: dkBg("#FFF7ED", isDark),
-    borderWidth: 1,
-    borderColor: dkBorder("#FED7AA", isDark),
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 16,
-  },
-  etaBannerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  etaIconBg: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: dkBg("#FFEDD5", isDark),
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  etaBannerTitle: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: C.orange,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  etaBannerLabel: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: C.orangeDark,
-  },
-  etaBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: C.surface,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: C.gray200,
-  },
-  etaBadgeText: {
-    fontSize: 12,
     fontWeight: "600",
-    color: C.gray600,
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderTopWidth: 1,
+    borderTopColor: C.gray100,
+    backgroundColor: C.white,
+  },
+  connDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  connText: {
+    flex: 1,
+    fontSize: 11,
+    color: C.gray500,
+    fontWeight: "500",
+  },
+  lastUpdate: {
+    fontSize: 10,
+    color: C.gray400,
+    fontWeight: "500",
   },
   headerRight: {
     flexDirection: "row",
@@ -1935,47 +1527,71 @@ const od = StyleSheet.create({
     marginTop: 4,
   },
 
-              {/* ── Delivery address ── */}
-              {displayOrder.delivery_address && (
-                <View style={od.addressBox}>
-                  <View style={od.addressIcon}>
-                    <Feather name="map-pin" size={14} color={C.green} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={od.addressLbl}>Delivery address</Text>
-                    <Text style={od.addressVal}>
-                      {(() => {
-                        const line = displayOrder.delivery_address?.address_line ||
-                          (typeof displayOrder.delivery_address === "string" ? displayOrder.delivery_address : "");
-                        const city = displayOrder.delivery_address?.city || "";
-                        // Only show city if it's not already mentioned in the address line
-                        const shouldAppendCity = city && !line.toLowerCase().includes(city.toLowerCase());
-                        return shouldAppendCity ? `${line}, ${city}` : line;
-                      })()}
-                    </Text>
-                  </View>
-                </View>
-              )}
+  // Tracking
+  trackBox: {
+    backgroundColor: C.white,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: C.gray100,
+  },
+  stepRow: { flexDirection: "row", gap: 14, minHeight: 40 },
+  stepLeft: { alignItems: "center", width: 28 },
+  stepConnector: { width: 2, height: 14, marginBottom: 2 },
+  stepConnectorBelow: { width: 2, flex: 1, minHeight: 14, marginTop: 2 },
+  stepDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+  },
+  stepDotDone: { backgroundColor: C.green, borderColor: C.green },
+  stepDotCurrent: {
+    backgroundColor: C.white,
+    borderColor: C.green,
+    shadowColor: C.green,
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  stepDotFuture: { backgroundColor: C.gray100, borderColor: C.gray200 },
+  stepContent: { flex: 1, paddingTop: 4, paddingBottom: 12 },
+  stepLabel: { fontSize: 14, fontWeight: "500" },
+  stepCurrentBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 3,
+  },
+  stepCurrentDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: C.green,
+  },
+  stepCurrentText: { fontSize: 11, color: C.green, fontWeight: "600" },
 
-              {/* ── Payment ── */}
-              {displayOrder.payment && (
-                <View style={od.paymentRow}>
-                  <Feather name="credit-card" size={14} color={C.gray500} />
-                  <Text style={od.paymentText}>
-                    {displayOrder.payment.method?.toUpperCase() || "UPI"}
-                    {" · "}
-                    <Text
-                      style={{
-                        color:
-                          displayOrder.payment.status === "paid" ? C.green : C.gray500,
-                        fontWeight: "700",
-                      }}
-                    >
-                      {displayOrder.payment.status === "paid" ? "Paid" : "Pending"}
-                    </Text>
-                  </Text>
-                </View>
-              )}
+  // Failed
+  failedBox: {
+    alignItems: "center",
+    backgroundColor: C.redLight,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+  },
+  failedIcon: { marginBottom: 10 },
+  failedTitle: { fontSize: 17, fontWeight: "800", color: C.red },
+  failedReason: {
+    fontSize: 13,
+    color: C.gray600,
+    marginTop: 6,
+    textAlign: "center",
+  },
 
   // Items
   itemRow: {
@@ -2050,122 +1666,149 @@ const od = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: C.gray100,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-    overflow: "hidden",
   },
-  topRow: {
+  billRow: {
     flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    gap: 12,
+    justifyContent: "space-between",
+    paddingVertical: 7,
   },
-  statusIconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
+  billLbl: { fontSize: 14, color: C.gray500 },
+  billVal: { fontSize: 14, fontWeight: "600", color: C.gray900 },
+  billTotal: {
+    borderTopWidth: 1,
+    borderTopColor: C.gray200,
+    marginTop: 4,
+    paddingTop: 12,
   },
-  headerTextContainer: {
-    flex: 1,
-  },
-  statusTitleText: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: C.gray900,
-    letterSpacing: -0.2,
-  },
-  subheadText: {
-    fontSize: 13,
-    color: C.gray500,
-    marginTop: 2,
-    fontWeight: "500",
-  },
-  menuBtn: {
-    padding: 4,
-  },
-  cardDivider: {
-    height: 1,
-    backgroundColor: C.gray100,
-  },
-  thumbsContainer: {
-    padding: 16,
+  billTotalLbl: { fontSize: 15, fontWeight: "800", color: C.gray900 },
+  billTotalVal: { fontSize: 17, fontWeight: "900", color: C.gray900 },
+
+  // Address
+  addressBox: {
     flexDirection: "row",
-    alignItems: "center",
-  },
-  thumbBox: {
-    width: 56,
-    height: 56,
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: C.greenLight,
     borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: C.gray100,
-    backgroundColor: C.gray100,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: C.greenBorder,
+  },
+  addressIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: C.greenMid,
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
   },
-  thumbImg: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 12,
-  },
-  thumbMoreBox: {
-    backgroundColor: C.gray100,
-    borderColor: C.gray200,
-  },
-  thumbMoreText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: C.gray600,
-  },
-  actionsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: C.surface,
-  },
-  actionBtn: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-  },
-  actionBtnText: {
-    fontSize: 14,
-    fontWeight: "800",
+  addressLbl: {
+    fontSize: 11,
     color: C.green,
+    fontWeight: "700",
+    marginBottom: 2,
   },
-  actionDivider: {
-    width: 1,
-    height: "100%",
-    backgroundColor: C.gray100,
+  addressVal: {
+    fontSize: 13,
+    color: C.gray700,
+    fontWeight: "500",
+    lineHeight: 18,
   },
 
-  // ETA chip
-  etaChipRow: {
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    paddingTop: 2,
-  },
-  etaChip: {
+  // Payment
+  paymentRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    alignSelf: "flex-start",
-    backgroundColor: dkBg("#FFF7ED", isDark),
+    gap: 8,
+    paddingVertical: 10,
+  },
+  paymentText: { fontSize: 13, color: C.gray500, fontWeight: "500" },
+
+  // Track button
+  trackBtn: { borderRadius: 14, overflow: "hidden", marginTop: 16 },
+  trackBtnGrad: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 15,
+  },
+  trackBtnText: { fontSize: 15, fontWeight: "800", color: "#fff" },
+
+  // Invoice button
+  invoiceBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: C.green,
+    marginTop: 10,
+    backgroundColor: C.white,
+  },
+  invoiceBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: C.green,
+  },
+
+  // ETA Banner (inside detail modal)
+  etaBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFF7ED",
     borderWidth: 1,
-    borderColor: dkBorder("#FED7AA", isDark),
+    borderColor: "#FED7AA",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  etaBannerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  etaIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#FFEDD5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  etaBannerTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.orange,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  etaBannerLabel: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: C.orangeDark,
+  },
+  etaBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: C.white,
+    borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.gray200,
   },
-  etaChipText: {
+  etaBadgeText: {
     fontSize: 12,
-    fontWeight: "700",
-    color: C.orangeDark,
+    fontWeight: "600",
+    color: C.gray600,
   },
 
   // ── Tip & Feedback Modal Styles ──
@@ -2341,7 +1984,7 @@ const formatCardDate = (iso) => {
 
 function OrderCard({ order, onPress, onRate, onViewRating, alreadyRated, onReorder, onDownloadInvoice, isFirstDelivered }) {
   const { t } = useTranslation();
-  const st = getStatus(order.status, isDark);
+  const st = getStatus(order.status);
   const stepIdx = stepIndex(order.status);
   const items = order.order_items || order.items || [];
   const subtotal = order.subtotal || 0;
@@ -2554,196 +2197,139 @@ function OrderCard({ order, onPress, onRate, onViewRating, alreadyRated, onReord
   );
 }
 
+const oc = StyleSheet.create({
+  card: {
+    backgroundColor: C.white,
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: C.gray100,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    overflow: "hidden",
+  },
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    gap: 12,
+  },
+  statusIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTextContainer: {
+    flex: 1,
+  },
+  statusTitleText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: C.gray900,
+    letterSpacing: -0.2,
+  },
+  subheadText: {
+    fontSize: 13,
+    color: C.gray500,
+    marginTop: 2,
+    fontWeight: "500",
+  },
+  menuBtn: {
+    padding: 4,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: C.gray100,
+  },
+  thumbsContainer: {
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  thumbBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: C.gray100,
+    backgroundColor: C.gray100,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  thumbImg: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 12,
+  },
+  thumbMoreBox: {
+    backgroundColor: C.gray100,
+    borderColor: C.gray200,
+  },
+  thumbMoreText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.gray600,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.white,
+  },
+  actionBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+  },
+  actionBtnText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: C.green,
+  },
+  actionDivider: {
+    width: 1,
+    height: "100%",
+    backgroundColor: C.gray100,
+  },
 
+  // ETA chip
+  etaChipRow: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    paddingTop: 2,
+  },
+  etaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    backgroundColor: "#FFF7ED",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  etaChipText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: C.orangeDark,
+  },
+  etaDistText: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: C.gray500,
+  },
+});
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function MyOrdersScreen() {
-  const { isDark } = useTheme();
-  const C = isDark ? DARK_COLORS : LIGHT_COLORS;
-  const s = useMemo(() => StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
-  centered: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
-  loadingText: { fontSize: 15, color: C.gray400, fontWeight: "500" },
-
-  header: {
-    paddingTop: Platform.OS === "android" ? 36 : 48,
-    paddingBottom: 14,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: isDark ? C.bg : C.surface,
-  },
-  backBtn: {
-    width: isDark ? 40 : 38,
-    height: isDark ? 40 : 38,
-    borderRadius: isDark ? 12 : 19,
-    backgroundColor: isDark ? C.surface : C.gray100,
-    borderWidth: isDark ? 1 : 0,
-    borderColor: C.gray100,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: { 
-    fontSize: 20, 
-    fontWeight: "800", 
-    color: C.gray900, 
-    flex: 1,
-    letterSpacing: -0.5,
-  },
-  refreshBtn: {
-    width: isDark ? undefined : 38,
-    height: isDark ? 40 : 38,
-    paddingHorizontal: isDark ? 16 : 0,
-    flexDirection: "row",
-    gap: 8,
-    borderRadius: isDark ? 12 : 19,
-    backgroundColor: isDark ? C.surface : C.gray100,
-    borderWidth: isDark ? 1 : 0,
-    borderColor: C.gray100,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  refreshText: { fontSize: 13.5, fontWeight: "700", color: C.gray800 },
-
-  searchBarContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: isDark ? 14 : 12,
-    backgroundColor: isDark ? C.bg : C.surface,
-    borderBottomWidth: isDark ? 0 : 1,
-    borderBottomColor: C.gray100,
-  },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: isDark ? C.surface : C.gray100,
-    borderRadius: isDark ? 14 : 12,
-    borderWidth: isDark ? 1 : 0,
-    borderColor: C.gray100,
-    paddingHorizontal: isDark ? 16 : 12,
-    height: isDark ? 52 : 46,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: C.gray900,
-    fontWeight: "600",
-    padding: 0,
-    outlineStyle: "none",
-  },
-  clearBtn: {
-    padding: 4,
-  },
-
-  tabs: {
-    flexDirection: "row",
-    backgroundColor: isDark ? C.bg : C.surface,
-    paddingHorizontal: 16,
-    paddingVertical: isDark ? 14 : 10,
-    gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: C.gray100,
-  },
-  tab: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: isDark ? 20 : 16,
-    paddingVertical: isDark ? 10 : 8,
-    borderRadius: isDark ? 12 : 20,
-    borderWidth: isDark ? 1 : 1.5,
-    borderColor: isDark ? C.gray100 : C.gray200,
-    backgroundColor: isDark ? C.surface : "transparent",
-  },
-  tabActive: isDark
-    ? { backgroundColor: C.greenMid, borderColor: C.greenBorder }
-    : { backgroundColor: C.green, borderColor: C.green },
-  tabLabel: { fontSize: 13, fontWeight: isDark ? "700" : "600", color: isDark ? C.gray800 : C.gray600 },
-  tabLabelActive: { color: C.white },
-  tabBubble: {
-    backgroundColor: C.gray100,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 10,
-  },
-  tabBubbleActive: { backgroundColor: "rgba(255,255,255,0.25)" },
-  tabBubbleText: { fontSize: 10, fontWeight: "800", color: C.gray500 },
-  tabBubbleTextActive: { color: C.white },
-
-  list: { padding: 16, paddingTop: 12 },
-
-  activeBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: C.greenLight,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: C.greenBorder,
-  },
-  activeBannerDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: C.green,
-  },
-  activeBannerText: { fontSize: 13, color: C.green, fontWeight: "600" },
-
-  emptyWrap: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 32,
-  },
-  emptyIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
-    backgroundColor: C.gray100,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  emptyIllo: { width: 170, height: 150, alignItems: "center", justifyContent: "center", marginBottom: 14 },
-  emptyIlloCircle: { position: "absolute", top: 0, width: 136, height: 136, borderRadius: 68, backgroundColor: C.surface, borderWidth: 1, borderColor: C.gray100 },
-  emptyIlloBag: { position: "absolute", top: 30, width: 66, height: 78, borderRadius: 8, backgroundColor: C.gray200, alignItems: "center", justifyContent: "center" },
-  emptyIlloGround: { position: "absolute", bottom: 10, width: 164, height: 2, borderRadius: 1, backgroundColor: C.gray200 },
-  emptyIlloLeafL: { position: "absolute", bottom: 12, left: 4, transform: [{ rotate: "-20deg" }] },
-  emptyIlloLeafR: { position: "absolute", bottom: 12, right: 4, transform: [{ scaleX: -1 }, { rotate: "-20deg" }] },
-  emptySpark: { position: "absolute", fontSize: 11, color: C.gray300 },
-  emptyTitle: {
-    fontSize: isDark ? 22 : 20,
-    fontWeight: isDark ? "900" : "800",
-    color: isDark ? C.gray900 : C.gray800,
-    textAlign: "center",
-  },
-  emptySub: {
-    fontSize: isDark ? 15 : 14,
-    color: isDark ? C.gray500 : C.gray400,
-    textAlign: "center",
-    marginTop: 6,
-    marginBottom: 24,
-  },
-  shopBtn: { borderRadius: isDark ? 12 : 14, overflow: "hidden" },
-  shopBtnGrad: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: isDark ? 32 : 28,
-    paddingVertical: isDark ? 17 : 14,
-  },
-  shopBtnText: { fontSize: 16, fontWeight: "800", color: C.white },
-}), [C]);
   const { t } = useTranslation();
   const navigation = useNavigation();
   const { token } = useAuthStore();
@@ -3074,7 +2660,7 @@ export default function MyOrdersScreen() {
 
   return (
     <View style={s.root}>
-      <StatusBar barStyle={isDark ? 'light-content' : (Platform.OS === 'ios' ? 'dark-content' : 'default')} backgroundColor={isDark ? C.bg : "#FFFFFF"} />
+      <StatusBar barStyle={Platform.OS === 'ios' ? 'dark-content' : 'default'} backgroundColor="#FFFFFF" />
 
 
 {/* HEADER */}
@@ -3113,7 +2699,7 @@ export default function MyOrdersScreen() {
           <TextInput
             style={s.searchInput}
             placeholder={t('orders.searchPlaceholder', 'Search your grocery orders')}
-            placeholderTextColor={isDark ? C.gray500 : C.gray400}
+            placeholderTextColor={C.gray400}
             value={searchQuery}
             onChangeText={setSearchQuery}
             clearButtonMode="while-editing"
@@ -3290,7 +2876,7 @@ export default function MyOrdersScreen() {
         >
           <Pressable
             style={{
-              backgroundColor: C.surface,
+              backgroundColor: C.white,
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
               padding: 24,
@@ -3418,7 +3004,7 @@ export default function MyOrdersScreen() {
         >
           <Pressable
             style={{
-              backgroundColor: C.surface,
+              backgroundColor: C.white,
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
               padding: 24,
