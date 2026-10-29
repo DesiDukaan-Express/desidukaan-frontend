@@ -20,6 +20,7 @@ import PaymentScreen from "../apps/customer/PaymentScreen";
 import SupportScreen from "../apps/customer/SupportScreen";
 import VendorOnboardingScreen from "../apps/vendor/VendorOnboardingScreen";
 import DashboardScreen from "../apps/vendor/DashboardScreen";
+import VendorProfileScreen from "../apps/vendor/VendorProfileScreen";
 import DeliveryOnboardingScreen from "../apps/delivery/DeliveryOnboardingScreen";
 import DeliveryPendingScreen from "../apps/delivery/DeliveryPendingScreen";
 import RolePickerScreen from "../apps/RolePickerScreen";
@@ -306,6 +307,10 @@ export default function Navigation() {
                       />
                     )}
                   </Stack.Screen>
+                  <Stack.Screen
+  name="Profile"
+  component={VendorProfileScreen}
+/>
                   <Stack.Screen name="VendorOnboarding">
                     {(props) => (
                       <VendorOnboardingScreen
