@@ -571,11 +571,30 @@ export default function VendorProfileScreen() {
     </>
   );
 
-  return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <StatusBar barStyle="light-content" backgroundColor="#12141C" />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-        {content}
+
+return (
+  <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+
+    {/* Top Header */}
+    <View style={styles.topHeader}>
+      <TouchableOpacity
+        onPress={() => navigation.navigate("Dashboard")}
+        style={styles.backButton}
+        activeOpacity={0.7}
+      >
+        <MaterialIcons name="arrow-back" size={24} color={C.ink} />
+      </TouchableOpacity>
+
+      <Text style={styles.topHeaderTitle}>Home</Text>
+    </View>
+
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 100 }}
+    >
+      {content}
+
       </ScrollView>
 
       {/* ── EDIT FIELD MODAL ─────────────────────────────── */}
@@ -1718,4 +1737,26 @@ const styles = StyleSheet.create({
     backgroundColor: C.red,
     alignItems: "center",
   },
+  
+topHeader: {
+  height: 58,
+  backgroundColor: "#FFFFFF",
+  flexDirection: "row",
+  alignItems: "center",
+  paddingHorizontal: 16,
+  borderBottomWidth: 1,
+  borderBottomColor: "#E6E8EC",
+},
+backButton: {
+  width: 40,
+  height: 40,
+  justifyContent: "center",
+  alignItems: "center",
+  marginRight: 8,
+},
+topHeaderTitle: {
+  fontSize: 16,
+  fontWeight: "700",
+  color: "#12141C",
+},
 });

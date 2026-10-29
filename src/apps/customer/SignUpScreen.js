@@ -331,11 +331,11 @@ export default function SignupScreen({ navigation, route }) {
 
 
                       {/* Full Name */}
-                     <Field label={t("profile.fullName", { defaultValue: t("auth.fullName", { defaultValue: "Full Name" }) })}>
+                    <Field label={t("auth.fullName", { defaultValue: "Full Name" })}>
                         <View style={[s.inputBox, focusedField === "name" && s.inputBoxFocused]}>
                           <IIcon name="user" focused={focusedField === "name"} />
                           <TextInput
-                            placeholder={t("auth.fullNamePlaceholder", {
+placeholder={t("auth.fullNamePlaceholder", {
   defaultValue: "Your full name",
 })}
                             placeholderTextColor={C.gray400}
@@ -452,7 +452,7 @@ export default function SignupScreen({ navigation, route }) {
                         </View>
 
                         <View style={[s.fieldGroup, tablet ? { flex: 2 } : { width: "100%" }]}>
-                          <Text style={s.fieldLabel}>
+<Text style={s.fieldLabel}>
   {t("auth.gender", { defaultValue: "Gender" })}
 </Text>
                           <View style={s.genderRow}>
@@ -467,7 +467,9 @@ export default function SignupScreen({ navigation, route }) {
                                 >
                                   <FontAwesome name={g.icon} size={15} color={active ? C.white : C.greenBright} />
                                   <Text style={[s.genderText, active && s.genderTextActive]}>
-                                    {t(`auth.genderOptions.${g.key}`, { defaultValue: g.label })}
+                                    {t(`auth.genderOptions.${g.key}`, {
+  defaultValue: g.label,
+})}
                                   </Text>
                                 </TouchableOpacity>
                               );
