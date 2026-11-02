@@ -60,16 +60,21 @@ export const tryRefreshToken = async () => {
     });
 
     const data = await res.json();
-    if (!res.ok) {
-      if (res.status === 403 && data.error === "ACCOUNT_DEACTIVATED") {
-        return { error: "ACCOUNT_DEACTIVATED" };
-      }
-      if (res.status === 401 || res.status === 403) {
-        return { error: "INVALID_TOKEN" };
-      }
-      return null;
-    }
+if (!res.ok) {
+  if (data.error === "ACCOUNT_DEACTIVATED") {
+    return { error: "ACCOUNT_DEACTIVATED" };
+  }
 
+  if (data.error === "INACTIVITY_EXPIRED") {
+    return { error: "INACTIVITY_EXPIRED" };
+  }
+
+  if (res.status === 401 || res.status === 403) {
+    return { error: "INVALID_TOKEN" };
+  }
+
+  return null;
+}
     // Persist new tokens and user details if returned
     useAuthStore.getState()._setAccessToken(data.accessToken);
     await secureSet(REFRESH_KEY, data.refreshToken);
@@ -184,64 +189,86 @@ const useAuthStore = create((set, get) => ({
   // ── Hydrate: called on app start ──────────────────────────────────────────
   // We only persist the user object + refresh token.
   // On boot, if a refresh token exists, we silently refresh to get an access token.
-  hydrate: async () => {
-    try {
-      const refreshToken = await secureGet(REFRESH_KEY);
-      if (!refreshToken) {
-        set({ isLoading: false });
-        return;
-      }
+  
+hydrate: async () => {
+  try {
+    const refreshToken = await secureGet(REFRESH_KEY);
 
-      // Try refreshing the token to restore the session
-      const refreshResult = await tryRefreshToken();
+    if (!refreshToken) {
+      set({ isLoading: false });
+      return;
+    }
 
-      if (refreshResult && refreshResult.token) {
-        const currentUser = refreshResult.user;
-        const backendRoles = currentUser?.roles || (currentUser?.role ? [currentUser.role] : []);
-        const enabledRoles = await loadPersistedEnabledRoles(backendRoles);
-        await AsyncStorage.setItem(ENABLED_ROLES_KEY, JSON.stringify(enabledRoles));
-        set({
-          token: refreshResult.token,
-          user: currentUser,
-          role: currentUser ? currentUser.role : null,
-          enabledRoles,
-          activeRole: null,   // ← always null on app open → triggers role picker
-          isAuthenticated: true,
-          accountDeactivated: currentUser?.is_active === false,
-          isLoading: false,
-        });
-        await useAddressStore.getState().loadAddresses(refreshResult.token);
-        await useWishlistStore.getState().loadIds(refreshResult.token);
-      } else if (refreshResult && refreshResult.error === "ACCOUNT_DEACTIVATED") {
-        set({ accountDeactivated: true, isLoading: false });
-      } else if (refreshResult && refreshResult.error === "INVALID_TOKEN") {
-        await AsyncStorage.removeItem("user");
-        await AsyncStorage.removeItem(ACTIVE_ROLE_KEY);
-        await AsyncStorage.removeItem(ENABLED_ROLES_KEY);
-        await secureDelete(REFRESH_KEY);
-        set({ isLoading: false });
-      } else {
-        const userStr = await AsyncStorage.getItem("user");
-        if (userStr) {
-          const user = JSON.parse(userStr);
-          const backendRoles = user.roles || (user.role ? [user.role] : []);
-          const enabledRoles = await loadPersistedEnabledRoles(backendRoles);
-          set({
-            user,
-            role: user.role,
-            enabledRoles,
-            activeRole: null,   // ← always null on app open → triggers role picker
-            isAuthenticated: true,
-            isLoading: false,
-          });
-        } else {
-          set({ isLoading: false });
-        }
-      }
-    } catch {
+    // Try refreshing the token to restore the session
+    const refreshResult = await tryRefreshToken();
+
+    if (refreshResult && refreshResult.token) {
+      const currentUser = refreshResult.user;
+      const backendRoles =
+        currentUser?.roles || (currentUser?.role ? [currentUser.role] : []);
+
+      const enabledRoles = await loadPersistedEnabledRoles(backendRoles);
+
+      await AsyncStorage.setItem(
+        ENABLED_ROLES_KEY,
+        JSON.stringify(enabledRoles)
+      );
+
+      set({
+        token: refreshResult.token,
+        user: currentUser,
+        role: currentUser ? currentUser.role : null,
+        enabledRoles,
+        activeRole: null,
+        isAuthenticated: true,
+        accountDeactivated: currentUser?.is_active === false,
+        isLoading: false,
+      });
+
+      await useAddressStore.getState().loadAddresses(refreshResult.token);
+      await useWishlistStore.getState().loadIds(refreshResult.token);
+
+    } else if (
+      refreshResult &&
+      refreshResult.error === "ACCOUNT_DEACTIVATED"
+    ) {
+      set({
+        accountDeactivated: true,
+        isLoading: false,
+      });
+
+    } else if (
+      refreshResult &&
+      (
+        refreshResult.error === "INVALID_TOKEN" ||
+        refreshResult.error === "INACTIVITY_EXPIRED"
+      )
+    ) {
+      await AsyncStorage.removeItem("user");
+      await AsyncStorage.removeItem(ACTIVE_ROLE_KEY);
+      await AsyncStorage.removeItem(ENABLED_ROLES_KEY);
+      await secureDelete(REFRESH_KEY);
+
+      set({
+        token: null,
+        user: null,
+        role: null,
+        enabledRoles: [],
+        activeRole: null,
+        isAuthenticated: false,
+        isLoading: false,
+        accountDeactivated: false,
+      });
+
+    } else {
       set({ isLoading: false });
     }
-  },
+
+  } catch (error) {
+    console.error("Session hydration error:", error);
+    set({ isLoading: false });
+  }
+},
 
   // ── Login: called after OTP verify / password login ──────────────────────
   login: async (userData, accessToken, refreshToken) => {

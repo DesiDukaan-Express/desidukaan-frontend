@@ -198,6 +198,9 @@ function StatCol({ label, value, noBorder }) {
 export default function DeliveryHomeScreen({ navigation, route }) {
   const { token, user } = useAuthStore();
   const { t } = useTranslation();
+  const handleBackToRolePicker = async () => {
+    await useAuthStore.getState().setActiveRole(null);
+  };
 
   const [partnerReviewOrder, setPartnerReviewOrder] = useState(null);
   const [partnerReviewRating, setPartnerReviewRating] = useState(0);
@@ -534,6 +537,25 @@ export default function DeliveryHomeScreen({ navigation, route }) {
           <View style={s.heroLeft}>
             {/* Shield + level */}
             <View style={s.shieldRow}>
+              <TouchableOpacity
+  onPress={handleBackToRolePicker}
+  activeOpacity={0.8}
+  accessibilityRole="button"
+  accessibilityLabel="Back to role selection"
+  style={{
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  }}
+>
+  <Text style={{ color: '#FFFFFF', fontSize: 23, fontWeight: '700' }}>
+    ←
+  </Text>
+</TouchableOpacity>
               <View style={s.shieldWrap}>
                 <Svg width={20} height={22} viewBox="0 0 20 22">
                   <Path d="M10 0 L20 4 L20 11 Q20 17 10 22 Q0 17 0 11 L0 4 Z" fill={C.greenDark} />

@@ -184,6 +184,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
   const { token, user } = useAuthStore();
   const { t } = useTranslation();
   const navigation = useNavigation();
+  const handleBackToRolePicker = async () => {
+  await useAuthStore.getState().setActiveRole(null);
+};
   const { width: SCREEN_W } = useWindowDimensions();
   const [newOrderBanner, setNewOrderBanner] = useState(null);
   const bannerAnim = useRef(new Animated.Value(-120)).current;
@@ -928,6 +931,21 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               gap: 12,
             }}
           >
+            <TouchableOpacity
+  onPress={handleBackToRolePicker}
+  activeOpacity={0.8}
+  accessibilityLabel="Back to role selection"
+  style={{
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: C.primaryDim,
+    alignItems: "center",
+    justifyContent: "center",
+  }}
+>
+  <MaterialIcons name="arrow-back" size={21} color={C.primary} />
+</TouchableOpacity>
             {/* Logo */}
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <View
@@ -1087,6 +1105,21 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 marginBottom: 10,
               }}
             >
+              <TouchableOpacity
+  onPress={handleBackToRolePicker}
+  activeOpacity={0.8}
+  accessibilityLabel="Back to role selection"
+  style={{
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: C.primaryDim,
+    alignItems: "center",
+    justifyContent: "center",
+  }}
+>
+  <MaterialIcons name="arrow-back" size={21} color={C.primary} />
+</TouchableOpacity>
               {/* Logo */}
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                 <View
