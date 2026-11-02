@@ -560,12 +560,16 @@ async function reverseGeocodeAddress(lat, lng) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function VendorOnboardingScreen({ onComplete }) {
+export default function VendorOnboardingScreen({
+  onComplete,
+  onBackToRolePicker,
+}) {
   const navigation = useNavigation();
   const { token, user } = useAuthStore();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
+  const submitLock = useRef(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [autoApproved, setAutoApproved] = useState(false);
 
@@ -1234,8 +1238,16 @@ return false;
       return;
     }
 
-    // ── Final submit ──────────────────────────────────────────────────────────
-    setLoading(true);
+// ── Final submit ──────────────────────────────────────────────────────────
+if (submitLock.current) {
+  console.log("Submission already in progress");
+  return;
+}
+
+submitLock.current = true;
+setLoading(true);
+
+console.log("Starting vendor onboarding submission...");
     try {
       // 1. Auto-geocode pincode + city → lat/lng
       //    This runs just before submit so we always have fresh coords
@@ -1300,45 +1312,100 @@ return false;
         body: JSON.stringify(body),
       });
 
-      const vendorData = await vendorRes.json();
-      if (!vendorRes.ok) throw new Error(vendorData.msg || vendorData.message || 'Failed to create shop');
+      const vendorData = await vendorRes.json().catch(() => ({}));
+
+console.log("Vendor creation response:", {
+  status: vendorRes.status,
+  success: vendorRes.ok,
+  data: vendorData,
+});
+
+if (!vendorRes.ok) {
+  throw new Error(
+    vendorData.msg ||
+    vendorData.message ||
+    'Failed to create shop'
+  );
+}
 
       // Capture auto-approve flag from backend (response: { data: { vendor: { auto_approved, ... } } })
       setAutoApproved(vendorData.data?.vendor?.auto_approved === true);
 
       // 3. Create products
       //    Note: we send item_type (DB column name) NOT type, to avoid backend mapping issues
-      const allProds = getAllProducts();
-      for (const product of allProds) {
-        await fetch(`${API_BASE}/products`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            name: product.name,
-            description: product.description || null,
-            brand: product.brand || null,
-            mrp: parseFloat(product.mrp || 0),
-            price: parseFloat(product.price || product.base_price || product.sp || 0),
-            unit: product.unit || 'kg',
-            category: product.category?.name || product.cat || currentCategory?.name || '',
-            category_id: product.subcategory_id || product.category_id || currentCategory?.id,
-            stock_qty: parseInt(product.stock || product.stock_qty || 0),
-            type: product.item_type || product.type || 'packed',
-            image_url: product.image_url || product.image || null,
-            weight_options: (() => {
-              const opts = Array.isArray(product.weight_options) ? product.weight_options : [];
-              return opts.map(opt => {
-                if (typeof opt === 'string') {
-                  const m = opt.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Z]+)$/);
-                  if (m) return { weight: parseFloat(m[1]), unit: m[2] };
-                  return { weight: parseFloat(opt) || 0, unit: 'g' };
-                }
-                return opt;
-              });
-            })(),
-          }),
+const allProds = getAllProducts();
+
+for (const product of allProds) {
+  const productRes = await fetch(`${API_BASE}/products`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      name: product.name,
+      description: product.description || null,
+      brand: product.brand || null,
+      mrp: parseFloat(product.mrp || 0),
+      price: parseFloat(
+        product.price || product.base_price || product.sp || 0
+      ),
+      unit: product.unit || 'kg',
+      category:
+        product.category?.name ||
+        product.cat ||
+        currentCategory?.name ||
+        '',
+      category_id:
+        product.subcategory_id ||
+        product.category_id ||
+        currentCategory?.id,
+      stock_qty: parseInt(
+        product.stock || product.stock_qty || 0,
+        10
+      ),
+      type: product.item_type || product.type || 'packed',
+      image_url: product.image_url || product.image || null,
+      weight_options: (() => {
+        const opts = Array.isArray(product.weight_options)
+          ? product.weight_options
+          : [];
+
+        return opts.map(opt => {
+          if (typeof opt === 'string') {
+            const m = opt.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Z]+)$/);
+
+            if (m) {
+              return {
+                weight: parseFloat(m[1]),
+                unit: m[2],
+              };
+            }
+
+            return {
+              weight: parseFloat(opt) || 0,
+              unit: 'g',
+            };
+          }
+
+          return opt;
         });
-      }
+      })(),
+    }),
+  });
+
+  const productData = await productRes.json().catch(() => ({}));
+
+  if (!productRes.ok) {
+    throw new Error(
+      productData.msg ||
+      productData.message ||
+      `Failed to create product: ${product.name}`
+    );
+  }
+
+  console.log(`Product created successfully: ${product.name}`);
+}
 
       // Show the success popup FIRST and do NOT call onComplete() yet.
       // onComplete() triggers checkVendorProfile() in the root navigator,
@@ -1349,13 +1416,16 @@ return false;
       // did nothing. Instead we show the modal now and only call
       // onComplete() once the user taps through it (see successBtn below),
       // so the screen swap happens after they've seen the confirmation.
-      setShowSuccess(true);
+      console.log("Vendor onboarding completed successfully. Opening vendor dashboard...");
+onComplete?.();
     } catch (err) {
       Alert.alert('Error', err.message);
     } finally {
-      setLoading(false);
-      setGeocoding(false);
-    }
+  setLoading(false);
+  setGeocoding(false);
+  submitLock.current = false;
+  console.log("Vendor onboarding submission finished.");
+}
   };
 
   const progressPercent = ((currentStep - 1) / (STEPS.length - 1)) * 100;
@@ -1460,26 +1530,56 @@ return false;
         }}
       >
         {/* Top bar */}
-        <View style={styles.topBar}>
-          <View style={styles.brandRow}>
-            <View style={styles.brandIconWrap}>
-              <MaterialIcons name="storefront" size={18} color="#fff" />
-            </View>
-            <View style={styles.brandTextWrap}>
-              <Text style={styles.brandName} numberOfLines={1}>Desi<Text style={{ color: PRIMARY }}>Dukaan</Text></Text>
-              <Text style={styles.brandSub} numberOfLines={1}>Seller Registration</Text>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.helpPill} activeOpacity={0.8}>
-            <View style={styles.helpIconCircle}>
-              <MaterialIcons name="help-outline" size={13} color={PRIMARY} />
-            </View>
-            <View style={styles.helpTextWrap}>
-              <Text style={styles.helpTitle} numberOfLines={1}>Need help?</Text>
-              <Text style={styles.helpSub} numberOfLines={2}>We're here to assist</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
+<View style={styles.topBar}>
+  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+
+    {/* Back to RolePick */}
+    <TouchableOpacity
+onPress={() => {
+  onBackToRolePicker?.();
+}}
+  activeOpacity={0.7}
+  style={{
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  }}
+>
+  <MaterialIcons name="arrow-back" size={24} color={PRIMARY_DARK} />
+</TouchableOpacity>
+
+    {/* Brand */}
+    <View style={styles.brandRow}>
+      <View style={styles.brandIconWrap}>
+        <MaterialIcons name="storefront" size={18} color="#fff" />
+      </View>
+
+      <View style={styles.brandTextWrap}>
+        <Text style={styles.brandName} numberOfLines={1}>
+          Desi<Text style={{ color: PRIMARY }}>Dukaan</Text>
+        </Text>
+        <Text style={styles.brandSub} numberOfLines={1}>
+          Seller Registration
+        </Text>
+      </View>
+    </View>
+
+  </View>
+
+  <TouchableOpacity style={styles.helpPill} activeOpacity={0.8}>
+    <View style={styles.helpIconCircle}>
+      <MaterialIcons name="help-outline" size={13} color={PRIMARY} />
+    </View>
+    <View style={styles.helpTextWrap}>
+      <Text style={styles.helpTitle} numberOfLines={1}>Need help?</Text>
+      <Text style={styles.helpSub} numberOfLines={2}>
+        We're here to assist
+      </Text>
+    </View>
+  </TouchableOpacity>
+</View>
 
         {/* Progress card */}
         <View style={styles.progressCard}>
@@ -2052,7 +2152,18 @@ return false;
                 }}
               />
               <Text style={styles.label}>Account Number</Text>
-              <TextInput style={styles.input} placeholder="Enter account number" keyboardType="numeric" secureTextEntry value={accountNumber} onChangeText={setAccountNumber} />
+<TextInput
+  style={styles.input}
+  placeholder="Enter account number"
+  keyboardType="number-pad"
+  secureTextEntry
+  value={accountNumber}
+  onChangeText={(value) => {
+    const digitsOnly = value.replace(/[^0-9]/g, '').slice(0, 16);
+    setAccountNumber(digitsOnly);
+  }}
+  maxLength={16}
+/>
               <Text style={styles.label}>IFSC Code</Text>
               <TextInput style={styles.input} placeholder="e.g. SBIN0001234" autoCapitalize="characters" maxLength={11} value={ifsc} onChangeText={v => setIfsc(v.toUpperCase())} />
               {ifscStatus?.status === 'loading' ? (

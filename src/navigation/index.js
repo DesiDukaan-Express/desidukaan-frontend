@@ -313,10 +313,15 @@ export default function Navigation() {
 />
                   <Stack.Screen name="VendorOnboarding">
                     {(props) => (
-                      <VendorOnboardingScreen
-                        {...props}
-                        onComplete={() => checkVendorProfile()}
-                      />
+<VendorOnboardingScreen
+  {...props}
+  onComplete={() => checkVendorProfile()}
+  onBackToRolePicker={() => {
+    setVendorOnboarded(null);
+    setDeliveryOnboarded(null);
+    setActiveRole(null);
+  }}
+/>
                     )}
                   </Stack.Screen>
                 </>

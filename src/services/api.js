@@ -60,20 +60,27 @@ export const request = async (method, endpoint, body = null, token = null, _isRe
       useAuthStore.getState()._setAccessToken(newAccessToken);
       // Retry the original request with the fresh token
       return request(method, endpoint, body, newAccessToken, true);
-    } else if (refreshResult?.error === "ACCOUNT_DEACTIVATED") {
-      // Account deactivated by admin → block the app (keep refresh token so a
-      // reload after reactivation restores the session automatically).
-      useAuthStore.getState().flagDeactivated();
-      const err = new Error("Your account has been deactivated.");
-      err.accountDeactivated = true;
-      throw err;
-    } else {
-      // Refresh token also expired/revoked → force logout
-      useAuthStore.getState().logout();
-      const err = new Error("Session expired. Please log in again.");
-      err.sessionExpired = true;
-      throw err;
-    }
+    }  else if (refreshResult?.error === "ACCOUNT_DEACTIVATED") {
+  useAuthStore.getState().flagDeactivated();
+  const err = new Error("Your account has been deactivated.");
+  err.accountDeactivated = true;
+  throw err;
+} else {
+  const isInactive =
+    refreshResult?.error === "INACTIVITY_EXPIRED";
+
+  useAuthStore.getState().logout();
+
+  const err = new Error(
+    isInactive
+      ? "You were logged out because your profile was inactive for 15 days. Please log in again."
+      : "Session expired. Please log in again."
+  );
+
+  err.sessionExpired = true;
+  err.inactivityExpired = isInactive;
+  throw err;
+}
   }
 
   if (!response.ok) {
@@ -357,26 +364,30 @@ console.log(
         return await _doUpload(
           newAccessToken
         );
-      } else if (
-        refreshResult?.error ===
-        "ACCOUNT_DEACTIVATED"
-      ) {
-        useAuthStore
-          .getState()
-          .flagDeactivated();
+} else if (
+  refreshResult?.error === "ACCOUNT_DEACTIVATED"
+) {
+  useAuthStore
+    .getState()
+    .flagDeactivated();
 
-        throw new Error(
-          "Your account has been deactivated."
-        );
-      } else {
-        useAuthStore
-          .getState()
-          .logout();
+  throw new Error(
+    "Your account has been deactivated."
+  );
+} else {
+  const isInactive =
+    refreshResult?.error === "INACTIVITY_EXPIRED";
 
-        throw new Error(
-          "Session expired. Please log in again."
-        );
-      }
+  useAuthStore
+    .getState()
+    .logout();
+
+  throw new Error(
+    isInactive
+      ? "You were logged out because your profile was inactive for 15 days. Please log in again."
+      : "Session expired. Please log in again."
+  );
+}
     }
 
     throw err;

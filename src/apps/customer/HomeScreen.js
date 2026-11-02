@@ -2748,6 +2748,9 @@ export default function HomeScreen() {
   const { t } = useTranslation();
   const { token, user } = useAuthStore();
   const navigation = useNavigation();
+  const handleBackToRolePicker = async () => {
+  await useAuthStore.getState().setActiveRole(null);
+};
   const goToSearch = (focusField) => {
     const validFields = ["stores", "categories", "items"];
     const field = validFields.includes(focusField) ? focusField : null;
@@ -3521,6 +3524,22 @@ export default function HomeScreen() {
         {wide ? (
           <View style={[s.headerRow, { paddingHorizontal: hPad }]}>
             <TouchableOpacity
+  onPress={handleBackToRolePicker}
+  activeOpacity={0.8}
+  accessibilityLabel="Back to role selection"
+  style={{
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: C.greenLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  }}
+>
+  <MaterialIcons name="arrow-back" size={21} color={C.green} />
+</TouchableOpacity>
+            <TouchableOpacity
               style={s.brandSection}
               onPress={() => navigation.navigate("Home")}
               activeOpacity={0.8}
@@ -3647,6 +3666,22 @@ export default function HomeScreen() {
           <>
             {/* ── Mobile header row: location (left) + account (right) ── */}
             <View style={[s.mobileRow1, { paddingHorizontal: hPad }]}>
+              <TouchableOpacity
+  onPress={handleBackToRolePicker}
+  activeOpacity={0.8}
+  accessibilityLabel="Back to role selection"
+  style={{
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: C.greenLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  }}
+>
+  <MaterialIcons name="arrow-back" size={21} color={C.green} />
+</TouchableOpacity>
               <TouchableOpacity
                 style={s.mobileLocBtn}
                 onPress={openAddressPicker}
