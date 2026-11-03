@@ -1002,4 +1002,51 @@ agreeTo: "I agree to the",
 and: "and",
 createAccountSendOtp: "Create Account & Send OTP",
 
+  sellerRegistration: 'Seller Registration',
+  needHelp: 'Need help?',
+  helpSubtitle: "We're here to assist",
+  whoIsUsing: "Who's using KwikPik?",
+  chooseRole: 'Choose your role to continue',
+  customer: "Customer",
+customerDescription: "Shop from nearby stores",
+
+vendor: "Vendor",
+vendorDescription: "Manage your store",
+
+delivery: "Delivery",
+deliveryDescription: "Deliver & earn",
+
+// Add these inside the translation object in src/i18n/locales/en.js
+
+  // ── Onboarding: step titles (short, shown in the progress pills) ──
+  shopInfo: 'Shop Info',
+  shopInfoFull: 'Shop Information',
+  compliance: 'Compliance',
+  bank: 'Bank',
+  catalog: 'Catalog',
+  review: 'Review',
+  goLive: 'Go Live',
+
+  // ── Onboarding: step descriptions (shown under the step title) ──
+  shopInfoDesc: 'Tell us about your shop and where customers can find you',
+  complianceDesc: 'Licenses and IDs needed to verify your shop',
+  bankDesc: 'Where we send your payments',
+  catalogDesc: 'Add the products you sell',
+  reviewDesc: 'Check prices and stock before going live',
+  goLiveDesc: 'Confirm your details and submit your shop',
+
+  // ── Onboarding: hero headline + sub-heading in the progress card ──
+  shopHeroTitle: "Let's set up your shop",
+  shopHeroSub: 'Add your shop details to get started',
+  complianceHeroTitle: 'Verify your business',
+  complianceHeroSub: 'Add your FSSAI and GST details for approval',
+  bankHeroTitle: 'Set up your payments',
+  bankHeroSub: 'Tell us where to send your earnings',
+  catalogHeroTitle: 'Build your catalog',
+  catalogHeroSub: 'Add products so customers can start ordering',
+  reviewHeroTitle: 'Review your inventory',
+  reviewHeroSub: 'Make sure prices and stock look right',
+  goLiveHeroTitle: "You're almost there!",
+  goLiveHeroSub: 'Review everything and submit your shop',
 };
+

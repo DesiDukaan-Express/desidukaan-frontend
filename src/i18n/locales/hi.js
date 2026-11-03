@@ -910,4 +910,53 @@ genderOptions: {
 "agreeTo": "मैं सहमत हूं:",
 "and": "और",
 "createAccountSendOtp": "खाता बनाएं और OTP भेजें",
+
+  sellerRegistration: "विक्रेता पंजीकरण",
+needHelp: "मदद चाहिए?",
+helpSubtitle: "हम आपकी सहायता के लिए यहाँ हैं",
+
+whoIsUsing: "KwikPik का उपयोग कौन कर रहा है?",
+chooseRole: "जारी रखने के लिए अपनी भूमिका चुनें",
+
+customer: "ग्राहक",
+customerDescription: "आस-पास की दुकानों से खरीदारी करें",
+
+vendor: "विक्रेता",
+vendorDescription: "अपनी दुकान प्रबंधित करें",
+
+delivery: "डिलीवरी",
+deliveryDescription: "डिलीवरी करें और कमाएं",
+
+// Add these inside the translation object in src/i18n/locales/hi.js
+
+  // ── Onboarding: step titles ──
+  shopInfo: 'दुकान की जानकारी',
+  shopInfoFull: 'दुकान की जानकारी',
+  compliance: 'अनुपालन',
+  bank: 'बैंक',
+  catalog: 'कैटलॉग',
+  review: 'समीक्षा',
+  goLive: 'लाइव करें',
+
+  // ── Onboarding: step descriptions ──
+  shopInfoDesc: 'अपनी दुकान के बारे में बताएं और यह भी कि ग्राहक आपको कहां ढूंढ सकते हैं',
+  complianceDesc: 'आपकी दुकान को सत्यापित करने के लिए ज़रूरी लाइसेंस और पहचान पत्र',
+  bankDesc: 'जहां हम आपका भुगतान भेजेंगे',
+  catalogDesc: 'वे उत्पाद जोड़ें जो आप बेचते हैं',
+  reviewDesc: 'लाइव होने से पहले कीमत और स्टॉक जांच लें',
+  goLiveDesc: 'अपनी जानकारी की पुष्टि करें और दुकान सबमिट करें',
+
+  // ── Onboarding: hero headline + sub-heading ──
+  shopHeroTitle: 'आइए आपकी दुकान सेट करें',
+  shopHeroSub: 'शुरू करने के लिए अपनी दुकान की जानकारी जोड़ें',
+  complianceHeroTitle: 'अपना व्यवसाय सत्यापित करें',
+  complianceHeroSub: 'मंज़ूरी के लिए अपने FSSAI और GST विवरण जोड़ें',
+  bankHeroTitle: 'अपना भुगतान सेट करें',
+  bankHeroSub: 'बताएं कि आपकी कमाई कहां भेजनी है',
+  catalogHeroTitle: 'अपना कैटलॉग बनाएं',
+  catalogHeroSub: 'उत्पाद जोड़ें ताकि ग्राहक ऑर्डर करना शुरू कर सकें',
+  reviewHeroTitle: 'अपनी इन्वेंटरी की समीक्षा करें',
+  reviewHeroSub: 'सुनिश्चित करें कि कीमतें और स्टॉक सही हैं',
+  goLiveHeroTitle: 'आप लगभग तैयार हैं!',
+  goLiveHeroSub: 'सब कुछ जांचें और अपनी दुकान सबमिट करें',
 };
