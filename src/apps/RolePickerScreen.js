@@ -14,13 +14,17 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import useAuthStore from "../store/authStore";
+import LanguageSelector from '../components/LanguageSelector';
+import { useTranslation } from 'react-i18next';
 
 // ─── Role definitions ────────────────────────────────────────────────────────
 const ROLES = [
   {
     key: "customer",
     label: "Customer",
+    labelKey: "customer",
     sublabel: "Shop from nearby stores",
+    sublabelKey: "customerDescription",
     icon: "shopping-bag",
     iconLib: "feather",
     gradientColors: ["#F97316", "#EA580C"],
@@ -30,7 +34,9 @@ const ROLES = [
   {
     key: "vendor",
     label: "Vendor",
+    labelKey: "vendor",
     sublabel: "Manage your store",
+    sublabelKey: "vendorDescription",
     icon: "store",
     iconLib: "material",
     gradientColors: ["#10B981", "#059669"],
@@ -40,7 +46,9 @@ const ROLES = [
   {
     key: "delivery",
     label: "Delivery",
+    labelKey: "delivery",
     sublabel: "Deliver & earn",
+    sublabelKey: "deliveryDescription",
     icon: "bike",
     iconLib: "material",
     gradientColors: ["#6366F1", "#4F46E5"],
@@ -67,6 +75,7 @@ function RoleIcon({ role, size = 28, color = "#fff" }) {
 // ─── Role Card ──────────────────────────────────────────────────────────────
 function RoleCard({
   role,
+  t,
   enabled,
   onPress,
   index,
@@ -198,7 +207,7 @@ function RoleCard({
           adjustsFontSizeToFit
           minimumFontScale={0.75}
         >
-          {role.label}
+          {t(role.labelKey)}
         </Text>
 
         <Text
@@ -207,7 +216,7 @@ function RoleCard({
           adjustsFontSizeToFit
           minimumFontScale={0.8}
         >
-          {role.sublabel}
+          {t(role.sublabelKey)}
         </Text>
 
         <View
@@ -335,6 +344,8 @@ export default function RolePickerScreen({ onRolePicked }) {
   const titleOpacity = useRef(new Animated.Value(0)).current;
   const taglineAnim = useRef(new Animated.Value(0)).current;
 
+  const { t } = useTranslation();
+
   useEffect(() => {
     Animated.parallel([
       Animated.timing(bgAnim, {
@@ -411,28 +422,32 @@ export default function RolePickerScreen({ onRolePicked }) {
       {/* Main content */}
       <View style={s.scrollContent}>
         {/* Header */}
-        <View style={s.topBar}>
-          <View style={s.topRight}>
-            <Text style={s.topName}>
-              {user?.name || "Welcome"}
-            </Text>
+<View style={s.topBar}>
+  <View style={s.topRight}>
+    <Text style={s.topName}>
+      {user?.name || "Welcome"}
+    </Text>
 
-            <Text style={s.topPhone}>
-              {user?.phone ? `+91 ${user.phone}` : ""}
-            </Text>
-          </View>
+    <Text style={s.topPhone}>
+      {user?.phone ? `+91 ${user.phone}` : ""}
+    </Text>
+  </View>
 
-          <TouchableOpacity
-            style={s.logoutBtn}
-            onPress={() => setLogoutModal(true)}
-          >
-            <Feather
-              name="log-out"
-              size={18}
-              color="rgba(255,255,255,0.7)"
-            />
-          </TouchableOpacity>
-        </View>
+  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+    <LanguageSelector />
+
+    <TouchableOpacity
+      style={s.logoutBtn}
+      onPress={() => setLogoutModal(true)}
+    >
+      <Feather
+        name="log-out"
+        size={18}
+        color="rgba(255,255,255,0.7)"
+      />
+    </TouchableOpacity>
+  </View>
+</View>
 
         {/* Center content */}
         <View style={s.centerContent}>
@@ -452,7 +467,7 @@ export default function RolePickerScreen({ onRolePicked }) {
                 isSmallMobile && { fontSize: 22 },
               ]}
             >
-              Who's using KwikPik?
+             {t('whoIsUsing')}
             </Text>
 
             <Animated.Text
@@ -461,7 +476,7 @@ export default function RolePickerScreen({ onRolePicked }) {
                 { opacity: taglineAnim },
               ]}
             >
-              Choose your role to continue
+              {t('chooseRole')}
             </Animated.Text>
           </Animated.View>
 
@@ -476,6 +491,7 @@ export default function RolePickerScreen({ onRolePicked }) {
               <RoleCard
                 key={role.key}
                 role={role}
+                t={t}
                 enabled={enabledRoles.includes(role.key)}
                 onPress={() => handleRoleTap(role)}
                 index={idx}

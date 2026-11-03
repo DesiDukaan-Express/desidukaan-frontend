@@ -15,6 +15,8 @@ import UnitDropdownMenu from '../../components/UnitDropdownMenu';
 import { uploadAPI } from '../../services/api';
 import { MaterialIcons } from '@expo/vector-icons';
 import BANK_BRANCH_DATA from '../../data/bankBranches.json';
+import LanguageSelector from '../../components/LanguageSelector';
+import { useTranslation } from 'react-i18next';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 // ─── Premium palette — DesiDukaan emerald on soft cloud-white ──────────────────
@@ -33,24 +35,23 @@ const CARD_SHADOW = 'rgba(15, 45, 28, 0.08)';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STEPS = [
-  { id: 1, title: 'Shop Info', icon: 'store', desc: 'Basic store details' },
-  { id: 2, title: 'Compliance', icon: 'assignment', desc: 'FSSAI, GST & legal' },
-  { id: 3, title: 'Bank', icon: 'account-balance', desc: 'Payment setup' },
-  { id: 4, title: 'Catalog', icon: 'inventory', desc: 'Pick your products' },
-  { id: 5, title: 'Review', icon: 'assessment', desc: 'Inventory & pricing' },
-  { id: 6, title: 'Go Live', icon: 'publish', desc: 'Submit & launch' },
+  { id: 1, titleKey: 'shopInfo', icon: 'store', descKey: 'shopInfoDesc' },
+  { id: 2, titleKey: 'compliance', icon: 'assignment', descKey: 'complianceDesc' },
+  { id: 3, titleKey: 'bank', icon: 'account-balance', descKey: 'bankDesc' },
+  { id: 4, titleKey: 'catalog', icon: 'inventory', descKey: 'catalogDesc' },
+  { id: 5, titleKey: 'review', icon: 'assessment', descKey: 'reviewDesc' },
+  { id: 6, titleKey: 'goLive', icon: 'publish', descKey: 'goLiveDesc' },
 ];
 
 // Friendly headline shown in the progress card for each step
 const STEP_HERO = [
-  { title: "Let's set up your shop 🎉", sub: 'Add your basic shop details to get started' },
-  { title: 'A few legal details 📋', sub: 'FSSAI & GST keep your shop compliant' },
-  { title: 'Where should we pay you? 💳', sub: "Add your bank or UPI to receive payouts" },
-  { title: 'Build your catalog 🛒', sub: 'Add the products you want to sell' },
-  { title: 'Almost there — review 👀', sub: 'Check your inventory & pricing' },
-  { title: "You're ready to go live 🚀", sub: 'Submit your shop for launch' },
+  { titleKey: 'shopHeroTitle', subKey: 'shopHeroSub' },
+  { titleKey: 'complianceHeroTitle', subKey: 'complianceHeroSub' },
+  { titleKey: 'bankHeroTitle', subKey: 'bankHeroSub' },
+  { titleKey: 'catalogHeroTitle', subKey: 'catalogHeroSub' },
+  { titleKey: 'reviewHeroTitle', subKey: 'reviewHeroSub' },
+  { titleKey: 'goLiveHeroTitle', subKey: 'goLiveHeroSub' },
 ];
-
 
 const isValidShopEmail = (value) =>
   /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/.test(
@@ -572,7 +573,7 @@ export default function VendorOnboardingScreen({
   const submitLock = useRef(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [autoApproved, setAutoApproved] = useState(false);
-
+const { t } = useTranslation();
   const scrollRef = useRef(null);
 
   // ── Collapsing header (banner hides on scroll down, reappears on scroll up) ──
@@ -1529,26 +1530,25 @@ onComplete?.();
           if (h > 0 && Math.abs(h - headerHeight) > 1) setHeaderHeight(h);
         }}
       >
-        {/* Top bar */}
+{/* Top bar */}
 <View style={styles.topBar}>
   <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-
-    {/* Back to RolePick */}
+    {/* Back to RolePicker */}
     <TouchableOpacity
-onPress={() => {
-  onBackToRolePicker?.();
-}}
-  activeOpacity={0.7}
-  style={{
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  }}
->
-  <MaterialIcons name="arrow-back" size={24} color={PRIMARY_DARK} />
-</TouchableOpacity>
+      onPress={() => {
+        onBackToRolePicker?.();
+      }}
+      activeOpacity={0.7}
+      style={{
+        width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+      }}
+    >
+      <MaterialIcons name="arrow-back" size={24} color={PRIMARY_DARK} />
+    </TouchableOpacity>
 
     {/* Brand */}
     <View style={styles.brandRow}>
@@ -1560,27 +1560,42 @@ onPress={() => {
         <Text style={styles.brandName} numberOfLines={1}>
           Desi<Text style={{ color: PRIMARY }}>Dukaan</Text>
         </Text>
+
         <Text style={styles.brandSub} numberOfLines={1}>
-          Seller Registration
+          {t('sellerRegistration')}
         </Text>
       </View>
     </View>
-
   </View>
 
-  <TouchableOpacity style={styles.helpPill} activeOpacity={0.8}>
-    <View style={styles.helpIconCircle}>
-      <MaterialIcons name="help-outline" size={13} color={PRIMARY} />
-    </View>
-    <View style={styles.helpTextWrap}>
-      <Text style={styles.helpTitle} numberOfLines={1}>Need help?</Text>
-      <Text style={styles.helpSub} numberOfLines={2}>
-        We're here to assist
-      </Text>
-    </View>
-  </TouchableOpacity>
-</View>
+  {/* Language selector + Help */}
+  <View
+  style={{
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+  }}
+>
+    <LanguageSelector />
 
+    <TouchableOpacity style={styles.helpPill} activeOpacity={0.8}>
+      <View style={styles.helpIconCircle}>
+        <MaterialIcons name="help-outline" size={13} color={PRIMARY} />
+      </View>
+
+      <View style={styles.helpTextWrap}>
+        <Text style={styles.helpTitle} numberOfLines={1}>
+          {t('needHelp')}
+        </Text>
+
+        <Text style={styles.helpSub} numberOfLines={2}>
+          {t('helpSubtitle')}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  </View>
+</View>
         {/* Progress card */}
         <View style={styles.progressCard}>
           <View style={styles.stepCountPill}>
@@ -1589,8 +1604,8 @@ onPress={() => {
 
           <View style={styles.progressCardMain}>
             <View style={styles.progressCardLeft}>
-              <Text style={styles.heroTitle}>{STEP_HERO[currentStep - 1].title}</Text>
-              <Text style={styles.heroSub}>{STEP_HERO[currentStep - 1].sub}</Text>
+              <Text style={styles.heroTitle}>{t(STEP_HERO[currentStep - 1].titleKey)}</Text>
+              <Text style={styles.heroSub}>{t(STEP_HERO[currentStep - 1].subKey)}</Text>
               <View style={styles.safeRow}>
                 <MaterialIcons name="check-circle" size={13} color={PRIMARY} />
                 <Text style={styles.safeText}>Your information is safe &amp; secure</Text>
@@ -1623,7 +1638,7 @@ onPress={() => {
                       currentStep === step.id && styles.stepPillTextActive,
                       currentStep > step.id && styles.stepPillTextDone,
                     ]} numberOfLines={1}>
-                      {step.title}
+                      {t(step.titleKey)}
                     </Text>
                     <View style={[styles.stepUnderline, currentStep === step.id && styles.stepUnderlineActive]} />
                   </TouchableOpacity>
@@ -1655,8 +1670,8 @@ onPress={() => {
                 <MaterialIcons name={`${STEPS[currentStep - 1].icon}`} size={20} color={PRIMARY} />
               </View>
               <View style={{ flexShrink: 1 }}>
-                <Text style={styles.stepTitle}>{STEPS[currentStep - 1].title === 'Shop Info' ? 'Shop Information' : STEPS[currentStep - 1].title}</Text>
-                <Text style={styles.stepDesc}>{STEPS[currentStep - 1].desc}</Text>
+                <Text style={styles.stepTitle}>{currentStep === 1 ? t('shopInfoFull') : t(STEPS[currentStep - 1].titleKey)}</Text>
+                <Text style={styles.stepDesc}>{t(STEPS[currentStep - 1].descKey)}</Text>
               </View>
             </View>
             {currentStep === 1 && (
@@ -2776,13 +2791,18 @@ const styles = StyleSheet.create({
     backgroundColor: BG,
   },
 
-  topBar: {
-    backgroundColor: '#fff', paddingTop: 50, paddingBottom: 16,
-    paddingHorizontal: 16, flexDirection: 'row',
-    justifyContent: 'space-between', alignItems: 'center',
-    borderBottomWidth: 1, borderBottomColor: BORDER,
-    overflow: 'hidden', width: '100%',
-  },
+topBar: {
+  backgroundColor: '#fff',
+  paddingTop: 50,
+  paddingBottom: 16,
+  paddingHorizontal: 16,
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  borderBottomWidth: 1,
+  borderBottomColor: BORDER,
+  width: '100%',
+},
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, overflow: 'hidden' },
   brandIconWrap: {
     width: 36, height: 36, borderRadius: 11, backgroundColor: PRIMARY,
