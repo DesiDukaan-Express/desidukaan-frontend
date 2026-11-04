@@ -1906,6 +1906,41 @@ createAccountSendOtp: "Create Account & Send OTP",
   dobApproved: "✅ Instantly Approved! You can start accepting delivery orders right away.",
   dobSubmitted: "🎉 Application Submitted! We'll verify your documents within 24 hours. You'll receive an SMS once approved.",
 
+  
+  // ── Delivery pending screen ──
+  dpHi: "Hi, {{name}} 👋",
+  dpPending: "PENDING",
+  dpReceived: "Application Received!",
+  dpB1: "Thank you for registering with ",
+  dpBrand: "KwikPik",
+  dpB2: ". Your documents are being reviewed by our team.\n\nOnce verified, you'll receive an ",
+  dpSmsEmail: "SMS and email",
+  dpB3: " confirming your account activation — usually within ",
+  dpHours: "24–48 hours",
+  dpB4: ".",
+  dpTrackerTitle: "Application Status",
+  dpStepSubmitted: "Application Submitted",
+  dpStepReview: "Documents Under Review",
+  dpStepActive: "Account Activated",
+  dpStepSub: "Avg. 24–48 hrs · Mon–Sat",
+  dpSupport: "Support: 1800-XXX-XXXX",
+  dpChecking: "Checking…",
+  dpCheckStatus: "🔄  Check approval status",
+  dpSignOut: "Sign out",
+
+  //Deliveryonboard
+  dobErrRcReq: "RC registration number is required.",
+dobErrRcMismatch: "RC number must match the vehicle registration number.",
+
+dobErrHolderFmt: "Enter a valid account holder name.",
+dobErrBankNameFmt: "Enter a valid bank name.",
+dobErrAccFmt: "Account number must contain 9 to 18 digits.",
+
+dobErrInstitutionFmt: "Enter a valid institution name.",
+dobErrPassYearRange: "Passing year must be between 1950 and {{max}}.",
+
+dobErrTraining: "Please select valid training options.",
+
 };
 
 
