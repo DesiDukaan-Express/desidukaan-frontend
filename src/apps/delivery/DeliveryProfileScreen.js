@@ -138,7 +138,7 @@ export default function DeliveryProfileScreen({ navigation }) {
 
   const totalDeliveries = stats?.totalDeliveries || profile?.total_deliveries || 0;
   const levelInfo = getLevelInfo(totalDeliveries, t);
-  const displayName = user?.name || profile?.user?.name || 'Partner';
+  const displayName = user?.name || profile?.user?.name || t('delivery.partner');
   const initials  = displayName.trim().split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
   const phone  = user?.phone  || profile?.user?.phone  || '—';
   const rating = stats?.rating ?? profile?.rating ?? null;
@@ -194,7 +194,7 @@ export default function DeliveryProfileScreen({ navigation }) {
             </View>
             <View style={p.heroStatDivider} />
             <View style={p.heroStat}>
-              <Text style={p.heroStatValue}>Lvl {levelInfo.level}</Text>
+              <Text style={p.heroStatValue}>{t('delivery.lvl', { n: levelInfo.level })}</Text>
               <Text style={p.heroStatLabel}>{levelInfo.label}</Text>
             </View>
           </View>
@@ -206,9 +206,9 @@ export default function DeliveryProfileScreen({ navigation }) {
           <View style={p.sectionCard}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <View>
-                <Text style={p.sectionTitle}>Level {levelInfo.level} · {levelInfo.label}</Text>
+                <Text style={p.sectionTitle}>{t('delivery.levelTitle', { n: levelInfo.level, label: levelInfo.label })}</Text>
                 {levelInfo.next && (
-                  <Text style={p.levelSub}>{totalDeliveries} / {levelInfo.next} {t('delivery.deliveriesStat', 'deliveries').toLowerCase()}</Text>
+                  <Text style={p.levelSub}>{t('delivery.progressCount', { done: totalDeliveries, next: levelInfo.next })}</Text>
                 )}
               </View>
               <View style={p.levelBadge}>
@@ -219,7 +219,7 @@ export default function DeliveryProfileScreen({ navigation }) {
               <View style={[p.progressFill, { width: `${Math.round(levelInfo.progress * 100)}%` }]} />
             </View>
             {levelInfo.next ? (
-              <Text style={p.levelHint}>{levelInfo.next - totalDeliveries} {t('delivery.moreToReach', { count: levelInfo.next - totalDeliveries, nextLevel: levelInfo.level + 1, defaultValue: `more to reach Level ${levelInfo.level + 1}` })}</Text>
+              <Text style={p.levelHint}>{t('delivery.moreToReachLevel', { n: levelInfo.next - totalDeliveries, level: levelInfo.level + 1 })}</Text>
             ) : (
               <Text style={[p.levelHint, { color: C.greenDark }]}>{t('delivery.maxLevelReached', 'Maximum level reached 🎉')}</Text>
             )}
@@ -227,14 +227,14 @@ export default function DeliveryProfileScreen({ navigation }) {
 
           {/* ── Vehicle info ── */}
           <SectionCard title={t('delivery.vehicle', 'Vehicle')}>
-            <InfoRow label={t('delivery.vehicleType', 'Type')}           value={profile?.vehicle_type ? profile.vehicle_type.charAt(0).toUpperCase() + profile.vehicle_type.slice(1) : null} />
+            <InfoRow label={t('delivery.vehicleType', 'Type')}           value={profile?.vehicle_type ? t(`delivery.vt_${String(profile.vehicle_type).toLowerCase()}`, { defaultValue: profile.vehicle_type.charAt(0).toUpperCase() + profile.vehicle_type.slice(1) }) : null} />
             <InfoRow label={t('delivery.vehicleNumber', 'Vehicle number')} value={profile?.vehicle_number} />
             <InfoRow label={t('delivery.vehicleYear', 'Year')}           value={profile?.vehicle_year} last />
           </SectionCard>
 
           {/* ── Documents ── */}
           <SectionCard title={t('delivery.documents', 'Documents')}>
-            <InfoRow label={t('delivery.drivingLicence', 'Driving licence')} value={profile?.license_number ? `${profile.license_number} · Exp ${profile.license_expiry || '—'}` : null} />
+            <InfoRow label={t('delivery.drivingLicence', 'Driving licence')} value={profile?.license_number ? `${profile.license_number} · ${t('delivery.exp')} ${profile.license_expiry || '—'}` : null} />
             <InfoRow label={t('delivery.aadhaar', 'Aadhaar')}          value={profile?.aadhar_number ? `****${profile.aadhar_number.slice(-4)}` : null} />
             <InfoRow label={t('delivery.pan', 'PAN')}              value={profile?.pan_number} last />
           </SectionCard>
@@ -284,7 +284,7 @@ export default function DeliveryProfileScreen({ navigation }) {
             onPress={async () => { await setActiveRole(null); }}
             activeOpacity={0.8}
           >
-            <Text style={[p.logoutText, { color: '#3B82F6' }]}>Switch Profile</Text>
+            <Text style={[p.logoutText, { color: '#3B82F6' }]}>{t('vpSwitchProfile')}</Text>
           </TouchableOpacity>
 
           {/* ── Log out ── */}
@@ -387,6 +387,7 @@ export default function DeliveryProfileScreen({ navigation }) {
 
 // ─── Logout modal ─────────────────────────────────────────────────────────
 function LogoutModal({ visible, onConfirm, onCancel }) {
+  const { t } = useTranslation();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable style={lm.backdrop} onPress={onCancel}>
@@ -394,14 +395,14 @@ function LogoutModal({ visible, onConfirm, onCancel }) {
           <LinearGradient colors={["#FEF2F2", "#FFF"]} style={lm.iconWrap}>
             <Feather name="log-out" size={26} color={C.red} />
           </LinearGradient>
-          <Text style={lm.title}>Log out?</Text>
+          <Text style={lm.title}>{t("cpLogoutTitle")}</Text>
           {/* <Text style={lm.sub}>Your cart and session will be cleared.</Text> */}
           <View style={lm.btns}>
             <TouchableOpacity style={lm.cancel} onPress={onCancel}>
-              <Text style={lm.cancelText}>Cancel</Text>
+              <Text style={lm.cancelText}>{t("delivery.cancel")}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={lm.confirm} onPress={onConfirm}>
-              <Text style={lm.confirmText}>Log out</Text>
+              <Text style={lm.confirmText}>{t("cpLogoutConfirm")}</Text>
             </TouchableOpacity>
           </View>
         </Pressable>

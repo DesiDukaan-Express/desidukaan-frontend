@@ -137,13 +137,19 @@ function ScooterOfflineIllustration({ width = 180, height = 160 }) {
   );
 }
 
+// Pick a date locale that is valid for the active language (falls back to en-IN)
+const safeLocale = (lng) => {
+  try { new Intl.DateTimeFormat(lng); return lng || 'en-IN'; } catch { return 'en-IN'; }
+};
+
 // ── Transaction Row ────────────────────────────────────────────────────────────
 function TxRow({ item, isLast }) {
+  const { t, i18n } = useTranslation();
   const date    = new Date(item.delivered_at || item.created_at);
-  const timeStr = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-  const today   = new Date().toDateString() === date.toDateString() ? 'Today, ' : '';
-  const rawTitle = item.description || (item.order_number ? `Single Delivery · ${item.order_number}` : 'Delivery completed');
-  const dist    = item.distance_km != null ? ` · ${Number(item.distance_km).toFixed(1)} km` : '';
+  const timeStr = date.toLocaleTimeString(safeLocale(i18n.language), { hour: '2-digit', minute: '2-digit', hour12: true });
+  const today   = new Date().toDateString() === date.toDateString() ? t('delivery.txToday') : '';
+  const rawTitle = item.description || (item.order_number ? t('delivery.txSingle', { order: item.order_number }) : t('delivery.txCompleted'));
+  const dist    = item.distance_km != null ? ` · ${t('vpKm', { n: Number(item.distance_km).toFixed(1) })}` : '';
   const isTip   = rawTitle.toLowerCase().includes('tip');
   const isBatch = rawTitle.toLowerCase().includes('batch');
 
@@ -164,7 +170,7 @@ function TxRow({ item, isLast }) {
             + ₹{Number(item.partner_earnings || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </Text>
           {item.tip_amount > 0 && (
-            <Text style={tx.tip}>+ ₹{Number(item.tip_amount).toFixed(2)} Tips</Text>
+            <Text style={tx.tip}>{t('delivery.txTips', { amount: Number(item.tip_amount).toFixed(2) })}</Text>
           )}
         </View>
       </View>
@@ -488,7 +494,7 @@ export default function DeliveryHomeScreen({ navigation, route }) {
     pendingOrders    = 0,
   } = stats || {};
 
-  const firstName = user?.name?.trim().split(' ')[0] || 'Partner';
+  const firstName = user?.name?.trim().split(' ')[0] || t('delivery.partner');
   const level     = getLevelFromDeliveries(totalDeliveries);
 
   const displayCompletionRate = completionRate != null
@@ -541,7 +547,7 @@ export default function DeliveryHomeScreen({ navigation, route }) {
   onPress={handleBackToRolePicker}
   activeOpacity={0.8}
   accessibilityRole="button"
-  accessibilityLabel="Back to role selection"
+  accessibilityLabel={t("dbBackToRole")}
   style={{
     width: 34,
     height: 34,
@@ -563,11 +569,11 @@ export default function DeliveryHomeScreen({ navigation, route }) {
                 <Text style={s.shieldNum}>{level}</Text>
               </View>
               <View style={s.levelPill}>
-                <Text style={s.levelPillText}>Level {level}</Text>
+                <Text style={s.levelPillText}>{t('delivery.levelPill', { n: level })}</Text>
               </View>
             </View>
 
-            <Text style={s.heroName}>Partner {firstName}</Text>
+            <Text style={s.heroName}>{t('delivery.partnerName', { name: firstName })}</Text>
             <Text style={s.earningsLabel}>{t('delivery.totalEarningsLabel')}</Text>
             <View style={s.earningsRow}>
               <Text style={s.earningsCurrency}>₹</Text>
@@ -733,10 +739,10 @@ export default function DeliveryHomeScreen({ navigation, route }) {
               {/* ── Rate Customer ── */}
               <View style={{ marginBottom: 24, backgroundColor: "#F9FAFB", padding: 16, borderRadius: 16, borderWidth: 1, borderColor: "#E5E7EB" }}>
                 <Text style={{ fontSize: 18, fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#111827", marginBottom: 4 }}>
-                  Rate Customer
+                  {t('delivery.rateCustomer')}
                 </Text>
                 <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: "#9CA3AF", marginBottom: 16 }}>
-                  {partnerReviewOrder?.order?.customer?.name || partnerReviewOrder?.order?.order_number || partnerReviewOrder?.customer?.name || partnerReviewOrder?.order_number || "Customer"}
+                  {partnerReviewOrder?.order?.customer?.name || partnerReviewOrder?.order?.order_number || partnerReviewOrder?.customer?.name || partnerReviewOrder?.order_number || t("dbCustomer")}
                 </Text>
 
                 <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
@@ -760,7 +766,7 @@ export default function DeliveryHomeScreen({ navigation, route }) {
                     borderWidth: 1,
                     borderColor: "#E5E7EB",
                   }}
-                  placeholder="Tell us about the customer (optional)"
+                  placeholder={t("delivery.customerCommentPh")}
                   placeholderTextColor="#9CA3AF"
                   multiline
                   value={partnerReviewComment}
@@ -771,10 +777,10 @@ export default function DeliveryHomeScreen({ navigation, route }) {
               {/* ── Rate Store ── */}
               <View style={{ marginBottom: 24, backgroundColor: "#F9FAFB", padding: 16, borderRadius: 16, borderWidth: 1, borderColor: "#E5E7EB" }}>
                 <Text style={{ fontSize: 18, fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#111827", marginBottom: 4 }}>
-                  Rate Store
+                  {t('delivery.rateStore')}
                 </Text>
                 <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: "#9CA3AF", marginBottom: 16 }}>
-                  {partnerReviewOrder?.order?.vendor?.shop_name || partnerReviewOrder?.vendor?.shop_name || "Store"}
+                  {partnerReviewOrder?.order?.vendor?.shop_name || partnerReviewOrder?.vendor?.shop_name || t("delivery.storeFallback")}
                 </Text>
 
                 <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, justifyContent: "center" }}>
@@ -798,7 +804,7 @@ export default function DeliveryHomeScreen({ navigation, route }) {
                     borderWidth: 1,
                     borderColor: "#E5E7EB",
                   }}
-                  placeholder="Tell us about the pickup experience (optional)"
+                  placeholder={t("delivery.storeCommentPh")}
                   placeholderTextColor="#9CA3AF"
                   multiline
                   value={partnerStoreComment}
@@ -810,7 +816,7 @@ export default function DeliveryHomeScreen({ navigation, route }) {
             <TouchableOpacity
               onPress={async () => {
                 if (partnerReviewRating === 0 && partnerStoreRating === 0) {
-                  Alert.alert("Please provide at least one rating");
+                  Alert.alert(t("delivery.ratingRequired"));
                   return;
                 }
                 setPartnerReviewLoading(true);
@@ -854,7 +860,7 @@ export default function DeliveryHomeScreen({ navigation, route }) {
               }}
             >
               <Text style={{ color: "#fff", fontSize: 16, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold" }}>
-                {partnerReviewLoading ? "Submitting..." : "Submit Review"}
+                {partnerReviewLoading ? t("delivery.submitting") : t("delivery.submitReview")}
               </Text>
             </TouchableOpacity>
 
@@ -869,7 +875,7 @@ export default function DeliveryHomeScreen({ navigation, route }) {
               }}
             >
               <Text style={{ color: "#6B7280", fontSize: 14, fontWeight: "600" }}>
-                Skip
+                {t("delivery.skip")}
               </Text>
             </TouchableOpacity>
           </Pressable>

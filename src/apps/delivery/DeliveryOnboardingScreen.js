@@ -19,8 +19,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     TextInput, Image, Alert, Platform, StatusBar,
-    KeyboardAvoidingView, ActivityIndicator,
+    KeyboardAvoidingView, ActivityIndicator, Modal, Pressable,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -33,6 +34,7 @@ import ImageCropModal from '../../components/onboarding/ImageCropModal';
 import PdfViewerModal from '../../components/onboarding/PdfViewerModal';
 import RemovalConfirmDialog from '../../components/onboarding/RemovalConfirmDialog';
 import ToastBanner from '../../components/common/ToastBanner';
+import LanguageSwitcher from '../../components/common/LanguageSwitcher';
 import { C } from '../../components/onboarding/onboardingTheme';
 import { compressImage, revokeObjectUrl } from '../../utils/imageEditor';
 
@@ -74,63 +76,65 @@ const INITIAL_FORM = {
 const getVal = (form, key) =>
     key.split('.').reduce((o, p) => (o ? o[p] : undefined), form);
 
+// Validators return null (valid) or [translationKey, params] so the message can be
+// translated at render time and updates when the user changes language.
 const validators = {
-    'profile.photoUrl': (_v, form) => (form.profile.photoUrl ? null : 'Profile photo is required'),
+    'profile.photoUrl': (_v, form) => (form.profile.photoUrl ? null : ['dobErrPhoto']),
 
     'license.number': (v) => {
-        if (!v.trim()) return 'License number is required';
-        if (!/^[A-Z]{2}[A-Z0-9]{6,18}$/.test(v.trim())) return 'Invalid license number format (e.g. TS0720190012345)';
+        if (!v.trim()) return ['dobErrLicReq'];
+        if (!/^[A-Z]{2}[A-Z0-9]{6,18}$/.test(v.trim())) return ['dobErrLicFmt'];
         return null;
     },
     'license.expiry': (v) => {
-        if (!v.trim()) return 'Expiry date is required';
+        if (!v.trim()) return ['dobErrExpReq'];
         const m = v.trim().match(/^(0[1-9]|1[0-2])\/(\d{4})$/);
-        if (!m) return 'Use MM/YYYY format (e.g. 05/2030)';
+        if (!m) return ['dobErrExpFmt'];
         const end = new Date(+m[2], +m[1], 0, 23, 59, 59);
-        if (end < new Date()) return 'License has expired';
+        if (end < new Date()) return ['dobErrExpired'];
         return null;
     },
-    'license.photoUrl': (_v, form) => (form.license.photoUrl ? null : 'License photo is required'),
+    'license.photoUrl': (_v, form) => (form.license.photoUrl ? null : ['dobErrLicPhoto']),
 
-    'vehicle.type': (v) => (v ? null : 'Select your vehicle type'),
+    'vehicle.type': (v) => (v ? null : ['dobErrVehType']),
     'vehicle.registration': (v) => {
-        if (!v.trim()) return 'Registration number is required';
+        if (!v.trim()) return ['dobErrRegReq'];
         const compact = v.replace(/\s+/g, '').toUpperCase();
-        if (!/^[A-Z]{2}\d{2}[A-Z]{1,2}\d{4}$/.test(compact)) return 'Invalid registration number (e.g. TS09EF1234)';
+        if (!/^[A-Z]{2}\d{2}[A-Z]{1,2}\d{4}$/.test(compact)) return ['dobErrRegFmt'];
         return null;
     },
     'vehicle.year': (v) => {
         if (!v.trim()) return null;
-        if (!/^(19|20)\d{2}$/.test(v.trim())) return 'Enter a valid 4-digit year';
+        if (!/^(19|20)\d{2}$/.test(v.trim())) return ['dobErrYearFmt'];
         const y = +v.trim();
-        if (y < 1990 || y > new Date().getFullYear() + 1) return `Year must be between 1990 and ${new Date().getFullYear() + 1}`;
+        if (y < 1990 || y > new Date().getFullYear() + 1) return ['dobErrYearRange', { max: new Date().getFullYear() + 1 }];
         return null;
     },
 
     'rc.number': (v) => {
         if (!v.trim()) return null;
-        if (!/^[A-Z0-9]{5,20}$/.test(v.trim())) return 'Invalid RC number';
+        if (!/^[A-Z0-9]{5,20}$/.test(v.trim())) return ['dobErrRcFmt'];
         return null;
     },
-    'rc.photoUrl': (_v, form) => (form.rc.photoUrl ? null : 'RC document is required (image or PDF)'),
+    'rc.photoUrl': (_v, form) => (form.rc.photoUrl ? null : ['dobErrRcDoc']),
 
-    'bank.accountHolderName': (v) => (v.trim() ? null : 'Account holder name is required'),
-    'bank.accountNumber': (v) => (v.trim() ? null : 'Account number is required'),
+    'bank.accountHolderName': (v) => (v.trim() ? null : ['dobErrHolder']),
+    'bank.accountNumber': (v) => (v.trim() ? null : ['dobErrAccNum']),
     'bank.confirmAccount': (v, form) => {
-        if (!v.trim()) return 'Confirm account number is required';
-        if (v !== form.bank.accountNumber) return 'Account numbers do not match';
+        if (!v.trim()) return ['dobErrConfirmReq'];
+        if (v !== form.bank.accountNumber) return ['dobErrConfirmMismatch'];
         return null;
     },
     'bank.ifsc': (v) => {
-        if (!v.trim()) return 'IFSC code is required';
-        if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(v.trim())) return 'Invalid IFSC (e.g. SBIN0001234)';
+        if (!v.trim()) return ['dobErrIfscReq'];
+        if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(v.trim())) return ['dobErrIfscFmt'];
         return null;
     },
 
-    'education.level': (v) => (v ? null : 'Select your education level'),
+    'education.level': (v) => (v ? null : ['dobErrEduLevel']),
     'education.passingYear': (v) => {
         if (!v.trim()) return null;
-        if (!/^(19|20)\d{2}$/.test(v.trim())) return 'Enter a valid 4-digit year';
+        if (!/^(19|20)\d{2}$/.test(v.trim())) return ['dobErrYearFmt'];
         return null;
     },
 };
@@ -243,7 +247,7 @@ function Input({ value, onChangeText, placeholder, keyboardType, maxLength, secu
     );
 }
 
-function ChipSelect({ options, selected, onSelect, multi = false }) {
+function ChipSelect({ options, selected, onSelect, multi = false, renderLabel }) {
     return (
         <View style={s.chipRow}>
             {options.map((opt) => {
@@ -261,7 +265,7 @@ function ChipSelect({ options, selected, onSelect, multi = false }) {
                         accessibilityRole="button"
                         accessibilityState={{ selected: active }}
                     >
-                        <Text style={[s.chipTxt, active && s.chipTxtActive]}>{opt}</Text>
+                        <Text style={[s.chipTxt, active && s.chipTxtActive]}>{renderLabel ? renderLabel(opt) : opt}</Text>
                     </TouchableOpacity>
                 );
             })}
@@ -279,6 +283,7 @@ function TipBox({ icon = 'ℹ️', text }) {
 }
 
 function ProgressBar({ form }) {
+    const { t } = useTranslation();
     const completions = SECTION_FIELDS.map((_, i) => sectionComplete(form, i));
     const filled = completions.filter(Boolean).length;
     return (
@@ -296,7 +301,7 @@ function ProgressBar({ form }) {
                 ))}
             </View>
             <Text style={s.progressTxt}>
-                {filled} of {completions.length} sections completed
+                {t('dobProgress', { done: filled, total: completions.length })}
             </Text>
         </View>
     );
@@ -308,7 +313,9 @@ function ProgressBar({ form }) {
 
 
 export default function DeliveryOnboarding({ navigation, onComplete }) {
+    const { t, i18n } = useTranslation();
     const token = useAuthStore((state) => state.token);
+    const setActiveRole = useAuthStore((state) => state.setActiveRole);
     const login = useAuthStore((state) => state.login);
 
     const [form, setForm] = useState(INITIAL_FORM);
@@ -325,8 +332,18 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
     const [cropState, setCropState] = useState(null);          // { visible, sourceUri, title, mode, target, name }
     const [removeConfirm, setRemoveConfirm] = useState(null);  // { target, fileName } | null
     const [pdfViewer, setPdfViewer] = useState(null);          // { visible, uri, localUri, fileName }
+    const [showLanguage, setShowLanguage] = useState(false);
 
-    const markTouched = (key) => setTouched((t) => (t[key] ? t : { ...t, [key]: true }));
+    const markTouched = (key) => setTouched((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
+
+    const cropTitle = (target) =>
+        target === 'profile' ? t('dobCropProfile') : target === 'license' ? t('dobCropLicense') : t('dobCropRc');
+
+    // Back: go to the previous screen, or fall back to the role picker when this is the first screen
+    const handleBack = () => {
+        if (navigation?.canGoBack?.()) navigation.goBack();
+        else setActiveRole?.(null);
+    };
 
     // ── Toast ──────────────────────────────────────────────────────────────
     const showToast = (message, type = 'success') =>
@@ -334,8 +351,8 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
 
     useEffect(() => {
         if (!toast) return;
-        const t = setTimeout(() => setToast(null), 4200);
-        return () => clearTimeout(t);
+        const timer = setTimeout(() => setToast(null), 4200);
+        return () => clearTimeout(timer);
     }, [toast]);
 
     // ── Derived validation ─────────────────────────────────────────────────
@@ -343,10 +360,13 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
     const visibleErrors = useMemo(() => {
         const v = {};
         for (const k of Object.keys(allErrors)) {
-            if (submitted || touched[k]) v[k] = allErrors[k];
+            if (submitted || touched[k]) {
+                const [msgKey, params] = allErrors[k];
+                v[k] = t(msgKey, params);
+            }
         }
         return v;
-    }, [allErrors, touched, submitted]);
+    }, [allErrors, touched, submitted, t, i18n.language]);
     const isFormValid = Object.keys(allErrors).length === 0;
 
     // Generic nested field setter
@@ -358,7 +378,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
     const requestMediaPermission = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-            Alert.alert('Permission required', 'Please allow access to your photo library in Settings.');
+            Alert.alert(t('cpPermRequired'), t('dobPermMsg'));
             return false;
         }
         return true;
@@ -384,11 +404,11 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
             setField(target, 'photoName', name);
             setField(target, 'photoSize', size);
             markTouched(`${target}.photoUrl`);
-            showToast(mime === 'application/pdf' ? 'PDF uploaded successfully' : 'Image uploaded successfully', 'success');
+            showToast(mime === 'application/pdf' ? t('dobPdfUploaded') : t('dobImageUploaded'), 'success');
         } catch (err) {
-            setUploadError({ target, message: err.message || 'Upload failed. Please try again.' });
+            setUploadError({ target, message: err.message || t('dobUploadFailed') });
             setPendingRetry({ target, uri, mime, name, size });
-            showToast(err.message || 'Upload failed. Please try again.', 'danger');
+            showToast(err.message || t('dobUploadFailed'), 'danger');
         } finally {
             setUploading(null);
             setUploadProgress(null);
@@ -407,9 +427,9 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
         const f = form[target];
         const fileName =
             f?.photoName ||
-            (target === 'profile' ? 'your profile photo'
-            : target === 'license' ? 'your license photo'
-            : 'this RC document');
+            (target === 'profile' ? t('dobYourProfilePhoto')
+            : target === 'license' ? t('dobYourLicensePhoto')
+            : t('dobThisRc'));
         setRemoveConfirm({ target, fileName });
     };
 
@@ -444,10 +464,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
         const f = form[target];
         if (!f?.photoLocalUri || f.photoMime === 'application/pdf') return;
         const mode = target === 'profile' ? 'circle' : 'free';
-        const title =
-            target === 'profile' ? 'Crop Profile Photo'
-            : target === 'license' ? 'Crop License Photo'
-            : 'Crop RC Photo';
+        const title = cropTitle(target);
         openCrop(f.photoLocalUri, title, mode, target, f.photoName || `${target}.jpg`);
     };
 
@@ -459,7 +476,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
             const compressed = await compressImage({ uri: res.uri, maxDim: 1600, quality: 0.8 });
             await runUpload(cs.target, compressed.uri, 'image/jpeg', cs.name || `${cs.target}.jpg`, res.sizeBytes);
         } catch (err) {
-            showToast(err.message || 'Could not process the image. Please try again.', 'danger');
+            showToast(err.message || t('dobImgProcessFail'), 'danger');
         }
     };
 
@@ -476,22 +493,19 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
             const asset = result.assets[0];
             const mime = asset.mimeType || 'image/jpeg';
             if (!/^image\/(jpe?g|png)$/i.test(mime)) {
-                showToast('Only JPG or PNG images are allowed', 'danger');
+                showToast(t('dobOnlyJpgPng'), 'danger');
                 return;
             }
             if (asset.fileSize && asset.fileSize > MAX_UPLOAD_BYTES) {
-                showToast('Image is too large. Maximum size is 10 MB.', 'danger');
+                showToast(t('dobImgTooLarge'), 'danger');
                 return;
             }
             // Per-field crop type: profile/face → circle, documents → rectangular
             const mode = target === 'profile' ? 'circle' : 'free';
-            const title =
-                target === 'profile' ? 'Crop Profile Photo'
-                : target === 'license' ? 'Crop License Photo'
-                : 'Crop RC Photo';
+            const title = cropTitle(target);
             openCrop(asset.uri, title, mode, target, asset.fileName || `${target}.jpg`);
         } catch (err) {
-            showToast(err.message || 'Could not pick the image', 'danger');
+            showToast(err.message || t('dobPickImgFail'), 'danger');
         }
     };
 
@@ -501,17 +515,17 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
         const isPdf = mime === 'application/pdf' || /\.pdf$/i.test(fileData.name || '');
         const isImg = /^image\/(jpe?g|png)$/i.test(mime);
         if (!isPdf && !isImg) {
-            showToast('Only JPG, PNG or PDF files are allowed', 'danger');
+            showToast(t('dobOnlyJpgPngPdf'), 'danger');
             return;
         }
         if (fileData.size && fileData.size > MAX_UPLOAD_BYTES) {
-            showToast('File is too large. Maximum size is 10 MB.', 'danger');
+            showToast(t('dobFileTooLarge'), 'danger');
             return;
         }
         if (isPdf) {
             runUpload(target, fileData.uri, 'application/pdf', fileData.name || `${target}.pdf`, fileData.size);
         } else {
-            const title = target === 'license' ? 'Crop License Photo' : 'Crop RC Photo';
+            const title = cropTitle(target);
             // Documents use rectangular (free aspect) crop
             openCrop(fileData.uri, title, 'free', target, fileData.name || `${target}.jpg`);
         }
@@ -536,7 +550,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                 'rc'
             );
         } catch (err) {
-            showToast(err.message || 'Could not pick the file', 'danger');
+            showToast(err.message || t('dobPickFileFail'), 'danger');
         }
     };
 
@@ -568,7 +582,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
     const handleSubmit = async () => {
         if (!isFormValid) {
             setSubmitted(true);
-            showToast('Please fill all required fields marked with *', 'danger');
+            showToast(t('dobFillRequired'), 'danger');
             return;
         }
         setErrorMsg(null);
@@ -584,15 +598,15 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
             const autoApproved = res.data?.auto_approved === true;
             setSuccessMsg(
                 autoApproved
-                    ? "✅ Instantly Approved! You can start accepting delivery orders right away."
-                    : "🎉 Application Submitted! We'll verify your documents within 24 hours. You'll receive an SMS once approved."
+                    ? t('dobApproved')
+                    : t('dobSubmitted')
             );
             setTimeout(() => {
                 if (onComplete) onComplete();
                 else navigation?.navigate('DeliveryApp');
             }, 2500);
         } catch (err) {
-            setErrorMsg(err.message || 'Submission failed. Please try again.');
+            setErrorMsg(err.message || t('dobSubmitFail'));
         } finally {
             setSubmitting(false);
         }
@@ -631,23 +645,38 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     style={s.hero}
                 >
                     <View style={s.heroNav}>
-                        <TouchableOpacity onPress={() => navigation?.goBack()} style={s.backBtn} activeOpacity={0.7} accessibilityRole="button">
+                        <TouchableOpacity
+                            onPress={handleBack}
+                            style={s.backBtn}
+                            activeOpacity={0.7}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('dobBackRoles')}
+                        >
                             <Text style={s.backArrow}>←</Text>
                         </TouchableOpacity>
                         <View style={{ flex: 1, marginLeft: 12 }}>
-                            <Text style={s.heroEyebrow}>PARTNER</Text>
-                            <Text style={s.heroTitle}>Partner Onboarding</Text>
+                            <Text style={s.heroEyebrow}>{t('dobEyebrow')}</Text>
+                            <Text style={s.heroTitle}>{t('dobTitle')}</Text>
                         </View>
+                        <TouchableOpacity
+                            onPress={() => setShowLanguage(true)}
+                            style={s.langBtn}
+                            activeOpacity={0.7}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('dobLanguage')}
+                        >
+                            <Text style={s.langBtnIcon}>🌐</Text>
+                        </TouchableOpacity>
                         <View style={s.heroBadge}>
-                            <Text style={s.heroBadgeTxt}>6 STEPS</Text>
+                            <Text style={s.heroBadgeTxt}>{t('dobSteps')}</Text>
                         </View>
                     </View>
 
                     <View style={s.heroStats}>
                         {[
-                            { value: '⚡ 5 min', label: 'Quick setup' },
-                            { value: '🕐 24 hrs', label: 'Verification' },
-                            { value: '🔒 100%', label: 'Secure' },
+                            { value: t('dobStat1V'), label: t('dobStat1L') },
+                            { value: t('dobStat2V'), label: t('dobStat2L') },
+                            { value: t('dobStat3V'), label: t('dobStat3L') },
                         ].map((stat, i) => (
                             <View key={i} style={s.heroStatPill}>
                                 <Text style={s.heroStatValue}>{stat.value}</Text>
@@ -663,8 +692,8 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
 
                 {/* ── SECTION 1 — Profile Photo ── */}
                 <SectionCard
-                    title="Your Photo"
-                    subtitle="A clear face photo helps customers identify you"
+                    title={t('dobS1Title')}
+                    subtitle={t('dobS1Sub')}
                     stepIndex="1"
                     completed={sectionComplete(form, 0)}
                 >
@@ -675,7 +704,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                             style={s.profilePhotoWrap}
                             disabled={uploading === 'profile'}
                             accessibilityRole="button"
-                            accessibilityLabel="Upload profile photo"
+                            accessibilityLabel={t('dobUploadPhotoA11y')}
                         >
                             {uploading === 'profile' ? (
                                 <ActivityIndicator color={C.green} size="large" />
@@ -693,25 +722,25 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                         </TouchableOpacity>
 
                         <Text style={s.profilePhotoHint}>
-                            {form.profile.photoLocalUri ? 'Tap to change photo' : 'Tap to upload your photo'}
+                            {form.profile.photoLocalUri ? t('dobTapChange') : t('dobTapUpload')}
                         </Text>
 
                         {uploading === 'profile' && progressPct('profile') != null ? (
                             <View style={s.inlineProgress}>
                                 <ActivityIndicator color={C.green} size="small" />
-                                <Text style={s.inlineProgressTxt}>Uploading… {progressPct('profile')}%</Text>
+                                <Text style={s.inlineProgressTxt}>{t('dobUploadingPct', { pct: progressPct('profile') })}</Text>
                             </View>
                         ) : null}
 
                         {form.profile.photoUrl ? (
                             <View style={s.uploadedRow}>
                                 <Text style={s.uploadedCheck}>✓</Text>
-                                <Text style={s.uploadedOkTxt}>Image uploaded successfully</Text>
-                                <TouchableOpacity onPress={() => handleReCrop('profile')} accessibilityRole="button" accessibilityLabel="Crop profile photo again">
-                                    <Text style={s.recropLink}>🔄 Crop Again</Text>
+                                <Text style={s.uploadedOkTxt}>{t('dobImageUploaded')}</Text>
+                                <TouchableOpacity onPress={() => handleReCrop('profile')} accessibilityRole="button" accessibilityLabel={t('dobCropAgainA11y')}>
+                                    <Text style={s.recropLink}>{t('dobCropAgain')}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity onPress={() => handleRemoveClick('profile')} accessibilityRole="button">
-                                    <Text style={s.removeLink}>Remove</Text>
+                                    <Text style={s.removeLink}>{t('dobRemove')}</Text>
                                 </TouchableOpacity>
                             </View>
                         ) : null}
@@ -720,43 +749,43 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                             <Text style={s.fieldError}>{visibleErrors['profile.photoUrl']}</Text>
                         ) : null}
                     </View>
-                    <TipBox text="Use a clear, well-lit photo. Face must be fully visible — no sunglasses or filters." />
+                    <TipBox text={t('dobTipPhoto')} />
                 </SectionCard>
 
                 {/* ── SECTION 2 — Driving License ── */}
                 <SectionCard
-                    title="Driving License"
-                    subtitle="Must be valid and not expired"
+                    title={t('dobS2Title')}
+                    subtitle={t('dobS2Sub')}
                     stepIndex="2"
                     completed={sectionComplete(form, 1)}
                 >
-                    <OnboardingField label="License Number" required errorKey="license.number" errors={visibleErrors}>
+                    <OnboardingField label={t('dobLicNumber')} required errorKey="license.number" errors={visibleErrors}>
                         <Input
                             value={form.license.number}
                             onChangeText={(v) => setField('license', 'number', v.toUpperCase())}
-                            placeholder="e.g. TS0720190012345"
+                            placeholder={t('dobLicNumberPh')}
                             maxLength={20}
                             autoCapitalize="characters"
                             onBlur={() => markTouched('license.number')}
                         />
                     </OnboardingField>
 
-                    <OnboardingField label="Expiry Date" required errorKey="license.expiry" errors={visibleErrors}>
+                    <OnboardingField label={t('dobExpiry')} required errorKey="license.expiry" errors={visibleErrors}>
                         <Input
                             value={form.license.expiry}
                             onChangeText={(v) => setField('license', 'expiry', v)}
-                            placeholder="MM/YYYY"
+                            placeholder={t('dobExpiryPh')}
                             keyboardType="numeric"
                             maxLength={7}
                             onBlur={() => markTouched('license.expiry')}
                         />
                     </OnboardingField>
 
-                    <OnboardingField label="License Photo" required errorKey="license.photoUrl" errors={visibleErrors}>
+                    <OnboardingField label={t('dobLicPhoto')} required errorKey="license.photoUrl" errors={visibleErrors}>
                         <UploadBox
                             accept="image-pdf"
-                            label="Upload front of license"
-                            hint="Tap to upload — JPG, PNG, or PDF (max 10 MB)"
+                            label={t('dobLicUploadLabel')}
+                            hint={t('dobLicUploadHint')}
                             icon="🪪"
                             file={form.license.photoUrl
                                 ? { uri: form.license.photoLocalUri, name: form.license.photoName, mime: form.license.photoMime, size: form.license.photoSize }
@@ -769,40 +798,41 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                         />
                     </OnboardingField>
 
-                    <TipBox text="All 4 corners must be visible. File size under 10 MB. JPG, PNG, or PDF." />
+                    <TipBox text={t('dobTipLicense')} />
                 </SectionCard>
 
                 {/* ── SECTION 3 — Vehicle Details ── */}
                 <SectionCard
-                    title="Vehicle Details"
-                    subtitle="The vehicle you'll use for deliveries"
+                    title={t('dobS3Title')}
+                    subtitle={t('dobS3Sub')}
                     stepIndex="3"
                     completed={sectionComplete(form, 2)}
                 >
-                    <OnboardingField label="Vehicle Type" required errorKey="vehicle.type" errors={visibleErrors}>
+                    <OnboardingField label={t('dobVehType')} required errorKey="vehicle.type" errors={visibleErrors}>
                         <ChipSelect
                             options={VEHICLE_TYPES}
+                            renderLabel={(o) => t(`delivery.vt_${o.toLowerCase()}`, { defaultValue: o })}
                             selected={form.vehicle.type}
                             onSelect={(v) => { setField('vehicle', 'type', v); markTouched('vehicle.type'); }}
                         />
                     </OnboardingField>
 
-                    <OnboardingField label="Registration Number" required errorKey="vehicle.registration" errors={visibleErrors}>
+                    <OnboardingField label={t('dobRegNumber')} required errorKey="vehicle.registration" errors={visibleErrors}>
                         <Input
                             value={form.vehicle.registration}
                             onChangeText={(v) => setField('vehicle', 'registration', v.toUpperCase())}
-                            placeholder="e.g. TS 09 EF 1234"
+                            placeholder={t('dobRegNumberPh')}
                             maxLength={15}
                             autoCapitalize="characters"
                             onBlur={() => markTouched('vehicle.registration')}
                         />
                     </OnboardingField>
 
-                    <OnboardingField label="Year of Manufacture" errorKey="vehicle.year" errors={visibleErrors}>
+                    <OnboardingField label={t('dobMfgYear')} errorKey="vehicle.year" errors={visibleErrors}>
                         <Input
                             value={form.vehicle.year}
                             onChangeText={(v) => setField('vehicle', 'year', v)}
-                            placeholder="e.g. 2019"
+                            placeholder={t('dobMfgYearPh')}
                             keyboardType="numeric"
                             maxLength={4}
                             onBlur={() => markTouched('vehicle.year')}
@@ -812,23 +842,23 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
 
                 {/* ── SECTION 4 — RC (Registration Certificate) ── */}
                 <SectionCard
-                    title="Registration Certificate (RC)"
-                    subtitle="Proof of vehicle ownership — image or PDF"
+                    title={t('dobS4Title')}
+                    subtitle={t('dobS4Sub')}
                     stepIndex="4"
                     completed={sectionComplete(form, 3)}
                 >
-                    <OnboardingField label="RC Number" errorKey="rc.number" errors={visibleErrors}>
+                    <OnboardingField label={t('dobRcNumber')} errorKey="rc.number" errors={visibleErrors}>
                         <Input
                             value={form.rc.number}
                             onChangeText={(v) => setField('rc', 'number', v.toUpperCase())}
-                            placeholder="e.g. TS09EF1234"
+                            placeholder={t('dobRcNumberPh')}
                             maxLength={20}
                             autoCapitalize="characters"
                             onBlur={() => markTouched('rc.number')}
                         />
                     </OnboardingField>
 
-                    <OnboardingField label="RC Document" required errorKey="rc.photoUrl" errors={visibleErrors}>
+                    <OnboardingField label={t('dobRcDocument')} required errorKey="rc.photoUrl" errors={visibleErrors}>
                         <View style={s.rcButtonRow}>
                             <TouchableOpacity
                                 style={s.rcPickerBtn}
@@ -838,7 +868,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                                 accessibilityRole="button"
                             >
                                 <Text style={s.rcPickerBtnIcon}>📷</Text>
-                                <Text style={s.rcPickerBtnTxt}>Photo</Text>
+                                <Text style={s.rcPickerBtnTxt}>{t('dobBtnPhoto')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={s.rcPickerBtn}
@@ -848,14 +878,14 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                                 accessibilityRole="button"
                             >
                                 <Text style={s.rcPickerBtnIcon}>📄</Text>
-                                <Text style={s.rcPickerBtnTxt}>PDF</Text>
+                                <Text style={s.rcPickerBtnTxt}>{t('dobBtnPdf')}</Text>
                             </TouchableOpacity>
                         </View>
 
                         <UploadBox
                             accept="image-pdf"
-                            label="Upload RC document"
-                            hint="JPG, PNG, or PDF (max 10 MB)"
+                            label={t('dobRcUploadLabel')}
+                            hint={t('dobRcUploadHint')}
                             icon="📄"
                             file={form.rc.photoUrl
                                 ? { uri: form.rc.photoLocalUri, name: form.rc.photoName, mime: form.rc.photoMime, size: form.rc.photoSize }
@@ -868,44 +898,44 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                         />
                     </OnboardingField>
 
-                    <TipBox icon="📋" text="Upload the front page of your RC. PDF, JPG, or PNG accepted. Max 10 MB." />
+                    <TipBox icon="📋" text={t('dobTipRc')} />
                 </SectionCard>
 
                 {/* ── SECTION 5 — Bank Details ── */}
                 <SectionCard
-                    title="Bank Details"
-                    subtitle="Your earnings will be credited here weekly"
+                    title={t('dobS5Title')}
+                    subtitle={t('dobS5Sub')}
                     stepIndex="5"
                     completed={sectionComplete(form, 4)}
                 >
                     <View style={s.securityRow}>
                         <Text style={{ fontSize: 15 }}>🔒</Text>
-                        <Text style={s.securityText}>Your bank details are encrypted with 256-bit SSL</Text>
+                        <Text style={s.securityText}>{t('dobSecurity')}</Text>
                     </View>
 
-                    <OnboardingField label="Account Holder Name" required errorKey="bank.accountHolderName" errors={visibleErrors}>
+                    <OnboardingField label={t('dobHolder')} required errorKey="bank.accountHolderName" errors={visibleErrors}>
                         <Input
                             value={form.bank.accountHolderName}
                             onChangeText={(v) => setField('bank', 'accountHolderName', v)}
-                            placeholder="As per bank records"
+                            placeholder={t('dobHolderPh')}
                             onBlur={() => markTouched('bank.accountHolderName')}
                         />
                     </OnboardingField>
 
-                    <OnboardingField label="Bank Name" errorKey="bank.bankName" errors={visibleErrors}>
+                    <OnboardingField label={t('dobBankName')} errorKey="bank.bankName" errors={visibleErrors}>
                         <Input
                             value={form.bank.bankName}
                             onChangeText={(v) => setField('bank', 'bankName', v)}
-                            placeholder="e.g. State Bank of India"
+                            placeholder={t('dobBankNamePh')}
                             onBlur={() => markTouched('bank.bankName')}
                         />
                     </OnboardingField>
 
-                    <OnboardingField label="Account Number" required errorKey="bank.accountNumber" errors={visibleErrors}>
+                    <OnboardingField label={t('dobAccNumber')} required errorKey="bank.accountNumber" errors={visibleErrors}>
                         <Input
                             value={form.bank.accountNumber}
                             onChangeText={(v) => setField('bank', 'accountNumber', v)}
-                            placeholder="Enter account number"
+                            placeholder={t('dobAccNumberPh')}
                             keyboardType="numeric"
                             secureTextEntry
                             maxLength={18}
@@ -913,69 +943,71 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                         />
                     </OnboardingField>
 
-                    <OnboardingField label="Confirm Account Number" required errorKey="bank.confirmAccount" errors={visibleErrors}>
+                    <OnboardingField label={t('dobConfirmAcc')} required errorKey="bank.confirmAccount" errors={visibleErrors}>
                         <Input
                             value={form.bank.confirmAccount}
                             onChangeText={(v) => setField('bank', 'confirmAccount', v)}
-                            placeholder="Re-enter account number"
+                            placeholder={t('dobConfirmAccPh')}
                             keyboardType="numeric"
                             maxLength={18}
                             onBlur={() => markTouched('bank.confirmAccount')}
                         />
                     </OnboardingField>
 
-                    <OnboardingField label="IFSC Code" required errorKey="bank.ifsc" errors={visibleErrors}>
+                    <OnboardingField label={t('dobIfsc')} required errorKey="bank.ifsc" errors={visibleErrors}>
                         <Input
                             value={form.bank.ifsc}
                             onChangeText={(v) => setField('bank', 'ifsc', v.toUpperCase())}
-                            placeholder="e.g. SBIN0001234"
+                            placeholder={t('dobIfscPh')}
                             maxLength={11}
                             autoCapitalize="characters"
                             onBlur={() => markTouched('bank.ifsc')}
                         />
                     </OnboardingField>
 
-                    <TipBox text="Find your IFSC on the first page of your cheque book or bank passbook." />
+                    <TipBox text={t('dobTipIfsc')} />
                 </SectionCard>
 
                 {/* ── SECTION 6 — Education & Training ── */}
                 <SectionCard
-                    title="Education & Training"
-                    subtitle="Help us understand your background"
+                    title={t('dobS6Title')}
+                    subtitle={t('dobS6Sub')}
                     stepIndex="6"
                     completed={sectionComplete(form, 5)}
                 >
-                    <OnboardingField label="Highest Education Level" required errorKey="education.level" errors={visibleErrors}>
+                    <OnboardingField label={t('dobEduLevel')} required errorKey="education.level" errors={visibleErrors}>
                         <ChipSelect
                             options={EDU_LEVELS}
+                            renderLabel={(o) => t(`dobEdu_${o}`, { defaultValue: o })}
                             selected={form.education.level}
                             onSelect={(v) => { setField('education', 'level', v); markTouched('education.level'); }}
                         />
                     </OnboardingField>
 
-                    <OnboardingField label="Institution / School Name" errorKey="education.institution" errors={visibleErrors}>
+                    <OnboardingField label={t('dobInstitution')} errorKey="education.institution" errors={visibleErrors}>
                         <Input
                             value={form.education.institution}
                             onChangeText={(v) => setField('education', 'institution', v)}
-                            placeholder="e.g. St. Mary's High School"
+                            placeholder={t('dobInstitutionPh')}
                             onBlur={() => markTouched('education.institution')}
                         />
                     </OnboardingField>
 
-                    <OnboardingField label="Year of Passing" errorKey="education.passingYear" errors={visibleErrors}>
+                    <OnboardingField label={t('dobPassYear')} errorKey="education.passingYear" errors={visibleErrors}>
                         <Input
                             value={form.education.passingYear}
                             onChangeText={(v) => setField('education', 'passingYear', v)}
-                            placeholder="e.g. 2018"
+                            placeholder={t('dobPassYearPh')}
                             keyboardType="numeric"
                             maxLength={4}
                             onBlur={() => markTouched('education.passingYear')}
                         />
                     </OnboardingField>
 
-                    <OnboardingField label="Relevant Training (select all that apply)" errorKey="education.trainings" errors={visibleErrors}>
+                    <OnboardingField label={t('dobTraining')} errorKey="education.trainings" errors={visibleErrors}>
                         <ChipSelect
                             options={TRAINING_OPTS}
+                            renderLabel={(o) => t(`dobTr_${o}`, { defaultValue: o })}
                             selected={form.education.trainings}
                             onSelect={(v) => setField('education', 'trainings', v)}
                             multi
@@ -987,11 +1019,11 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                 <View style={s.summaryStrip}>
                     <Text style={{ fontSize: 28 }}>🎉</Text>
                     <View style={{ flex: 1 }}>
-                        <Text style={s.summaryTitle}>Almost done!</Text>
+                        <Text style={s.summaryTitle}>{t('dobAlmostDone')}</Text>
                         <View style={s.summaryTextRow}>
-                            <Text style={s.summaryText}>Documents verified within </Text>
-                            <Text style={s.summaryAccent}>24 hours</Text>
-                            <Text style={s.summaryText}>. SMS on approval.</Text>
+                            <Text style={s.summaryText}>{t('dobAlmostA')}</Text>
+                            <Text style={s.summaryAccent}>{t('dobAlmostHours')}</Text>
+                            <Text style={s.summaryText}>{t('dobAlmostB')}</Text>
                         </View>
                     </View>
                 </View>
@@ -1014,7 +1046,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     <View style={s.successBanner}>
                         <Text style={s.successBannerText}>{successMsg}</Text>
                         <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 4 }}>
-                            Redirecting you shortly…
+                            {t('dobRedirecting')}
                         </Text>
                     </View>
                 )}
@@ -1026,25 +1058,24 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     disabled={submitting || uploading !== null}
                     activeOpacity={0.85}
                     accessibilityRole="button"
-                    accessibilityLabel="Submit application"
+                    accessibilityLabel={t('dobSubmitA11y')}
                 >
                     {submitting ? (
                         <ActivityIndicator color="#fff" size="small" />
                     ) : (
                         <>
-                            <Text style={s.submitBtnTxt}>Submit Application</Text>
+                            <Text style={s.submitBtnTxt}>{t('dobSubmit')}</Text>
                             <Text style={s.submitBtnArrow}>→</Text>
                         </>
                     )}
                 </TouchableOpacity>
 
                 <View style={s.bottomNoteWrap}>
-                    <Text style={s.bottomNote}>
-                        By submitting, you agree to our{' '}
-                    </Text>
-                    <Text style={s.bottomNoteLink}>Terms of Service</Text>
-                    <Text style={s.bottomNote}>{' '}and{' '}</Text>
-                    <Text style={s.bottomNoteLink}>Privacy Policy</Text>
+                    <Text style={s.bottomNote}>{t('dobAgreeA')}</Text>
+                    <Text style={s.bottomNoteLink}>{t('dobTerms')}</Text>
+                    <Text style={s.bottomNote}>{t('dobAnd')}</Text>
+                    <Text style={s.bottomNoteLink}>{t('dobPrivacy')}</Text>
+                    <Text style={s.bottomNote}>{t('dobAgreeB')}</Text>
                 </View>
 
                 <View style={{ height: 40 }} />
@@ -1076,6 +1107,22 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                 onCancel={() => setRemoveConfirm(null)}
             />
 
+            {/* ── Language Picker Modal ── */}
+            <Modal visible={showLanguage} transparent animationType="slide" onRequestClose={() => setShowLanguage(false)}>
+                <Pressable
+                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}
+                    onPress={() => setShowLanguage(false)}
+                >
+                    <Pressable
+                        style={{ backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, maxHeight: '80%' }}
+                        onPress={(e) => e.stopPropagation?.()}
+                    >
+                        <View style={{ width: 44, height: 5, backgroundColor: '#E5E7EB', borderRadius: 3, alignSelf: 'center', marginBottom: 16 }} />
+                        <LanguageSwitcher inline onClose={() => setShowLanguage(false)} />
+                    </Pressable>
+                </Pressable>
+            </Modal>
+
             {/* ── Toast ── */}
             <ToastBanner key={toast?.id} message={toast?.message} visible={!!toast} type={toast?.type} />
         </KeyboardAvoidingView>
@@ -1092,6 +1139,8 @@ const s = StyleSheet.create({
     heroNav: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
     backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
     backArrow: { fontSize: 18, color: '#fff', fontWeight: '400' },
+    langBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', marginRight: 8 },
+    langBtnIcon: { fontSize: 17 },
     heroBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
     heroBadgeTxt: { fontSize: 10, color: '#fff', fontWeight: '800', letterSpacing: 1.5 },
     heroEyebrow: { fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase' },
