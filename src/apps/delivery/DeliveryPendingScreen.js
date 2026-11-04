@@ -1,10 +1,12 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  Platform, StatusBar, TouchableOpacity
+  Platform, StatusBar, TouchableOpacity, Modal, Pressable
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import useAuthStore from '../../store/authStore';
+import LanguageSwitcher from '../../components/common/LanguageSwitcher';
 
 const C = {
   green:      '#1A9E3F',
@@ -21,15 +23,18 @@ const C = {
 };
 
 const STEPS = [
-  { icon: '📋', label: 'Application Submitted',  done: true  },
-  { icon: '🔍', label: 'Documents Under Review',  done: false },
-  { icon: '✅', label: 'Account Activated',        done: false },
+  { icon: '📋', labelKey: 'dpStepSubmitted', done: true  },
+  { icon: '🔍', labelKey: 'dpStepReview',    done: false },
+  { icon: '✅', labelKey: 'dpStepActive',    done: false },
 ];
 
 export default function DeliveryPendingScreen({ onRefresh, refreshing }) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
-  const name = user?.name || 'Partner';
+  const setActiveRole = useAuthStore((s) => s.setActiveRole);
+  const { t } = useTranslation();
+  const [showLanguage, setShowLanguage] = React.useState(false);
+  const name = user?.name || t('delivery.partner');
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -43,16 +48,36 @@ export default function DeliveryPendingScreen({ onRefresh, refreshing }) {
         style={s.hero}
       >
         <View style={s.heroInner}>
-          <View style={s.avatarWrap}>
+          {/* Back to the role picker */}
+          <TouchableOpacity
+            onPress={() => setActiveRole?.(null)}
+            style={s.iconBtn}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('dobBackRoles')}
+          >
+            <Text style={s.backArrow}>←</Text>
+          </TouchableOpacity>
+          <View style={[s.avatarWrap, { marginLeft: 10 }]}>
             <Text style={s.avatarTxt}>{name.substring(0, 2).toUpperCase()}</Text>
           </View>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={s.heroEyebrow}>PARTNER</Text>
-            <Text style={s.heroTitle}>Hi, {name.split(' ')[0]} 👋</Text>
+            <Text style={s.heroEyebrow}>{t('dobEyebrow')}</Text>
+            <Text style={s.heroTitle}>{t('dpHi', { name: name.split(' ')[0] })}</Text>
           </View>
+          {/* Language */}
+          <TouchableOpacity
+            onPress={() => setShowLanguage(true)}
+            style={[s.iconBtn, { marginRight: 8 }]}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('dobLanguage')}
+          >
+            <Text style={s.langIcon}>🌐</Text>
+          </TouchableOpacity>
           <View style={s.heroBadge}>
             <View style={s.badgeDot} />
-            <Text style={s.heroBadgeTxt}>PENDING</Text>
+            <Text style={s.heroBadgeTxt}>{t('dpPending')}</Text>
           </View>
         </View>
         <View style={s.heroWave} />
@@ -65,16 +90,15 @@ export default function DeliveryPendingScreen({ onRefresh, refreshing }) {
         {/* Main card */}
         <View style={s.mainCard}>
           <Text style={s.thankIcon}>🎉</Text>
-          <Text style={s.thankTitle}>Application Received!</Text>
+          <Text style={s.thankTitle}>{t('dpReceived')}</Text>
           <Text style={s.thankBody}>
-            Thank you for registering with <Text style={s.bold}>KwikPik</Text>. Your documents are being reviewed by our team.{'\n\n'}
-            Once verified, you'll receive an <Text style={s.bold}>SMS and email</Text> confirming your account activation — usually within <Text style={s.bold}>24–48 hours</Text>.
+            {t('dpB1')}<Text style={s.bold}>{t('dpBrand')}</Text>{t('dpB2')}<Text style={s.bold}>{t('dpSmsEmail')}</Text>{t('dpB3')}<Text style={s.bold}>{t('dpHours')}</Text>{t('dpB4')}
           </Text>
         </View>
 
         {/* Progress tracker */}
         <View style={s.trackerCard}>
-          <Text style={s.trackerTitle}>Application Status</Text>
+          <Text style={s.trackerTitle}>{t('dpTrackerTitle')}</Text>
           {STEPS.map((step, i) => (
             <View key={i} style={s.stepRow}>
               {/* Connector line */}
@@ -89,9 +113,9 @@ export default function DeliveryPendingScreen({ onRefresh, refreshing }) {
               <View style={s.stepContent}>
                 <Text style={s.stepIcon}>{step.icon}</Text>
                 <View>
-                  <Text style={[s.stepLabel, step.done && { color: C.green }]}>{step.label}</Text>
+                  <Text style={[s.stepLabel, step.done && { color: C.green }]}>{t(step.labelKey)}</Text>
                   {i === 1 && (
-                    <Text style={s.stepSub}>Avg. 24–48 hrs · Mon–Sat</Text>
+                    <Text style={s.stepSub}>{t('dpStepSub')}</Text>
                   )}
                 </View>
               </View>
@@ -102,7 +126,7 @@ export default function DeliveryPendingScreen({ onRefresh, refreshing }) {
         {/* Info pills */}
         <View style={s.pillRow}>
           {[
-            { icon: '📞', text: 'Support: 1800-XXX-XXXX' },
+            { icon: '📞', text: t('dpSupport') },
             { icon: '📧', text: 'support@kwikpik.in' },
           ].map((p, i) => (
             <View key={i} style={s.pill}>
@@ -115,17 +139,33 @@ export default function DeliveryPendingScreen({ onRefresh, refreshing }) {
         {/* Refresh hint */}
         <TouchableOpacity style={s.refreshBtn} onPress={onRefresh} activeOpacity={0.8}>
           <Text style={s.refreshTxt}>
-            {refreshing ? 'Checking…' : '🔄  Check approval status'}
+            {refreshing ? t('dpChecking') : t('dpCheckStatus')}
           </Text>
         </TouchableOpacity>
 
         {/* Logout */}
         <TouchableOpacity onPress={logout} activeOpacity={0.7} style={s.logoutBtn}>
-          <Text style={s.logoutTxt}>Sign out</Text>
+          <Text style={s.logoutTxt}>{t('dpSignOut')}</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Language picker */}
+      <Modal visible={showLanguage} transparent animationType="slide" onRequestClose={() => setShowLanguage(false)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}
+          onPress={() => setShowLanguage(false)}
+        >
+          <Pressable
+            style={{ backgroundColor: C.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, maxHeight: '80%' }}
+            onPress={(e) => e.stopPropagation?.()}
+          >
+            <View style={{ width: 44, height: 5, backgroundColor: C.border, borderRadius: 3, alignSelf: 'center', marginBottom: 16 }} />
+            <LanguageSwitcher inline onClose={() => setShowLanguage(false)} />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -137,6 +177,9 @@ const s = StyleSheet.create({
     paddingBottom: 0,
   },
   heroInner:   { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
+  iconBtn:     { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
+  backArrow:   { fontSize: 18, color: '#fff' },
+  langIcon:    { fontSize: 17 },
   avatarWrap:  { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)' },
   avatarTxt:   { fontSize: 15, fontWeight: '900', color: '#fff' },
   heroEyebrow: { fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: '700', letterSpacing: 1.2 },
