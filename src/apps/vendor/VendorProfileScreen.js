@@ -56,6 +56,12 @@ const C = {
   redDim: "#FEF2F2",
 };
 
+// Date locale that can never crash: falls back to en-IN if the key is missing
+const getDateLocale = (t) => {
+  const v = t("vpDateLocale");
+  return /^[a-z]{2,3}-[A-Z]{2}$/.test(v) ? v : "en-IN";
+};
+
 export default function VendorProfileScreen() {
   const { token, logout, setActiveRole } = useAuthStore();
   const navigation = useNavigation();
@@ -172,10 +178,10 @@ export default function VendorProfileScreen() {
       if (data.success) {
         setVendor(data.data.vendor);
       } else {
-        Alert.alert("Error", data.message || "Failed to update");
+        Alert.alert(t("vpError"), data.message || t("vpUpdateFailed"));
       }
     } catch (err) {
-      Alert.alert("Error", "Check your connection and try again.");
+      Alert.alert(t("vpError"), t("vpConnectionError"));
     }
   };
 
@@ -231,18 +237,18 @@ export default function VendorProfileScreen() {
   const saveEdit = () => {
     const valTrim = editValue.trim();
     if (!valTrim) {
-      Alert.alert("Required", `${activeLabel} cannot be empty`);
+      Alert.alert(t("vpRequired"), t("vpCannotBeEmpty", { field: activeLabel }));
       return;
     }
     if (activeField === "opening_time" || activeField === "closing_time") {
       if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(valTrim)) {
-        Alert.alert("Invalid Format", "Use HH:MM format (e.g. 09:30)");
+        Alert.alert(t("vpInvalidFormat"), t("vpUseHHMM"));
         return;
       }
     }
     if (["min_order_value", "quick_delivery_fee", "weather_surcharge", "delivery_base_km", "delivery_fee_base", "delivery_fee_per_km"].includes(activeField)) {
       if (isNaN(parseFloat(valTrim))) {
-        Alert.alert("Invalid Input", "Please enter a valid numeric value.");
+        Alert.alert(t("vpInvalidInput"), t("vpEnterNumeric"));
         return;
       }
     }
@@ -291,7 +297,7 @@ export default function VendorProfileScreen() {
         setImageModal(false);
       }
     } catch (e) {
-      Alert.alert("Error", "Image upload failed: " + e.message);
+      Alert.alert(t("vpError"), t("vpImageUploadFailed", { msg: e.message }));
     } finally {
       setUploading(false);
     }
@@ -303,7 +309,7 @@ export default function VendorProfileScreen() {
     : "??";
 
   const memberSince = vendor?.created_at
-    ? new Date(vendor.created_at).toLocaleDateString("en-IN", {
+    ? new Date(vendor.created_at).toLocaleDateString(getDateLocale(t), {
         month: "long",
         year: "numeric",
       })
@@ -408,7 +414,7 @@ export default function VendorProfileScreen() {
             <View style={styles.heroPhonePill}>
               <MaterialIcons name="phone" size={12} color={C.primary} />
               <Text style={[styles.heroPhone, { fontSize: isWide ? 13 : rs(11, 12, 13) }]}>
-                {vendor.user?.phone || "No phone"}
+                {vendor.user?.phone || t("vpNoPhone")}
               </Text>
             </View>
 
@@ -586,7 +592,7 @@ return (
         <MaterialIcons name="arrow-back" size={24} color={C.ink} />
       </TouchableOpacity>
 
-      <Text style={styles.topHeaderTitle}>Home</Text>
+      <Text style={styles.topHeaderTitle}>{t("vpHome")}</Text>
     </View>
 
     <ScrollView
@@ -813,14 +819,14 @@ return (
             </TouchableOpacity>
           </View>
           {[
-            { value: "grocery",   label: "Grocery Store",     icon: "local-grocery-store", sub: "Daily essentials, FMCG" },
-            { value: "medical",   label: "Medical / Pharmacy", icon: "local-pharmacy",       sub: "Medicines, health products" },
-            { value: "bakery",    label: "Bakery",             icon: "cake",                 sub: "Bread, cakes, snacks" },
-            { value: "dairy",     label: "Dairy & Eggs",       icon: "egg",                  sub: "Milk, paneer, eggs" },
-            { value: "electronics", label: "Electronics",     icon: "devices",              sub: "Gadgets, accessories" },
-            { value: "stationery", label: "Stationery",        icon: "edit",                 sub: "Books, pens, office" },
-            { value: "restaurant", label: "Restaurant / Food", icon: "restaurant",           sub: "Cooked food, meals" },
-            { value: "general",   label: "General Store",      icon: "store",                sub: "Multi-category" },
+            { value: "grocery",   label: t("vendor.cat_grocery"),     icon: "local-grocery-store", sub: t("vendor.catsub_grocery") },
+            { value: "medical",   label: t("vendor.cat_medical"), icon: "local-pharmacy",       sub: t("vendor.catsub_medical") },
+            { value: "bakery",    label: t("vendor.cat_bakery"),             icon: "cake",                 sub: t("vendor.catsub_bakery") },
+            { value: "dairy",     label: t("vendor.cat_dairy"),       icon: "egg",                  sub: t("vendor.catsub_dairy") },
+            { value: "electronics", label: t("vendor.cat_electronics"),     icon: "devices",              sub: t("vendor.catsub_electronics") },
+            { value: "stationery", label: t("vendor.cat_stationery"),        icon: "edit",                 sub: t("vendor.catsub_stationery") },
+            { value: "restaurant", label: t("vendor.cat_restaurant"), icon: "restaurant",           sub: t("vendor.catsub_restaurant") },
+            { value: "general",   label: t("vendor.cat_general"),      icon: "store",                sub: t("vendor.catsub_general") },
           ].map((opt) => (
             <TouchableOpacity
               key={opt.value}
@@ -916,6 +922,7 @@ function SectionCard({ title, overline, children, rs, isWide }) {
 }
 
 function InfoRow({ icon, label, value, onEdit, editable = true, rs, isWide }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.infoRow}>
       <View style={styles.infoRowLeft}>
@@ -926,7 +933,7 @@ function InfoRow({ icon, label, value, onEdit, editable = true, rs, isWide }) {
           style={[styles.infoValue, { fontSize: isWide ? 15 : rs(13, 14, 15) }]}
           numberOfLines={2}
         >
-          {value || "Not set"}
+          {value || t("vendor.notSet")}
         </Text>
       </View>
       {editable ? (
@@ -1017,7 +1024,7 @@ function StoreInfoCard({ vendor, onEdit, onCategoryPress, rs, isWide, t }) {
       />
       <InfoRow
         label={t('profile.memberSinceLabel')}
-        value={new Date(vendor.created_at).toDateString()}
+        value={new Date(vendor.created_at).toLocaleDateString(getDateLocale(t), { day: "2-digit", month: "short", year: "numeric" })}
         editable={false}
         rs={rs}
         isWide={isWide}
@@ -1071,7 +1078,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
         </View>
         <View style={styles.timeChip}>
           <MaterialIcons name="alarm-on" size={14} color={C.primaryDark} />
-          <Text style={styles.timeChipText}>Set</Text>
+          <Text style={styles.timeChipText}>{t("vpSet")}</Text>
         </View>
       </TouchableOpacity>
 
@@ -1092,7 +1099,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
         </View>
         <View style={styles.timeChip}>
           <MaterialIcons name="alarm-on" size={14} color={C.tealIcon} />
-          <Text style={styles.timeChipText}>Set</Text>
+          <Text style={styles.timeChipText}>{t("vpSet")}</Text>
         </View>
       </TouchableOpacity>
 
@@ -1184,7 +1191,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
               </View>
               <View>
                 <Text style={styles.settingTitle}>{t('vendor.baseDeliveryDistance')}</Text>
-                <Text style={styles.settingSub}>{vendor.delivery_base_km ?? 2} km</Text>
+                <Text style={styles.settingSub}>{t("vpKm", { n: vendor.delivery_base_km ?? 2 })}</Text>
               </View>
             </View>
             <View style={styles.sliderMini}>
@@ -1203,7 +1210,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
           {/* Base Delivery Fee */}
           <TouchableOpacity
             style={styles.settingRow}
-            onPress={() => onEdit("delivery_fee_base", "Base Delivery Fee (₹)", vendor.delivery_fee_base)}
+            onPress={() => onEdit("delivery_fee_base", t("vpBaseFeeLabel"), vendor.delivery_fee_base)}
             activeOpacity={0.6}
           >
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -1221,7 +1228,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
           {/* Extra Delivery Fee per KM */}
           <TouchableOpacity
             style={styles.settingRow}
-            onPress={() => onEdit("delivery_fee_per_km", "Extra Delivery Fee per KM (₹)", vendor.delivery_fee_per_km)}
+            onPress={() => onEdit("delivery_fee_per_km", t("vpExtraFeeLabel"), vendor.delivery_fee_per_km)}
             activeOpacity={0.6}
           >
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -1230,7 +1237,7 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
               </View>
               <View>
                 <Text style={styles.settingTitle}>{t('vendor.extraFeePerKm')}</Text>
-                <Text style={styles.settingSub}>₹{vendor.delivery_fee_per_km ?? 5} / km</Text>
+                <Text style={styles.settingSub}>{t("vpPerKm", { n: vendor.delivery_fee_per_km ?? 5 })}</Text>
               </View>
             </View>
             <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
@@ -1275,7 +1282,7 @@ function AccountSettingsCard({ rs, isWide, navigation }) {
   ];
 
   return (
-    <SectionCard title={t('profile.accountSettings')} overline="SETTINGS" rs={rs} isWide={isWide}>
+    <SectionCard title={t('profile.accountSettings')} overline={t("vpSettingsOverline")} rs={rs} isWide={isWide}>
       {/* Language row */}
       <TouchableOpacity
         style={styles.settingRow}
@@ -1361,7 +1368,7 @@ function SwitchProfileButton({ onPress, rs, isWide, t }) {
     >
       <MaterialIcons name="swap-horiz" size={isWide ? 20 : rs(16, 18, 18)} color={C.tealIcon} />
       <Text style={[styles.logoutText, { fontSize: isWide ? 15 : rs(13, 14, 15), color: C.tealIcon }]}>
-        Switch Profile
+        {t("vpSwitchProfile")}
       </Text>
     </TouchableOpacity>
   );

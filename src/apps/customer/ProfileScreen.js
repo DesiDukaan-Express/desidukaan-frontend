@@ -92,6 +92,7 @@ function Avatar({ name, imageUrl, size = 64 }) {
 
 // ─── Edit modal ───────────────────────────────────────────────────────────
 function EditModal({ visible, label, value, keyboardType = "default", onSave, onClose, saving }) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState(value || "");
   useEffect(() => { if (visible) setDraft(value || ""); }, [visible, value]);
 
@@ -100,7 +101,7 @@ function EditModal({ visible, label, value, keyboardType = "default", onSave, on
       <Pressable style={em.backdrop} onPress={onClose}>
         <Pressable style={em.sheet} onPress={() => { }}>
           <View style={em.handle} />
-          <Text style={em.title}>Edit {label}</Text>
+          <Text style={em.title}>{t("cpEditLabel", { label })}</Text>
           <View style={em.inputBox}>
             <TextInput
               style={em.input}
@@ -117,7 +118,7 @@ function EditModal({ visible, label, value, keyboardType = "default", onSave, on
           </View>
           <View style={em.btns}>
             <TouchableOpacity style={em.cancel} onPress={onClose}>
-              <Text style={em.cancelText}>Cancel</Text>
+              <Text style={em.cancelText}>{t("common.cancel")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[em.save, (!draft.trim() || saving) && em.saveOff]}
@@ -126,7 +127,7 @@ function EditModal({ visible, label, value, keyboardType = "default", onSave, on
             >
               {saving
                 ? <ActivityIndicator size="small" color={C.white} />
-                : <Text style={em.saveText}>Save</Text>}
+                : <Text style={em.saveText}>{t("common.save")}</Text>}
             </TouchableOpacity>
           </View>
         </Pressable>
@@ -151,6 +152,7 @@ const em = StyleSheet.create({
 
 // ─── Info row ─────────────────────────────────────────────────────────────
 function InfoRow({ label, value, onEdit, editable = true, icon = "user", last = false }) {
+  const { t } = useTranslation();
   return (
     <View style={[ir.row, last && { borderBottomWidth: 0 }]}>
       <View style={[ir.iconWrap, !editable && ir.iconWrapOff]}>
@@ -159,7 +161,7 @@ function InfoRow({ label, value, onEdit, editable = true, icon = "user", last = 
       <View style={ir.left}>
         <Text style={ir.label}>{label}</Text>
         <Text style={[ir.value, !value && ir.placeholder]}>
-          {value || `Add ${String(label).toLowerCase()}`}
+          {value || t("cpAddLabel", { label: String(label).toLowerCase() })}
         </Text>
       </View>
       {editable ? (
@@ -259,6 +261,7 @@ const mi = StyleSheet.create({
 
 // ─── Address detail modal ─────────────────────────────────────────────────
 function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
+  const { t } = useTranslation();
   const [region, setRegion] = useState({
     latitude: 28.6139,
     longitude: 77.209,
@@ -278,14 +281,14 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
   }, [addr]);
 
   if (!addr) return null;
-  const text = typeof addr.address === "string" ? addr.address : addr.address_line || "Saved address";
+  const text = typeof addr.address === "string" ? addr.address : addr.address_line || t("cpSavedAddress");
 
   return (
     <Modal visible={!!addr} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={adm.backdrop} onPress={onClose}>
         <Pressable style={adm.sheet} onPress={() => { }}>
           <View style={adm.handle} />
-          <Text style={adm.title}>Address details</Text>
+          <Text style={adm.title}>{t("cpAddressDetails")}</Text>
 
           {addr.lat && addr.lng && (
             <View style={adm.mapWrapper}>
@@ -317,7 +320,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
           {isSelected && (
             <View style={adm.activeBadge}>
               <Feather name="check-circle" size={14} color={C.green} />
-              <Text style={adm.activeBadgeText}>This is your active delivery address</Text>
+              <Text style={adm.activeBadgeText}>{t("cpActiveAddressMsg")}</Text>
             </View>
           )}
 
@@ -325,7 +328,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
             {!isSelected && (
               <TouchableOpacity style={adm.selectBtn} onPress={() => onSelect(addr)} activeOpacity={0.85}>
                 <Feather name="check" size={15} color={C.white} />
-                <Text style={adm.selectBtnText}>Set as delivery address</Text>
+                <Text style={adm.selectBtnText}>{t("cpSetAsDelivery")}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -336,7 +339,7 @@ function AddressDetailModal({ addr, isSelected, onSelect, onRemove, onClose }) {
             >
               <Feather name="trash-2" size={15} color={C.red} />
               <Text style={adm.removeBtnText}>
-                {isSelected ? "Can't delete active address" : "Remove address"}
+                {isSelected ? t("cpCantDeleteActive") : t("cpRemoveAddress")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -383,6 +386,7 @@ const sec = StyleSheet.create({
 
 // ─── Logout modal ─────────────────────────────────────────────────────────
 function LogoutModal({ visible, onConfirm, onCancel }) {
+  const { t } = useTranslation();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable style={lm.backdrop} onPress={onCancel}>
@@ -390,14 +394,14 @@ function LogoutModal({ visible, onConfirm, onCancel }) {
           <LinearGradient colors={["#FEF2F2", "#FFF"]} style={lm.iconWrap}>
             <Feather name="log-out" size={26} color={C.red} />
           </LinearGradient>
-          <Text style={lm.title}>Log out?</Text>
-          <Text style={lm.sub}>Your cart and session will be cleared.</Text>
+          <Text style={lm.title}>{t("cpLogoutTitle")}</Text>
+          <Text style={lm.sub}>{t("cpLogoutSub")}</Text>
           <View style={lm.btns}>
             <TouchableOpacity style={lm.cancel} onPress={onCancel}>
-              <Text style={lm.cancelText}>Cancel</Text>
+              <Text style={lm.cancelText}>{t("common.cancel")}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={lm.confirm} onPress={onConfirm}>
-              <Text style={lm.confirmText}>Log out</Text>
+              <Text style={lm.confirmText}>{t("cpLogoutConfirm")}</Text>
             </TouchableOpacity>
           </View>
         </Pressable>
@@ -420,19 +424,20 @@ const lm = StyleSheet.create({
 
 // ─── Payment modal ────────────────────────────────────────────────────────
 function PaymentModal({ visible, onClose }) {
+  const { t } = useTranslation();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={pm.backdrop} onPress={onClose}>
         <Pressable style={pm.sheet} onPress={() => { }}>
           <View style={pm.handle} />
-          <Text style={pm.title}>Payment Methods</Text>
+          <Text style={pm.title}>{t("cpPaymentMethods")}</Text>
           <View style={pm.placeholder}>
             <Feather name="credit-card" size={36} color={C.gray300} />
-            <Text style={pm.placeholderTitle}>Coming soon</Text>
-            <Text style={pm.placeholderSub}>Razorpay integration for UPI & cards will be available soon.</Text>
+            <Text style={pm.placeholderTitle}>{t("cpComingSoon")}</Text>
+            <Text style={pm.placeholderSub}>{t("cpRazorpaySoon")}</Text>
           </View>
           <TouchableOpacity style={pm.closeBtn} onPress={onClose}>
-            <Text style={pm.closeBtnText}>Close</Text>
+            <Text style={pm.closeBtnText}>{t("cpClose")}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -484,7 +489,7 @@ function LinkRow({ title, sub, icon, onPress }) {
 // ═════════════════════════════════════════════════════════════════════════
 export default function ProfileScreen() {
   const navigation = useNavigation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, token, logout, updateUser, setActiveRole } = useAuthStore();
   const { clearCart } = useCartStore();
   const addressStore = useAddressStore();
@@ -530,11 +535,11 @@ const [showThemes, setShowThemes] = useState(false);
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert("Permission required", "Please allow photo library access to choose a profile picture.");
+        Alert.alert(t("cpPermRequired"), t("cpPermMsg"));
         return;
       }
       if (!token) {
-        Alert.alert("Not authenticated", "Please log in again and try again.");
+        Alert.alert(t("cpNotAuth"), t("cpNotAuthMsg"));
         return;
       }
 
@@ -551,7 +556,7 @@ const [showThemes, setShowThemes] = useState(false);
 
       const mimeType = asset.mimeType || "image/jpeg";
       const uploadResult = await uploadAPI.upload(asset.uri, mimeType, token);
-      if (!uploadResult?.url) throw new Error("Image upload did not return a URL.");
+      if (!uploadResult?.url) throw new Error(t("cpUploadNoUrl"));
 
       const response = await fetch(`${BASE_URL}/auth/me`, {
         method: "PUT",
@@ -560,16 +565,16 @@ const [showThemes, setShowThemes] = useState(false);
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.msg || data?.message || "Failed to update profile picture.");
+        throw new Error(data?.msg || data?.message || t("cpUpdateFail"));
       }
 
       if (data.user) updateUser(data.user);
       else updateUser({ profile_image_url: uploadResult.url });
 
-      Alert.alert("Success", "Your profile picture has been updated.");
+      Alert.alert(t("cpSuccess"), t("cpPhotoUpdated"));
     } catch (error) {
       console.error("Profile photo upload error:", error);
-      Alert.alert("Upload failed", error?.message || "Could not upload your profile picture. Please try again.");
+      Alert.alert(t("cpUploadFailed"), error?.message || t("cpUploadFailedMsg"));
     } finally {
       setUploadingPhoto(false);
     }
@@ -590,10 +595,10 @@ const [showThemes, setShowThemes] = useState(false);
         updateUser(data.user);
         setEditField(null);
       } else {
-        Alert.alert("Couldn't save", data.msg || "Please try again");
+        Alert.alert(t("cpCouldntSave"), data.msg || t("cpTryAgain"));
       }
     } catch {
-      Alert.alert("Network error", "Please check your connection and try again");
+      Alert.alert(t("cpNetworkError"), t("cpCheckConnection"));
     } finally {
       setSaving(false);
     }
@@ -610,7 +615,7 @@ const [showThemes, setShowThemes] = useState(false);
     try {
       await Share.share({
         message:
-          "🛒 DesiDukaan — order groceries from nearby kirana stores!\n\nJoin with my invite and get ₹150 credit:\nhttps://desidukaan.app/invite",
+          t("cpInviteMsg") + "\nhttps://desidukaan.app/invite",
       });
     } catch { }
   };
@@ -628,17 +633,23 @@ const [showThemes, setShowThemes] = useState(false);
     else navigation.navigate("Home");
   };
 
+  // Use the active app language for dates; fall back to en-IN if the tag is not supported
+  const dateLocale = (() => {
+    try { new Intl.DateTimeFormat(i18n.language); return i18n.language || "en-IN"; } catch { return "en-IN"; }
+  })();
+
   const memberSince = user?.created_at
-    ? new Date(user.created_at).toLocaleDateString("en-IN", { month: "long", year: "numeric" })
+    ? new Date(user.created_at).toLocaleDateString(dateLocale, { month: "long", year: "numeric" })
     : null;
 
-  const roleLabel = (user?.role || "customer").charAt(0).toUpperCase() + (user?.role || "customer").slice(1);
+  const roleKey = user?.role || "customer";
+  const roleLabel = t(`cpRole_${roleKey}`, { defaultValue: roleKey.charAt(0).toUpperCase() + roleKey.slice(1) });
 
   const tabs = [
-    { key: "orders", label: "My Orders", icon: "shopping-bag" },
-    { key: "addresses", label: "Addresses", icon: "map-pin" },
-    { key: "payments", label: "Payment Methods", icon: "credit-card" },
-    { key: "help", label: "Need Help", icon: "help-circle" },
+    { key: "orders", label: t("cpTabOrders"), icon: "shopping-bag" },
+    { key: "addresses", label: t("cpTabAddresses"), icon: "map-pin" },
+    { key: "payments", label: t("cpTabPayments"), icon: "credit-card" },
+    { key: "help", label: t("cpTabHelp"), icon: "help-circle" },
   ];
 
   // ── Tab content ─────────────────────────────────────────────────────────
@@ -647,13 +658,13 @@ const [showThemes, setShowThemes] = useState(false);
       case "orders":
         return (
           <View>
-            <PanelHeader icon="shopping-bag" title="My Orders" sub="Track and review your orders" />
+            <PanelHeader icon="shopping-bag" title={t("cpTabOrders")} sub={t("cpOrdersSub")} />
             <View style={s.emptyBox}>
               <Feather name="package" size={28} color={C.gray300} />
-              <Text style={s.emptyTitle}>View your order history</Text>
-              <Text style={s.emptySub}>See current deliveries, past orders and reorder in one tap.</Text>
+              <Text style={s.emptyTitle}>{t("cpOrderHistory")}</Text>
+              <Text style={s.emptySub}>{t("cpOrderHistorySub")}</Text>
               <TouchableOpacity style={s.primaryBtn} onPress={() => navigation.navigate("Orders")} activeOpacity={0.85}>
-                <Text style={s.primaryBtnText}>Open My Orders</Text>
+                <Text style={s.primaryBtnText}>{t("cpOpenOrders")}</Text>
                 <Feather name="arrow-right" size={15} color={C.white} />
               </TouchableOpacity>
             </View>
@@ -666,7 +677,7 @@ const [showThemes, setShowThemes] = useState(false);
             <PanelHeader
               icon="map-pin"
               title={t("profile.deliveryAddresses")}
-              sub={`${addresses.length} saved ${addresses.length === 1 ? "address" : "addresses"}`}
+              sub={addresses.length === 1 ? t("cpSavedOne") : t("cpSavedMany", { n: addresses.length })}
             />
             {addresses.length === 0 ? (
               <View style={s.emptyBox}>
@@ -689,9 +700,9 @@ const [showThemes, setShowThemes] = useState(false);
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[adc.text, active && adc.textActive]} numberOfLines={2}>
-                        {typeof addr.address === "string" ? addr.address : addr.address_line || "Saved address"}
+                        {typeof addr.address === "string" ? addr.address : addr.address_line || t("cpSavedAddress")}
                       </Text>
-                      {active && <Text style={adc.activeLabel}>Active delivery address</Text>}
+                      {active && <Text style={adc.activeLabel}>{t("cpActiveAddr")}</Text>}
                     </View>
                     <Feather name="chevron-right" size={15} color={active ? C.green : C.gray300} />
                   </TouchableOpacity>
@@ -704,13 +715,13 @@ const [showThemes, setShowThemes] = useState(false);
       case "payments":
         return (
           <View>
-            <PanelHeader icon="credit-card" title="Payment Methods" sub="UPI, cards and wallets" />
+            <PanelHeader icon="credit-card" title={t("cpPaymentMethods")} sub={t("cpPaymentsSub")} />
             <View style={s.emptyBox}>
               <Feather name="credit-card" size={28} color={C.gray300} />
-              <Text style={s.emptyTitle}>Manage payment methods</Text>
-              <Text style={s.emptySub}>Razorpay integration for UPI & cards will be available soon.</Text>
+              <Text style={s.emptyTitle}>{t("cpManagePayments")}</Text>
+              <Text style={s.emptySub}>{t("cpRazorpaySoon")}</Text>
               <TouchableOpacity style={s.primaryBtn} onPress={() => setShowPayments(true)} activeOpacity={0.85}>
-                <Text style={s.primaryBtnText}>View payment options</Text>
+                <Text style={s.primaryBtnText}>{t("cpViewPayOptions")}</Text>
                 <Feather name="arrow-right" size={15} color={C.white} />
               </TouchableOpacity>
             </View>
@@ -721,23 +732,23 @@ const [showThemes, setShowThemes] = useState(false);
       default:
         return (
           <View>
-            <PanelHeader icon="help-circle" title="Need Help?" sub="Support, terms and privacy" />
+            <PanelHeader icon="help-circle" title={t("cpNeedHelpTitle")} sub={t("cpHelpSub")} />
             <LinkRow
               icon="message-circle"
-              title="Customer Support"
-              sub="We're here to help you"
+              title={t("cpCustSupport")}
+              sub={t("cpCustSupportSub")}
               onPress={() => navigation.navigate("Support")}
             />
             <LinkRow
               icon="file-text"
-              title="Terms & Conditions"
-              sub="Read our terms of service"
+              title={t("profile.termsConditions")}
+              sub={t("cpTermsSub")}
               onPress={() => navigation.navigate("Terms")}
             />
             <LinkRow
               icon="shield"
-              title="Privacy Policy"
-              sub="Learn how we protect your data"
+              title={t("auth.privacyPolicy")}
+              sub={t("cpPrivacySub")}
               onPress={() => navigation.navigate("Privacy")}
             />
           </View>
@@ -751,7 +762,7 @@ const [showThemes, setShowThemes] = useState(false);
       <View style={s.backHeader}>
         <TouchableOpacity style={s.backButton} onPress={goBack} activeOpacity={0.75}>
           <Feather name="arrow-left" size={19} color={C.gray900} />
-          <Text style={s.backHeaderText}>Back to Home</Text>
+          <Text style={s.backHeaderText}>{t("cpBackHome")}</Text>
         </TouchableOpacity>
       </View>
 
@@ -766,11 +777,11 @@ const [showThemes, setShowThemes] = useState(false);
           <View style={s.greetingTopCard}>
             <View style={s.greetingWelcomeRow}>
               <View style={{ flex: 1 }}>
-                <Text style={s.greetingText}>Welcome back,</Text>
+                <Text style={s.greetingText}>{t("cpWelcomeBack")}</Text>
                 <Text style={s.greetingName} numberOfLines={1}>
-                  {user?.name?.split(" ")[0] || "there"}!
+                  {user?.name?.split(" ")[0] || t("cpThere")}!
                 </Text>
-                <Text style={s.greetingSub}>Shop local. Support local.</Text>
+                <Text style={s.greetingSub}>{t("cpTagline")}</Text>
               </View>
               <View style={s.greetingLeafCircle}>
                 <Feather name="feather" size={30} color={C.green} />
@@ -778,7 +789,7 @@ const [showThemes, setShowThemes] = useState(false);
             </View>
             <View style={s.greetingDecorativeRow}>
               <View style={s.greetingAccentLine} />
-              <Text style={s.greetingFooter}>Your neighbourhood, your marketplace.</Text>
+              <Text style={s.greetingFooter}>{t("cpFooterTag")}</Text>
             </View>
           </View>
 
@@ -793,7 +804,7 @@ const [showThemes, setShowThemes] = useState(false);
                 onPress={handleProfilePhoto}
                 disabled={uploadingPhoto}
                 activeOpacity={0.85}
-                accessibilityLabel="Change profile picture"
+                accessibilityLabel={t("cpChangePhoto")}
               >
                 <View style={s.avatarOuter}>
                   <Avatar name={user?.name} imageUrl={user?.profile_image_url} size={88} />
@@ -806,16 +817,16 @@ const [showThemes, setShowThemes] = useState(false);
               </TouchableOpacity>
 
               <View style={s.heroInfo}>
-                <Text style={s.heroName} numberOfLines={2}>{user?.name || "Guest"}</Text>
+                <Text style={s.heroName} numberOfLines={2}>{user?.name || t("cpGuest")}</Text>
 
                 <View style={s.heroDetailRow}>
                   <Feather name="phone" size={16} color={C.greenDark} />
-                  <Text style={s.heroDetailText}>{user?.phone || "Add phone number"}</Text>
+                  <Text style={s.heroDetailText}>{user?.phone || t("cpAddPhone")}</Text>
                 </View>
 
                 <View style={s.heroDetailRow}>
                   <Feather name="mail" size={16} color={C.greenDark} />
-                  <Text style={s.heroDetailText} numberOfLines={2}>{user?.email || "Add email address"}</Text>
+                  <Text style={s.heroDetailText} numberOfLines={2}>{user?.email || t("cpAddEmail")}</Text>
                 </View>
 
                 <View style={s.roleBadge}>
@@ -833,7 +844,7 @@ const [showThemes, setShowThemes] = useState(false);
                 activeOpacity={0.8}
               >
                 <Feather name="edit-2" size={15} color={C.greenDark} />
-                <Text style={s.heroEditText}>Edit Profile</Text>
+                <Text style={s.heroEditText}>{t("cpEditProfile")}</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -911,8 +922,8 @@ const [showThemes, setShowThemes] = useState(false);
           />
           <MenuItem
             icon="globe"
-            label="Language"
-            sub="Change app language"
+            label={t("profile.language")}
+            sub={t("profile.languageSub")}
             tint="green"
             onPress={() => setShowLanguage(true)}
           />
@@ -935,8 +946,8 @@ const [showThemes, setShowThemes] = useState(false);
 
 <MenuItem
   icon="moon"
-  label="Themes"
-  sub={`Current theme: ${mode === "default" ? "System" : mode === "dark" ? "Dark" : "Light"}`}
+  label={t("cpThemes")}
+  sub={t("cpCurrentTheme", { mode: mode === "default" ? t("cpThemeSystem") : mode === "dark" ? t("cpThemeDark") : t("cpThemeLight") })}
   tint="orange"
   onPress={() => setShowThemes(true)}
 />
@@ -944,8 +955,8 @@ const [showThemes, setShowThemes] = useState(false);
           <SectionLabel title={t("profile.accountSection")} />
           <MenuItem
             icon="shuffle"
-            label="Switch Profile"
-            sub="Switch between Customer, Vendor & Delivery"
+            label={t("vpSwitchProfile")}
+            sub={t("cpSwitchSub")}
             tint="blue"
             onPress={async () => { await setActiveRole(null); }}
           />
@@ -1042,16 +1053,16 @@ const [showThemes, setShowThemes] = useState(false);
             />
 
             <Text style={{ fontSize: 21, fontWeight: "900", color: C.gray900, marginBottom: 6 }}>
-              Choose Theme
+              {t("cpChooseTheme")}
             </Text>
             <Text style={{ fontSize: 13, color: C.gray500, marginBottom: 16 }}>
-              Select how DesiDukaan looks.
+              {t("cpThemeSub")}
             </Text>
 
             {[
-              { label: "Light Mode", value: "light", icon: "sun" },
-              { label: "Dark Mode", value: "dark", icon: "moon" },
-              { label: "System Default", value: "default", icon: "smartphone" },
+              { label: t("cpLightMode"), value: "light", icon: "sun" },
+              { label: t("cpDarkMode"), value: "dark", icon: "moon" },
+              { label: t("cpSystemDefault"), value: "default", icon: "smartphone" },
             ].map((option) => (
               <TouchableOpacity
                 key={option.value}
@@ -1096,7 +1107,7 @@ const [showThemes, setShowThemes] = useState(false);
               }}
             >
               <Text style={{ fontSize: 14, fontWeight: "700", color: C.gray500 }}>
-                Cancel
+                {t("common.cancel")}
               </Text>
             </TouchableOpacity>
           </Pressable>

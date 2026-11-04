@@ -84,8 +84,8 @@ const MANUAL_UNIT_OPTIONS = [
 
 
 const DELIVERY_TYPES = [
-  { id: 'partner', label: 'Use Delivery Boy' },
-  { id: 'self', label: 'Own Staff / Self' },
+  { id: 'partner', labelKey: 'obDeliveryPartner' },
+  { id: 'self', labelKey: 'obDeliverySelf' },
 ];
 
 // ─── Full generic product catalog ────────────────────────────────────────────
@@ -243,6 +243,7 @@ const FALLBACK_CATEGORIES = [
 // Fetches top categories from GET /products/categories and subcategories from
 // GET /products/subcategories/:id — exactly like components/inventory/ProductModal.
 function ProductCategoryDropdown({ topCategories = [], loading, value, subvalue, onChange }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
   const [subs, setSubs] = useState([]);
@@ -282,7 +283,7 @@ function ProductCategoryDropdown({ topCategories = [], loading, value, subvalue,
         onPress={() => { setOpen(!open); setSubOpen(false); }}
       >
         <Text style={[styles.dropdownValue, !value && styles.dropdownPlaceholder]}>
-          {value ? (subvalue ? `${value} › ${subvalue}` : value) : 'Select Category...'}
+          {value ? (subvalue ? `${value} › ${subvalue}` : value) : t('obSelectCategory')}
         </Text>
         <MaterialIcons name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#666" />
       </TouchableOpacity>
@@ -317,7 +318,7 @@ function ProductCategoryDropdown({ topCategories = [], loading, value, subvalue,
             onPress={() => { setSubOpen(!subOpen); setOpen(false); }}
           >
             <Text style={[styles.dropdownValue, !subvalue && styles.dropdownPlaceholder]}>
-              {subvalue ? subvalue : 'Select Subcategory (Optional)...'}
+              {subvalue ? subvalue : t('obSelectSubcategory')}
             </Text>
             <MaterialIcons name={subOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#666" />
           </TouchableOpacity>
@@ -328,7 +329,7 @@ function ProductCategoryDropdown({ topCategories = [], loading, value, subvalue,
                 <ActivityIndicator size="small" color={PRIMARY} style={{ margin: 12 }} />
               ) : subs.length === 0 ? (
                 <View style={styles.dropdownEmpty}>
-                  <Text style={styles.dropdownEmptyText}>No subcategories available.</Text>
+                  <Text style={styles.dropdownEmptyText}>{t('obNoSubcategories')}</Text>
                 </View>
               ) : (
                 <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
@@ -360,12 +361,13 @@ const BANK_OPTIONS = [
 
 // ─── Bank name dropdown (same visual pattern as ProductCategoryDropdown) ──────
 function BankNameDropdown({ value, onChange }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
     <View>
       <TouchableOpacity style={styles.dropdownBox} activeOpacity={0.8} onPress={() => setOpen(o => !o)}>
         <Text style={[styles.dropdownValue, !value && styles.dropdownPlaceholder]}>
-          {value || 'Select Bank...'}
+          {value || t('obSelectBank')}
         </Text>
         <MaterialIcons name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#666" />
       </TouchableOpacity>
@@ -394,6 +396,7 @@ function BankNameDropdown({ value, onChange }) {
 // records) — fully offline, no network dependency. Pick a bank, then type a
 // city or branch name to filter; selecting a branch auto-fills the IFSC code.
 function BranchPicker({ bankName, value, onSelectBranch }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -417,7 +420,7 @@ function BranchPicker({ bankName, value, onSelectBranch }) {
   if (!allBranches) {
     return (
       <View style={[styles.dropdownBox, styles.dropdownBoxDisabled]}>
-        <Text style={styles.dropdownPlaceholder}>Select your bank above first</Text>
+        <Text style={styles.dropdownPlaceholder}>{t('obSelectBankFirst')}</Text>
       </View>
     );
   }
@@ -430,7 +433,7 @@ function BranchPicker({ bankName, value, onSelectBranch }) {
         onPress={() => setOpen(o => !o)}
       >
         <Text style={[styles.dropdownValue, !value && styles.dropdownPlaceholder]} numberOfLines={1}>
-          {value || 'Select your branch'}
+          {value || t('obSelectBranch')}
         </Text>
         <MaterialIcons name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#666" />
       </TouchableOpacity>
@@ -441,7 +444,7 @@ function BranchPicker({ bankName, value, onSelectBranch }) {
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Type city or branch name"
+              placeholder={t('obBranchSearchPh')}
               placeholderTextColor="#aaa"
               style={styles.branchSearchInput}
               autoCapitalize="words"
@@ -451,11 +454,11 @@ function BranchPicker({ bankName, value, onSelectBranch }) {
           <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
             {query.trim().length < 2 ? (
               <View style={styles.dropdownEmpty}>
-                <Text style={styles.dropdownEmptyText}>Type at least 2 letters — e.g. your city or branch name</Text>
+                <Text style={styles.dropdownEmptyText}>{t('obBranchMin')}</Text>
               </View>
             ) : results.length === 0 ? (
               <View style={styles.dropdownEmpty}>
-                <Text style={styles.dropdownEmptyText}>No matches — try a different spelling, or enter your IFSC code below.</Text>
+                <Text style={styles.dropdownEmptyText}>{t('obBranchNone')}</Text>
               </View>
             ) : (
               results.map(([branch, city, state, ifscCode]) => (
@@ -775,7 +778,7 @@ const { t } = useTranslation();
     setLocError('');
     if (Platform.OS === 'web') {
       if (typeof navigator === 'undefined' || !navigator.geolocation) {
-        setLocError("Geolocation isn't available in this browser.");
+        setLocError(t('obErrGeoUnavailable'));
         return;
       }
       setLocating(true);
@@ -786,7 +789,7 @@ const { t } = useTranslation();
         },
         () => {
           setLocating(false);
-          setLocError('Location permission denied — type your address or pick a suggestion instead.');
+          setLocError(t('obErrLocDenied'));
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
       );
@@ -798,13 +801,13 @@ const { t } = useTranslation();
           const Location = require('expo-location');
           const { status } = await Location.requestForegroundPermissionsAsync();
           if (status !== 'granted') {
-            setLocError('Location permission denied — type your address or pick a suggestion instead.');
+            setLocError(t('obErrLocDenied'));
             return;
           }
           const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
           await applyCurrentCoords(loc.coords.latitude, loc.coords.longitude);
         } catch {
-          setLocError('Could not detect your location. Please type it manually.');
+          setLocError(t('obErrLocFail'));
         } finally {
           setLocating(false);
         }
@@ -1098,9 +1101,9 @@ const { t } = useTranslation();
       const mimeType = asset.mimeType || (asset.name?.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
       const data = await uploadAPI.upload(asset.uri, mimeType, token);
       setDocUrls(prev => ({ ...prev, [docKey]: data.url }));
-      Alert.alert('✅ Uploaded', 'Document uploaded successfully!');
+      Alert.alert(t('obUploadedTitle'), t('obDocUploadedMsg'));
     } catch (e) {
-      Alert.alert('Upload Failed', e.message || 'Could not upload document');
+      Alert.alert(t('obUploadFailed'), e.message || t('obUploadDocFail'));
     } finally {
       setDocUploading(prev => ({ ...prev, [docKey]: false }));
     }
@@ -1122,7 +1125,7 @@ const { t } = useTranslation();
       const data = await uploadAPI.upload(asset.uri, mimeType, token);
       updateManualProd(index, 'image_url', data.url);
     } catch (e) {
-      Alert.alert('Upload Failed', e.message || 'Could not upload image');
+      Alert.alert(t('obUploadFailed'), e.message || t('obUploadImgFail'));
     } finally {
       setProdImgUploading(prev => ({ ...prev, [index]: false }));
     }
@@ -1139,9 +1142,9 @@ const { t } = useTranslation();
         return obj;
       }).filter(p => p.name);
       setCsvPreview(parsed);
-      if (parsed.length > 0) Alert.alert('✅ Parsed', `${parsed.length} products ready to import`);
+      if (parsed.length > 0) Alert.alert(t('obParsedTitle'), t('obParsedMsg', { count: parsed.length }));
     } catch {
-      Alert.alert('Error', 'Could not parse CSV. Check the format.');
+      Alert.alert(t('obError'), t('obCsvError'));
     }
   };
 
@@ -1156,34 +1159,34 @@ const { t } = useTranslation();
 
   const validateStep = () => {
     if (currentStep === 1) {
-      if (!shopName.trim()) { Alert.alert('Required', 'Enter your shop name'); return false; }
-      if (!ownerName.trim()) { Alert.alert('Required', 'Enter owner name'); return false; }
+      if (!shopName.trim()) { Alert.alert(t('obRequired'), t('obErrShopName')); return false; }
+      if (!ownerName.trim()) { Alert.alert(t('obRequired'), t('obErrOwnerName')); return false; }
      if (!isValidEstYear(estYear)) {
   Alert.alert(
-    'Invalid Year',
-    'Select a valid four-digit establishment year.'
+    t('obInvalidYear'),
+    t('obErrYear')
   );
   return false;
 }
       if (!email.trim()) {
-  Alert.alert('Required', 'Enter email address');
+  Alert.alert(t('obRequired'), t('obErrEmailEmpty'));
   return false;
 }
 
 
 if (!isValidShopEmail(email)) {
-Alert.alert('Invalid Email', 'Enter a valid shop email address.');
+Alert.alert(t('obInvalidEmail'), t('obErrEmail'));
 return false;
 }
-      if (!shopLoc.formattedAddress.trim()) { Alert.alert('Required', 'Enter shop address'); return false; }
-      if (!shopLoc.city.trim()) { Alert.alert('Required', 'Enter your city'); return false; }
-      if (shopLoc.pincode.length !== 6) { Alert.alert('Required', 'Enter a valid 6-digit pincode'); return false; }
+      if (!shopLoc.formattedAddress.trim()) { Alert.alert(t('obRequired'), t('obErrAddress')); return false; }
+      if (!shopLoc.city.trim()) { Alert.alert(t('obRequired'), t('obErrCity')); return false; }
+      if (shopLoc.pincode.length !== 6) { Alert.alert(t('obRequired'), t('obErrPincode')); return false; }
     }
 if (currentStep === 2) {
   if (!isValidFSSAI(fssai)) {
     Alert.alert(
-      'Invalid FSSAI',
-      'Enter a valid 14-digit FSSAI license number using numbers only.'
+      t('obInvalidFssai'),
+      t('obErrFssai')
     );
     return false;
   }
@@ -1191,39 +1194,39 @@ if (currentStep === 2) {
 
 if (!isValidGST(gst)) {
 Alert.alert(
-'Invalid GST',
-'Enter a valid 15-character GST number in the correct format.'
+t('obInvalidGst'),
+t('obErrGst')
 );
 return false;
 }
 
 if (aadhar.trim() && !isValidAadhaar(aadhar)) {
 Alert.alert(
-'Invalid Aadhaar',
-'Aadhaar must contain exactly 12 digits.'
+t('obInvalidAadhaar'),
+t('obErrAadhaar')
 );
 return false;
 }
 
 if (pan.trim() && !isValidPAN(pan)) {
 Alert.alert(
-'Invalid PAN',
-'Enter a valid PAN in the format ABCDE1234F.'
+t('obInvalidPan'),
+t('obErrPan')
 );
 return false;
 }
 }
     if (currentStep === 3) {
       if (!upiId.trim() && !accountNumber.trim()) {
-        Alert.alert('Required', 'Enter UPI ID or bank account details'); return false;
+        Alert.alert(t('obRequired'), t('obErrPayment')); return false;
       }
     }
     if (currentStep === 4) {
       if (getAllProducts().length === 0) {
-        Alert.alert('Required', 'Add at least one product'); return false;
+        Alert.alert(t('obRequired'), t('obErrNoProducts')); return false;
       }
       if (manualProds.some(p => p.name && p.sp && !p.cat)) {
-        Alert.alert('Required', 'Select a Category for every product you add manually'); return false;
+        Alert.alert(t('obRequired'), t('obErrNoCategory')); return false;
       }
     }
     return true;
@@ -1267,9 +1270,9 @@ console.log("Starting vendor onboarding submission...");
       if (!latitude || !longitude) {
         // Non-blocking warning — vendor still registers, just won't appear in nearby search
         Alert.alert(
-          'Location not found',
-          `We couldn't pinpoint "${shopLoc.pincode}, ${shopLoc.city}". Your shop will still be created but may not show in nearby results. You can update your location from the dashboard.`,
-          [{ text: 'Continue anyway' }]
+          t('obLocNotFound'),
+          t('obLocNotFoundMsg', { pincode: shopLoc.pincode, city: shopLoc.city }),
+          [{ text: t('obContinueAnyway') }]
         );
       }
 
@@ -1325,7 +1328,7 @@ if (!vendorRes.ok) {
   throw new Error(
     vendorData.msg ||
     vendorData.message ||
-    'Failed to create shop'
+    t('obErrCreateShop')
   );
 }
 
@@ -1401,7 +1404,7 @@ for (const product of allProds) {
     throw new Error(
       productData.msg ||
       productData.message ||
-      `Failed to create product: ${product.name}`
+      t('obErrCreateProduct', { name: product.name })
     );
   }
 
@@ -1420,7 +1423,7 @@ for (const product of allProds) {
       console.log("Vendor onboarding completed successfully. Opening vendor dashboard...");
 onComplete?.();
     } catch (err) {
-      Alert.alert('Error', err.message);
+      Alert.alert(t('obError'), err.message);
     } finally {
   setLoading(false);
   setGeocoding(false);
@@ -1452,23 +1455,23 @@ onComplete?.();
             </View>
 
             <Text style={styles.successTitle}>
-              {autoApproved ? "You're Live! 🎉" : "You're Submitted!"}
+              {autoApproved ? t('obSuccessLiveTitle') : t('obSuccessSubmittedTitle')}
             </Text>
             <Text style={styles.successSub}>
               <Text style={{ fontWeight: '800', fontFamily: "PlusJakartaSans_800ExtraBold", color: '#16A34A' }}>
-                {shopName || 'Your shop'}
+                {shopName || t('obSuccessYourShop')}
               </Text>
               {autoApproved
-                ? ' is now live and ready to accept orders!'
-                : ' is under review.'}
+                ? t('obSuccessIsLive')
+                : t('obSuccessUnderReview')}
             </Text>
             <Text style={styles.successDesc}>
               {autoApproved
-                ? 'Your shop has been instantly approved. Customers can now find and order from your store.'
+                ? t('obSuccessApprovedDesc')
                 : <>
-                    Our team will verify your FSSAI &amp; GST details within{' '}
-                    <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>24–48 hours</Text>. You'll get an
-                    email notification once approved and live.
+                    {t('obSuccessReviewPre')}{' '}
+                    <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>{t('obSuccessReviewHours')}</Text>
+                    {t('obSuccessReviewPost')}
                   </>
               }
             </Text>
@@ -1476,9 +1479,9 @@ onComplete?.();
             {/* Timeline */}
             {autoApproved
               ? [
-                  { icon: 'assignment', label: 'Application submitted', done: true },
-                  { icon: 'check-circle', label: 'Auto-approved instantly', done: true },
-                  { icon: 'store', label: 'Shop is live!', done: true },
+                  { icon: 'assignment', label: t('obTlSubmitted'), done: true },
+                  { icon: 'check-circle', label: t('obTlAutoApproved'), done: true },
+                  { icon: 'store', label: t('obTlShopLive'), done: true },
                 ].map((step, i) => (
                   <View key={i} style={styles.successStep}>
                     <MaterialIcons name={step.icon} size={18} color="#16A34A" style={{ marginRight: 8 }} />
@@ -1489,9 +1492,9 @@ onComplete?.();
                   </View>
                 ))
               : [
-                  { icon: 'assignment', label: 'Application submitted', done: true },
-                  { icon: 'search', label: 'Admin verification (24–48 hrs)', done: false },
-                  { icon: 'check-circle', label: 'Shop goes live!', done: false },
+                  { icon: 'assignment', label: t('obTlSubmitted'), done: true },
+                  { icon: 'search', label: t('obTlAdminVerify'), done: false },
+                  { icon: 'check-circle', label: t('obTlGoesLive'), done: false },
                 ].map((step, i) => (
                   <View key={i} style={styles.successStep}>
                     <MaterialIcons name={step.icon} size={18} color={step.done ? '#16A34A' : '#9CA3AF'} style={{ marginRight: 8 }} />
@@ -1516,7 +1519,7 @@ onComplete?.();
               }}
               activeOpacity={0.88}
             >
-              <Text style={styles.successBtnText}>Go to Dashboard →</Text>
+              <Text style={styles.successBtnText}>{t('obGoDashboard')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1532,7 +1535,14 @@ onComplete?.();
       >
 {/* Top bar */}
 <View style={styles.topBar}>
-  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+  {/* Left section: Back button + Brand */}
+  <View
+    style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    }}
+  >
     {/* Back to RolePicker */}
     <TouchableOpacity
       onPress={() => {
@@ -1547,13 +1557,21 @@ onComplete?.();
         marginRight: 10,
       }}
     >
-      <MaterialIcons name="arrow-back" size={24} color={PRIMARY_DARK} />
+      <MaterialIcons
+        name="arrow-back"
+        size={24}
+        color={PRIMARY_DARK}
+      />
     </TouchableOpacity>
 
     {/* Brand */}
     <View style={styles.brandRow}>
       <View style={styles.brandIconWrap}>
-        <MaterialIcons name="storefront" size={18} color="#fff" />
+        <MaterialIcons
+          name="storefront"
+          size={18}
+          color="#fff"
+        />
       </View>
 
       <View style={styles.brandTextWrap}>
@@ -1561,45 +1579,54 @@ onComplete?.();
           Desi<Text style={{ color: PRIMARY }}>Dukaan</Text>
         </Text>
 
-        <Text style={styles.brandSub} numberOfLines={1}>
-          {t('sellerRegistration')}
-        </Text>
+<Text style={styles.brandSub}>
+  {t('sellerRegistration')}
+</Text>
       </View>
     </View>
   </View>
 
-  {/* Language selector + Help */}
+  {/* Right section: Language selector + Help button */}
   <View
-  style={{
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexShrink: 0,
-  }}
->
+    style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    }}
+  >
+    {/* Language Selector */}
     <LanguageSelector />
 
-    <TouchableOpacity style={styles.helpPill} activeOpacity={0.8}>
+    {/* Help Button */}
+    <TouchableOpacity
+      style={styles.helpPill}
+      activeOpacity={0.8}
+    >
       <View style={styles.helpIconCircle}>
-        <MaterialIcons name="help-outline" size={13} color={PRIMARY} />
+        <MaterialIcons
+          name="help-outline"
+          size={13}
+          color={PRIMARY}
+        />
       </View>
 
       <View style={styles.helpTextWrap}>
-        <Text style={styles.helpTitle} numberOfLines={1}>
-          {t('needHelp')}
-        </Text>
+<Text style={styles.helpTitle}>
+  {t('needHelp')}
+</Text>
 
-        <Text style={styles.helpSub} numberOfLines={2}>
-          {t('helpSubtitle')}
-        </Text>
+<Text style={styles.helpSub}>
+  {t('helpSubtitle')}
+</Text>
       </View>
     </TouchableOpacity>
   </View>
 </View>
+
         {/* Progress card */}
         <View style={styles.progressCard}>
           <View style={styles.stepCountPill}>
-            <Text style={styles.stepCount}>Step {currentStep} of {STEPS.length}</Text>
+            <Text style={styles.stepCount}>{t('obStepOf', { current: currentStep, total: STEPS.length })}</Text>
           </View>
 
           <View style={styles.progressCardMain}>
@@ -1608,7 +1635,7 @@ onComplete?.();
               <Text style={styles.heroSub}>{t(STEP_HERO[currentStep - 1].subKey)}</Text>
               <View style={styles.safeRow}>
                 <MaterialIcons name="check-circle" size={13} color={PRIMARY} />
-                <Text style={styles.safeText}>Your information is safe &amp; secure</Text>
+                <Text style={styles.safeText}>{t('obSafeSecure')}</Text>
               </View>
             </View>
 
@@ -1678,9 +1705,9 @@ onComplete?.();
               <View style={styles.setupBadge}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <MaterialIcons name="auto-awesome" size={12} color="#4F46E5" />
-                  <Text style={styles.setupBadgeTitle}>Quick &amp; Easy Setup</Text>
+                  <Text style={styles.setupBadgeTitle}>{t('obQuickSetup')}</Text>
                 </View>
-                <Text style={styles.setupBadgeSub}>Takes less than 5 minutes</Text>
+                <Text style={styles.setupBadgeSub}>{t('obTakesLess')}</Text>
               </View>
             )}
           </View>
@@ -1689,43 +1716,43 @@ onComplete?.();
           {currentStep === 1 && (
             <View style={styles.form}>
               <View style={styles.labelRow}>
-                <Text style={styles.label}>Shop Name <Text style={styles.req}>*</Text></Text>
+                <Text style={styles.label}>{t('obShopName')} <Text style={styles.req}>*</Text></Text>
                 <MaterialIcons name="info-outline" size={13} color={SUBTLE} />
               </View>
               <View style={styles.inputIconWrap}>
                 <MaterialIcons name="storefront" size={17} color={SUBTLE} style={styles.inputIcon} />
-                <TextInput style={[styles.input, styles.inputWithIcon]} placeholder="e.g. Sharma Kirana Store" placeholderTextColor="#A6ACA4" value={shopName} onChangeText={setShopName} />
+                <TextInput style={[styles.input, styles.inputWithIcon]} placeholder={t('obShopNamePh')} placeholderTextColor="#A6ACA4" value={shopName} onChangeText={setShopName} />
               </View>
               <View style={styles.helperRow}>
-                <Text style={styles.helperText}>This will be visible to your customers</Text>
+                <Text style={styles.helperText}>{t('obShopNameHelp')}</Text>
                 {shopName.trim().length > 0 && (
                   <View style={styles.looksGoodRow}>
                     <MaterialIcons name="check-circle" size={12} color={PRIMARY} />
-                    <Text style={styles.looksGoodText}>Looks good</Text>
+                    <Text style={styles.looksGoodText}>{t('obLooksGood')}</Text>
                   </View>
                 )}
               </View>
 
               <View style={styles.labelRow}>
-                <Text style={styles.label}>Shop Owner Name <Text style={styles.req}>*</Text></Text>
+                <Text style={styles.label}>{t('obOwnerName')} <Text style={styles.req}>*</Text></Text>
                 <MaterialIcons name="info-outline" size={13} color={SUBTLE} />
               </View>
               <View style={styles.inputIconWrap}>
                 <MaterialIcons name="person-outline" size={17} color={SUBTLE} style={styles.inputIcon} />
-                <TextInput style={[styles.input, styles.inputWithIcon]} placeholder="Full name as per ID" placeholderTextColor="#A6ACA4" value={ownerName} onChangeText={setOwnerName} />
+                <TextInput style={[styles.input, styles.inputWithIcon]} placeholder={t('obOwnerNamePh')} placeholderTextColor="#A6ACA4" value={ownerName} onChangeText={setOwnerName} />
               </View>
               <View style={styles.helperRow}>
-                <Text style={styles.helperText}>Enter your full legal name</Text>
+                <Text style={styles.helperText}>{t('obOwnerNameHelp')}</Text>
                 {ownerName.trim().length > 0 && (
                   <View style={styles.looksGoodRow}>
                     <MaterialIcons name="check-circle" size={12} color={PRIMARY} />
-                    <Text style={styles.looksGoodText}>Looks good</Text>
+                    <Text style={styles.looksGoodText}>{t('obLooksGood')}</Text>
                   </View>
                 )}
               </View>
 
               <View style={styles.yearWhyRow}>
-                <Text style={styles.label}>Establishment Year <Text style={styles.req}>*</Text></Text>
+                <Text style={styles.label}>{t('obEstYear')} <Text style={styles.req}>*</Text></Text>
                 <View style={styles.inputIconWrap}>
                   <MaterialIcons name="calendar-today" size={15} color={SUBTLE} style={styles.inputIcon} />
                   <TouchableOpacity
@@ -1733,7 +1760,7 @@ onComplete?.();
                     activeOpacity={0.8}
                     onPress={() => setYearDropdownOpen(o => !o)}
                   >
-                    <Text style={estYear ? styles.selectValue : styles.selectPlaceholder}>{estYear || 'Select year'}</Text>
+                    <Text style={estYear ? styles.selectValue : styles.selectPlaceholder}>{estYear || t('obSelectYear')}</Text>
                   </TouchableOpacity>
                   <MaterialIcons name={yearDropdownOpen ? 'arrow-drop-up' : 'arrow-drop-down'} size={20} color={SUBTLE} style={styles.selectChevron} />
                 </View>
@@ -1753,28 +1780,28 @@ onComplete?.();
                     </ScrollView>
                   </View>
                 )}
-                <Text style={styles.helperText}>The year your business was started</Text>
+                <Text style={styles.helperText}>{t('obEstYearHelp')}</Text>
 
                 <View style={styles.whyAskBox}>
                   <View style={styles.whyIconCircle}>
                     <MaterialIcons name="shield" size={14} color={PRIMARY} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.whyAskTitle}>Why we ask this?</Text>
-                    <Text style={styles.whyAskText}>Helps build trust and credibility with your customers.</Text>
+                    <Text style={styles.whyAskTitle}>{t('obWhyAsk')}</Text>
+                    <Text style={styles.whyAskText}>{t('obWhyAskText')}</Text>
                   </View>
                 </View>
               </View>
 
               <View style={styles.labelRow}>
-                <Text style={styles.label}>Shop Email <Text style={styles.req}>*</Text></Text>
+                <Text style={styles.label}>{t('obShopEmail')} <Text style={styles.req}>*</Text></Text>
                 <MaterialIcons name="info-outline" size={13} color={SUBTLE} />
               </View>
               <View style={styles.inputIconWrap}>
                 <MaterialIcons name="mail-outline" size={17} color={SUBTLE} style={styles.inputIcon} />
                 <TextInput
   style={[styles.input, styles.inputWithIcon]}
-  placeholder="For order notifications & updates"
+  placeholder={t('obShopEmailPh')}
   placeholderTextColor="#A6ACA4"
   keyboardType="email-address"
   autoCapitalize="none"
@@ -1784,11 +1811,11 @@ onComplete?.();
 />
               </View>
               <View style={styles.helperRow}>
-                <Text style={styles.helperText}>We'll send important updates to this email</Text>
+                <Text style={styles.helperText}>{t('obShopEmailHelp')}</Text>
                 {isValidShopEmail(email) && (
                   <View style={styles.looksGoodRow}>
                     <MaterialIcons name="check-circle" size={12} color={PRIMARY} />
-                    <Text style={styles.looksGoodText}>Looks good</Text>
+                    <Text style={styles.looksGoodText}>{t('obLooksGood')}</Text>
                   </View>
                 )}
               </View>
@@ -1799,15 +1826,15 @@ onComplete?.();
           {currentStep === 1 && (
             <View style={styles.advCard}>
               <View style={styles.advHeaderRow}>
-                <Text style={styles.advTitle}>Advanced Features</Text>
-                <View style={styles.optionalPill}><Text style={styles.optionalPillText}>Optional</Text></View>
+                <Text style={styles.advTitle}>{t('obAdvTitle')}</Text>
+                <View style={styles.optionalPill}><Text style={styles.optionalPillText}>{t('obOptional')}</Text></View>
               </View>
-              <Text style={styles.advSub}>Enable these features to grow your business faster</Text>
+              <Text style={styles.advSub}>{t('obAdvSub')}</Text>
 
               {[
-                { key: 'notifications', icon: 'shopping-cart', title: 'Order Notifications', desc: 'Get real-time alerts for new orders', tag: '⭐ Recommended', value: advNotifications, onToggle: setAdvNotifications },
-                { key: 'analytics', icon: 'bar-chart', title: 'Business Analytics', desc: 'Track sales, customers & products performance', tag: '📈 Grow your business', value: advAnalytics, onToggle: setAdvAnalytics },
-                { key: 'promotions', icon: 'campaign', title: 'Promotions & Offers', desc: 'Run discounts and reach more customers', tag: '📢 Increase visibility', value: advPromotions, onToggle: setAdvPromotions },
+                { key: 'notifications', icon: 'shopping-cart', title: t('obAdvNotifTitle'), desc: t('obAdvNotifDesc'), tag: t('obAdvNotifTag'), value: advNotifications, onToggle: setAdvNotifications },
+                { key: 'analytics', icon: 'bar-chart', title: t('obAdvAnalyticsTitle'), desc: t('obAdvAnalyticsDesc'), tag: t('obAdvAnalyticsTag'), value: advAnalytics, onToggle: setAdvAnalytics },
+                { key: 'promotions', icon: 'campaign', title: t('obAdvPromoTitle'), desc: t('obAdvPromoDesc'), tag: t('obAdvPromoTag'), value: advPromotions, onToggle: setAdvPromotions },
               ].map((f) => (
                 <View key={f.key} style={styles.advItem}>
                   <View style={styles.advItemTop}>
@@ -1838,10 +1865,10 @@ onComplete?.();
                 <MaterialIcons name="verified-user" size={18} color={PRIMARY} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.secureBannerTitle}>Your data is 100% secure</Text>
-                <Text style={styles.secureBannerText}>We use enterprise-grade encryption to keep your information safe and private.</Text>
+                <Text style={styles.secureBannerTitle}>{t('obSecureTitle')}</Text>
+                <Text style={styles.secureBannerText}>{t('obSecureText')}</Text>
               </View>
-              <TouchableOpacity><Text style={styles.learnMore}>Learn more →</Text></TouchableOpacity>
+              <TouchableOpacity><Text style={styles.learnMore}>{t('obLearnMore')}</Text></TouchableOpacity>
             </View>
           )}
 
@@ -1850,41 +1877,41 @@ onComplete?.();
               {/* Contacts */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16, marginBottom: 12 }}>
                 <MaterialIcons name="phone" size={18} color={PRIMARY} />
-                <Text style={[styles.sectionSep, { marginTop: 0, marginBottom: 0 }]}>Contact Details</Text>
+                <Text style={[styles.sectionSep, { marginTop: 0, marginBottom: 0 }]}>{t('obContactDetails')}</Text>
               </View>
               <View style={styles.row}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Primary Name <Text style={styles.req}>*</Text></Text>
-                  <TextInput style={styles.input} placeholder="Name 1" value={ownerName} onChangeText={setOwnerName} />
+                  <Text style={styles.label}>{t('obPrimaryName')} <Text style={styles.req}>*</Text></Text>
+                  <TextInput style={styles.input} placeholder={t('obName1Ph')} value={ownerName} onChangeText={setOwnerName} />
                 </View>
                 <View style={{ width: 12 }} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Primary Phone <Text style={styles.req}>*</Text></Text>
-                  <TextInput style={styles.input} placeholder="10-digit" keyboardType="phone-pad" maxLength={10} value={phone} onChangeText={setPhone} />
+                  <Text style={styles.label}>{t('obPrimaryPhone')} <Text style={styles.req}>*</Text></Text>
+                  <TextInput style={styles.input} placeholder={t('obPhonePh')} keyboardType="phone-pad" maxLength={10} value={phone} onChangeText={setPhone} />
                 </View>
               </View>
               <View style={styles.row}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Alternate Name</Text>
-                  <TextInput style={styles.input} placeholder="Name 2" value={altName} onChangeText={setAltName} />
+                  <Text style={styles.label}>{t('obAltName')}</Text>
+                  <TextInput style={styles.input} placeholder={t('obName2Ph')} value={altName} onChangeText={setAltName} />
                 </View>
                 <View style={{ width: 12 }} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Alternate Phone</Text>
-                  <TextInput style={styles.input} placeholder="Backup number" keyboardType="phone-pad" maxLength={10} value={altPhone} onChangeText={setAltPhone} />
+                  <Text style={styles.label}>{t('obAltPhone')}</Text>
+                  <TextInput style={styles.input} placeholder={t('obBackupPh')} keyboardType="phone-pad" maxLength={10} value={altPhone} onChangeText={setAltPhone} />
                 </View>
               </View>
               <View style={styles.infoBox}>
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   <MaterialIcons name="lightbulb-outline" size={14} color="#047857" style={{ marginTop: 2 }} />
-                  <Text style={styles.infoText}>Two contacts ensure customers can always reach someone if one person is unavailable.</Text>
+                  <Text style={styles.infoText}>{t('obTwoContacts')}</Text>
                 </View>
               </View>
 
               {/* Address */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16, marginBottom: 12 }}>
                 <MaterialIcons name="location-on" size={18} color={PRIMARY} />
-                <Text style={[styles.sectionSep, { marginTop: 0, marginBottom: 0 }]}>Shop Address</Text>
+                <Text style={[styles.sectionSep, { marginTop: 0, marginBottom: 0 }]}>{t('obShopAddress')}</Text>
               </View>
               <UseCurrentLocationButton
                 loading={locating}
@@ -1898,11 +1925,11 @@ onComplete?.();
                 </View>
               )}
               <View style={styles.addressWrap}>
-                <Text style={styles.label}>Street Address <Text style={styles.req}>*</Text></Text>
+                <Text style={styles.label}>{t('obStreetAddress')} <Text style={styles.req}>*</Text></Text>
                 <TextInput
                   ref={inputRef}
                   style={[styles.input, styles.textArea, { marginBottom: 0 }]}
-                  placeholder="Shop no., Street, Area — start typing for suggestions"
+                  placeholder={t('obStreetPh')}
                   value={shopLoc.formattedAddress}
                   onChangeText={handleAddressChange}
                   multiline numberOfLines={2}
@@ -1919,7 +1946,7 @@ onComplete?.();
                       {addrLoading && suggestions.length === 0 && (
                         <View style={styles.suggestionLoading}>
                           <ActivityIndicator size="small" color={PRIMARY} />
-                          <Text style={styles.suggestionLoadingText}>Searching…</Text>
+                          <Text style={styles.suggestionLoadingText}>{t('obSearching')}</Text>
                         </View>
                       )}
                       {suggestions.map((item, i) => (
@@ -1943,22 +1970,22 @@ onComplete?.();
                 )}
               </View>
 
-              <Text style={styles.label}>Landmark</Text>
-              <TextInput style={styles.input} placeholder="e.g. Near Hanuman Temple" value={landmark} onChangeText={setLandmark} />
+              <Text style={styles.label}>{t('obLandmark')}</Text>
+              <TextInput style={styles.input} placeholder={t('obLandmarkPh')} value={landmark} onChangeText={setLandmark} />
               <View style={styles.row}>
                 <View style={{ flex: 2 }}>
-                  <Text style={styles.label}>City <Text style={styles.req}>*</Text></Text>
+                  <Text style={styles.label}>{t('obCity')} <Text style={styles.req}>*</Text></Text>
                   <TextInput
-                    style={styles.input} placeholder="e.g. Noida"
+                    style={styles.input} placeholder={t('obCityPh')}
                     value={shopLoc.city}
                     onChangeText={text => { applyingRef.current = false; updateShopLoc({ city: text }); }}
                   />
                 </View>
                 <View style={{ width: 12 }} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Pincode <Text style={styles.req}>*</Text></Text>
+                  <Text style={styles.label}>{t('obPincode')} <Text style={styles.req}>*</Text></Text>
                   <TextInput
-                    style={styles.input} placeholder="6-digit" keyboardType="numeric" maxLength={6}
+                    style={styles.input} placeholder={t('obPincodePh')} keyboardType="numeric" maxLength={6}
                     value={shopLoc.pincode}
                     onChangeText={text => { applyingRef.current = false; updateShopLoc({ pincode: text }); }}
                   />
@@ -1980,16 +2007,16 @@ onComplete?.();
 
               {geocoding && (
                 <View style={[styles.infoBox, { marginTop: 8 }]}>
-                  <Text style={styles.infoText}>Detecting location…</Text>
+                  <Text style={styles.infoText}>{t('obDetectingLocation')}</Text>
                 </View>
               )}
             
               {!geocoding && geoError && shopLoc.city.length >= 3 && shopLoc.pincode.length === 6 && (
                 <View style={[styles.infoBox, { marginTop: 8, backgroundColor: '#FEF2F2' }]}>
                   <Text style={[styles.infoText, { color: '#B91C1C' }]}>
-                    {geoError}. We couldn't pin your shop on the map — double-check the city/pincode, or{' '}
+                    {geoError}. {t('obGeoPinFail')}{' '}
                     <Text style={{ fontWeight: '700', textDecorationLine: 'underline' }} onPress={runGeocode}>
-                      try again
+                      {t('obTryAgain')}
                     </Text>.
                   </Text>
                 </View>
@@ -1999,12 +2026,12 @@ onComplete?.();
               <View style={styles.geoNote}>
                 <MaterialIcons name="location-on" size={18} color="#D97706" style={{ marginRight: 6 }} />
                 <Text style={styles.geoNoteText}>
-                  Your shop location will be auto-detected from pincode + city when you submit. This helps customers find you nearby.
+                  {t('obGeoNote')}
                 </Text>
               </View>
 
 
-              <Text style={styles.label}>How will you deliver orders? <Text style={styles.req}>*</Text></Text>
+              <Text style={styles.label}>{t('obDeliverHow')} <Text style={styles.req}>*</Text></Text>
               <View style={styles.segmentRow}>
                 {DELIVERY_TYPES.map(dt => (
                   <TouchableOpacity
@@ -2013,7 +2040,7 @@ onComplete?.();
                     onPress={() => setDeliveryType(dt.id)}
                   >
                     <Text style={[styles.segBtnText, deliveryType === dt.id && styles.segBtnTextActive, { textAlign: 'center', fontSize: 11 }]}>
-                      {dt.label}
+                      {t(dt.labelKey)}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -2027,13 +2054,13 @@ onComplete?.();
               <View style={styles.infoBox}>
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   <MaterialIcons name="assignment" size={14} color="#047857" style={{ marginTop: 2 }} />
-                  <Text style={styles.infoText}>These details are required for shop verification. Your shop will be reviewed by our team before going live.</Text>
+                  <Text style={styles.infoText}>{t('obComplianceInfo')}</Text>
                 </View>
               </View>
-              <Text style={styles.label}>FSSAI License Number <Text style={styles.req}>*</Text></Text>
+              <Text style={styles.label}>{t('obFssai')} <Text style={styles.req}>*</Text></Text>
               <TextInput
   style={styles.input}
-  placeholder="14-digit FSSAI number"
+  placeholder={t('obFssaiPh')}
   keyboardType="numeric"
   maxLength={14}
   value={fssai}
@@ -2041,12 +2068,12 @@ onComplete?.();
     setFssai(value.replace(/[^0-9]/g, '').slice(0, 14))
   }
 />
-              <Text style={styles.hintText}>Required for food businesses.</Text>
+              <Text style={styles.hintText}>{t('obFssaiHint')}</Text>
 
-              <Text style={styles.label}>GST Number <Text style={styles.req}>*</Text></Text>
+              <Text style={styles.label}>{t('obGst')} <Text style={styles.req}>*</Text></Text>
               <TextInput
   style={styles.input}
-  placeholder="15-character GST number"
+  placeholder={t('obGstPh')}
   maxLength={15}
   autoCapitalize="characters"
   autoCorrect={false}
@@ -2055,10 +2082,10 @@ onComplete?.();
     setGst(value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15))
   }/>
 
-              <Text style={styles.label}>Aadhaar Number (Optional)</Text>
+              <Text style={styles.label}>{t('obAadhaar')}</Text>
               <TextInput
   style={styles.input}
-  placeholder="12-digit Aadhaar number"
+  placeholder={t('obAadhaarPh')}
   keyboardType="numeric"
   maxLength={12}
   value={aadhar}
@@ -2067,10 +2094,10 @@ onComplete?.();
   }
 />
 
-              <Text style={styles.label}>PAN Number (Optional)</Text>
+              <Text style={styles.label}>{t('obPan')}</Text>
               <TextInput
   style={styles.input}
-  placeholder="10-character PAN number"
+  placeholder={t('obPanPh')}
   maxLength={10}
   autoCapitalize="characters"
   autoCorrect={false}
@@ -2080,36 +2107,36 @@ onComplete?.();
   }
 />
 
-              <Text style={styles.label}>Trade License Number (Optional)</Text>
-              <TextInput style={styles.input} placeholder="Enter Trade License number" maxLength={50} value={tradeLicense} onChangeText={setTradeLicense} />
+              <Text style={styles.label}>{t('obTradeLicense')}</Text>
+              <TextInput style={styles.input} placeholder={t('obTradeLicensePh')} maxLength={50} value={tradeLicense} onChangeText={setTradeLicense} />
 
               <View style={[styles.infoBox, { marginTop: 16 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                   <MaterialIcons name="hourglass-empty" size={14} color="#047857" />
-                  <Text style={[styles.infoText, { fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", marginBottom: 0 }]}>Admin Approval Process</Text>
+                  <Text style={[styles.infoText, { fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", marginBottom: 0 }]}>{t('obAdminApproval')}</Text>
                 </View>
                 <Text style={styles.infoText}>
-                  Once you submit, our team will verify your FSSAI & GST details within <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>24–48 hours</Text>. You'll receive an email once approved. Your shop will not be visible to customers until then.
+                  {t('obApprovalA')} <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>{t('obHours')}</Text>{t('obApprovalB')}
                 </Text>
               </View>
 
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 12 }}>
                 <MaterialIcons name="description" size={18} color={PRIMARY} />
-                <Text style={[styles.sectionSep, { marginTop: 0, marginBottom: 0 }]}>Document Upload (optional — speeds up approval)</Text>
+                <Text style={[styles.sectionSep, { marginTop: 0, marginBottom: 0 }]}>{t('obDocUpload')}</Text>
               </View>
               {[
-                { label: 'FSSAI Certificate', key: 'fssai' },
-                { label: 'GST Registration Certificate', key: 'gst' },
+                { label: t('obDocFssai'), key: 'fssai' },
+                { label: t('obDocGst'), key: 'gst' },
               ].map(doc => (
                 <View key={doc.key}>
                   <Text style={styles.label}>{doc.label}</Text>
                   {docUrls[doc.key] ? (
                     <View style={styles.uploadedBox}>
                       <MaterialIcons name="check-circle" size={18} color="#16A34A" style={{ marginRight: 6 }} />
-                      <Text style={styles.uploadedText} numberOfLines={1}>Document uploaded successfully</Text>
+                      <Text style={styles.uploadedText} numberOfLines={1}>{t('obDocUploaded')}</Text>
                       <TouchableOpacity onPress={() => setDocUrls(prev => ({ ...prev, [doc.key]: null }))} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                         <MaterialIcons name="close" size={13} color="#EF4444" />
-                        <Text style={styles.uploadRemove}>Remove</Text>
+                        <Text style={styles.uploadRemove}>{t('obRemove')}</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
@@ -2124,9 +2151,9 @@ onComplete?.();
                         <MaterialIcons name="folder-open" size={24} color="#9CA3AF" />
                       )}
                       <Text style={styles.uploadText}>
-                        {docUploading[doc.key] ? 'Uploading…' : 'Tap to upload PDF or photo'}
+                        {docUploading[doc.key] ? t('obUploading') : t('obTapUpload')}
                       </Text>
-                      <Text style={styles.uploadHint}>Max 10MB</Text>
+                      <Text style={styles.uploadHint}>{t('obMax10')}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -2140,24 +2167,24 @@ onComplete?.();
               <View style={styles.infoBox}>
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   <MaterialIcons name="lightbulb-outline" size={14} color="#047857" style={{ marginTop: 2 }} />
-                  <Text style={styles.infoText}>Payments settled within 2 business days after delivery confirmation.</Text>
+                  <Text style={styles.infoText}>{t('obPayInfo')}</Text>
                 </View>
               </View>
-              <Text style={styles.sectionLabel}>UPI ID (Recommended)</Text>
-              <TextInput style={styles.input} placeholder="yourname@upi or phone@paytm" value={upiId} onChangeText={setUpiId} autoCapitalize="none" />
+              <Text style={styles.sectionLabel}>{t('obUpi')}</Text>
+              <TextInput style={styles.input} placeholder={t('obUpiPh')} value={upiId} onChangeText={setUpiId} autoCapitalize="none" />
               <View style={styles.dividerRow}>
                 <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>OR Bank Account</Text>
+                <Text style={styles.dividerText}>{t('obOrBank')}</Text>
                 <View style={styles.dividerLine} />
               </View>
-              <Text style={styles.label}>Account Holder Name</Text>
-              <TextInput style={styles.input} placeholder="As per bank records" value={accountName} onChangeText={setAccountName} />
-              <Text style={styles.label}>Bank Name</Text>
+              <Text style={styles.label}>{t('obAccHolder')}</Text>
+              <TextInput style={styles.input} placeholder={t('obAccHolderPh')} value={accountName} onChangeText={setAccountName} />
+              <Text style={styles.label}>{t('obBankName')}</Text>
               <BankNameDropdown
                 value={bankName}
                 onChange={(v) => { setBankName(v); setBranch(''); }}
               />
-              <Text style={styles.label}>Bank Branch</Text>
+              <Text style={styles.label}>{t('obBankBranch')}</Text>
               <BranchPicker
                 bankName={bankName}
                 value={branch}
@@ -2166,10 +2193,10 @@ onComplete?.();
                   setIfsc(code.toUpperCase());
                 }}
               />
-              <Text style={styles.label}>Account Number</Text>
+              <Text style={styles.label}>{t('obAccNumber')}</Text>
 <TextInput
   style={styles.input}
-  placeholder="Enter account number"
+  placeholder={t('obAccNumberPh')}
   keyboardType="number-pad"
   secureTextEntry
   value={accountNumber}
@@ -2179,12 +2206,12 @@ onComplete?.();
   }}
   maxLength={16}
 />
-              <Text style={styles.label}>IFSC Code</Text>
-              <TextInput style={styles.input} placeholder="e.g. SBIN0001234" autoCapitalize="characters" maxLength={11} value={ifsc} onChangeText={v => setIfsc(v.toUpperCase())} />
+              <Text style={styles.label}>{t('obIfsc')}</Text>
+              <TextInput style={styles.input} placeholder={t('obIfscPh')} autoCapitalize="characters" maxLength={11} value={ifsc} onChangeText={v => setIfsc(v.toUpperCase())} />
               {ifscStatus?.status === 'loading' ? (
                 <View style={styles.ifscStatusRow}>
                   <ActivityIndicator size="small" color="#999" />
-                  <Text style={styles.ifscStatusTextMuted}>Verifying IFSC…</Text>
+                  <Text style={styles.ifscStatusTextMuted}>{t('obIfscVerifying')}</Text>
                 </View>
               ) : ifscStatus?.status === 'found' ? (
                 <View style={styles.ifscStatusRow}>
@@ -2196,12 +2223,12 @@ onComplete?.();
               ) : ifscStatus?.status === 'notfound' ? (
                 <View style={styles.ifscStatusRow}>
                   <MaterialIcons name="cancel" size={15} color="#DC2626" />
-                  <Text style={styles.ifscStatusTextErr}>IFSC not found — double-check the code</Text>
+                  <Text style={styles.ifscStatusTextErr}>{t('obIfscNotFound')}</Text>
                 </View>
               ) : ifscStatus?.status === 'error' ? (
                 <View style={styles.ifscStatusRow}>
                   <MaterialIcons name="error-outline" size={15} color="#B8860B" />
-                  <Text style={styles.ifscStatusTextMuted}>Couldn't verify right now — you can still continue</Text>
+                  <Text style={styles.ifscStatusTextMuted}>{t('obIfscError')}</Text>
                 </View>
               ) : null}
             </View>
@@ -2212,8 +2239,8 @@ onComplete?.();
             <View style={styles.form}>
               <View style={styles.modeToggle}>
                 {[
-                  { key: 'generic', label: 'Catalog', icon: 'shopping-basket' },
-                  { key: 'manual', label: 'Manual', icon: 'edit' },
+                  { key: 'generic', label: t('obModeCatalog'), icon: 'shopping-basket' },
+                  { key: 'manual', label: t('obModeManual'), icon: 'edit' },
                   { key: 'csv', label: 'CSV', icon: 'insert-drive-file' },
                 ].map(m => (
                   <TouchableOpacity
@@ -2233,7 +2260,7 @@ onComplete?.();
                   {/* Category Navigation / Breadcrumbs */}
                   {categoryStack.length > 0 && (
                     <TouchableOpacity onPress={handleBackCategory} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                      <Text style={{ fontSize: 16, color: PRIMARY, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>← {currentCategory?.name || 'Back'}</Text>
+                      <Text style={{ fontSize: 16, color: PRIMARY, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>← {currentCategory?.name || t('obBack')}</Text>
                     </TouchableOpacity>
                   )}
 
@@ -2244,7 +2271,7 @@ onComplete?.();
                       {/* Hierarchical Categories */}
                       {masterCategories.length > 0 && (
                         <View>
-                          <Text style={styles.sectionLabel}>Select Category</Text>
+                          <Text style={styles.sectionLabel}>{t('obSelectCategoryLabel')}</Text>
                           <View style={styles.segmentGrid}>
                             {masterCategories.map(cat => (
                               <TouchableOpacity
@@ -2271,14 +2298,14 @@ onComplete?.();
                         <View>
                           <TextInput
                             style={[styles.input, { marginBottom: 16 }]}
-                            placeholder={`Search in ${currentCategory.name}...`}
+                            placeholder={t('obSearchIn', { name: currentCategory.name })}
                             value={prodSearch}
                             onChangeText={setProdSearch}
                           />
                           <View style={styles.selAllRow}>
-                            <Text style={styles.catalogMeta}>{currentCategory.products.length} items available</Text>
+                            <Text style={styles.catalogMeta}>{t('obItemsAvailable', { count: currentCategory.products.length })}</Text>
                             <TouchableOpacity onPress={() => currentCategory.products.forEach(p => toggleProduct(p))}>
-                              <Text style={styles.selAllBtn}>Select all</Text>
+                              <Text style={styles.selAllBtn}>{t('obSelectAll')}</Text>
                             </TouchableOpacity>
                           </View>
 
@@ -2318,14 +2345,14 @@ onComplete?.();
                       {masterCategories.length === 0 && (!currentCategory?.products || currentCategory.products.length === 0) && !loadingCatalog && (
                         <View style={styles.emptyState}>
                           <MaterialIcons name="search" size={44} color="#9CA3AF" style={{ marginBottom: 8 }} />
-                          <Text style={styles.emptyTitle}>No items found</Text>
+                          <Text style={styles.emptyTitle}>{t('obNoItems')}</Text>
                         </View>
                       )}
                     </View>
                   )}
 
                   <TouchableOpacity style={[styles.cantFindBtn, { marginTop: 20 }]} onPress={() => setAddMode('manual')}>
-                    <Text style={styles.cantFindText}>+ Can't find your product? Add it manually</Text>
+                    <Text style={styles.cantFindText}>{t('obCantFind')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -2336,11 +2363,11 @@ onComplete?.();
                   {manualProds.map((product, index) => (
                     <View key={index} style={styles.productCard}>
                       <View style={styles.productCardHeader}>
-                        <Text style={styles.productCardNum}>Product {index + 1}</Text>
+                        <Text style={styles.productCardNum}>{t('obProductN', { n: index + 1 })}</Text>
                         {manualProds.length > 1 && (
                           <TouchableOpacity onPress={() => removeManualRow(index)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                             <MaterialIcons name="close" size={13} color="#EF4444" />
-                            <Text style={styles.removeBtn}>Remove</Text>
+                            <Text style={styles.removeBtn}>{t('obRemove')}</Text>
                           </TouchableOpacity>
                         )}
                       </View>
@@ -2372,14 +2399,14 @@ onComplete?.();
                         <View style={{ flex: 1 }}>
                           <Text style={styles.photoHint}>
                             {product.image_url && urlInputIdx !== index
-                              ? 'Photo uploaded! Tap close icon to remove.'
-                              : `Add a photo for better visibility.\nCustomers trust shops with product photos.`}
+                              ? t('obPhotoUploaded')
+                              : t('obPhotoHint')}
                           </Text>
                           {product.image_url && urlInputIdx !== index ? null : urlInputIdx === index ? (
                             <View style={styles.urlInputRow}>
                               <TextInput
                                 style={[styles.input, { flex: 1, marginBottom: 0 }]}
-                                placeholder="Paste image URL…"
+                                placeholder={t('obPasteUrl')}
                                 autoCapitalize="none"
                                 autoCorrect={false}
                                 keyboardType="url"
@@ -2391,7 +2418,7 @@ onComplete?.();
                                 activeOpacity={0.8}
                                 onPress={() => setUrlInputIdx(null)}
                               >
-                                <Text style={styles.urlApplyText}>{product.image_url ? 'Use' : 'Cancel'}</Text>
+                                <Text style={styles.urlApplyText}>{product.image_url ? t('obUse') : t('obCancel')}</Text>
                               </TouchableOpacity>
                             </View>
                           ) : (
@@ -2401,32 +2428,32 @@ onComplete?.();
                               onPress={() => setUrlInputIdx(index)}
                             >
                               <MaterialIcons name="link" size={14} color={PRIMARY} />
-                              <Text style={styles.urlLinkText}>Use image URL</Text>
+                              <Text style={styles.urlLinkText}>{t('obUseImageUrl')}</Text>
                             </TouchableOpacity>
                           )}
                         </View>
                       </View>
 
-                      <Text style={styles.label}>Product Name <Text style={styles.req}>*</Text></Text>
+                      <Text style={styles.label}>{t('obProductName')} <Text style={styles.req}>*</Text></Text>
                       <TextInput
-                        style={styles.input} placeholder="e.g. Loose Basmati Rice"
+                        style={styles.input} placeholder={t('obProductNamePh')}
                         value={product.name} onChangeText={v => updateManualProd(index, 'name', v)}
                       />
 
-                      <Text style={styles.label}>Brand</Text>
+                      <Text style={styles.label}>{t('obBrand')}</Text>
                       <TextInput
-                        style={styles.input} placeholder="e.g. Amul, Nestle, Tata..."
+                        style={styles.input} placeholder={t('obBrandPh')}
                         value={product.brand} onChangeText={v => updateManualProd(index, 'brand', v)}
                       />
 
-                      <Text style={styles.label}>Description</Text>
+                      <Text style={styles.label}>{t('obDescription')}</Text>
                       <TextInput
-                        style={[styles.input, styles.textArea]} placeholder="Optional product details..."
+                        style={[styles.input, styles.textArea]} placeholder={t('obDescriptionPh')}
                         value={product.description} onChangeText={v => updateManualProd(index, 'description', v)}
                         multiline
                       />
 
-                      <Text style={styles.label}>Category <Text style={styles.req}>*</Text></Text>
+                      <Text style={styles.label}>{t('obCategory')} <Text style={styles.req}>*</Text></Text>
                       <ProductCategoryDropdown
                         topCategories={catTopOptions}
                         loading={catTopLoading}
@@ -2437,16 +2464,16 @@ onComplete?.();
 
                       <View style={styles.row}>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.label}>Item Type</Text>
+                          <Text style={styles.label}>{t('obItemType')}</Text>
                           <View style={styles.segmentRow}>
-                            {['loose', 'packed'].map(t => (
+                            {['loose', 'packed'].map(tp => (
                               <TouchableOpacity
-                                key={t}
-                                style={[styles.segBtn, product.type === t && styles.segBtnActive]}
-                                onPress={() => updateManualProd(index, 'type', t)}
+                                key={tp}
+                                style={[styles.segBtn, product.type === tp && styles.segBtnActive]}
+                                onPress={() => updateManualProd(index, 'type', tp)}
                               >
-                                <Text style={[styles.segBtnText, product.type === t && styles.segBtnTextActive]}>
-                                  {t === 'loose' ? 'Loose' : 'Packed'}
+                                <Text style={[styles.segBtnText, product.type === tp && styles.segBtnTextActive]}>
+                                  {tp === 'loose' ? t('obLoose') : t('obPacked')}
                                 </Text>
                               </TouchableOpacity>
                             ))}
@@ -2454,7 +2481,7 @@ onComplete?.();
                         </View>
                         <View style={{ width: 12 }} />
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.label}>Unit <Text style={styles.req}>*</Text></Text>
+                          <Text style={styles.label}>{t('obUnit')} <Text style={styles.req}>*</Text></Text>
                           {Platform.OS === 'web' ? (
                             <select
                               value={product.unit || ''}
@@ -2475,7 +2502,7 @@ onComplete?.();
                                 cursor: 'pointer',
                               }}
                             >
-                              <option value="" disabled>Select Unit...</option>
+                              <option value="" disabled>{t('obSelectUnit')}</option>
                               {MANUAL_UNIT_OPTIONS.map((u) => (
                                 <option key={u} value={u} style={{ color: '#111827' }}>
                                   {u}
@@ -2493,7 +2520,7 @@ onComplete?.();
                                 onPress={() => setUnitOpenIdx(unitOpenIdx === index ? null : index)}
                               >
                                 <Text style={[styles.dropdownValue, !product.unit && styles.dropdownPlaceholder]}>
-                                  {product.unit || 'Select Unit...'}
+                                  {product.unit || t('obSelectUnit')}
                                 </Text>
                                 <MaterialIcons name={unitOpenIdx === index ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#666" />
                               </TouchableOpacity>
@@ -2518,7 +2545,7 @@ onComplete?.();
 
                       {product.type === 'loose' && (
                         <View style={{ marginTop: 10 }}>
-                          <Text style={styles.label}>Available Quantities <Text style={styles.req}>*</Text></Text>
+                          <Text style={styles.label}>{t('obAvailableQty')} <Text style={styles.req}>*</Text></Text>
                           <View style={styles.chipGrid}>
                             {['50g', '100g', '200g', '250g', '500g', '1kg'].map(w => {
                               const isSel = product.weight_options?.includes(w);
@@ -2543,18 +2570,18 @@ onComplete?.();
 
                       <View style={styles.row}>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.label}>MRP (₹) <Text style={styles.req}>*</Text></Text>
+                          <Text style={styles.label}>{t('obMrp')} <Text style={styles.req}>*</Text></Text>
                           <TextInput
-                            style={styles.input} placeholder="Max retail price"
+                            style={styles.input} placeholder={t('obMrpPh')}
                             keyboardType="numeric" value={product.mrp}
                             onChangeText={v => updateManualProd(index, 'mrp', v)}
                           />
                         </View>
                         <View style={{ width: 12 }} />
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.label}>Selling Price (₹) <Text style={styles.req}>*</Text></Text>
+                          <Text style={styles.label}>{t('obSellingPrice')} <Text style={styles.req}>*</Text></Text>
                           <TextInput
-                            style={styles.input} placeholder="Your price"
+                            style={styles.input} placeholder={t('obSellingPh')}
                             keyboardType="numeric" value={product.sp}
                             onChangeText={v => updateManualProd(index, 'sp', v)}
                           />
@@ -2563,7 +2590,7 @@ onComplete?.();
                     </View>
                   ))}
                   <TouchableOpacity style={styles.addRowBtn} onPress={addManualRow}>
-                    <Text style={styles.addRowBtnText}>+ Add Another Product</Text>
+                    <Text style={styles.addRowBtnText}>{t('obAddAnother')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -2574,25 +2601,25 @@ onComplete?.();
                   <View style={styles.infoBox}>
                     <View style={{ flexDirection: 'row', gap: 6 }}>
                       <MaterialIcons name="assignment" size={14} color="#047857" style={{ marginTop: 2 }} />
-                      <Text style={styles.infoText}>Paste CSV with headers:</Text>
+                      <Text style={styles.infoText}>{t('obCsvHeaders')}</Text>
                     </View>
                     <Text style={[styles.infoText, styles.codeText]}>{SAMPLE_CSV}</Text>
                   </View>
                   <TextInput
                     style={[styles.input, styles.csvInput]}
-                    placeholder="Paste CSV data here..."
+                    placeholder={t('obCsvPh')}
                     value={csvText} onChangeText={setCsvText}
                     multiline numberOfLines={8}
                   />
                   <TouchableOpacity style={[styles.parseBtn, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} onPress={parseCSV}>
                     <MaterialIcons name="file-download" size={16} color="#fff" />
-                    <Text style={styles.parseBtnText}>Parse & Preview</Text>
+                    <Text style={styles.parseBtnText}>{t('obParsePreview')}</Text>
                   </TouchableOpacity>
                   {csvPreview.length > 0 && (
                     <View style={styles.previewBox}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                         <MaterialIcons name="check-circle" size={16} color="#16A34A" />
-                        <Text style={styles.previewTitle}>{csvPreview.length} products ready</Text>
+                        <Text style={styles.previewTitle}>{t('obProductsReady', { count: csvPreview.length })}</Text>
                       </View>
                       {csvPreview.slice(0, 3).map((p, i) => (
                         <Text key={i} style={styles.previewItem}>• {p.name} — MRP ₹{p.mrp} / SP ₹{p.sp} / {p.unit}</Text>
@@ -2610,15 +2637,15 @@ onComplete?.();
               <View style={styles.infoBox}>
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   <MaterialIcons name="assessment" size={14} color="#047857" style={{ marginTop: 2 }} />
-                  <Text style={styles.infoText}>Review pricing and stock. You can edit anytime from your dashboard.</Text>
+                  <Text style={styles.infoText}>{t('obReviewInfo')}</Text>
                 </View>
               </View>
               {getAllProducts().length === 0 ? (
                 <View style={styles.emptyState}>
                   <MaterialIcons name="inventory" size={44} color="#9CA3AF" style={{ marginBottom: 8 }} />
-                  <Text style={styles.emptyTitle}>No products added</Text>
+                  <Text style={styles.emptyTitle}>{t('obNoProducts')}</Text>
                   <TouchableOpacity onPress={() => setCurrentStep(4)}>
-                    <Text style={{ color: PRIMARY, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", marginTop: 8 }}>← Go back and add products</Text>
+                    <Text style={{ color: PRIMARY, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", marginTop: 8 }}>{t('obGoBackAdd')}</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -2631,7 +2658,7 @@ onComplete?.();
                       </Text>
                       <View style={[styles.typeBadge, product.type === 'loose' ? styles.badgeLoose : styles.badgePacked, { marginTop: 4 }]}>
                         <Text style={[styles.typeBadgeText, product.type === 'loose' ? styles.badgeLooseText : styles.badgePackedText]}>
-                          {product.type || 'packed'}
+                          {(product.type || 'packed') === 'loose' ? t('obLoose') : t('obPacked')}
                         </Text>
                       </View>
                       {/* Show weight options in review */}
@@ -2646,10 +2673,10 @@ onComplete?.();
                       )}
                     </View>
                     <View style={styles.inventoryRight}>
-                      <Text style={styles.inventoryMrp}>MRP ₹{product.mrp}</Text>
-                      <Text style={styles.inventoryPrice}>SP ₹{product.sp || product.price}</Text>
+                      <Text style={styles.inventoryMrp}>{t('obMrpLabel', { price: product.mrp })}</Text>
+                      <Text style={styles.inventoryPrice}>{t('obSpLabel', { price: product.sp || product.price })}</Text>
                       <Text style={styles.inventoryStock}>
-                        {product.is_active !== false ? "Available" : "Unavailable"}
+                        {product.is_active !== false ? t('obAvailable') : t('obUnavailable')}
                       </Text>
                     </View>
                   </View>
@@ -2663,21 +2690,21 @@ onComplete?.();
             <View>
               <View style={styles.goLiveContainer}>
                 <MaterialIcons name="stars" size={44} color="#D97706" style={{ marginBottom: 8 }} />
-                <Text style={styles.goLiveTitle}>Almost live!</Text>
-                <Text style={styles.goLiveSub}>Here's your shop summary before submission.</Text>
+                <Text style={styles.goLiveTitle}>{t('obAlmostLive')}</Text>
+                <Text style={styles.goLiveSub}>{t('obSummarySub')}</Text>
               </View>
               <View style={styles.summaryCard}>
                 {[
-                  { icon: 'store', label: 'Shop Name', value: shopName || '—' },
-                  { icon: 'person', label: 'Owner', value: ownerName || '—' },
-                  { icon: 'location-on', label: 'Location', value: shopLoc.city && shopLoc.pincode ? `${shopLoc.city} – ${shopLoc.pincode}` : '—' },
-                  { icon: 'assignment', label: 'FSSAI / GST', value: `${fssai || '—'} / ${gst || '—'}` },
-                  ...(aadhar ? [{ icon: 'badge', label: 'Aadhaar', value: aadhar }] : []),
-                  ...(pan ? [{ icon: 'description', label: 'PAN', value: pan }] : []),
-                  ...(tradeLicense ? [{ icon: 'receipt-long', label: 'Trade License', value: tradeLicense }] : []),
-                  { icon: 'inventory', label: 'Products', value: `${getAllProducts().length} products ready` },
-                  { icon: 'payment', label: 'Payment', value: upiId || (accountNumber ? 'Bank account' : 'Not set') },
-                  { icon: 'local-shipping', label: 'Delivery', value: deliveryType === 'partner' ? 'Via Delivery Boy' : 'Own Staff / Self' },
+                  { icon: 'store', label: t('obShopName'), value: shopName || '—' },
+                  { icon: 'person', label: t('obSumOwner'), value: ownerName || '—' },
+                  { icon: 'location-on', label: t('obSumLocation'), value: shopLoc.city && shopLoc.pincode ? `${shopLoc.city} – ${shopLoc.pincode}` : '—' },
+                  { icon: 'assignment', label: t('obSumFssaiGst'), value: `${fssai || '—'} / ${gst || '—'}` },
+                  ...(aadhar ? [{ icon: 'badge', label: t('obSumAadhaar'), value: aadhar }] : []),
+                  ...(pan ? [{ icon: 'description', label: t('obSumPan'), value: pan }] : []),
+                  ...(tradeLicense ? [{ icon: 'receipt-long', label: t('obSumTrade'), value: tradeLicense }] : []),
+                  { icon: 'inventory', label: t('obSumProducts'), value: t('obProductsReady', { count: getAllProducts().length }) },
+                  { icon: 'payment', label: t('obSumPayment'), value: upiId || (accountNumber ? t('obBankAccount') : t('obNotSet')) },
+                  { icon: 'local-shipping', label: t('obSumDelivery'), value: deliveryType === 'partner' ? t('obDeliveryViaPartner') : t('obDeliverySelf') },
                 ].map((row, i, arr) => (
                   <View key={row.label}>
                     <View style={styles.summaryRow}>
@@ -2695,7 +2722,7 @@ onComplete?.();
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   <MaterialIcons name="check-circle" size={14} color="#047857" style={{ marginTop: 2 }} />
                   <Text style={styles.infoText}>
-                    Your shop will be reviewed within <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>24–48 hours</Text>. You'll be notified at <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>{email || 'your email'}</Text> once approved and live.
+                    {t('obReviewA')} <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>{t('obHours')}</Text>{t('obReviewB')} <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>{email || t('obYourEmail')}</Text> {t('obReviewC')}
                   </Text>
                 </View>
               </View>
@@ -2705,10 +2732,10 @@ onComplete?.();
           {/* Trust footer */}
           <View style={styles.trustFooter}>
             {[
-              { icon: 'groups', title: 'Trusted by', sub: '1000+ sellers across India' },
-              { icon: 'flash-on', title: 'Fast Onboarding', sub: 'Get your shop online in minutes' },
-              { icon: 'support-agent', title: '24/7 Support', sub: "We're here to help you grow" },
-              { icon: 'verified-user', title: 'Secure & Reliable', sub: 'Bank-grade security you can trust' },
+              { icon: 'groups', title: t('obTrust1T'), sub: t('obTrust1S') },
+              { icon: 'flash-on', title: t('obTrust2T'), sub: t('obTrust2S') },
+              { icon: 'support-agent', title: t('obTrust3T'), sub: t('obTrust3S') },
+              { icon: 'verified-user', title: t('obTrust4T'), sub: t('obTrust4S') },
             ].map((item) => (
               <View key={item.title} style={styles.trustItem}>
                 <View style={styles.trustIconCircle}>
@@ -2729,7 +2756,7 @@ onComplete?.();
         <View style={styles.bottomBarRow}>
           {currentStep > 1 && (
             <TouchableOpacity style={styles.backBtn} onPress={() => setCurrentStep(prev => prev - 1)}>
-              <Text style={styles.backText}>← Back</Text>
+              <Text style={styles.backText}>← {t('obBack')}</Text>
             </TouchableOpacity>
           )}
           {currentStep === 1 && (
@@ -2738,16 +2765,16 @@ onComplete?.();
               activeOpacity={0.8}
               onPress={() => {
                 Alert.alert(
-                  'Progress saved',
-                  'Your details are saved. Come back anytime to finish setting up your shop.',
-                  [{ text: 'OK', onPress: () => navigation.goBack?.() }]
+                  t('obProgressSaved'),
+                  t('obProgressSavedMsg'),
+                  [{ text: t('obOk'), onPress: () => navigation.goBack?.() }]
                 );
               }}
             >
               <MaterialIcons name="bookmark-border" size={16} color={PRIMARY} />
               <View>
-                <Text style={styles.saveExitText}>Save &amp; Exit</Text>
-                <Text style={styles.saveExitSub}>Continue later</Text>
+                <Text style={styles.saveExitText}>{t('obSaveExit')}</Text>
+                <Text style={styles.saveExitSub}>{t('obContinueLater')}</Text>
               </View>
             </TouchableOpacity>
           )}
@@ -2761,13 +2788,13 @@ onComplete?.();
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <ActivityIndicator color="#fff" size="small" />
                 <Text style={styles.nextText}>
-                  {geocoding ? 'Detecting location…' : 'Submitting…'}
+                  {geocoding ? t('obDetectingLocation') : t('obSubmitting')}
                 </Text>
               </View>
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Text style={styles.nextText}>
-                  {currentStep === STEPS.length ? 'Submit & Go Live' : 'Save & Continue'}
+                  {currentStep === STEPS.length ? t('obSubmitGoLive') : t('obSaveContinue')}
                 </Text>
                 <MaterialIcons name="arrow-forward" size={17} color="#fff" />
               </View>
@@ -2776,7 +2803,7 @@ onComplete?.();
         </View>
         <View style={styles.secureRow}>
           <MaterialIcons name="check-circle" size={12} color={SUBTLE} />
-          <Text style={styles.secureText}>All changes are saved automatically</Text>
+          <Text style={styles.secureText}>{t('obAutoSaved')}</Text>
         </View>
       </View>
     </View>
@@ -2791,18 +2818,13 @@ const styles = StyleSheet.create({
     backgroundColor: BG,
   },
 
-topBar: {
-  backgroundColor: '#fff',
-  paddingTop: 50,
-  paddingBottom: 16,
-  paddingHorizontal: 16,
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  borderBottomWidth: 1,
-  borderBottomColor: BORDER,
-  width: '100%',
-},
+  topBar: {
+    backgroundColor: '#fff', paddingTop: 50, paddingBottom: 16,
+    paddingHorizontal: 16, flexDirection: 'row',
+    justifyContent: 'space-between', alignItems: 'center',
+    borderBottomWidth: 1, borderBottomColor: BORDER,
+    overflow: 'hidden', width: '100%',
+  },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, overflow: 'hidden' },
   brandIconWrap: {
     width: 36, height: 36, borderRadius: 11, backgroundColor: PRIMARY,
