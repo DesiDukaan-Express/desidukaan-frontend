@@ -53,10 +53,42 @@ const STEP_HERO = [
   { titleKey: 'goLiveHeroTitle', subKey: 'goLiveHeroSub' },
 ];
 
-const isValidShopEmail = (value) =>
-  /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/.test(
-    value.trim()
-  );
+// Names: English letters and spaces only
+const NAME_REGEX = /^[A-Za-z]+(?:\s+[A-Za-z]+)*$/;
+
+const isValidName = (value) =>
+  NAME_REGEX.test((value || '').trim());
+
+// Only accept these email domains.
+// Add more trusted domains here if your vendors use them.
+const ALLOWED_EMAIL_DOMAINS = [
+  'gmail.com',
+  'googlemail.com',
+  'yahoo.com',
+  'yahoo.co.in',
+  'outlook.com',
+  'hotmail.com',
+  'live.com',
+  'icloud.com',
+  'rediffmail.com',
+  'protonmail.com',
+  'proton.me',
+];
+
+const isValidShopEmail = (value) => {
+  const emailValue = (value || '').trim().toLowerCase();
+
+  // Basic email structure
+  const emailRegex =
+    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
+
+  if (!emailRegex.test(emailValue)) return false;
+
+  const domain = emailValue.split('@')[1];
+
+  // Exact domain match prevents gmail typos and .co mistakes
+  return ALLOWED_EMAIL_DOMAINS.includes(domain);
+};
 
 const isValidEstYear = (value) =>
   /^\d{4}$/.test(value) &&
@@ -1161,6 +1193,20 @@ const { t } = useTranslation();
     if (currentStep === 1) {
       if (!shopName.trim()) { Alert.alert(t('obRequired'), t('obErrShopName')); return false; }
       if (!ownerName.trim()) { Alert.alert(t('obRequired'), t('obErrOwnerName')); return false; }
+      if (!isValidName(shopName)) {
+  Alert.alert(t('obInvalidName'), 'Shop name must contain only letters and spaces.');
+  return false;
+}
+
+if (!isValidName(ownerName)) {
+  Alert.alert(t('obInvalidName'), 'Owner name must contain only letters and spaces.');
+  return false;
+}
+
+if (altName.trim() && !isValidName(altName)) {
+  Alert.alert(t('obInvalidName'), 'Alternative contact name must contain only letters and spaces.');
+  return false;
+}
      if (!isValidEstYear(estYear)) {
   Alert.alert(
     t('obInvalidYear'),
@@ -1216,11 +1262,21 @@ t('obErrPan')
 return false;
 }
 }
-    if (currentStep === 3) {
-      if (!upiId.trim() && !accountNumber.trim()) {
-        Alert.alert(t('obRequired'), t('obErrPayment')); return false;
-      }
-    }
+if (currentStep === 3) {
+  if (!upiId.trim() && !accountNumber.trim()) {
+    Alert.alert(t('obRequired'), t('obErrPayment'));
+    return false;
+  }
+
+  // Validate bank account holder name
+  if (accountNumber.trim() && !isValidName(accountName)) {
+    Alert.alert(
+      t('obInvalidName'),
+      'Bank account holder name must contain only letters and spaces.'
+    );
+    return false;
+  }
+}
     if (currentStep === 4) {
       if (getAllProducts().length === 0) {
         Alert.alert(t('obRequired'), t('obErrNoProducts')); return false;
@@ -1721,7 +1777,15 @@ onComplete?.();
               </View>
               <View style={styles.inputIconWrap}>
                 <MaterialIcons name="storefront" size={17} color={SUBTLE} style={styles.inputIcon} />
-                <TextInput style={[styles.input, styles.inputWithIcon]} placeholder={t('obShopNamePh')} placeholderTextColor="#A6ACA4" value={shopName} onChangeText={setShopName} />
+                <TextInput
+  style={[styles.input, styles.inputWithIcon]}
+  placeholder={t('obShopNamePh')}
+  placeholderTextColor="#A6ACA4"
+  value={shopName}
+  onChangeText={(value) =>
+    setShopName(value.replace(/[^A-Za-z ]/g, ''))
+  }
+/>
               </View>
               <View style={styles.helperRow}>
                 <Text style={styles.helperText}>{t('obShopNameHelp')}</Text>
@@ -1733,23 +1797,42 @@ onComplete?.();
                 )}
               </View>
 
-              <View style={styles.labelRow}>
-                <Text style={styles.label}>{t('obOwnerName')} <Text style={styles.req}>*</Text></Text>
-                <MaterialIcons name="info-outline" size={13} color={SUBTLE} />
-              </View>
-              <View style={styles.inputIconWrap}>
-                <MaterialIcons name="person-outline" size={17} color={SUBTLE} style={styles.inputIcon} />
-                <TextInput style={[styles.input, styles.inputWithIcon]} placeholder={t('obOwnerNamePh')} placeholderTextColor="#A6ACA4" value={ownerName} onChangeText={setOwnerName} />
-              </View>
-              <View style={styles.helperRow}>
-                <Text style={styles.helperText}>{t('obOwnerNameHelp')}</Text>
-                {ownerName.trim().length > 0 && (
-                  <View style={styles.looksGoodRow}>
-                    <MaterialIcons name="check-circle" size={12} color={PRIMARY} />
-                    <Text style={styles.looksGoodText}>{t('obLooksGood')}</Text>
-                  </View>
-                )}
-              </View>
+<View style={styles.labelRow}>
+  <Text style={styles.label}>
+    {t('obOwnerName')} <Text style={styles.req}>*</Text>
+  </Text>
+  <MaterialIcons name="info-outline" size={13} color={SUBTLE} />
+</View>
+
+<View style={styles.inputIconWrap}>
+  <MaterialIcons
+    name="person-outline"
+    size={17}
+    color={SUBTLE}
+    style={styles.inputIcon}
+  />
+
+  <TextInput
+    style={[styles.input, styles.inputWithIcon]}
+    placeholder={t('obOwnerNamePh')}
+    placeholderTextColor="#A6ACA4"
+    value={ownerName}
+    onChangeText={(value) =>
+      setOwnerName(value.replace(/[^A-Za-z ]/g, ''))
+    }
+  />
+</View>
+
+<View style={styles.helperRow}>
+  <Text style={styles.helperText}>{t('obOwnerNameHelp')}</Text>
+
+  {ownerName.trim().length > 0 && (
+    <View style={styles.looksGoodRow}>
+      <MaterialIcons name="check-circle" size={12} color={PRIMARY} />
+      <Text style={styles.looksGoodText}>{t('obLooksGood')}</Text>
+    </View>
+  )}
+</View>
 
               <View style={styles.yearWhyRow}>
                 <Text style={styles.label}>{t('obEstYear')} <Text style={styles.req}>*</Text></Text>
@@ -1881,24 +1964,60 @@ onComplete?.();
               </View>
               <View style={styles.row}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>{t('obPrimaryName')} <Text style={styles.req}>*</Text></Text>
-                  <TextInput style={styles.input} placeholder={t('obName1Ph')} value={ownerName} onChangeText={setOwnerName} />
+<Text style={styles.label}>
+  {t('obPrimaryName')} <Text style={styles.req}>*</Text>
+</Text>
+
+<TextInput
+  style={styles.input}
+  placeholder={t('obPrimaryName')}
+  autoCapitalize="words"
+  value={ownerName}
+  onChangeText={(value) =>
+    setOwnerName(value.replace(/[^A-Za-z ]/g, ''))
+  }
+/>
                 </View>
                 <View style={{ width: 12 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>{t('obPrimaryPhone')} <Text style={styles.req}>*</Text></Text>
-                  <TextInput style={styles.input} placeholder={t('obPhonePh')} keyboardType="phone-pad" maxLength={10} value={phone} onChangeText={setPhone} />
+                 <TextInput
+  style={styles.input}
+  placeholder={t('obBackupPh')}
+  keyboardType="number-pad"
+  maxLength={10}
+  value={altPhone}
+  onChangeText={(value) =>
+    setAltPhone(value.replace(/[^0-9]/g, '').slice(0, 10))
+  }
+/>
                 </View>
               </View>
               <View style={styles.row}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>{t('obAltName')}</Text>
-                  <TextInput style={styles.input} placeholder={t('obName2Ph')} value={altName} onChangeText={setAltName} />
+                 <TextInput
+  style={styles.input}
+  placeholder={t('obName2Ph')}
+  value={altName}
+  onChangeText={(value) =>
+    setAltName(value.replace(/[^A-Za-z ]/g, ''))
+  }
+/>
                 </View>
                 <View style={{ width: 12 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>{t('obAltPhone')}</Text>
-                  <TextInput style={styles.input} placeholder={t('obBackupPh')} keyboardType="phone-pad" maxLength={10} value={altPhone} onChangeText={setAltPhone} />
+                  <TextInput
+  style={styles.input}
+  placeholder={t('obBackupPh')}
+  keyboardType="number-pad"
+  maxLength={10}
+  value={altPhone}
+  onChangeText={(value) =>
+    setAltPhone(value.replace(/[^0-9]/g, '').slice(0, 10))
+  }
+/>
                 </View>
               </View>
               <View style={styles.infoBox}>
@@ -2178,7 +2297,15 @@ onComplete?.();
                 <View style={styles.dividerLine} />
               </View>
               <Text style={styles.label}>{t('obAccHolder')}</Text>
-              <TextInput style={styles.input} placeholder={t('obAccHolderPh')} value={accountName} onChangeText={setAccountName} />
+              <TextInput
+  style={styles.input}
+  placeholder={t('obAccHolderPh')}
+  value={accountName}
+  onChangeText={(value) =>
+    setAccountName(value.replace(/[^A-Za-z ]/g, ''))
+  }
+  autoCapitalize="words"
+/>
               <Text style={styles.label}>{t('obBankName')}</Text>
               <BankNameDropdown
                 value={bankName}

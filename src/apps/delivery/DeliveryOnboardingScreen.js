@@ -73,97 +73,291 @@ const INITIAL_FORM = {
 // 2. VALIDATION  (per-field, used for on-blur + submit + section completion)
 // ─────────────────────────────────────────────────────────────────────────────
 
+
 const getVal = (form, key) =>
     key.split('.').reduce((o, p) => (o ? o[p] : undefined), form);
 
-// Validators return null (valid) or [translationKey, params] so the message can be
-// translated at render time and updates when the user changes language.
+// Indian-format regex patterns
+const DL_REGEX = /^[A-Z]{2}\d{13}$/;
+
+const VEHICLE_REGEX =
+    /^(?:[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{1,4}|\d{2}BH\d{4}[A-Z]{2})$/;
+
+const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+const ACCOUNT_REGEX = /^\d{9,18}$/;
+
+const HOLDER_REGEX = /^[A-Za-z][A-Za-z .'-]{1,79}$/;
+
+const BANK_NAME_REGEX =
+    /^[A-Za-z][A-Za-z0-9 &.'()-]{1,79}$/;
+
+const INSTITUTION_REGEX =
+    /^[A-Za-z0-9][A-Za-z0-9 .,'&()/-]{1,99}$/;
+
+const CURRENT_YEAR = new Date().getFullYear();
+
+const normalizeRegistration = (value = '') =>
+    value.replace(/[\s-]/g, '').toUpperCase();
+
 const validators = {
-    'profile.photoUrl': (_v, form) => (form.profile.photoUrl ? null : ['dobErrPhoto']),
+    // SECTION 1: PROFILE
+    'profile.photoUrl': (_v, form) =>
+        form.profile.photoUrl ? null : ['dobErrPhoto'],
 
+    // SECTION 2: DRIVING LICENCE
     'license.number': (v) => {
-        if (!v.trim()) return ['dobErrLicReq'];
-        if (!/^[A-Z]{2}[A-Z0-9]{6,18}$/.test(v.trim())) return ['dobErrLicFmt'];
+        const value = (v || '').trim().toUpperCase();
+
+        if (!value) return ['dobErrLicReq'];
+
+        if (!DL_REGEX.test(value))
+            return ['dobErrLicFmt'];
+
         return null;
     },
+
     'license.expiry': (v) => {
-        if (!v.trim()) return ['dobErrExpReq'];
-        const m = v.trim().match(/^(0[1-9]|1[0-2])\/(\d{4})$/);
-        if (!m) return ['dobErrExpFmt'];
-        const end = new Date(+m[2], +m[1], 0, 23, 59, 59);
-        if (end < new Date()) return ['dobErrExpired'];
+        const value = (v || '').trim();
+
+        if (!value) return ['dobErrExpReq'];
+
+        const match = value.match(/^(0[1-9]|1[0-2])\/(\d{4})$/);
+
+        if (!match) return ['dobErrExpFmt'];
+
+        const month = Number(match[1]);
+        const year = Number(match[2]);
+
+        if (year < 1900 || year > CURRENT_YEAR + 30)
+            return ['dobErrExpFmt'];
+
+        const expiryDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+        if (expiryDate < new Date())
+            return ['dobErrExpired'];
+
         return null;
     },
-    'license.photoUrl': (_v, form) => (form.license.photoUrl ? null : ['dobErrLicPhoto']),
 
-    'vehicle.type': (v) => (v ? null : ['dobErrVehType']),
+    'license.photoUrl': (_v, form) =>
+        form.license.photoUrl ? null : ['dobErrLicPhoto'],
+
+    // SECTION 3: VEHICLE
+    'vehicle.type': (v) =>
+        VEHICLE_TYPES.includes(v) ? null : ['dobErrVehType'],
+
     'vehicle.registration': (v) => {
-        if (!v.trim()) return ['dobErrRegReq'];
-        const compact = v.replace(/\s+/g, '').toUpperCase();
-        if (!/^[A-Z]{2}\d{2}[A-Z]{1,2}\d{4}$/.test(compact)) return ['dobErrRegFmt'];
+        const value = normalizeRegistration(v);
+
+        if (!value) return ['dobErrRegReq'];
+
+        if (!VEHICLE_REGEX.test(value))
+            return ['dobErrRegFmt'];
+
         return null;
     },
+
     'vehicle.year': (v) => {
-        if (!v.trim()) return null;
-        if (!/^(19|20)\d{2}$/.test(v.trim())) return ['dobErrYearFmt'];
-        const y = +v.trim();
-        if (y < 1990 || y > new Date().getFullYear() + 1) return ['dobErrYearRange', { max: new Date().getFullYear() + 1 }];
+        const value = (v || '').trim();
+
+        if (!value) return null;
+
+        if (!/^\d{4}$/.test(value))
+            return ['dobErrYearFmt'];
+
+        const year = Number(value);
+
+        if (year < 1990 || year > CURRENT_YEAR)
+            return ['dobErrYearRange', { max: CURRENT_YEAR }];
+
         return null;
     },
 
-    'rc.number': (v) => {
-        if (!v.trim()) return null;
-        if (!/^[A-Z0-9]{5,20}$/.test(v.trim())) return ['dobErrRcFmt'];
+    // SECTION 4: RC
+    'rc.number': (v, form) => {
+        const value = normalizeRegistration(v);
+        const vehicleNumber =
+            normalizeRegistration(form.vehicle.registration);
+
+        if (!value) return ['dobErrRcReq'];
+
+        if (!VEHICLE_REGEX.test(value))
+            return ['dobErrRcFmt'];
+
+        if (vehicleNumber && value !== vehicleNumber)
+            return ['dobErrRcMismatch'];
+
         return null;
     },
-    'rc.photoUrl': (_v, form) => (form.rc.photoUrl ? null : ['dobErrRcDoc']),
 
-    'bank.accountHolderName': (v) => (v.trim() ? null : ['dobErrHolder']),
-    'bank.accountNumber': (v) => (v.trim() ? null : ['dobErrAccNum']),
+    'rc.photoUrl': (_v, form) =>
+        form.rc.photoUrl ? null : ['dobErrRcDoc'],
+
+    // SECTION 5: BANK
+    'bank.accountHolderName': (v) => {
+        const value = (v || '').trim().replace(/\s+/g, ' ');
+
+        if (!value) return ['dobErrHolder'];
+
+        if (!HOLDER_REGEX.test(value))
+            return ['dobErrHolderFmt'];
+
+        return null;
+    },
+
+    'bank.bankName': (v) => {
+        const value = (v || '').trim();
+
+        if (!value) return null;
+
+        if (!BANK_NAME_REGEX.test(value))
+            return ['dobErrBankNameFmt'];
+
+        return null;
+    },
+
+    'bank.accountNumber': (v) => {
+        const value = (v || '').trim();
+
+        if (!value) return ['dobErrAccNum'];
+
+        if (!ACCOUNT_REGEX.test(value))
+            return ['dobErrAccFmt'];
+
+        return null;
+    },
+
     'bank.confirmAccount': (v, form) => {
-        if (!v.trim()) return ['dobErrConfirmReq'];
-        if (v !== form.bank.accountNumber) return ['dobErrConfirmMismatch'];
-        return null;
-    },
-    'bank.ifsc': (v) => {
-        if (!v.trim()) return ['dobErrIfscReq'];
-        if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(v.trim())) return ['dobErrIfscFmt'];
+        const value = (v || '').trim();
+        const account = (form.bank.accountNumber || '').trim();
+
+        if (!value) return ['dobErrConfirmReq'];
+
+        if (!ACCOUNT_REGEX.test(value))
+            return ['dobErrAccFmt'];
+
+        if (value !== account)
+            return ['dobErrConfirmMismatch'];
+
         return null;
     },
 
-    'education.level': (v) => (v ? null : ['dobErrEduLevel']),
+    'bank.ifsc': (v) => {
+        const value = (v || '').trim().toUpperCase();
+
+        if (!value) return ['dobErrIfscReq'];
+
+        if (!IFSC_REGEX.test(value))
+            return ['dobErrIfscFmt'];
+
+        return null;
+    },
+
+    // SECTION 6: EDUCATION
+    'education.level': (v) =>
+        EDU_LEVELS.includes(v) ? null : ['dobErrEduLevel'],
+
+    'education.institution': (v) => {
+        const value = (v || '').trim();
+
+        if (!value) return null;
+
+        if (!INSTITUTION_REGEX.test(value))
+            return ['dobErrInstitutionFmt'];
+
+        return null;
+    },
+
     'education.passingYear': (v) => {
-        if (!v.trim()) return null;
-        if (!/^(19|20)\d{2}$/.test(v.trim())) return ['dobErrYearFmt'];
+        const value = (v || '').trim();
+
+        if (!value) return null;
+
+        if (!/^\d{4}$/.test(value))
+            return ['dobErrYearFmt'];
+
+        const year = Number(value);
+
+        if (year < 1950 || year > CURRENT_YEAR)
+            return ['dobErrPassYearRange', { max: CURRENT_YEAR }];
+
+        return null;
+    },
+
+    'education.trainings': (v) => {
+        if (!Array.isArray(v))
+            return ['dobErrTraining'];
+
+        if (new Set(v).size !== v.length)
+            return ['dobErrTraining'];
+
+        if (!v.every(item => TRAINING_OPTS.includes(item)))
+            return ['dobErrTraining'];
+
         return null;
     },
 };
 
 function validateAll(form) {
-    const e = {};
+    const errors = {};
+
     for (const key of Object.keys(validators)) {
-        const err = validators[key](getVal(form, key), form);
-        if (err) e[key] = err;
+        const error = validators[key](getVal(form, key), form);
+
+        if (error) errors[key] = error;
     }
-    return e;
+
+    return errors;
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 3. SECTIONS  (used by progress bar + completion checks)
 // ─────────────────────────────────────────────────────────────────────────────
 
+
 const SECTION_FIELDS = [
     ['profile.photoUrl'],
-    ['license.number', 'license.expiry', 'license.photoUrl'],
-    ['vehicle.type', 'vehicle.registration'],
-    ['rc.photoUrl'],
-    ['bank.accountHolderName', 'bank.accountNumber', 'bank.confirmAccount', 'bank.ifsc'],
-    ['education.level'],
+
+    [
+        'license.number',
+        'license.expiry',
+        'license.photoUrl'
+    ],
+
+    [
+        'vehicle.type',
+        'vehicle.registration',
+        'vehicle.year'
+    ],
+
+    [
+        'rc.number',
+        'rc.photoUrl'
+    ],
+
+    [
+        'bank.accountHolderName',
+        'bank.bankName',
+        'bank.accountNumber',
+        'bank.confirmAccount',
+        'bank.ifsc'
+    ],
+
+    [
+        'education.level',
+        'education.institution',
+        'education.passingYear',
+        'education.trainings'
+    ],
 ];
 
 function sectionComplete(form, idx) {
-    return SECTION_FIELDS[idx].every((k) => !validators[k](getVal(form, k), form));
+    return SECTION_FIELDS[idx].every((key) =>
+        !validators[key](getVal(form, key), form)
+    );
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. PAYLOAD BUILDER
@@ -820,7 +1014,9 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     <OnboardingField label={t('dobRegNumber')} required errorKey="vehicle.registration" errors={visibleErrors}>
                         <Input
                             value={form.vehicle.registration}
-                            onChangeText={(v) => setField('vehicle', 'registration', v.toUpperCase())}
+                           onChangeText={(v) =>
+    setField('vehicle', 'registration', normalizeRegistration(v))
+}
                             placeholder={t('dobRegNumberPh')}
                             maxLength={15}
                             autoCapitalize="characters"
@@ -847,10 +1043,17 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     stepIndex="4"
                     completed={sectionComplete(form, 3)}
                 >
-                    <OnboardingField label={t('dobRcNumber')} errorKey="rc.number" errors={visibleErrors}>
+                    <OnboardingField
+    label={t('dobRcNumber')}
+    required
+    errorKey="rc.number"
+    errors={visibleErrors}
+>
                         <Input
                             value={form.rc.number}
-                            onChangeText={(v) => setField('rc', 'number', v.toUpperCase())}
+                            onChangeText={(v) =>
+    setField('rc', 'number', normalizeRegistration(v))
+}
                             placeholder={t('dobRcNumberPh')}
                             maxLength={20}
                             autoCapitalize="characters"
@@ -916,7 +1119,9 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     <OnboardingField label={t('dobHolder')} required errorKey="bank.accountHolderName" errors={visibleErrors}>
                         <Input
                             value={form.bank.accountHolderName}
-                            onChangeText={(v) => setField('bank', 'accountHolderName', v)}
+                            onChangeText={(v) =>
+    setField('bank', 'accountNumber', v.replace(/\D/g, ''))
+}
                             placeholder={t('dobHolderPh')}
                             onBlur={() => markTouched('bank.accountHolderName')}
                         />
@@ -946,7 +1151,9 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     <OnboardingField label={t('dobConfirmAcc')} required errorKey="bank.confirmAccount" errors={visibleErrors}>
                         <Input
                             value={form.bank.confirmAccount}
-                            onChangeText={(v) => setField('bank', 'confirmAccount', v)}
+                            onChangeText={(v) =>
+    setField('bank', 'confirmAccount', v.replace(/\D/g, ''))
+}
                             placeholder={t('dobConfirmAccPh')}
                             keyboardType="numeric"
                             maxLength={18}
