@@ -30,15 +30,15 @@ const SOCKET_URL =
   process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
-function timeAgo(dateString) {
+function timeAgo(dateString, t) {
   if (!dateString) return "";
   const diffSec = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
-  if (diffSec < 60) return `${diffSec}s ago`;
+  if (diffSec < 60) return t("dbSecAgo", { n: diffSec });
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffMin < 60) return t("dbMinAgo", { n: diffMin });
   const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  return `${Math.floor(diffHr / 24)}d ago`;
+  if (diffHr < 24) return t("dbHrAgo", { n: diffHr });
+  return t("dbDayAgo", { n: Math.floor(diffHr / 24) });
 }
 
 // ─── Color Tokens ───────────────────────────────────────────────
@@ -182,7 +182,18 @@ class ChartSafeBoundary extends React.Component {
 
 export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
   const { token, user } = useAuthStore();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // Show backend status values (which stay English in the data) in the current language
+  const statusLabel = (raw) => {
+    const map = {
+      pending: "dbStPending", preparing: "dbStPreparing", delivered: "dbStDelivered",
+      completed: "dbStCompleted", cancelled: "dbStCancelled", canceled: "dbStCancelled",
+      accepted: "dbStAccepted", rejected: "dbStRejected", on_the_way: "dbStOnTheWay",
+      out_for_delivery: "dbStOnTheWay", online: "dbOnline", offline: "dbOffline",
+    };
+    const k = map[String(raw || "").toLowerCase().replace(/\s+/g, "_")];
+    return k ? t(k) : raw;
+  };
   const navigation = useNavigation();
   const handleBackToRolePicker = async () => {
   await useAuthStore.getState().setActiveRole(null);
@@ -225,7 +236,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
   const greetSlideAnim = useRef(new Animated.Value(20)).current;
   const heroScaleAnim = useRef(new Animated.Value(0.95)).current;
 
-  const vendorName = user?.name || "Vendor";
+  const vendorName = user?.name || t("vendor");
   const greeting = getGreetingConfig(t);
 
   // ─── Banner Handlers (defined before early-returns so socket effect can use them) ───
@@ -304,7 +315,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               new Date(d.date).toLocaleDateString("en-IN", {
                 weekday: "short",
               }),
-            ) || ["D-6", "D-5", "D-4", "D-3", "D-2", "D-1", "Today"],
+            ) || ["D-6", "D-5", "D-4", "D-3", "D-2", "D-1", t("dbToday")],
             today: {
               totalOrders: s.today_orders ?? 0,
               revenue: s.today_revenue ?? 0,
@@ -361,7 +372,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             setRecentOrders(
               ordersData.data.map((o) => ({
                 id: o.order_number || `#${o.id}`,
-                customer: o.customer_name || o.customer?.name || "Customer",
+                customer: o.customer_name || o.customer?.name || t("dbCustomer"),
                 items: o.items_count ?? o.items?.length ?? 0,
                 amount: o.total ?? o.amount ?? 0,
                 status: o.status || "Pending",
@@ -382,7 +393,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           if (lowStockData.success && Array.isArray(lowStockData.data)) {
             setLowStockItems(
               lowStockData.data.map((item) => ({
-                name: item.product?.name || item.name || "Item",
+                name: item.product?.name || item.name || t("dbItem"),
                 stockLeft: item.stock_qty ?? 0,
               })),
             );
@@ -421,9 +432,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           if (s.pending_orders > 0) {
             builtNotifs.push({
               type: "order",
-              title: `${s.pending_orders} order${s.pending_orders > 1 ? "s" : ""} waiting for your response`,
-              body: "Tap to go to Orders and respond.",
-              time: "Just now",
+              title: s.pending_orders > 1 ? t("dbNotifPendingMany", { n: s.pending_orders }) : t("dbNotifPendingOne"),
+              body: t("dbNotifTapOrders"),
+              time: t("dbJustNow"),
               read: true,
             });
           }
@@ -431,9 +442,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           if (s.low_stock_count > 0) {
             builtNotifs.push({
               type: "system",
-              title: `${s.low_stock_count} product${s.low_stock_count > 1 ? "s" : ""} running low on stock`,
-              body: "Check your inventory before accepting more orders.",
-              time: "Today",
+              title: s.low_stock_count > 1 ? t("dbNotifLowMany", { n: s.low_stock_count }) : t("dbNotifLowOne"),
+              body: t("dbNotifCheckInv"),
+              time: t("dbToday"),
               read: true,
             });
           }
@@ -441,9 +452,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           if (s.today_revenue > 0) {
             builtNotifs.push({
               type: "order",
-              title: `₹${Number(s.today_revenue).toLocaleString("en-IN")} earned today`,
-              body: `${s.today_orders} orders completed successfully.`,
-              time: "Today",
+              title: t("dbNotifEarned", { amount: Number(s.today_revenue).toLocaleString("en-IN") }),
+              body: t("dbNotifCompleted", { n: s.today_orders }),
+              time: t("dbToday"),
               read: true,
             });
           }
@@ -462,7 +473,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               type: n.type === "delivery_declined" ? "delivery" : "system",
               title: n.title,
               body: n.body,
-              time: timeAgo(n.created_at),
+              time: timeAgo(n.created_at, t),
               read: n.read,
               action: "orders",
               _fromDb: true,
@@ -499,9 +510,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
       setNotifications((prev) => [
         {
           type: "order",
-          title: `New order ${data.order_number || "#" + data.order_id} received!`,
-          body: `₹${data.total || ""} · Tap Orders to respond.`,
-          time: "Just now",
+          title: t("dbNotifNewOrder", { id: data.order_number || "#" + data.order_id }),
+          body: t("dbNotifNewOrderBody", { amount: data.total || "" }),
+          time: t("dbJustNow"),
           read: false,
           action: "orders",
         },
@@ -526,9 +537,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
       setNotifications((prev) => [
         {
           type: "system",
-          title: "New phone number request",
-          body: "A customer wants to see your phone number.",
-          time: "Just now",
+          title: t("dbNotifPhoneTitle"),
+          body: t("dbNotifPhoneBody"),
+          time: t("dbJustNow"),
           read: false,
           action: "requests",
         },
@@ -547,9 +558,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
       setNotifications((prev) => [
         {
           type: "system",
-          title: "New delivery slot request",
-          body: "A customer wants a specific delivery time.",
-          time: "Just now",
+          title: t("dbNotifSlotTitle"),
+          body: t("dbNotifSlotBody"),
+          time: t("dbJustNow"),
           read: false,
           action: "requests",
         },
@@ -567,9 +578,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
       setNotifications((prev) => [
         {
           type: "order",
-          title: `Order ${data.order_number || "#" + data.order_id} updated`,
-          body: `Status: ${data.status}`,
-          time: "Just now",
+          title: t("dbNotifUpdatedTitle", { id: data.order_number || "#" + data.order_id }),
+          body: t("dbNotifStatusBody", { status: statusLabel(data.status) }),
+          time: t("dbJustNow"),
           read: false,
           action: "orders",
         },
@@ -582,9 +593,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
       setNotifications((prev) => [
         {
           type: "order",
-          title: `Counter offer for order ${data.order_number || "#" + data.order_id}`,
-          body: `${data.shop_name || "Vendor"} sent a counter offer.`,
-          time: "Just now",
+          title: t("dbNotifCounterTitle", { id: data.order_number || "#" + data.order_id }),
+          body: t("dbNotifCounterBody", { shop: data.shop_name || t("vendor") }),
+          time: t("dbJustNow"),
           read: false,
           action: "orders",
         },
@@ -597,9 +608,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
       setNotifications((prev) => [
         {
           type: "system",
-          title: "New fee negotiation",
-          body: "A customer proposed a different delivery fee.",
-          time: "Just now",
+          title: t("dbNotifFeeTitle"),
+          body: t("dbNotifFeeBody"),
+          time: t("dbJustNow"),
           read: false,
           action: "requests",
         },
@@ -611,9 +622,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
       setNotifications((prev) => [
         {
           type: "system",
-          title: "Delivery slot confirmed",
-          body: "A customer confirmed the delivery time.",
-          time: "Just now",
+          title: t("dbNotifSlotConfTitle"),
+          body: t("dbNotifSlotConfBody"),
+          time: t("dbJustNow"),
           read: false,
           action: "orders",
         },
@@ -625,9 +636,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
       setNotifications((prev) => [
         {
           type: "system",
-          title: "Fee negotiation confirmed",
-          body: "A customer accepted the delivery fee.",
-          time: "Just now",
+          title: t("dbNotifFeeConfTitle"),
+          body: t("dbNotifFeeConfBody"),
+          time: t("dbJustNow"),
           read: false,
           action: "orders",
         },
@@ -644,12 +655,12 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         {
           type: "delivery",
           title: count > 1
-            ? `Order #${data.order_id} — ${count} riders declined`
-            : `Order #${data.order_id} — Rider declined`,
+            ? t("dbNotifDeclinedMany", { id: data.order_id, n: count })
+            : t("dbNotifDeclinedOne", { id: data.order_id }),
           body: count > 1
-            ? `${count} riders declined at ${declinedAt}. Tap to reassign.`
-            : `${data.partner_name} declined at ${declinedAt}. Tap to reassign.`,
-          time: "Just now",
+            ? t("dbNotifDeclinedBodyMany", { n: count, time: declinedAt })
+            : t("dbNotifDeclinedBodyOne", { name: data.partner_name, time: declinedAt }),
+          time: t("dbJustNow"),
           read: false,
           action: "orders",
         },
@@ -769,7 +780,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           const inventoryItems = invData.data.map((item) => ({
             _type: "inventory",
             id: item.id,
-            name: item.product?.name || item.name || "Unknown Item",
+            name: item.product?.name || item.name || t("dbUnknownItem"),
             is_active: item.is_active ?? true,
             stockStatus: (item.is_active ?? true) ? "ok" : "out",
           }));
@@ -791,7 +802,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             const productItems = prodData.data.map((p) => ({
               _type: "product",
               id: p.id,
-              name: p.name || "Product",
+              name: p.name || t("dbProduct"),
               price: p.price ?? 0,
               unit: p.unit || "",
               category: p.category?.name || "",
@@ -855,21 +866,21 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           ...results,
           {
             _type: "earnings",
-            name: "Today's Revenue",
+            name: t("dbTodaysRevenue"),
             detail: `₹${Number(stats?.today?.revenue || 0).toLocaleString("en-IN")}`,
-            sub: `${stats?.today?.totalOrders ?? 0} orders today`,
+            sub: t("dbOrdersToday", { n: stats?.today?.totalOrders ?? 0 }),
           },
           {
             _type: "earnings",
-            name: "Weekly Revenue",
+            name: t("dbWeeklyRevenue"),
             detail: `₹${Number(stats?.weekly?.revenue || 0).toLocaleString("en-IN")}`,
-            sub: `${stats?.weekly?.totalOrders ?? 0} orders this week`,
+            sub: t("dbOrdersThisWeek", { n: stats?.weekly?.totalOrders ?? 0 }),
           },
           {
             _type: "earnings",
-            name: "Monthly Revenue",
+            name: t("dbMonthlyRevenue"),
             detail: `₹${Number(stats?.monthly?.revenue || 0).toLocaleString("en-IN")}`,
-            sub: `${stats?.monthly?.totalOrders ?? 0} orders this month`,
+            sub: t("dbOrdersThisMonth", { n: stats?.monthly?.totalOrders ?? 0 }),
           },
         ];
       }
@@ -881,15 +892,15 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           ...results,
           {
             _type: "orders",
-            name: "Pending Orders",
+            name: t("dbPendingOrders"),
             detail: String(stats?.pendingOrders ?? 0),
-            sub: "Awaiting your action",
+            sub: t("dbAwaitingAction"),
           },
           {
             _type: "orders",
-            name: "Today's Orders",
+            name: t("dbTodaysOrders"),
             detail: String(stats?.today?.totalOrders ?? 0),
-            sub: "Orders placed today",
+            sub: t("dbOrdersPlacedToday"),
           },
         ];
       }
@@ -934,7 +945,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             <TouchableOpacity
   onPress={handleBackToRolePicker}
   activeOpacity={0.8}
-  accessibilityLabel="Back to role selection"
+  accessibilityLabel={t("dbBackToRole")}
   style={{
     width: 38,
     height: 38,
@@ -996,7 +1007,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 style={{ fontSize: 14, color: C.textLight, flex: 1 }}
                 numberOfLines={1}
               >
-                Search inventory, partners, earnings…
+                {t("dbSearchPh")}
               </Text>
               <View
                 style={{
@@ -1069,7 +1080,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 }}
               >
                 <Text style={{ fontSize: 13, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff" }}>
-                  {(vendorName || "Vendor")
+                  {(vendorName || t("vendor"))
   .trim()
   .split(/\s+/)
   .filter(Boolean)
@@ -1084,10 +1095,10 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                   style={{ fontSize: 14, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.text, maxWidth: 90 }}
                   numberOfLines={1}
                 >
-                  {(vendorName || "Vendor").trim().split(/\s+/)[0]}
+                  {(vendorName || t("vendor")).trim().split(/\s+/)[0]}
                 </Text>
                 <Text style={{ fontSize: 11, color: C.textSub, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" }}>
-                  Admin
+                  {t("dbAdmin")}
                 </Text>
               </View>
               <MaterialIcons name="keyboard-arrow-down" size={18} color={C.textSub} />
@@ -1108,7 +1119,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               <TouchableOpacity
   onPress={handleBackToRolePicker}
   activeOpacity={0.8}
-  accessibilityLabel="Back to role selection"
+  accessibilityLabel={t("dbBackToRole")}
   style={{
     width: 38,
     height: 38,
@@ -1210,7 +1221,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                         fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: "#fff",
                       }}
                     >
-{(vendorName || "Vendor")
+{(vendorName || t("vendor"))
   .trim()
   .split(/\s+/)
   .filter(Boolean)
@@ -1232,7 +1243,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                       {vendorName.split(" ")[0]}
                     </Text>
                     <Text style={{ fontSize: rs(9, 10, 10), color: C.textSub, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" }}>
-                      Admin
+                      {t("dbAdmin")}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -1269,7 +1280,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 }}
                 numberOfLines={1}
               >
-                Search inventory, partners, earnings…
+                {t("dbSearchPh")}
               </Text>
               <View
                 style={{
@@ -1319,7 +1330,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 letterSpacing: -0.4,
               }}
             >
-              {greeting.text}, {(vendorName || "Vendor").trim().split(/\s+/)[0]} 👋
+              {greeting.text}, {(vendorName || t("vendor")).trim().split(/\s+/)[0]} 👋
             </Text>
             <Text
               style={{
@@ -1330,7 +1341,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 marginTop: 3,
               }}
             >
-              Here's what's happening with your business today.
+              {t("dbWelcomeLine")}
             </Text>
           </View>
 
@@ -1363,7 +1374,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 color: C.text,
               }}
             >
-              {new Date().toLocaleDateString("en-GB", {
+              {new Date().toLocaleDateString(i18n.language === "hi" ? "hi-IN" : "en-GB", {
                 day: "2-digit",
                 month: "short",
                 year: "numeric",
@@ -1434,7 +1445,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                     color: "#FFFFFF",
                   }}
                 >
-                  Keep growing, stay winning! 🚀
+                  {t("dbKeepGrowing")}
                 </Text>
                 <Text
                   style={{
@@ -1446,7 +1457,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                     maxWidth: "88%",
                   }}
                 >
-                  Track, manage and grow your business all in one place.
+                  {t("dbTrackManage")}
                 </Text>
               </View>
             </View>
@@ -1471,23 +1482,23 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                   iconColor: C.primary,
                   iconBg: C.greenSoft,
                   value: stats.today.totalOrders,
-                  label: "Today's Orders",
-                  sub: "Placed today",
+                  label: t("dbTodaysOrders"),
+                  sub: t("dbPlacedToday"),
                 },
                 {
                   icon: "schedule",
                   iconColor: C.orange,
                   iconBg: C.orangeSoft,
                   value: stats.pendingOrders,
-                  label: "Pending Orders",
-                  sub: "Awaiting your action",
+                  label: t("dbPendingOrders"),
+                  sub: t("dbAwaitingAction"),
                 },
                 {
                   icon: "inventory-2",
                   iconColor: "#EF4444",
                   iconBg: C.redSoft,
                   value: stats.lowStockCount,
-                  label: "Low Stock Items",
+                  label: t("dbLowStockItems"),
                   isLink: true,
                 },
                 
@@ -1549,7 +1560,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                               fontFamily: "PlusJakartaSans_700Bold",
                             }}
                           >
-                            View Inventory
+                            {t("dbViewInventory")}
                           </Text>
                           <MaterialIcons name="arrow-forward" size={11} color={C.primary} />
                         </View>
@@ -1593,7 +1604,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           >
             <View style={[styles.cardHeader, { flexWrap: "wrap", gap: 8 }]}>
               <Text style={[styles.cardTitle, { fontSize: rs(15, 16, 17) }]}>
-                Overview
+                {t("dbOverview")}
               </Text>
               <TouchableOpacity
                 style={{
@@ -1610,7 +1621,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 onPress={() => setCurrIndex((currIndex + 1) % STAT_TABS.length)}
               >
                 <Text style={{ fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text }}>
-                  {currIndex === 0 ? "Today" : currIndex === 1 ? "This Week" : "This Month"}
+                  {STAT_TABS[currIndex]}
                 </Text>
                 <MaterialIcons name="keyboard-arrow-down" size={16} color={C.textSub} />
               </TouchableOpacity>
@@ -1625,7 +1636,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 marginTop: 10,
               }}
             >
-              Total Revenue
+              {t("dbTotalRevenue")}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 }}>
               <Text
@@ -1652,7 +1663,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               >
                 <MaterialIcons name="trending-up" size={13} color={C.primary} />
                 <Text style={{ fontSize: 11, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.primary }}>
-                  vs {currIndex === 0 ? "yesterday" : currIndex === 1 ? "last week" : "last month"}
+                  {currIndex === 0 ? t("dbVsYesterday") : currIndex === 1 ? t("dbVsLastWeek") : t("dbVsLastMonth")}
                 </Text>
               </View>
             </View>
@@ -1710,7 +1721,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                   icon: "shopping-cart",
                   iconColor: C.primary,
                   iconBg: C.greenSoft,
-                  label: "Total Orders",
+                  label: t("dbTotalOrders"),
                   value: String(currStats.totalOrders),
                 },
                 {
@@ -1718,7 +1729,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                   icon: "electric-moped",
                   iconColor: C.purple,
                   iconBg: C.purpleSoft,
-                  label: "Avg. Delivery Time",
+                  label: t("dbAvgDelivery"),
                   value: `${currStats.deliveryTime}m`,
                 },
                 {
@@ -1726,7 +1737,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                   icon: "person",
                   iconColor: C.blue,
                   iconBg: C.blueSoft,
-                  label: "Repeat Customers",
+                  label: t("dbRepeatCustomers"),
                   value: String(currStats.repeatCustomers ?? 0),
                 },
               ].map((box) => (
@@ -1763,23 +1774,23 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             ]}
           >
             <View style={[styles.cardHeader, { marginBottom: 4 }]}>
-              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 15) }]}>Orders</Text>
+              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 15) }]}>{t("dbOrders")}</Text>
               <TouchableOpacity
                 style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
                 onPress={() => goTo("Orders")}
               >
                 <Text style={{ fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.primary }}>
-                  View All
+                  {t("dbViewAll")}
                 </Text>
                 <MaterialIcons name="arrow-forward" size={13} color={C.primary} />
               </TouchableOpacity>
             </View>
 
             {[
-              { icon: "shopping-cart", color: C.primary, bg: C.greenSoft, label: "Total Orders", value: stats.today.totalOrders },
-              { icon: "schedule", color: C.orange, bg: C.orangeSoft, label: "Pending", value: stats.pendingOrders },
-              { icon: "check-circle", color: C.primary, bg: C.greenSoft, label: "Completed", value: stats.completedOrders },
-              { icon: "cancel", color: "#EF4444", bg: C.redSoft, label: "Cancelled", value: stats.cancelledOrders },
+              { icon: "shopping-cart", color: C.primary, bg: C.greenSoft, label: t("dbTotalOrders"), value: stats.today.totalOrders },
+              { icon: "schedule", color: C.orange, bg: C.orangeSoft, label: t("dbPending"), value: stats.pendingOrders },
+              { icon: "check-circle", color: C.primary, bg: C.greenSoft, label: t("dbCompleted"), value: stats.completedOrders },
+              { icon: "cancel", color: "#EF4444", bg: C.redSoft, label: t("dbCancelled"), value: stats.cancelledOrders },
             ].map((row, i) => (
               <View
                 key={row.label}
@@ -1825,13 +1836,13 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             ]}
           >
             <View style={[styles.cardHeader, { marginBottom: 4 }]}>
-              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 15) }]}>Top Selling Products</Text>
+              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 15) }]}>{t("dbTopSelling")}</Text>
               <TouchableOpacity
                 style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
                 onPress={() => goTo("Inventory")}
               >
                 <Text style={{ fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.primary }}>
-                  View All
+                  {t("dbViewAll")}
                 </Text>
                 <MaterialIcons name="arrow-forward" size={13} color={C.primary} />
               </TouchableOpacity>
@@ -1875,7 +1886,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                         {p.name}
                       </Text>
                       <Text style={{ fontSize: 11, color: C.textSub, marginTop: 2 }}>
-                        {sold} Orders
+                        {t("dbOrdersCount", { n: sold })}
                       </Text>
                     </View>
                   </View>
@@ -1884,7 +1895,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             ) : (
               <View style={{ paddingVertical: 24, alignItems: "center" }}>
                 <MaterialIcons name="shopping-bag" size={26} color={C.border} />
-                <Text style={{ color: C.textLight, fontSize: 12, marginTop: 8 }}>No sales yet</Text>
+                <Text style={{ color: C.textLight, fontSize: 12, marginTop: 8 }}>{t("dbNoSalesYet")}</Text>
               </View>
             )}
           </View>
@@ -1908,13 +1919,13 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             ]}
           >
             <View style={[styles.cardHeader, { marginBottom: 6 }]}>
-              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 15) }]}>Recent Orders</Text>
+              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 15) }]}>{t("dbRecentOrders")}</Text>
               <TouchableOpacity
                 style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
                 onPress={() => goTo("Orders")}
               >
                 <Text style={{ fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.primary }}>
-                  View All
+                  {t("dbViewAll")}
                 </Text>
                 <MaterialIcons name="arrow-forward" size={13} color={C.primary} />
               </TouchableOpacity>
@@ -1925,11 +1936,11 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 {/* Table header — desktop only */}
                 {SCREEN_W >= 640 && (
                   <View style={{ flexDirection: "row", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
-                    <Text style={[styles.tableHeadCell, { flex: 1.1 }]}>Order ID</Text>
-                    <Text style={[styles.tableHeadCell, { flex: 1.3 }]}>Customer</Text>
-                    <Text style={[styles.tableHeadCell, { flex: 0.7, textAlign: "center" }]}>Items</Text>
-                    <Text style={[styles.tableHeadCell, { flex: 0.9, textAlign: "right" }]}>Amount</Text>
-                    <Text style={[styles.tableHeadCell, { flex: 1, textAlign: "right" }]}>Status</Text>
+                    <Text style={[styles.tableHeadCell, { flex: 1.1 }]}>{t("dbOrderId")}</Text>
+                    <Text style={[styles.tableHeadCell, { flex: 1.3 }]}>{t("dbCustomer")}</Text>
+                    <Text style={[styles.tableHeadCell, { flex: 0.7, textAlign: "center" }]}>{t("dbItems")}</Text>
+                    <Text style={[styles.tableHeadCell, { flex: 0.9, textAlign: "right" }]}>{t("dbAmount")}</Text>
+                    <Text style={[styles.tableHeadCell, { flex: 1, textAlign: "right" }]}>{t("dbStatus")}</Text>
                   </View>
                 )}
                 {recentOrders.slice(0, 4).map((o, i) => {
@@ -1971,7 +1982,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                       <View style={{ flex: 1, alignItems: "flex-end" }}>
                         <View style={{ paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: statusBg }}>
                           <Text style={{ fontSize: 10.5, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: statusColor }}>
-                            {o.status}
+                            {statusLabel(o.status)}
                           </Text>
                         </View>
                       </View>
@@ -1982,7 +1993,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             ) : (
               <View style={{ paddingVertical: 24, alignItems: "center" }}>
                 <MaterialIcons name="receipt-long" size={26} color={C.border} />
-                <Text style={{ color: C.textLight, fontSize: 12, marginTop: 8 }}>No recent orders yet</Text>
+                <Text style={{ color: C.textLight, fontSize: 12, marginTop: 8 }}>{t("dbNoRecentOrders")}</Text>
               </View>
             )}
           </View>
@@ -1995,13 +2006,13 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             ]}
           >
             <View style={[styles.cardHeader, { marginBottom: 4 }]}>
-              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 15) }]}>Low Stock Alert</Text>
+              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 15) }]}>{t("dbLowStockAlert")}</Text>
               <TouchableOpacity
                 style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
                 onPress={() => goTo("Inventory")}
               >
                 <Text style={{ fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.primary }}>
-                  View All
+                  {t("dbViewAll")}
                 </Text>
                 <MaterialIcons name="arrow-forward" size={13} color={C.primary} />
               </TouchableOpacity>
@@ -2039,7 +2050,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                       {item.name}
                     </Text>
                     <Text style={{ fontSize: 11.5, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.orange }}>
-                      {item.stockLeft} left
+                      {t("dbLeft", { n: item.stockLeft })}
                     </Text>
                   </View>
                 );
@@ -2047,7 +2058,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             ) : (
               <View style={{ paddingVertical: 24, alignItems: "center" }}>
                 <MaterialIcons name="check-circle-outline" size={26} color={C.border} />
-                <Text style={{ color: C.textLight, fontSize: 12, marginTop: 8 }}>All stocked up</Text>
+                <Text style={{ color: C.textLight, fontSize: 12, marginTop: 8 }}>{t("dbAllStocked")}</Text>
               </View>
             )}
           </View>
@@ -2060,7 +2071,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             ]}
           >
             <View style={[styles.cardHeader, { marginBottom: 6, flexWrap: "wrap", gap: 6 }]}>
-              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 15) }]}>Store Performance</Text>
+              <Text style={[styles.cardTitle, { fontSize: rs(14, 15, 15) }]}>{t("dbStorePerformance")}</Text>
               <View
                 style={{
                   flexDirection: "row",
@@ -2075,7 +2086,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 }}
               >
                 <Text style={{ fontSize: 11, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text }}>
-                  This Month
+                  {t("dbThisMonth")}
                 </Text>
                 <MaterialIcons name="keyboard-arrow-down" size={14} color={C.textSub} />
               </View>
@@ -2118,7 +2129,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                       ₹{Number(stats.monthly.revenue).toLocaleString("en-IN")}
                     </Text>
                     <Text style={{ fontSize: 9, color: C.textSub, fontWeight: "600", fontFamily: "PlusJakartaSans_600SemiBold" }}>
-                      Total Revenue
+                      {t("dbTotalRevenue")}
                     </Text>
                   </View>
                 </View>
@@ -2142,7 +2153,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               <View style={{ paddingVertical: 24, alignItems: "center" }}>
                 <MaterialIcons name="pie-chart-outline" size={26} color={C.border} />
                 <Text style={{ color: C.textLight, fontSize: 12, marginTop: 8, textAlign: "center" }}>
-                  No category data yet
+                  {t("dbNoCategoryData")}
                 </Text>
               </View>
             )}
@@ -2160,16 +2171,16 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             <MaterialIcons name="star" size={20} color="#FFFFFF" />
           </View>
           <View style={{ flex: 1, minWidth: 160 }}>
-            <Text style={styles.proTipTitle}>Pro Tip</Text>
+            <Text style={styles.proTipTitle}>{t("dbProTip")}</Text>
             <Text style={styles.proTipText}>
-              Complete your store profile to build trust and get more orders.
+              {t("dbProTipText")}
             </Text>
           </View>
           <TouchableOpacity
             style={styles.proTipButton}
             onPress={() => navigation.navigate("VendorOnboarding")}
           >
-            <Text style={styles.proTipButtonText}>Complete Profile</Text>
+            <Text style={styles.proTipButtonText}>{t("dbCompleteProfile")}</Text>
             <MaterialIcons name="arrow-forward" size={16} color={C.primaryDark} />
           </TouchableOpacity>
         </View>
@@ -2200,10 +2211,10 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
             <View>
-              <Text style={styles.sheetTitle}>Notifications</Text>
+              <Text style={styles.sheetTitle}>{t("dbNotifications")}</Text>
               {unreadCount > 0 && (
                 <Text style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>
-                  {unreadCount} unread
+                  {t("dbUnread", { n: unreadCount })}
                 </Text>
               )}
             </View>
@@ -2232,7 +2243,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           ) : (
             <EmptyState
               icon="notifications-none"
-              message="You're all caught up!"
+              message={t("dbAllCaughtUp")}
             />
           )}
         </View>
@@ -2261,7 +2272,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         >
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>All Reviews</Text>
+            <Text style={styles.sheetTitle}>{t("dbAllReviews")}</Text>
             <TouchableOpacity
               onPress={() => setReviewsModal(false)}
               style={styles.closeIconBtn}
@@ -2278,7 +2289,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               </View>
             )}
             ListEmptyComponent={
-              <EmptyState icon="star-border" message="No reviews yet" />
+              <EmptyState icon="star-border" message={t("dbNoReviews")} />
             }
             contentContainerStyle={{ paddingBottom: 40 }}
           />
@@ -2308,7 +2319,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         >
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>All Delivery Partners</Text>
+            <Text style={styles.sheetTitle}>{t("dbAllPartners")}</Text>
             <TouchableOpacity
               onPress={() => setPartnersModal(false)}
               style={styles.closeIconBtn}
@@ -2329,7 +2340,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               </View>
             )}
             ListEmptyComponent={
-              <EmptyState icon="moped" message="No partners yet" />
+              <EmptyState icon="moped" message={t("dbNoPartners")} />
             }
             contentContainerStyle={{ paddingBottom: 40 }}
           />
@@ -2354,7 +2365,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 <MaterialIcons name="search" size={18} color={C.textLight} />
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="Search inventory, products, earnings…"
+                  placeholder={t("dbSearchPh2")}
                   placeholderTextColor={C.textLight}
                   autoFocus
                   value={searchQuery}
@@ -2382,7 +2393,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 <Text
                   style={{ color: C.primary, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", fontSize: 14 }}
                 >
-                  Cancel
+                  {t("dbCancel")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -2404,10 +2415,10 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
 
                   const stockLabel =
                     item.stockStatus === "out"
-                      ? "Out of Stock"
+                      ? t("dbOutOfStock")
                       : item.stockStatus === "low"
-                        ? "Low Stock"
-                        : "In Stock";
+                        ? t("dbLowStock")
+                        : t("dbInStock");
 
                   const stockBg =
                     item.stockStatus === "out"
@@ -2421,12 +2432,12 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                       icon: "inventory",
                       iconColor: C.primaryDark,
                       iconBg: C.primaryDim,
-                      badgeLabel: "Inventory",
+                      badgeLabel: t("dbInventory"),
                       badgeColor: C.primaryDark,
                       badgeBg: C.primaryDim,
                       mainText: item.name,
                       subText: `${item.unit || ""}${item.category ? " · " + item.category : ""}`,
-                      rightTop: (item.is_active ?? true) ? "Available" : "Unavailable",
+                      rightTop: (item.is_active ?? true) ? t("dbAvailable") : t("dbUnavailable"),
                       rightTopColor: (item.is_active ?? true) ? C.green : C.red,
                       rightBottom: "",
                       rightBottomBg: "transparent",
@@ -2436,14 +2447,14 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                       icon: "shopping-bag",
                       iconColor: C.blue,
                       iconBg: C.blueDim,
-                      badgeLabel: "Product",
+                      badgeLabel: t("dbProduct"),
                       badgeColor: C.blue,
                       badgeBg: C.blueDim,
                       mainText: item.name,
                       subText: `${item.unit || ""}${item.category ? " · " + item.category : ""}`,
                       rightTop: `₹${item.price}`,
                       rightTopColor: C.blue,
-                      rightBottom: (item.is_active ?? true) ? "Available" : "Unavailable",
+                      rightBottom: (item.is_active ?? true) ? t("dbAvailable") : t("dbUnavailable"),
                       rightBottomBg: C.blueDim,
                       rightBottomColor: C.blue,
                     },
@@ -2451,11 +2462,11 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                       icon: "moped",
                       iconColor: C.purple,
                       iconBg: C.purpleDim,
-                      badgeLabel: "Partner",
+                      badgeLabel: t("dbPartner"),
                       badgeColor: C.purple,
                       badgeBg: C.purpleDim,
                       mainText: item.name,
-                      subText: `${item.orders_count ?? 0} orders delivered`,
+                      subText: t("dbOrdersDelivered", { n: item.orders_count ?? 0 }),
                       rightTop: `⭐ ${item.rating ?? 0}`,
                       rightTopColor: C.orange,
                       rightBottom: item.status,
@@ -2468,14 +2479,14 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                       icon: "trending-up",
                       iconColor: C.orange,
                       iconBg: C.orangeDim,
-                      badgeLabel: "Top Seller",
+                      badgeLabel: t("dbTopSeller"),
                       badgeColor: C.orange,
                       badgeBg: C.orangeDim,
                       mainText: item.name,
-                      subText: `${item.sold ?? 0} units sold`,
+                      subText: t("dbUnitsSold", { n: item.sold ?? 0 }),
                       rightTop: `₹${Number(item.revenue ?? 0).toLocaleString("en-IN")}`,
                       rightTopColor: C.orange,
-                      rightBottom: "Revenue",
+                      rightBottom: t("dbRevenue"),
                       rightBottomBg: C.orangeDim,
                       rightBottomColor: C.orange,
                     },
@@ -2483,7 +2494,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                       icon: "payments",
                       iconColor: "#16A34A",
                       iconBg: "#ECFDF5",
-                      badgeLabel: "Earnings",
+                      badgeLabel: t("dbEarnings"),
                       badgeColor: "#16A34A",
                       badgeBg: "#ECFDF5",
                       mainText: item.name,
@@ -2498,7 +2509,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                       icon: "receipt-long",
                       iconColor: C.blue,
                       iconBg: C.blueDim,
-                      badgeLabel: "Orders",
+                      badgeLabel: t("dbOrders"),
                       badgeColor: C.blue,
                       badgeBg: C.blueDim,
                       mainText: item.name,
@@ -2641,7 +2652,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
               <View style={styles.empty}>
                 <MaterialIcons name="search-off" size={40} color={C.border} />
                 <Text style={styles.emptyText}>
-                  No results for "{searchQuery}"
+                  {t("dbNoResultsFor", { q: searchQuery })}
                 </Text>
               </View>
             ) : (
@@ -2652,7 +2663,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                   color={C.border}
                 />
                 <Text style={styles.emptyText}>
-                  Search your inventory or products
+                  {t("dbSearchHint")}
                 </Text>
               </View>
             )}
@@ -2673,10 +2684,10 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           onPress={() => setLocModalVisible(false)}
         />
         <View style={styles.locModal}>
-          <Text style={styles.sheetTitle}>Store Location</Text>
+          <Text style={styles.sheetTitle}>{t("dbStoreLocation")}</Text>
           <Text style={{ color: C.textSub, fontSize: 13, marginBottom: 14 }}>
-            This is pulled from your store profile. To change it permanently,
-            update your store address in Settings.
+            {t("dbStoreLocationText")}
+
           </Text>
           <View style={styles.locCurrentRow}>
             <MaterialIcons name="location-on" size={18} color={C.primary} />
@@ -2687,7 +2698,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 flex: 1,
               }}
             >
-              {vendorLocation || "Not set"}
+              {vendorLocation || t("dbNotSet")}
             </Text>
           </View>
           <TouchableOpacity
@@ -2701,13 +2712,13 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             }}
           >
             <MaterialIcons name="edit" size={16} color="#000" />
-            <Text style={styles.ctaBtnText}>Edit in Store Settings</Text>
+            <Text style={styles.ctaBtnText}>{t("dbEditInSettings")}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={{ marginTop: 18, alignSelf: "center" }}
             onPress={() => setLocModalVisible(false)}
           >
-            <Text style={{ color: C.textSub, fontSize: 14 }}>Close</Text>
+            <Text style={{ color: C.textSub, fontSize: 14 }}>{t("dbClose")}</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -2728,15 +2739,15 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         <View style={{ flex: 1 }}>
           <Text style={bannerStyles.title}>
             {newOrderBanner?._type === "phone"
-              ? "Phone Request!"
-              : "New Order Received!"}
+              ? t("dbPhoneRequest")
+              : t("dbNewOrderReceived")}
           </Text>
           <Text style={bannerStyles.sub} numberOfLines={1}>
             {newOrderBanner?._type === "phone"
-              ? "A customer wants your contact number."
+              ? t("dbWantsNumber")
               : newOrderBanner?.order_number
-                ? `Order ${newOrderBanner.order_number}`
-                : `Order #${newOrderBanner?.order_id ?? ""}`}
+                ? t("dbOrderRef", { id: newOrderBanner.order_number })
+                : t("dbOrderRef", { id: "#" + (newOrderBanner?.order_id ?? "") })}
             {newOrderBanner?._type !== "phone" && newOrderBanner?.total
               ? `  ·  ₹${newOrderBanner.total}`
               : ""}
@@ -2752,7 +2763,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
             });
           }}
         >
-          <Text style={bannerStyles.actionText}>View</Text>
+          <Text style={bannerStyles.actionText}>{t("dbView")}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={dismissBanner} style={bannerStyles.closeBtn}>
           <MaterialIcons name="close" size={16} color="#64748B" />
@@ -2768,6 +2779,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
 // ─── Sub-components ────────────────────────────────────────────
 
 function StatusBanner({ title, message, bg, border, textColor, missingDocs }) {
+  const { t } = useTranslation();
   return (
     <View
       style={[styles.banner, { backgroundColor: bg, borderLeftColor: border }]}
@@ -2781,7 +2793,7 @@ function StatusBanner({ title, message, bg, border, textColor, missingDocs }) {
             <Text
               style={[styles.bannerTitle, { color: textColor, marginBottom: 0 }]}
             >
-              Missing Documents:
+              {t("dbMissingDocs")}
             </Text>
           </View>
           {missingDocs.map((doc) => (
@@ -2840,6 +2852,7 @@ function MiniMetricCard({ label, value, icon, iconColor, iconBg, rs }) {
 }
 
 function ProductRow({ rank, name, sold, revenue, tag, image, rs }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.productRow}>
       <Text style={[styles.productRank, { fontSize: rs(11, 12, 12) }]}>
@@ -2864,7 +2877,7 @@ function ProductRow({ rank, name, sold, revenue, tag, image, rs }) {
           {name}
         </Text>
         <Text style={[styles.productSold, { fontSize: rs(10, 11, 11) }]}>
-          {sold} units sold
+          {t("dbUnitsSold", { n: sold })}
         </Text>
       </View>
       <View style={{ alignItems: "flex-end", gap: rs(10, 12, 14) }}>
@@ -2900,7 +2913,8 @@ function ProductRow({ rank, name, sold, revenue, tag, image, rs }) {
 }
 
 function ReviewRow({ review, rs }) {
-  const name = review.customer_name || review.name || "Customer";
+  const { t } = useTranslation();
+  const name = review.customer_name || review.name || t("dbCustomer");
   const rating = review.rating || 0;
   const comment = review.comment || review.quote || "";
   const positive = rating >= 3;
@@ -3030,7 +3044,8 @@ function StaticReviewRow({ data, rs }) {
 }
 
 function DeliveryRow({ index, partner, rs }) {
-  const name = partner.name || partner.driver_name || "Driver";
+  const { t } = useTranslation();
+  const name = partner.name || partner.driver_name || t("dbDriver");
   const status = partner.status || (partner.is_online ? "Online" : "Offline");
   const orders = partner.orders_count ?? partner.deliveries_today ?? 0;
   const score = partner.rating ?? partner.score ?? 0;
@@ -3074,7 +3089,7 @@ function DeliveryRow({ index, partner, rs }) {
             ]}
           />
           <Text style={[styles.deliverySub, { fontSize: rs(10, 11, 11) }]}>
-            {status} · {orders} orders
+            {t("dbDriverStatus", { status: status === "Online" ? t("dbOnline") : status === "Offline" ? t("dbOffline") : status, n: orders })}
           </Text>
         </View>
       </View>
