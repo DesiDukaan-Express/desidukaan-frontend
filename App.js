@@ -34,6 +34,11 @@ export default function App() {
     );
   }
 
+
+if (!fontsLoaded) {
+  return null;
+}
+
 return (
   <ThemeProvider>
     <SafeAreaProvider style={{ flex: 1 }}>

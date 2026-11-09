@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Vibration, Animated, StatusBar, Platform,
+  ActivityIndicator, Vibration, Animated, StatusBar, Platform, RefreshControl,
 } from 'react-native';
 import { io } from 'socket.io-client';
 import {
@@ -71,6 +71,11 @@ function TimerBar({ seconds, onComplete }) {
 
   const pct = Math.max(0, (remaining / seconds) * 100);
   const color = pct > 50 ? C.green : pct > 20 ? C.amber : C.red;
+  const fmt = (sec) => {
+    const m = Math.floor(Math.max(sec, 0) / 60);
+    const r = Math.max(sec, 0) % 60;
+    return `${m}:${String(r).padStart(2, '0')}`;
+  };
 
   return (
     <View style={tb.row}>
@@ -78,7 +83,7 @@ function TimerBar({ seconds, onComplete }) {
         <View style={[tb.fill, { width: `${pct}%`, backgroundColor: color }]} />
       </View>
       <Text style={[tb.label, { color, fontFamily: 'PlusJakartaSans_800ExtraBold' }]}>
-        {remaining}s
+        {fmt(remaining)}
       </Text>
     </View>
   );
@@ -212,8 +217,9 @@ function QueueCard({ order, onAccept, onDecline, onIgnore, isAccepting }) {
 const qc = StyleSheet.create({
   card: {
     backgroundColor: C.white, borderRadius: 20, padding: 18, marginBottom: 14,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07, shadowRadius: 10, elevation: 3,
+    borderLeftWidth: 4, borderLeftColor: C.green,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.09, shadowRadius: 12, elevation: 4,
   },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
   orderNum: { fontSize: 17, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray900 },
@@ -228,11 +234,11 @@ const qc = StyleSheet.create({
   routeStopLabel: { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray400, letterSpacing: 0.8 },
   routeStopName: { fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: C.gray900, marginTop: 1 },
   routeLineWrap: { paddingLeft: 4, paddingVertical: 4 },
-  routeVertLine: { width: 1.5, height: 14, backgroundColor: C.gray200, marginLeft: 3 },
+  routeVertLine: { width: 0, height: 18, borderLeftWidth: 1.5, borderStyle: 'dashed', borderColor: C.gray300, marginLeft: 4 },
   earningRow: { flexDirection: 'row', marginBottom: 14 },
   earningBox: { flex: 1, paddingVertical: 4 },
   earningLabel: { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray400, letterSpacing: 0.8, marginBottom: 4, paddingLeft: 2 },
-  earningValue: { fontSize: 22, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.green, paddingLeft: 2 },
+  earningValue: { fontSize: 24, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.greenDark, paddingLeft: 2 },
   btnRow: { flexDirection: 'row', gap: 10 },
   btnDecline: {
     flex: 1, paddingVertical: 13, borderRadius: 14,
@@ -241,8 +247,9 @@ const qc = StyleSheet.create({
   },
   btnDeclineText: { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: C.red },
   btnAccept: {
-    flex: 2, paddingVertical: 13, borderRadius: 14,
+    flex: 2, paddingVertical: 14, borderRadius: 14,
     backgroundColor: C.green, alignItems: 'center',
+    shadowColor: C.green, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   btnAcceptText: { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: C.white },
 });
@@ -312,6 +319,7 @@ export default function QueueScreen({ navigation }) {
 
   const [queue, setQueue] = useState([]);
   const [acceptingId, setAcceptingId] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
   const socketRef = useRef(null);
 
   // Session stats — refs to survive socket re-renders, state to trigger re-render
@@ -518,6 +526,14 @@ export default function QueueScreen({ navigation }) {
         style={s.scroll}
         contentContainerStyle={s.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={C.green}
+            colors={[C.green]}
+            onRefresh={async () => { setRefreshing(true); await fetchQueuedOrders(); setRefreshing(false); }}
+          />
+        }
       >
 
         {/* ── Queue or empty ── */}
@@ -557,7 +573,9 @@ const s = StyleSheet.create({
     backgroundColor: '#228948',
     paddingTop: Platform.OS === 'android' ? 36 : 58,
     paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingBottom: 28,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
   heroTop: {
     flexDirection: 'row', justifyContent: 'space-between',

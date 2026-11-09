@@ -114,6 +114,21 @@ const MANUAL_UNIT_OPTIONS = [
   'kg', 'g', 'litre', 'ml', 'piece', 'pack', 'dozen', 'box',
 ];
 
+// Available quantity chips change with the selected unit (manual product form)
+const WEIGHT_OPTIONS_BY_UNIT = {
+  kg: ['50g', '100g', '200g', '250g', '500g', '1kg'],
+  g: ['50g', '100g', '200g', '250g', '500g'],
+  litre: ['100ml', '250ml', '500ml', '1L'],
+  ml: ['50ml', '100ml', '250ml', '500ml'],
+  piece: ['1', '2', '5', '10'],
+  pack: ['1', '2', '5', '10'],
+  dozen: ['1', '2', '3'],
+  box: ['1', '2', '5'],
+};
+
+const getWeightOptionsForUnit = (unit) =>
+  WEIGHT_OPTIONS_BY_UNIT[unit] || WEIGHT_OPTIONS_BY_UNIT.kg;
+
 
 const DELIVERY_TYPES = [
   { id: 'partner', labelKey: 'obDeliveryPartner' },
@@ -700,6 +715,9 @@ const { t } = useTranslation();
     lng: null,
   });
   const updateShopLoc = (patch) => setShopLoc(prev => ({ ...prev, ...patch }));
+  // Always-current copy of shopLoc for use inside delayed (debounced) callbacks.
+  const shopLocRef = useRef(shopLoc);
+  shopLocRef.current = shopLoc;
 
   // ── Street Address autocomplete ───────────────────────────────────────────
   const [suggestions, setSuggestions] = useState([]);
@@ -733,10 +751,37 @@ const { t } = useTranslation();
       const seq = ++searchSeq.current;
       setAddrLoading(true);
       try {
-        const data = await searchAddressSuggestions(q);
+        let data = await searchAddressSuggestions(q);
+        // Short/partial manual entries (e.g. "12 MG Road") often return nothing on
+        // their own — retry with the current city/pincode as a locality hint.
+        if (seq === searchSeq.current && Array.isArray(data) && data.length === 0) {
+          const hint = [shopLocRef.current.city, shopLocRef.current.pincode].filter(Boolean).join(' ');
+          if (hint) data = await searchAddressSuggestions(`${q}, ${hint}`);
+        }
         if (seq === searchSeq.current && Array.isArray(data)) {
           setSuggestions(data);
           setSuggestionsOpen(data.length > 0);
+          // Manual typing (even after "Use current location") moves the map pin to
+          // the best match. The typed text is never overwritten; only the pin and,
+          // when the match provides them, city/pincode follow along.
+          const top = data[0];
+          if (top) {
+            const lat = parseFloat(top.lat);
+            const lng = parseFloat(top.lon);
+            if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+              const a = top.address || {};
+              const cityName = a.city || a.town || a.suburb || a.village || '';
+              const cur = shopLocRef.current;
+              const patch = { lat, lng };
+              if (cityName && cityName !== cur.city) patch.city = cityName;
+              if (a.postcode && a.postcode !== cur.pincode) patch.pincode = a.postcode;
+              // Only suppress the city/pincode forward-geocode when they actually
+              // change, otherwise the flag would linger and swallow a later edit.
+              if (patch.city || patch.pincode) applyingRef.current = true;
+              updateShopLoc(patch);
+              setGeoError(null);
+            }
+          }
         }
       } catch {
         if (seq === searchSeq.current) closeSuggestions();
@@ -931,6 +976,15 @@ const { t } = useTranslation();
   const [docUploading, setDocUploading] = useState({ fssai: false, gst: false });
   // Step 4 — Product photo uploading per row index
   const [prodImgUploading, setProdImgUploading] = useState({});
+  // Inline field errors shown under inputs (cleared as the user types)
+  const [fieldErrors, setFieldErrors] = useState({});
+  const clearFieldError = (key) =>
+    setFieldErrors((prev) => (prev[key] ? { ...prev, [key]: null } : prev));
+
+  // Clear inline errors whenever the user moves to another step
+  useEffect(() => {
+    setFieldErrors({});
+  }, [currentStep]);
 
   // Step 3 — Bank
   const [upiId, setUpiId] = useState('');
@@ -938,6 +992,7 @@ const { t } = useTranslation();
   const [bankName, setBankName] = useState('');
   const [branch, setBranch] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
+  const [showAccountNumber, setShowAccountNumber] = useState(false); // eye toggle
   const [ifsc, setIfsc] = useState('');
   const [ifscStatus, setIfscStatus] = useState(null); // { status: 'loading'|'found'|'notfound'|'error', bank, city }
 
@@ -1190,102 +1245,86 @@ const { t } = useTranslation();
   // ── Validation ────────────────────────────────────────────────────────────────
 
   const validateStep = () => {
+    const errors = {};
+
     if (currentStep === 1) {
-      if (!shopName.trim()) { Alert.alert(t('obRequired'), t('obErrShopName')); return false; }
-      if (!ownerName.trim()) { Alert.alert(t('obRequired'), t('obErrOwnerName')); return false; }
-      if (!isValidName(shopName)) {
-  Alert.alert(t('obInvalidName'), 'Shop name must contain only letters and spaces.');
-  return false;
-}
+      if (!shopName.trim()) errors.shopName = t('obErrShopName');
+      else if (!isValidName(shopName)) errors.shopName = 'Shop name must contain only letters and spaces.';
 
-if (!isValidName(ownerName)) {
-  Alert.alert(t('obInvalidName'), 'Owner name must contain only letters and spaces.');
-  return false;
-}
+      if (!ownerName.trim()) errors.ownerName = t('obErrOwnerName');
+      else if (!isValidName(ownerName)) errors.ownerName = 'Owner name must contain only letters and spaces.';
 
-if (altName.trim() && !isValidName(altName)) {
-  Alert.alert(t('obInvalidName'), 'Alternative contact name must contain only letters and spaces.');
-  return false;
-}
-     if (!isValidEstYear(estYear)) {
-  Alert.alert(
-    t('obInvalidYear'),
-    t('obErrYear')
-  );
-  return false;
-}
-      if (!email.trim()) {
-  Alert.alert(t('obRequired'), t('obErrEmailEmpty'));
-  return false;
-}
+      if (altName.trim() && !isValidName(altName)) {
+        errors.altName = 'Alternative contact name must contain only letters and spaces.';
+      }
 
+      if (!isValidEstYear(estYear)) errors.estYear = t('obErrYear');
 
-if (!isValidShopEmail(email)) {
-Alert.alert(t('obInvalidEmail'), t('obErrEmail'));
-return false;
-}
-      if (!shopLoc.formattedAddress.trim()) { Alert.alert(t('obRequired'), t('obErrAddress')); return false; }
-      if (!shopLoc.city.trim()) { Alert.alert(t('obRequired'), t('obErrCity')); return false; }
-      if (shopLoc.pincode.length !== 6) { Alert.alert(t('obRequired'), t('obErrPincode')); return false; }
+      if (!email.trim()) errors.email = t('obErrEmailEmpty');
+      else if (!isValidShopEmail(email)) errors.email = t('obErrEmail');
+
+      if (!phone.trim() || phone.replace(/\D/g, '').length !== 10) {
+        errors.phone = 'Enter a valid 10-digit phone number.';
+      }
+
+      if (!shopLoc.formattedAddress.trim()) errors.address = t('obErrAddress');
+      if (!shopLoc.city.trim()) errors.city = t('obErrCity');
+      if (shopLoc.pincode.length !== 6) errors.pincode = t('obErrPincode');
     }
-if (currentStep === 2) {
-  if (!isValidFSSAI(fssai)) {
-    Alert.alert(
-      t('obInvalidFssai'),
-      t('obErrFssai')
-    );
-    return false;
-  }
 
+    if (currentStep === 2) {
+      if (!isValidFSSAI(fssai)) errors.fssai = t('obErrFssai');
 
-if (!isValidGST(gst)) {
-Alert.alert(
-t('obInvalidGst'),
-t('obErrGst')
-);
-return false;
-}
+      // GST is optional — only validate format when filled
+      if (gst.trim() && !isValidGST(gst)) errors.gst = t('obErrGst');
 
-if (aadhar.trim() && !isValidAadhaar(aadhar)) {
-Alert.alert(
-t('obInvalidAadhaar'),
-t('obErrAadhaar')
-);
-return false;
-}
+      // Aadhaar and PAN are required
+      if (!aadhar.trim()) errors.aadhar = t('obErrAadhaar') || 'Aadhaar number is required.';
+      else if (!isValidAadhaar(aadhar)) errors.aadhar = t('obErrAadhaar');
 
-if (pan.trim() && !isValidPAN(pan)) {
-Alert.alert(
-t('obInvalidPan'),
-t('obErrPan')
-);
-return false;
-}
-}
-if (currentStep === 3) {
-  if (!upiId.trim() && !accountNumber.trim()) {
-    Alert.alert(t('obRequired'), t('obErrPayment'));
-    return false;
-  }
+      if (!pan.trim()) errors.pan = t('obErrPan') || 'PAN number is required.';
+      else if (!isValidPAN(pan)) errors.pan = t('obErrPan');
+    }
 
-  // Validate bank account holder name
-  if (accountNumber.trim() && !isValidName(accountName)) {
-    Alert.alert(
-      t('obInvalidName'),
-      'Bank account holder name must contain only letters and spaces.'
-    );
-    return false;
-  }
-}
+    if (currentStep === 3) {
+      if (!upiId.trim() && !accountNumber.trim()) {
+        errors.payment = t('obErrPayment');
+      }
+
+      const upiRegex = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z]{2,64}$/;
+      if (upiId.trim() && !upiRegex.test(upiId.trim())) {
+        errors.upiId = 'Please enter a valid UPI ID';
+      }
+
+      if (accountNumber.trim() && !isValidName(accountName)) {
+        errors.accountName = 'Bank account holder name must contain only letters and spaces.';
+      }
+    }
+
     if (currentStep === 4) {
       if (getAllProducts().length === 0) {
-        Alert.alert(t('obRequired'), t('obErrNoProducts')); return false;
+        errors.products = t('obErrNoProducts');
       }
       if (manualProds.some(p => p.name && p.sp && !p.cat)) {
-        Alert.alert(t('obRequired'), t('obErrNoCategory')); return false;
+        errors.category = t('obErrNoCategory');
       }
+
+      // Selling price must not exceed MRP on manual rows
+      manualProds.forEach((p, i) => {
+        if (!p.name && !p.sp && !p.mrp) return;
+        const mrpNum = parseFloat(p.mrp);
+        const spNum = parseFloat(p.sp);
+        if (p.sp !== '' && p.mrp !== '' && !Number.isNaN(mrpNum) && !Number.isNaN(spNum) && spNum > mrpNum) {
+          errors[`manualSp_${i}`] = 'Selling price cannot be higher than MRP.';
+        }
+        if (p.type === 'loose' && (!p.weight_options || p.weight_options.length === 0) && p.name) {
+          errors[`manualQty_${i}`] = 'Select at least one available quantity.';
+        }
+      });
     }
-    return true;
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   // ── Submit ────────────────────────────────────────────────────────────────────
@@ -1778,18 +1817,20 @@ onComplete?.();
               <View style={styles.inputIconWrap}>
                 <MaterialIcons name="storefront" size={17} color={SUBTLE} style={styles.inputIcon} />
                 <TextInput
-  style={[styles.input, styles.inputWithIcon]}
-  placeholder={t('obShopNamePh')}
-  placeholderTextColor="#A6ACA4"
-  value={shopName}
-  onChangeText={(value) =>
-    setShopName(value.replace(/[^A-Za-z ]/g, ''))
-  }
-/>
+                  style={[styles.input, styles.inputWithIcon, fieldErrors.shopName && styles.inputError]}
+                  placeholder={t('obShopNamePh')}
+                  placeholderTextColor="#A6ACA4"
+                  value={shopName}
+                  onChangeText={(value) => {
+                    setShopName(value.replace(/[^A-Za-z ]/g, ''));
+                    clearFieldError('shopName');
+                  }}
+                />
               </View>
+              {fieldErrors.shopName ? <Text style={styles.fieldError}>{fieldErrors.shopName}</Text> : null}
               <View style={styles.helperRow}>
                 <Text style={styles.helperText}>{t('obShopNameHelp')}</Text>
-                {shopName.trim().length > 0 && (
+                {shopName.trim().length > 0 && !fieldErrors.shopName && (
                   <View style={styles.looksGoodRow}>
                     <MaterialIcons name="check-circle" size={12} color={PRIMARY} />
                     <Text style={styles.looksGoodText}>{t('obLooksGood')}</Text>
@@ -1813,20 +1854,22 @@ onComplete?.();
   />
 
   <TextInput
-    style={[styles.input, styles.inputWithIcon]}
+    style={[styles.input, styles.inputWithIcon, fieldErrors.ownerName && styles.inputError]}
     placeholder={t('obOwnerNamePh')}
     placeholderTextColor="#A6ACA4"
     value={ownerName}
-    onChangeText={(value) =>
-      setOwnerName(value.replace(/[^A-Za-z ]/g, ''))
-    }
+    onChangeText={(value) => {
+      setOwnerName(value.replace(/[^A-Za-z ]/g, ''));
+      clearFieldError('ownerName');
+    }}
   />
 </View>
+{fieldErrors.ownerName ? <Text style={styles.fieldError}>{fieldErrors.ownerName}</Text> : null}
 
 <View style={styles.helperRow}>
   <Text style={styles.helperText}>{t('obOwnerNameHelp')}</Text>
 
-  {ownerName.trim().length > 0 && (
+  {ownerName.trim().length > 0 && !fieldErrors.ownerName && (
     <View style={styles.looksGoodRow}>
       <MaterialIcons name="check-circle" size={12} color={PRIMARY} />
       <Text style={styles.looksGoodText}>{t('obLooksGood')}</Text>
@@ -1839,7 +1882,7 @@ onComplete?.();
                 <View style={styles.inputIconWrap}>
                   <MaterialIcons name="calendar-today" size={15} color={SUBTLE} style={styles.inputIcon} />
                   <TouchableOpacity
-                    style={[styles.input, styles.inputWithIcon, styles.selectInput]}
+                    style={[styles.input, styles.inputWithIcon, styles.selectInput, fieldErrors.estYear && styles.inputError]}
                     activeOpacity={0.8}
                     onPress={() => setYearDropdownOpen(o => !o)}
                   >
@@ -1854,7 +1897,7 @@ onComplete?.();
                         <TouchableOpacity
                           key={y}
                           style={styles.yearOption}
-                          onPress={() => { setEstYear(y); setYearDropdownOpen(false); }}
+                          onPress={() => { setEstYear(y); setYearDropdownOpen(false); clearFieldError('estYear'); }}
                         >
                           <Text style={[styles.yearOptionText, estYear === y && { color: PRIMARY, fontWeight: '700', fontFamily: 'PlusJakartaSans_700Bold' }]}>{y}</Text>
                           {estYear === y && <MaterialIcons name="check" size={15} color={PRIMARY} />}
@@ -1863,6 +1906,7 @@ onComplete?.();
                     </ScrollView>
                   </View>
                 )}
+                {fieldErrors.estYear ? <Text style={styles.fieldError}>{fieldErrors.estYear}</Text> : null}
                 <Text style={styles.helperText}>{t('obEstYearHelp')}</Text>
 
                 <View style={styles.whyAskBox}>
@@ -1883,19 +1927,20 @@ onComplete?.();
               <View style={styles.inputIconWrap}>
                 <MaterialIcons name="mail-outline" size={17} color={SUBTLE} style={styles.inputIcon} />
                 <TextInput
-  style={[styles.input, styles.inputWithIcon]}
-  placeholder={t('obShopEmailPh')}
-  placeholderTextColor="#A6ACA4"
-  keyboardType="email-address"
-  autoCapitalize="none"
-  autoCorrect={false}
-  value={email}
-  onChangeText={setEmail}
-/>
+                  style={[styles.input, styles.inputWithIcon, fieldErrors.email && styles.inputError]}
+                  placeholder={t('obShopEmailPh')}
+                  placeholderTextColor="#A6ACA4"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={email}
+                  onChangeText={(v) => { setEmail(v); clearFieldError('email'); }}
+                />
               </View>
+              {fieldErrors.email ? <Text style={styles.fieldError}>{fieldErrors.email}</Text> : null}
               <View style={styles.helperRow}>
                 <Text style={styles.helperText}>{t('obShopEmailHelp')}</Text>
-                {isValidShopEmail(email) && (
+                {isValidShopEmail(email) && !fieldErrors.email && (
                   <View style={styles.looksGoodRow}>
                     <MaterialIcons name="check-circle" size={12} color={PRIMARY} />
                     <Text style={styles.looksGoodText}>{t('obLooksGood')}</Text>
@@ -1981,29 +2026,33 @@ onComplete?.();
                 <View style={{ width: 12 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>{t('obPrimaryPhone')} <Text style={styles.req}>*</Text></Text>
-                 <TextInput
-  style={styles.input}
-  placeholder={t('obBackupPh')}
-  keyboardType="number-pad"
-  maxLength={10}
-  value={altPhone}
-  onChangeText={(value) =>
-    setAltPhone(value.replace(/[^0-9]/g, '').slice(0, 10))
-  }
-/>
+                  <TextInput
+                    style={[styles.input, fieldErrors.phone && styles.inputError]}
+                    placeholder={t('obPrimaryPhone')}
+                    keyboardType="number-pad"
+                    maxLength={10}
+                    value={phone}
+                    onChangeText={(value) => {
+                      setPhone(value.replace(/[^0-9]/g, '').slice(0, 10));
+                      clearFieldError('phone');
+                    }}
+                  />
+                  {fieldErrors.phone ? <Text style={styles.fieldError}>{fieldErrors.phone}</Text> : null}
                 </View>
               </View>
               <View style={styles.row}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>{t('obAltName')}</Text>
                  <TextInput
-  style={styles.input}
+  style={[styles.input, fieldErrors.altName && styles.inputError]}
   placeholder={t('obName2Ph')}
   value={altName}
-  onChangeText={(value) =>
-    setAltName(value.replace(/[^A-Za-z ]/g, ''))
-  }
+  onChangeText={(value) => {
+    setAltName(value.replace(/[^A-Za-z ]/g, ''));
+    clearFieldError('altName');
+  }}
 />
+                  {fieldErrors.altName ? <Text style={styles.fieldError}>{fieldErrors.altName}</Text> : null}
                 </View>
                 <View style={{ width: 12 }} />
                 <View style={{ flex: 1 }}>
@@ -2047,13 +2096,14 @@ onComplete?.();
                 <Text style={styles.label}>{t('obStreetAddress')} <Text style={styles.req}>*</Text></Text>
                 <TextInput
                   ref={inputRef}
-                  style={[styles.input, styles.textArea, { marginBottom: 0 }]}
+                  style={[styles.input, styles.textArea, { marginBottom: 0 }, fieldErrors.address && styles.inputError]}
                   placeholder={t('obStreetPh')}
                   value={shopLoc.formattedAddress}
-                  onChangeText={handleAddressChange}
+                  onChangeText={(text) => { handleAddressChange(text); clearFieldError('address'); }}
                   multiline numberOfLines={2}
                   onFocus={() => { if (suggestions.length > 0) setSuggestionsOpen(true); }}
                 />
+                {fieldErrors.address ? <Text style={styles.fieldError}>{fieldErrors.address}</Text> : null}
 
                 {suggestionsOpen && suggestions.length > 0 && (
                   <View ref={dropdownRef} style={styles.suggestionPanel}>
@@ -2095,19 +2145,33 @@ onComplete?.();
                 <View style={{ flex: 2 }}>
                   <Text style={styles.label}>{t('obCity')} <Text style={styles.req}>*</Text></Text>
                   <TextInput
-                    style={styles.input} placeholder={t('obCityPh')}
+                    style={[styles.input, fieldErrors.city && styles.inputError]}
+                    placeholder={t('obCityPh')}
                     value={shopLoc.city}
-                    onChangeText={text => { applyingRef.current = false; updateShopLoc({ city: text }); }}
+                    onChangeText={text => {
+                      applyingRef.current = false;
+                      updateShopLoc({ city: text });
+                      clearFieldError('city');
+                    }}
                   />
+                  {fieldErrors.city ? <Text style={styles.fieldError}>{fieldErrors.city}</Text> : null}
                 </View>
                 <View style={{ width: 12 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>{t('obPincode')} <Text style={styles.req}>*</Text></Text>
                   <TextInput
-                    style={styles.input} placeholder={t('obPincodePh')} keyboardType="numeric" maxLength={6}
+                    style={[styles.input, fieldErrors.pincode && styles.inputError]}
+                    placeholder={t('obPincodePh')}
+                    keyboardType="numeric"
+                    maxLength={6}
                     value={shopLoc.pincode}
-                    onChangeText={text => { applyingRef.current = false; updateShopLoc({ pincode: text }); }}
+                    onChangeText={text => {
+                      applyingRef.current = false;
+                      updateShopLoc({ pincode: text });
+                      clearFieldError('pincode');
+                    }}
                   />
+                  {fieldErrors.pincode ? <Text style={styles.fieldError}>{fieldErrors.pincode}</Text> : null}
                 </View>
               </View>
 
@@ -2178,53 +2242,63 @@ onComplete?.();
               </View>
               <Text style={styles.label}>{t('obFssai')} <Text style={styles.req}>*</Text></Text>
               <TextInput
-  style={styles.input}
-  placeholder={t('obFssaiPh')}
-  keyboardType="numeric"
-  maxLength={14}
-  value={fssai}
-  onChangeText={(value) =>
-    setFssai(value.replace(/[^0-9]/g, '').slice(0, 14))
-  }
-/>
+                style={[styles.input, fieldErrors.fssai && styles.inputError]}
+                placeholder={t('obFssaiPh')}
+                keyboardType="numeric"
+                maxLength={14}
+                value={fssai}
+                onChangeText={(value) => {
+                  setFssai(value.replace(/[^0-9]/g, '').slice(0, 14));
+                  clearFieldError('fssai');
+                }}
+              />
+              {fieldErrors.fssai ? <Text style={styles.fieldError}>{fieldErrors.fssai}</Text> : null}
               <Text style={styles.hintText}>{t('obFssaiHint')}</Text>
 
-              <Text style={styles.label}>{t('obGst')} <Text style={styles.req}>*</Text></Text>
+              <Text style={styles.label}>{t('obGst')}</Text>
               <TextInput
-  style={styles.input}
-  placeholder={t('obGstPh')}
-  maxLength={15}
-  autoCapitalize="characters"
-  autoCorrect={false}
-  value={gst}
-  onChangeText={(value) =>
-    setGst(value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15))
-  }/>
+                style={[styles.input, fieldErrors.gst && styles.inputError]}
+                placeholder={t('obGstPh')}
+                maxLength={15}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                value={gst}
+                onChangeText={(value) => {
+                  setGst(value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15));
+                  clearFieldError('gst');
+                }}
+              />
+              {fieldErrors.gst ? <Text style={styles.fieldError}>{fieldErrors.gst}</Text> : null}
+              <Text style={styles.hintText}>Optional — enter if your shop has a GST registration</Text>
 
-              <Text style={styles.label}>{t('obAadhaar')}</Text>
+              <Text style={styles.label}>{t('obAadhaar')} <Text style={styles.req}>*</Text></Text>
               <TextInput
-  style={styles.input}
-  placeholder={t('obAadhaarPh')}
-  keyboardType="numeric"
-  maxLength={12}
-  value={aadhar}
-  onChangeText={(value) =>
-    setAadhar(value.replace(/[^0-9]/g, '').slice(0, 12))
-  }
-/>
+                style={[styles.input, fieldErrors.aadhar && styles.inputError]}
+                placeholder={t('obAadhaarPh')}
+                keyboardType="numeric"
+                maxLength={12}
+                value={aadhar}
+                onChangeText={(value) => {
+                  setAadhar(value.replace(/[^0-9]/g, '').slice(0, 12));
+                  clearFieldError('aadhar');
+                }}
+              />
+              {fieldErrors.aadhar ? <Text style={styles.fieldError}>{fieldErrors.aadhar}</Text> : null}
 
-              <Text style={styles.label}>{t('obPan')}</Text>
+              <Text style={styles.label}>{t('obPan')} <Text style={styles.req}>*</Text></Text>
               <TextInput
-  style={styles.input}
-  placeholder={t('obPanPh')}
-  maxLength={10}
-  autoCapitalize="characters"
-  autoCorrect={false}
-  value={pan}
-  onChangeText={(value) =>
-    setPan(value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))
-  }
-/>
+                style={[styles.input, fieldErrors.pan && styles.inputError]}
+                placeholder={t('obPanPh')}
+                maxLength={10}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                value={pan}
+                onChangeText={(value) => {
+                  setPan(value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10));
+                  clearFieldError('pan');
+                }}
+              />
+              {fieldErrors.pan ? <Text style={styles.fieldError}>{fieldErrors.pan}</Text> : null}
 
               <Text style={styles.label}>{t('obTradeLicense')}</Text>
               <TextInput style={styles.input} placeholder={t('obTradeLicensePh')} maxLength={50} value={tradeLicense} onChangeText={setTradeLicense} />
@@ -2289,8 +2363,18 @@ onComplete?.();
                   <Text style={styles.infoText}>{t('obPayInfo')}</Text>
                 </View>
               </View>
+              {fieldErrors.payment ? (
+                <Text style={[styles.fieldError, { marginBottom: 8 }]}>{fieldErrors.payment}</Text>
+              ) : null}
               <Text style={styles.sectionLabel}>{t('obUpi')}</Text>
-              <TextInput style={styles.input} placeholder={t('obUpiPh')} value={upiId} onChangeText={setUpiId} autoCapitalize="none" />
+              <TextInput
+                style={[styles.input, fieldErrors.upiId && styles.inputError]}
+                placeholder={t('obUpiPh')}
+                value={upiId}
+                onChangeText={(v) => { setUpiId(v); clearFieldError('upiId'); clearFieldError('payment'); }}
+                autoCapitalize="none"
+              />
+              {fieldErrors.upiId ? <Text style={styles.fieldError}>{fieldErrors.upiId}</Text> : null}
               <View style={styles.dividerRow}>
                 <View style={styles.dividerLine} />
                 <Text style={styles.dividerText}>{t('obOrBank')}</Text>
@@ -2298,14 +2382,16 @@ onComplete?.();
               </View>
               <Text style={styles.label}>{t('obAccHolder')}</Text>
               <TextInput
-  style={styles.input}
-  placeholder={t('obAccHolderPh')}
-  value={accountName}
-  onChangeText={(value) =>
-    setAccountName(value.replace(/[^A-Za-z ]/g, ''))
-  }
-  autoCapitalize="words"
-/>
+                style={[styles.input, fieldErrors.accountName && styles.inputError]}
+                placeholder={t('obAccHolderPh')}
+                value={accountName}
+                onChangeText={(value) => {
+                  setAccountName(value.replace(/[^A-Za-z ]/g, ''));
+                  clearFieldError('accountName');
+                }}
+                autoCapitalize="words"
+              />
+              {fieldErrors.accountName ? <Text style={styles.fieldError}>{fieldErrors.accountName}</Text> : null}
               <Text style={styles.label}>{t('obBankName')}</Text>
               <BankNameDropdown
                 value={bankName}
@@ -2321,18 +2407,33 @@ onComplete?.();
                 }}
               />
               <Text style={styles.label}>{t('obAccNumber')}</Text>
-<TextInput
-  style={styles.input}
-  placeholder={t('obAccNumberPh')}
-  keyboardType="number-pad"
-  secureTextEntry
-  value={accountNumber}
-  onChangeText={(value) => {
-    const digitsOnly = value.replace(/[^0-9]/g, '').slice(0, 16);
-    setAccountNumber(digitsOnly);
-  }}
-  maxLength={16}
-/>
+<View style={styles.secureInputWrap}>
+  <TextInput
+    style={[styles.input, styles.secureInput]}
+    placeholder={t('obAccNumberPh')}
+    keyboardType="number-pad"
+    secureTextEntry={!showAccountNumber}
+    value={accountNumber}
+    onChangeText={(value) => {
+      const digitsOnly = value.replace(/[^0-9]/g, '').slice(0, 16);
+      setAccountNumber(digitsOnly);
+    }}
+    maxLength={16}
+  />
+  <TouchableOpacity
+    style={styles.eyeBtn}
+    onPress={() => setShowAccountNumber((v) => !v)}
+    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    accessibilityRole="button"
+    accessibilityLabel={showAccountNumber ? 'Hide account number' : 'Show account number'}
+  >
+    <MaterialIcons
+      name={showAccountNumber ? 'visibility' : 'visibility-off'}
+      size={20}
+      color={SUBTLE}
+    />
+  </TouchableOpacity>
+</View>
               <Text style={styles.label}>{t('obIfsc')}</Text>
               <TextInput style={styles.input} placeholder={t('obIfscPh')} autoCapitalize="characters" maxLength={11} value={ifsc} onChangeText={v => setIfsc(v.toUpperCase())} />
               {ifscStatus?.status === 'loading' ? (
@@ -2364,6 +2465,12 @@ onComplete?.();
           {/* ── STEP 4: Product Catalog ── */}
           {currentStep === 4 && (
             <View style={styles.form}>
+              {fieldErrors.products ? (
+                <Text style={[styles.fieldError, { marginBottom: 8 }]}>{fieldErrors.products}</Text>
+              ) : null}
+              {fieldErrors.category ? (
+                <Text style={[styles.fieldError, { marginBottom: 8 }]}>{fieldErrors.category}</Text>
+              ) : null}
               <View style={styles.modeToggle}>
                 {[
                   { key: 'generic', label: t('obModeCatalog'), icon: 'shopping-basket' },
@@ -2612,7 +2719,15 @@ onComplete?.();
                           {Platform.OS === 'web' ? (
                             <select
                               value={product.unit || ''}
-                              onChange={(e) => updateManualProd(index, 'unit', e.target.value)}
+                              onChange={(e) => {
+                                const nextUnit = e.target.value;
+                                const allowed = getWeightOptionsForUnit(nextUnit);
+                                setManualProds(prev => prev.map((p, idx) => {
+                                  if (idx !== index) return p;
+                                  const kept = (p.weight_options || []).filter(w => allowed.includes(w));
+                                  return { ...p, unit: nextUnit, weight_options: kept };
+                                }));
+                              }}
                               style={{
                                 width: '100%',
                                 height: 44,
@@ -2660,7 +2775,12 @@ onComplete?.();
                                   hover={unitHover}
                                   onHover={setUnitHover}
                                   onSelect={(u) => {
-                                    updateManualProd(index, 'unit', u);
+                                    const allowed = getWeightOptionsForUnit(u);
+                                    setManualProds(prev => prev.map((p, idx) => {
+                                      if (idx !== index) return p;
+                                      const kept = (p.weight_options || []).filter(w => allowed.includes(w));
+                                      return { ...p, unit: u, weight_options: kept };
+                                    }));
                                     setUnitOpenIdx(null);
                                   }}
                                 />
@@ -2674,7 +2794,7 @@ onComplete?.();
                         <View style={{ marginTop: 10 }}>
                           <Text style={styles.label}>{t('obAvailableQty')} <Text style={styles.req}>*</Text></Text>
                           <View style={styles.chipGrid}>
-                            {['50g', '100g', '200g', '250g', '500g', '1kg'].map(w => {
+                            {getWeightOptionsForUnit(product.unit || 'kg').map(w => {
                               const isSel = product.weight_options?.includes(w);
                               return (
                                 <TouchableOpacity
@@ -2685,6 +2805,7 @@ onComplete?.();
                                     updateManualProd(index, 'weight_options',
                                       isSel ? curr.filter(x => x !== w) : [...curr, w]
                                     );
+                                    clearFieldError(`manualQty_${index}`);
                                   }}
                                 >
                                   <Text style={[styles.chipText, isSel && styles.chipTextActive]}>{w}</Text>
@@ -2692,6 +2813,9 @@ onComplete?.();
                               );
                             })}
                           </View>
+                          {fieldErrors[`manualQty_${index}`] ? (
+                            <Text style={styles.fieldError}>{fieldErrors[`manualQty_${index}`]}</Text>
+                          ) : null}
                         </View>
                       )}
 
@@ -2699,21 +2823,34 @@ onComplete?.();
                         <View style={{ flex: 1 }}>
                           <Text style={styles.label}>{t('obMrp')} <Text style={styles.req}>*</Text></Text>
                           <TextInput
-                            style={styles.input} placeholder={t('obMrpPh')}
-                            keyboardType="numeric" value={product.mrp}
-                            onChangeText={v => updateManualProd(index, 'mrp', v)}
+                            style={[styles.input, fieldErrors[`manualSp_${index}`] && styles.inputError]}
+                            placeholder={t('obMrpPh')}
+                            keyboardType="numeric"
+                            value={product.mrp}
+                            onChangeText={v => {
+                              updateManualProd(index, 'mrp', v);
+                              clearFieldError(`manualSp_${index}`);
+                            }}
                           />
                         </View>
                         <View style={{ width: 12 }} />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.label}>{t('obSellingPrice')} <Text style={styles.req}>*</Text></Text>
                           <TextInput
-                            style={styles.input} placeholder={t('obSellingPh')}
-                            keyboardType="numeric" value={product.sp}
-                            onChangeText={v => updateManualProd(index, 'sp', v)}
+                            style={[styles.input, fieldErrors[`manualSp_${index}`] && styles.inputError]}
+                            placeholder={t('obSellingPh')}
+                            keyboardType="numeric"
+                            value={product.sp}
+                            onChangeText={v => {
+                              updateManualProd(index, 'sp', v);
+                              clearFieldError(`manualSp_${index}`);
+                            }}
                           />
                         </View>
                       </View>
+                      {fieldErrors[`manualSp_${index}`] ? (
+                        <Text style={styles.fieldError}>{fieldErrors[`manualSp_${index}`]}</Text>
+                      ) : null}
                     </View>
                   ))}
                   <TouchableOpacity style={styles.addRowBtn} onPress={addManualRow}>
@@ -3123,11 +3260,21 @@ const styles = StyleSheet.create({
   sectionSep: { fontSize: 14, fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", color: '#333', marginTop: 20, marginBottom: 6, paddingTop: 0, borderTopWidth: 0.5, borderTopColor: '#eee' },
   req: { color: '#e53935' },
   hintText: { fontSize: 11, color: '#999', marginTop: -4, marginBottom: 6 },
+  fieldError: {
+    fontSize: 12, color: '#DC2626', marginTop: -4, marginBottom: 8,
+    fontFamily: 'PlusJakartaSans_500Medium',
+  },
+  inputError: {
+    borderColor: '#FCA5A5', backgroundColor: '#FEF2F2',
+  },
   input: {
     backgroundColor: '#FAFBFA', borderWidth: 1.5, borderColor: '#E7EBE8',
     borderRadius: 12, padding: 13, fontSize: 14, color: INK, marginBottom: 8, placeholderTextColor:"#A6ACA4"
   },
   textArea: { height: 80, textAlignVertical: 'top' },
+  secureInputWrap: { position: 'relative', justifyContent: 'center' },
+  secureInput: { paddingRight: 44 },
+  eyeBtn: { position: 'absolute', right: 12, top: 0, bottom: 8, justifyContent: 'center' },
   row: { flexDirection: 'row' },
 
   // Street Address autocomplete

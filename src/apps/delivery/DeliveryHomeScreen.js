@@ -5,6 +5,7 @@ import {
   StatusBar, Platform, Alert, Modal, Pressable, TextInput
 } from 'react-native';
 import Svg, { G, Path, Rect, Circle, Ellipse, Polygon } from 'react-native-svg';
+import { Feather } from '@expo/vector-icons';
 import { io } from 'socket.io-client';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
@@ -181,8 +182,8 @@ function TxRow({ item, isLast }) {
 
 const tx = StyleSheet.create({
   row:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 14 },
-  icon:     { width: 42, height: 42, borderRadius: 21, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
-  iconChar: { fontSize: 17, fontFamily: 'PlusJakartaSans_700Bold', color: '#4B5563' },
+  icon:     { width: 42, height: 42, borderRadius: 21, backgroundColor: '#E8F8EE', alignItems: 'center', justifyContent: 'center' },
+  iconChar: { fontSize: 17, fontFamily: 'PlusJakartaSans_700Bold', color: '#1A6B38' },
   title:    { fontSize: 12, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827', letterSpacing: 0.2 },
   sub:      { fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: '#9CA3AF', marginTop: 2 },
   amt:      { fontSize: 14, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827' },
@@ -191,11 +192,14 @@ const tx = StyleSheet.create({
 });
 
 // ── Stat Column ────────────────────────────────────────────────────────────────
-function StatCol({ label, value, noBorder }) {
+function StatCol({ label, value, icon, tint, tintBg }) {
   return (
-    <View style={[s.statCol, !noBorder && { borderRightWidth: 1, borderRightColor: C.gray200 }]}>
-      <Text style={s.statLabel}>{label}</Text>
-      <Text style={s.statValue}>{value}</Text>
+    <View style={s.statCol}>
+      <View style={[s.statIconWrap, { backgroundColor: tintBg }]}>
+        <Feather name={icon} size={15} color={tint} />
+      </View>
+      <Text style={s.statValue} numberOfLines={1}>{value}</Text>
+      <Text style={s.statLabel} numberOfLines={2}>{label}</Text>
     </View>
   );
 }
@@ -378,11 +382,12 @@ export default function DeliveryHomeScreen({ navigation, route }) {
       useNativeDriver: false,
     }).start();
     try {
-      await fetch(`${API_BASE}/delivery/toggle-availability`, {
+      const toggleRes = await fetch(`${API_BASE}/delivery/toggle-availability`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ is_available: next }),
       });
+      if (!toggleRes.ok) throw new Error('toggle failed');
       // Tell the live map immediately — online joins delivery:online and the
       // first heartbeat follows right away; offline removes the rider marker.
       if (next) {
@@ -430,6 +435,8 @@ export default function DeliveryHomeScreen({ navigation, route }) {
       }
     } catch {
       setStats(s => ({ ...s, isAvailable: !next }));
+      Animated.timing(heroBgAnim, { toValue: next ? 1 : 0, duration: 300, useNativeDriver: false }).start();
+      Alert.alert(t('delivery.toggleFailedTitle', { defaultValue: 'Could not update status' }), t('delivery.toggleFailedMsg', { defaultValue: 'Please check your connection and try again.' }));
     } finally {
       setToggling(false);
     }
@@ -573,7 +580,13 @@ export default function DeliveryHomeScreen({ navigation, route }) {
               </View>
             </View>
 
-            <Text style={s.heroName}>{t('delivery.partnerName', { name: firstName })}</Text>
+            <Text style={s.heroName} numberOfLines={1}>{t('delivery.partnerName', { name: firstName })}</Text>
+            <View style={s.todayChip}>
+              <View style={[s.todayDot, { backgroundColor: isAvailable ? '#86EFAC' : '#FCA5A5' }]} />
+              <Text style={s.todayChipTxt}>
+                {t('delivery.todayDeliveriesChip', { n: todayDeliveries, defaultValue: '{{n}} deliveries today' })}
+              </Text>
+            </View>
             <Text style={s.earningsLabel}>{t('delivery.totalEarningsLabel')}</Text>
             <View style={s.earningsRow}>
               <Text style={s.earningsCurrency}>₹</Text>
@@ -603,6 +616,7 @@ export default function DeliveryHomeScreen({ navigation, route }) {
           {/* ── Status toggle ── */}
           <View style={s.card}>
             <View style={s.statusRow}>
+              <View style={[s.statusDot, { backgroundColor: isAvailable ? C.green : C.red }]} />
               <View style={{ flex: 1 }}>
                 <Text style={s.statusTitle}>
                   {isAvailable ? t('delivery.statusOnline') : t('delivery.statusOffline')}
@@ -662,10 +676,10 @@ export default function DeliveryHomeScreen({ navigation, route }) {
           <View style={s.card}>
             <Text style={s.sectionLabel}>{t('delivery.performanceStats')}</Text>
             <View style={s.statsGrid}>
-              <StatCol label={t('delivery.totalDeliveriesLabel')}   value={String(totalDeliveries)} />
-              <StatCol label={t('delivery.completionRateLabel')}    value={displayCompletionRate} />
-              <StatCol label={t('delivery.distanceCoveredLabel')}   value={displayDistance} />
-              <StatCol label={t('delivery.profileRatingLabel')}     value={displayRating} noBorder />
+              <StatCol icon="package"     tint="#2E7D32" tintBg="#E8F8EE" label={t('delivery.totalDeliveriesLabel')} value={String(totalDeliveries)} />
+              <StatCol icon="check-circle" tint="#2563EB" tintBg="#EFF6FF" label={t('delivery.completionRateLabel')}  value={displayCompletionRate} />
+              <StatCol icon="navigation"  tint="#D97706" tintBg="#FFFBEB" label={t('delivery.distanceCoveredLabel')} value={displayDistance} />
+              <StatCol icon="star"        tint="#DB2777" tintBg="#FDF2F8" label={t('delivery.profileRatingLabel')}   value={displayRating} />
             </View>
           </View>
 
@@ -898,6 +912,8 @@ const s = StyleSheet.create({
     flexDirection:    'row',
     alignItems:       'flex-end',
     overflow:         'hidden',
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
   heroLeft:  { flex: 1 },
   heroRight: { width: 184, justifyContent: 'flex-end', alignItems: 'flex-end' },
@@ -908,7 +924,7 @@ const s = StyleSheet.create({
   levelPill:     { backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   levelPillText: { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' },
 
-  heroName:         { fontSize: 30, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: -0.5, marginBottom: 10 },
+  heroName:         { fontSize: 28, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: -0.5, marginBottom: 8 },
   earningsLabel:    { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: 'rgba(255,255,255,0.75)', letterSpacing: 1.3, textTransform: 'uppercase', marginBottom: 4 },
   earningsRow:      { flexDirection: 'row', alignItems: 'baseline', gap: 1 },
   earningsCurrency: { fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF' },
@@ -945,16 +961,21 @@ const s = StyleSheet.create({
   activePillText:     { fontSize: 10, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FF3B30', letterSpacing: 0.8 },
   ordersCount:        { fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827', marginBottom: 12 },
   viewDetailsBtn:     {
-    borderRadius: 999, borderWidth: 1.5, borderColor: '#D1D5DB',
+    borderRadius: 999, borderWidth: 1.5, borderColor: '#50C878', backgroundColor: '#50C878',
     paddingVertical: 10, paddingHorizontal: 22, alignSelf: 'flex-start',
   },
-  viewDetailsBtnText: { fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1F2937', letterSpacing: 1.1 },
+  viewDetailsBtnText: { fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#FFFFFF', letterSpacing: 1.1 },
 
   sectionLabel: { fontSize: 11, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#1F2937', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 14 },
-  statsGrid:    { flexDirection: 'row' },
-  statCol:      { flex: 1, alignItems: 'flex-start', paddingHorizontal: 4 },
-  statLabel:    { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#6B7280', lineHeight: 16, marginBottom: 6 },
-  statValue:    { fontSize: 19, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827', letterSpacing: -0.3 },
+  statsGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  statCol:      { width: '48%', flexGrow: 1, backgroundColor: '#F9FAFB', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#F0F1F3' },
+  statIconWrap: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  todayChip:    { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 10 },
+  todayDot:     { width: 7, height: 7, borderRadius: 3.5 },
+  todayChipTxt: { fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: '#FFFFFF' },
+  statusDot:    { width: 12, height: 12, borderRadius: 6, marginRight: 12 },
+  statLabel:    { fontSize: 11, fontFamily: 'PlusJakartaSans_500Medium', color: '#6B7280', lineHeight: 15, marginTop: 2 },
+  statValue:    { fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: '#111827', letterSpacing: -0.4 },
 
   txHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
