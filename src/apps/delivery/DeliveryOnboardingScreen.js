@@ -15,7 +15,7 @@
  *  3. Vehicle Details        6. Education & Training
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     TextInput, Image, Alert, Platform, StatusBar,
@@ -35,10 +35,19 @@ import PdfViewerModal from '../../components/onboarding/PdfViewerModal';
 import RemovalConfirmDialog from '../../components/onboarding/RemovalConfirmDialog';
 import ToastBanner from '../../components/common/ToastBanner';
 import LanguageSwitcher from '../../components/common/LanguageSwitcher';
-import { C } from '../../components/onboarding/onboardingTheme';
+import { C as THEME } from '../../components/onboarding/onboardingTheme';
 import { compressImage, revokeObjectUrl } from '../../utils/imageEditor';
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+// Theme with safe fallbacks (so a missing key in onboardingTheme never renders `undefined` colours)
+const C = {
+    green: '#1A9E3F', greenDark: '#147832', greenDeep: '#0a4d22', greenLight: '#E6F4EB', greenMid: '#B8DFCA',
+    bg: '#F7F9F7', border: '#E2E8E2', text: '#111827', textMed: '#374151', textLight: '#6B7280', textXLight: '#9CA3AF',
+    red: '#DC2626', blue: '#2563EB',
+    yellowLight: '#FFFBEB', yellowBorder: '#FDE68A', yellowText: '#92400E',
+    ...THEME,
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. FORM STATE
@@ -98,6 +107,27 @@ const CURRENT_YEAR = new Date().getFullYear();
 
 const normalizeRegistration = (value = '') =>
     value.replace(/[\s-]/g, '').toUpperCase();
+
+// ── Input sanitizers (applied while typing so users can't enter junk) ──
+const onlyDigits = (v = '') => v.replace(/\D/g, '');
+const cleanAlnumUpper = (v = '') => v.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+const cleanPersonName = (v = '') =>
+    v.replace(/[^A-Za-z .'-]/g, '').replace(/^[^A-Za-z]+/, '').replace(/\s{2,}/g, ' ');
+const formatExpiry = (raw = '') => {
+    const d = onlyDigits(raw).slice(0, 6);           // MMYYYY
+    return d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
+};
+
+// First 4 letters of an IFSC identify the bank → used to auto-fill "Bank name"
+const IFSC_BANKS = {
+    SBIN: 'State Bank of India', HDFC: 'HDFC Bank', ICIC: 'ICICI Bank', UTIB: 'Axis Bank',
+    PUNB: 'Punjab National Bank', BARB: 'Bank of Baroda', CNRB: 'Canara Bank', KKBK: 'Kotak Mahindra Bank',
+    IDIB: 'Indian Bank', UBIN: 'Union Bank of India', YESB: 'Yes Bank', INDB: 'IndusInd Bank',
+    IOBA: 'Indian Overseas Bank', BKID: 'Bank of India', MAHB: 'Bank of Maharashtra', FDRL: 'Federal Bank',
+    PYTM: 'Paytm Payments Bank', AIRP: 'Airtel Payments Bank', JSFB: 'Jana Small Finance Bank',
+    UCBA: 'UCO Bank', CBIN: 'Central Bank of India', IDFB: 'IDFC First Bank', RATN: 'RBL Bank',
+    SIBL: 'South Indian Bank', KARB: 'Karnataka Bank', CIUB: 'City Union Bank', ESFB: 'Equitas Small Finance Bank',
+};
 
 const validators = {
     // SECTION 1: PROFILE
@@ -403,9 +433,9 @@ const TRAINING_OPTS = [
 // 6. ATOMS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function SectionCard({ title, subtitle, stepIndex, completed, children }) {
+function SectionCard({ title, subtitle, stepIndex, completed, onLayout, children }) {
     return (
-        <View style={[s.card, completed && s.cardCompleted]}>
+        <View style={[s.card, completed && s.cardCompleted]} onLayout={onLayout}>
             <View style={s.cardHeader}>
                 <View style={[s.stepNumWrap, completed ? s.stepNumWrapDone : s.stepNumWrapPending]}>
                     {completed ? <Text style={s.stepCheck}>✓</Text> : <Text style={s.stepNum}>{stepIndex}</Text>}
@@ -421,23 +451,57 @@ function SectionCard({ title, subtitle, stepIndex, completed, children }) {
     );
 }
 
-function Input({ value, onChangeText, placeholder, keyboardType, maxLength, secureTextEntry, autoCapitalize = 'none', onBlur }) {
+function Input({
+    value, onChangeText, placeholder, keyboardType, maxLength, secureTextEntry,
+    autoCapitalize = 'none', onBlur, valid, hint, counter, inputRef, returnKeyType,
+    onSubmitEditing, textContentType, autoComplete,
+}) {
+    const { t } = useTranslation();
     const [focused, setFocused] = useState(false);
+    const [hidden, setHidden] = useState(!!secureTextEntry);
     return (
-        <TextInput
-            value={value}
-            onChangeText={onChangeText}
-            placeholder={placeholder}
-            placeholderTextColor={C.textXLight}
-            keyboardType={keyboardType || 'default'}
-            maxLength={maxLength}
-            secureTextEntry={secureTextEntry}
-            autoCapitalize={autoCapitalize}
-            onFocus={() => setFocused(true)}
-            onBlur={() => { setFocused(false); onBlur?.(); }}
-            style={[s.input, focused && s.inputFocused]}
-            accessibilityLabel={placeholder}
-        />
+        <View>
+            <View style={[s.input, focused && s.inputFocused, valid && !focused && s.inputValid]}>
+                <TextInput
+                    ref={inputRef}
+                    value={value}
+                    onChangeText={onChangeText}
+                    placeholder={placeholder}
+                    placeholderTextColor={C.textXLight}
+                    keyboardType={keyboardType || 'default'}
+                    maxLength={maxLength}
+                    secureTextEntry={secureTextEntry ? hidden : false}
+                    autoCapitalize={autoCapitalize}
+                    autoCorrect={false}
+                    spellCheck={false}
+                    autoComplete={autoComplete || 'off'}
+                    textContentType={textContentType}
+                    returnKeyType={returnKeyType}
+                    onSubmitEditing={onSubmitEditing}
+                    onFocus={() => setFocused(true)}
+                    onBlur={() => { setFocused(false); onBlur?.(); }}
+                    style={s.inputInner}
+                    accessibilityLabel={placeholder}
+                />
+                {secureTextEntry ? (
+                    <TouchableOpacity
+                        onPress={() => setHidden((h) => !h)}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        accessibilityRole="button"
+                    >
+                        <Text style={s.eyeTxt}>{hidden ? t('dobShow', { defaultValue: 'Show' }) : t('dobHide', { defaultValue: 'Hide' })}</Text>
+                    </TouchableOpacity>
+                ) : valid ? (
+                    <Text style={s.validTick}>✓</Text>
+                ) : null}
+            </View>
+            {(hint || counter) ? (
+                <View style={s.inputMetaRow}>
+                    <Text style={s.inputHint} numberOfLines={1}>{hint || ''}</Text>
+                    {counter ? <Text style={s.inputCounter}>{counter}</Text> : null}
+                </View>
+            ) : null}
+        </View>
     );
 }
 
@@ -527,6 +591,9 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
     const [removeConfirm, setRemoveConfirm] = useState(null);  // { target, fileName } | null
     const [pdfViewer, setPdfViewer] = useState(null);          // { visible, uri, localUri, fileName }
     const [showLanguage, setShowLanguage] = useState(false);
+    const scrollRef = useRef(null);
+    const sectionY = useRef({});
+    const sectionLayout = (i) => (e) => { sectionY.current[i] = e.nativeEvent.layout.y; };
 
     const markTouched = (key) => setTouched((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
 
@@ -569,6 +636,17 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
     };
 
     // ── Permissions ────────────────────────────────────────────────────────
+    const handleIfsc = (raw) => {
+        const v = cleanAlnumUpper(raw).slice(0, 11);
+        setField('bank', 'ifsc', v);
+        const bank = IFSC_BANKS[v.slice(0, 4)];
+        const current = form.bank.bankName;
+        // only auto-fill when empty or when it was previously auto-filled
+        if (v.length >= 4 && bank && (!current || Object.values(IFSC_BANKS).includes(current))) {
+            setField('bank', 'bankName', bank);
+        }
+    };
+
     const requestMediaPermission = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
@@ -777,6 +855,10 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
         if (!isFormValid) {
             setSubmitted(true);
             showToast(t('dobFillRequired'), 'danger');
+            const firstBad = SECTION_FIELDS.findIndex((keys) => keys.some((k) => allErrors[k]));
+            if (firstBad >= 0 && sectionY.current[firstBad] != null) {
+                scrollRef.current?.scrollTo({ y: Math.max(sectionY.current[firstBad] - 12, 0), animated: true });
+            }
             return;
         }
         setErrorMsg(null);
@@ -826,6 +908,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
             <StatusBar barStyle="light-content" backgroundColor={C.greenDeep} />
 
             <ScrollView
+                ref={scrollRef}
                 style={{ flex: 1, backgroundColor: C.bg }}
                 contentContainerStyle={s.scrollContent}
                 showsVerticalScrollIndicator={false}
@@ -889,6 +972,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     title={t('dobS1Title')}
                     subtitle={t('dobS1Sub')}
                     stepIndex="1"
+                    onLayout={sectionLayout(0)}
                     completed={sectionComplete(form, 0)}
                 >
                     <View style={{ alignItems: 'center', gap: 8 }}>
@@ -951,12 +1035,14 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     title={t('dobS2Title')}
                     subtitle={t('dobS2Sub')}
                     stepIndex="2"
+                    onLayout={sectionLayout(1)}
                     completed={sectionComplete(form, 1)}
                 >
                     <OnboardingField label={t('dobLicNumber')} required errorKey="license.number" errors={visibleErrors}>
                         <Input
                             value={form.license.number}
-                            onChangeText={(v) => setField('license', 'number', v.toUpperCase())}
+                            onChangeText={(v) => setField('license', 'number', cleanAlnumUpper(v).slice(0, 15))}
+                            valid={!allErrors['license.number']}
                             placeholder={t('dobLicNumberPh')}
                             maxLength={20}
                             autoCapitalize="characters"
@@ -967,7 +1053,8 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     <OnboardingField label={t('dobExpiry')} required errorKey="license.expiry" errors={visibleErrors}>
                         <Input
                             value={form.license.expiry}
-                            onChangeText={(v) => setField('license', 'expiry', v)}
+                            onChangeText={(v) => setField('license', 'expiry', formatExpiry(v))}
+                            valid={!allErrors['license.expiry']}
                             placeholder={t('dobExpiryPh')}
                             keyboardType="numeric"
                             maxLength={7}
@@ -1000,6 +1087,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     title={t('dobS3Title')}
                     subtitle={t('dobS3Sub')}
                     stepIndex="3"
+                    onLayout={sectionLayout(2)}
                     completed={sectionComplete(form, 2)}
                 >
                     <OnboardingField label={t('dobVehType')} required errorKey="vehicle.type" errors={visibleErrors}>
@@ -1027,7 +1115,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     <OnboardingField label={t('dobMfgYear')} errorKey="vehicle.year" errors={visibleErrors}>
                         <Input
                             value={form.vehicle.year}
-                            onChangeText={(v) => setField('vehicle', 'year', v)}
+                            onChangeText={(v) => setField('vehicle', 'year', onlyDigits(v))}
                             placeholder={t('dobMfgYearPh')}
                             keyboardType="numeric"
                             maxLength={4}
@@ -1041,6 +1129,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     title={t('dobS4Title')}
                     subtitle={t('dobS4Sub')}
                     stepIndex="4"
+                    onLayout={sectionLayout(3)}
                     completed={sectionComplete(form, 3)}
                 >
                     <OnboardingField
@@ -1109,6 +1198,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     title={t('dobS5Title')}
                     subtitle={t('dobS5Sub')}
                     stepIndex="5"
+                    onLayout={sectionLayout(4)}
                     completed={sectionComplete(form, 4)}
                 >
                     <View style={s.securityRow}>
@@ -1119,10 +1209,12 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     <OnboardingField label={t('dobHolder')} required errorKey="bank.accountHolderName" errors={visibleErrors}>
                         <Input
                             value={form.bank.accountHolderName}
-                            onChangeText={(v) =>
-    setField('bank', 'accountNumber', v.replace(/\D/g, ''))
-}
+                            onChangeText={(v) => setField('bank', 'accountHolderName', cleanPersonName(v).slice(0, 80))}
                             placeholder={t('dobHolderPh')}
+                            autoCapitalize="words"
+                            textContentType="name"
+                            returnKeyType="next"
+                            valid={!allErrors['bank.accountHolderName']}
                             onBlur={() => markTouched('bank.accountHolderName')}
                         />
                     </OnboardingField>
@@ -1139,11 +1231,13 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     <OnboardingField label={t('dobAccNumber')} required errorKey="bank.accountNumber" errors={visibleErrors}>
                         <Input
                             value={form.bank.accountNumber}
-                            onChangeText={(v) => setField('bank', 'accountNumber', v)}
+                            onChangeText={(v) => setField('bank', 'accountNumber', onlyDigits(v).slice(0, 18))}
                             placeholder={t('dobAccNumberPh')}
-                            keyboardType="numeric"
+                            keyboardType="number-pad"
                             secureTextEntry
                             maxLength={18}
+                            valid={!allErrors['bank.accountNumber']}
+                            counter={`${form.bank.accountNumber.length}/18`}
                             onBlur={() => markTouched('bank.accountNumber')}
                         />
                     </OnboardingField>
@@ -1151,12 +1245,12 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     <OnboardingField label={t('dobConfirmAcc')} required errorKey="bank.confirmAccount" errors={visibleErrors}>
                         <Input
                             value={form.bank.confirmAccount}
-                            onChangeText={(v) =>
-    setField('bank', 'confirmAccount', v.replace(/\D/g, ''))
-}
+                            onChangeText={(v) => setField('bank', 'confirmAccount', onlyDigits(v).slice(0, 18))}
                             placeholder={t('dobConfirmAccPh')}
-                            keyboardType="numeric"
+                            keyboardType="number-pad"
                             maxLength={18}
+                            valid={!allErrors['bank.confirmAccount']}
+                            counter={`${form.bank.confirmAccount.length}/18`}
                             onBlur={() => markTouched('bank.confirmAccount')}
                         />
                     </OnboardingField>
@@ -1164,8 +1258,11 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     <OnboardingField label={t('dobIfsc')} required errorKey="bank.ifsc" errors={visibleErrors}>
                         <Input
                             value={form.bank.ifsc}
-                            onChangeText={(v) => setField('bank', 'ifsc', v.toUpperCase())}
+                            onChangeText={handleIfsc}
                             placeholder={t('dobIfscPh')}
+                            valid={!allErrors['bank.ifsc']}
+                            hint={IFSC_BANKS[form.bank.ifsc.slice(0, 4)] || undefined}
+                            counter={`${form.bank.ifsc.length}/11`}
                             maxLength={11}
                             autoCapitalize="characters"
                             onBlur={() => markTouched('bank.ifsc')}
@@ -1180,6 +1277,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     title={t('dobS6Title')}
                     subtitle={t('dobS6Sub')}
                     stepIndex="6"
+                    onLayout={sectionLayout(5)}
                     completed={sectionComplete(form, 5)}
                 >
                     <OnboardingField label={t('dobEduLevel')} required errorKey="education.level" errors={visibleErrors}>
@@ -1203,7 +1301,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
                     <OnboardingField label={t('dobPassYear')} errorKey="education.passingYear" errors={visibleErrors}>
                         <Input
                             value={form.education.passingYear}
-                            onChangeText={(v) => setField('education', 'passingYear', v)}
+                            onChangeText={(v) => setField('education', 'passingYear', onlyDigits(v))}
                             placeholder={t('dobPassYearPh')}
                             keyboardType="numeric"
                             maxLength={4}
@@ -1342,7 +1440,7 @@ export default function DeliveryOnboarding({ navigation, onComplete }) {
 
 const s = StyleSheet.create({
     // ── Hero ──
-    hero: { paddingTop: Platform.OS === 'ios' ? 52 : StatusBar.currentHeight + 12 || 36, paddingBottom: 0, paddingHorizontal: 20, marginHorizontal: -20, marginTop: -16 },
+    hero: { paddingTop: Platform.OS === 'ios' ? 52 : (StatusBar.currentHeight || 24) + 12, paddingBottom: 0, paddingHorizontal: 20, marginHorizontal: -20, marginTop: -16 },
     heroNav: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
     backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
     backArrow: { fontSize: 18, color: '#fff', fontWeight: '400' },
@@ -1362,12 +1460,12 @@ const s = StyleSheet.create({
 
     progressWrap: { marginBottom: 12, marginHorizontal: 2 },
     progressTrack: { flexDirection: 'row', marginBottom: 4 },
-    progressSeg: { flex: 1, height: 4, borderRadius: 10, backgroundColor: C.border },
+    progressSeg: { flex: 1, height: 6, borderRadius: 10, backgroundColor: C.border },
     progressSegFilled: { backgroundColor: C.green },
-    progressTxt: { fontSize: 10, color: C.textLight, fontWeight: '700', textAlign: 'right', letterSpacing: 0.3 },
+    progressTxt: { fontSize: 11, color: C.greenDark, fontWeight: '800', textAlign: 'right', letterSpacing: 0.3 },
 
     card: { backgroundColor: '#fff', borderRadius: 20, marginBottom: 14, borderWidth: 1, borderColor: '#E8F0E8', shadowColor: '#147832', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.09, shadowRadius: 14, elevation: 5 },
-    cardCompleted: { borderColor: C.greenMid },
+    cardCompleted: { borderColor: C.green, borderWidth: 1.5 },
     cardHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
     stepNumWrap: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
     stepNumWrapPending: { backgroundColor: '#E5E7EB' },
@@ -1381,8 +1479,16 @@ const s = StyleSheet.create({
 
     fieldError: { fontSize: 11, color: C.red, fontWeight: '600', marginTop: 1 },
 
-    input: { borderWidth: 1.5, borderColor: '#E8EAE8', borderRadius: 12, paddingHorizontal: 14, paddingVertical: Platform.OS === 'ios' ? 13 : 12, fontSize: 14, color: C.text, backgroundColor: '#FAFCFA', fontWeight: '500', minHeight: 44 },
+    input: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#E8EAE8', borderRadius: 12, paddingHorizontal: 14, backgroundColor: '#FAFCFA', minHeight: 48 },
     inputFocused: { borderColor: C.green, backgroundColor: '#fff', shadowColor: C.green, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 3 },
+
+    inputInner: { flex: 1, fontSize: 14, color: C.text, fontWeight: '500', paddingVertical: Platform.OS === 'ios' ? 13 : 10 },
+    inputValid: { borderColor: C.greenMid, backgroundColor: '#F6FBF7' },
+    validTick: { fontSize: 15, fontWeight: '900', color: C.green, marginLeft: 8 },
+    eyeTxt: { fontSize: 12, fontWeight: '800', color: C.blue, marginLeft: 8 },
+    inputMetaRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, paddingHorizontal: 2 },
+    inputHint: { flex: 1, fontSize: 11, fontWeight: '700', color: C.greenDark },
+    inputCounter: { fontSize: 10, fontWeight: '700', color: C.textXLight, marginLeft: 8 },
 
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, borderWidth: 1.5, borderColor: '#E2E8E2', backgroundColor: '#F8FAF8', minHeight: 38 },
@@ -1425,7 +1531,7 @@ const s = StyleSheet.create({
     summaryText: { fontSize: 12, color: 'rgba(255,255,255,0.75)', lineHeight: 18, flexShrink: 1 },
     summaryAccent: { fontSize: 12, fontWeight: '800', color: '#86EFAC', lineHeight: 18 },
 
-    submitBtn: { backgroundColor: C.green, borderRadius: 16, paddingVertical: 17, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, shadowColor: C.green, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6, marginBottom: 14, minHeight: 52 },
+    submitBtn: { backgroundColor: C.green, borderRadius: 16, paddingVertical: 17, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, shadowColor: C.green, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 7, marginBottom: 14, minHeight: 54 },
     submitBtnDisabled: { backgroundColor: '#9CA3AF', opacity: 0.5, elevation: 0, shadowOpacity: 0 },
     submitBtnTxt: { fontSize: 15, fontWeight: '900', color: '#fff', letterSpacing: 0.2 },
     submitBtnArrow: { fontSize: 16, color: '#fff', fontWeight: '900' },

@@ -69,10 +69,15 @@ const ir = StyleSheet.create({
   value: { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#111827', maxWidth: '55%', textAlign: 'right' },
 });
 
-function SectionCard({ title, children }) {
+function SectionCard({ title, icon, children }) {
   return (
     <View style={p.sectionCard}>
-      <Text style={p.sectionTitle}>{title}</Text>
+      <View style={p.sectionHead}>
+        {icon ? (
+          <View style={p.sectionIcon}><Feather name={icon} size={14} color={C.greenDark} /></View>
+        ) : null}
+        <Text style={[p.sectionTitle, { marginBottom: 0 }]}>{title}</Text>
+      </View>
       {children}
     </View>
   );
@@ -117,14 +122,8 @@ export default function DeliveryProfileScreen({ navigation }) {
   useEffect(() => { fetchData(); }, [fetchData]);
   const onRefresh = () => { setRefreshing(true); fetchData(); };
 
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
-
-  const handleLogout = () => {
-    setShowLogoutModal(true);
-  };
-
   const confirmLogout = () => {
-    setShowLogoutModal(false);
+    setShowLogout(false);
     logout();
   };
 
@@ -165,9 +164,13 @@ export default function DeliveryProfileScreen({ navigation }) {
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Text style={p.heroName}>{displayName}</Text>
-                {isVerified && (
+                {isVerified ? (
                   <View style={p.verifiedBadge}>
                     <Text style={p.verifiedText}>{t('delivery.verified', '✓ Verified')}</Text>
+                  </View>
+                ) : (
+                  <View style={[p.verifiedBadge, { backgroundColor: 'rgba(253,230,138,0.28)' }]}>
+                    <Text style={[p.verifiedText, { color: '#FDE68A' }]}>{t('delivery.verificationPending', 'Pending')}</Text>
                   </View>
                 )}
               </View>
@@ -226,21 +229,22 @@ export default function DeliveryProfileScreen({ navigation }) {
           </View>
 
           {/* ── Vehicle info ── */}
-          <SectionCard title={t('delivery.vehicle', 'Vehicle')}>
+          <SectionCard icon="truck" title={t('delivery.vehicle', 'Vehicle')}>
             <InfoRow label={t('delivery.vehicleType', 'Type')}           value={profile?.vehicle_type ? t(`delivery.vt_${String(profile.vehicle_type).toLowerCase()}`, { defaultValue: profile.vehicle_type.charAt(0).toUpperCase() + profile.vehicle_type.slice(1) }) : null} />
             <InfoRow label={t('delivery.vehicleNumber', 'Vehicle number')} value={profile?.vehicle_number} />
-            <InfoRow label={t('delivery.vehicleYear', 'Year')}           value={profile?.vehicle_year} last />
+            <InfoRow label={t('delivery.vehicleYear', 'Year')} value={profile?.vehicle_year} />
+            <InfoRow label={t('delivery.rcNumber', 'RC number')} value={profile?.rc_number} last />
           </SectionCard>
 
           {/* ── Documents ── */}
-          <SectionCard title={t('delivery.documents', 'Documents')}>
+          <SectionCard icon="file-text" title={t('delivery.documents', 'Documents')}>
             <InfoRow label={t('delivery.drivingLicence', 'Driving licence')} value={profile?.license_number ? `${profile.license_number} · ${t('delivery.exp')} ${profile.license_expiry || '—'}` : null} />
             <InfoRow label={t('delivery.aadhaar', 'Aadhaar')}          value={profile?.aadhar_number ? `****${profile.aadhar_number.slice(-4)}` : null} />
             <InfoRow label={t('delivery.pan', 'PAN')}              value={profile?.pan_number} last />
           </SectionCard>
 
           {/* ── Bank details ── */}
-          <SectionCard title={t('delivery.bankAccount', 'Bank account')}>
+          <SectionCard icon="credit-card" title={t('delivery.bankAccount', 'Bank account')}>
             <InfoRow label={t('delivery.accountName', 'Account name')}   value={profile?.bank_account_name} />
             <InfoRow label={t('delivery.bank', 'Bank')}           value={profile?.bank_name} />
             <InfoRow label={t('delivery.accountNumber', 'Account number')} value={profile?.bank_account_number ? `****${profile.bank_account_number.slice(-4)}` : null} />
@@ -299,7 +303,7 @@ export default function DeliveryProfileScreen({ navigation }) {
 
       <LogoutModal
         visible={showLogout}
-        onConfirm={handleLogout}
+        onConfirm={confirmLogout}
         onCancel={() => setShowLogout(false)}
       />
 
@@ -331,57 +335,7 @@ export default function DeliveryProfileScreen({ navigation }) {
         </Pressable>
       </Modal>
 
-      {/* Logout Confirmation Modal */}
-      <Modal
-        visible={showLogoutModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowLogoutModal(false)}
-      >
-        <Pressable
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' }}
-          onPress={() => setShowLogoutModal(false)}
-        >
-          <Pressable
-            style={{
-              backgroundColor: C.white,
-              borderRadius: 20,
-              padding: 24,
-              width: '80%',
-              alignItems: 'center',
-            }}
-            onPress={(e) => e.stopPropagation?.()}
-          >
-            <Text style={{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.gray900, marginBottom: 8 }}>
-              {t('profile.logoutConfirmTitle', 'Log out')}
-            </Text>
-            <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_500Medium', color: C.gray500, marginBottom: 24, textAlign: 'center' }}>
-              {t('profile.logoutConfirmMsg', 'Are you sure you want to log out?')}
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
-              <TouchableOpacity
-                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: C.gray200, alignItems: 'center' }}
-                onPress={() => setShowLogoutModal(false)}
-                activeOpacity={0.8}
-              >
-                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: C.gray700 }}>
-                  {t('delivery.cancel', 'Cancel')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: C.red, alignItems: 'center' }}
-                onPress={confirmLogout}
-                activeOpacity={0.8}
-              >
-                <Text style={{ fontSize: 14, fontFamily: 'PlusJakartaSans_700Bold', color: C.white }}>
-                  {t('profile.logout', 'Log out')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </View>
+          </View>
   );
 }
 
@@ -431,15 +385,20 @@ const p = StyleSheet.create({
     backgroundColor: C.heroBg,
     paddingTop: Platform.OS === 'android' ? 36 : 58,
     paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingBottom: 28,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
   heroTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, marginBottom: 20 },
   avatarWrap: {
-    width: 64, height: 64, borderRadius: 32,
-    backgroundColor: 'rgba(255,255,255,0.20)',
+    width: 68, height: 68, borderRadius: 34,
+    backgroundColor: 'rgba(255,255,255,0.22)',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.40)',
+    borderWidth: 2.5, borderColor: 'rgba(255,255,255,0.5)',
   },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  sectionIcon: { width: 26, height: 26, borderRadius: 8, backgroundColor: C.greenLight, alignItems: 'center', justifyContent: 'center' },
+
   avatarText:   { fontSize: 22, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.white },
   heroName:     { fontSize: 20, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.white, letterSpacing: -0.3 },
   heroPhone:    { fontSize: 13, fontFamily: 'PlusJakartaSans_500Medium', color: C.heroSub, marginTop: 4 },
@@ -447,7 +406,7 @@ const p = StyleSheet.create({
   verifiedBadge:{ backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
   verifiedText: { fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold', color: C.white },
 
-  heroStats:       { flexDirection: 'row', backgroundColor: C.heroStatBg, borderRadius: 16, paddingVertical: 14 },
+  heroStats:       { flexDirection: 'row', backgroundColor: C.heroStatBg, borderRadius: 18, paddingVertical: 14 },
   heroStat:        { flex: 1, alignItems: 'center' },
   heroStatValue:   { fontSize: 16, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.white, marginBottom: 2 },
   heroStatLabel:   { fontSize: 9, fontFamily: 'PlusJakartaSans_500Medium', color: 'rgba(255,255,255,0.60)' },
@@ -465,8 +424,8 @@ const p = StyleSheet.create({
   levelSub:      { fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: C.gray400, marginTop: 2 },
   levelBadge:    { width: 40, height: 40, borderRadius: 20, backgroundColor: C.heroBg, alignItems: 'center', justifyContent: 'center' },
   levelBadgeText:{ fontSize: 18, fontFamily: 'PlusJakartaSans_800ExtraBold', color: C.white },
-  progressTrack: { height: 6, backgroundColor: C.gray200, borderRadius: 3, overflow: 'hidden', marginBottom: 8 },
-  progressFill:  { height: 6, backgroundColor: C.green, borderRadius: 3 },
+  progressTrack: { height: 8, backgroundColor: C.gray200, borderRadius: 4, overflow: 'hidden', marginBottom: 8 },
+  progressFill:  { height: 8, backgroundColor: C.green, borderRadius: 4 },
   levelHint:     { fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium', color: C.gray400 },
 
   onboardingBanner: {

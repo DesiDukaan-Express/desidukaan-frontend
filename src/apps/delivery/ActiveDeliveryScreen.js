@@ -53,7 +53,7 @@ const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || (API_BASE.includes('/api') ? API_BASE.split('/api')[0] : 'http://localhost:3000');
 
 const C = {
-  // Hero greens â€” matches DeliveryHomeScreen exactly
+  // Hero greens
   heroBg:      '#228948',
   heroSubText: 'rgba(255,255,255,0.70)',
   heroStatBg:  'rgba(0,0,0,0.15)',
@@ -90,13 +90,6 @@ const getSteps = (t) => [
   { key: 'reach_drop',   label: t('delivery.reachDrop', 'Reach Drop'),    api: null,        btnLabel: t('delivery.reachedDropLocation', 'REACHED DROP LOCATION')   },
   { key: 'drop_order',   label: t('delivery.dropOrder', 'Drop Order'),    api: 'delivered', btnLabel: t('delivery.orderDelivered', 'ORDER DELIVERED')         },
 ];
-const STEPS = [
-  { key: 'reach_pickup', label: 'Reach Pickup',  api: null,        btnLabel: 'Reached Pickup Location' },
-  { key: 'pick_order',   label: 'Pick Order',    api: 'picked_up', btnLabel: 'Picked Order'            },
-  { key: 'reach_drop',   label: 'Reach Drop',    api: null,        btnLabel: 'Reached Drop Location'   },
-  { key: 'drop_order',   label: 'Drop Order',    api: 'delivered', btnLabel: 'Order Delivered'         },
-];
-
 // Helper to get clientX for mouse/touch events on web
 const getClientX = (e) => {
   if (e.touches && e.touches.length > 0) {
@@ -473,7 +466,7 @@ const sb = StyleSheet.create({
     justifyContent: 'center',
   },
 });
-// â”€â”€ Step Progress Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Step Progress Bar
 function StepBar({ currentStep, steps: propSteps }) {
   const { t } = useTranslation();
   const steps = propSteps || getSteps(t);
@@ -506,7 +499,7 @@ function StepBar({ currentStep, steps: propSteps }) {
 
 const spb = StyleSheet.create({
   row:       { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, marginBottom: 12, marginTop: 4 },
-  stepWrap:  { alignItems: 'center', width: 56 },
+  stepWrap:  { alignItems: 'center', width: 62 },
   dot: {
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: C.border, alignItems: 'center', justifyContent: 'center',
@@ -515,11 +508,11 @@ const spb = StyleSheet.create({
   dotDone:   { backgroundColor: C.primary, borderColor: C.primary },
   dotActive: { backgroundColor: C.primary, borderColor: C.primaryDark },
   dotNum:    { fontSize: 12, fontWeight: '700', color: C.textSecond },
-  stepLabel: { fontSize: 9, color: C.textLight, textAlign: 'center', fontWeight: '600', letterSpacing: 0.2 },
+  stepLabel: { fontSize: 10, color: C.textLight, textAlign: 'center', fontWeight: '600', letterSpacing: 0.2 },
   line:      { flex: 1, height: 2, backgroundColor: C.border, marginTop: 13, marginHorizontal: 2 },
 });
 
-// â”€â”€ Action Buttons (Call + Map) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Action Buttons (Call + Map)
 function ActionButtons({ onCall, onMap, phone, hideCall = false }) {
   const { t } = useTranslation();
   const handleCall = () => {
@@ -563,7 +556,7 @@ const ab = StyleSheet.create({
   mapText: { fontSize: 13, fontWeight: '700', color: C.white },
 });
 
-// â”€â”€ Meta row (small icon + text) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Meta row (small icon + text)
 function MetaRow({ icon, text }) {
   return (
     <View style={mr.row}>
@@ -577,7 +570,7 @@ const mr = StyleSheet.create({
   text: { fontSize: 13, color: C.textSecond, fontWeight: '500' },
 });
 
-// â”€â”€ Order Items Accordion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Order Items Accordion
 function ItemsAccordion({ items, vendorName }) {
   const [open, setOpen] = useState(false);
   const { t } = useTranslation();
@@ -622,7 +615,7 @@ const ac = StyleSheet.create({
   itemPrice:{ fontSize: 12, color: C.textSecond, fontWeight: '500' },
 });
 
-// â”€â”€ Step Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Step Content
 function StepContent({ step, activeOrder, myLocation }) {
   const { t } = useTranslation();
   const vendorLoc = activeOrder?.vendorLoc;
@@ -807,10 +800,9 @@ function StepContent({ step, activeOrder, myLocation }) {
   );
 }
 
-// â”€â”€ Available Order Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Available Order Card
 
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 export default function ActiveDeliveryScreen({ navigation }) {
   const { token, user } = useAuthStore();
   const { t } = useTranslation();
@@ -842,7 +834,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
   const clearStep = async (id) => {
     try { await AsyncStorage.removeItem(STEP_KEY(id)); } catch (_) {}
   };
-  // â”€â”€ Fetch & parse orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Fetch & parse orders
   const fetchOrders = async () => {
     try {
       const actRes = await fetch(`${API_BASE}/delivery/active`, { headers: { Authorization: `Bearer ${token}` } });
@@ -859,6 +851,7 @@ export default function ActiveDeliveryScreen({ navigation }) {
           pickup: d.order?.vendor?.shop_name,
           drop: d.order?.delivery_address?.address_line || d.order?.delivery_address?.city || 'Local',
           total: d.order?.total,
+          deliveryFee: d.delivery_fee ?? d.order?.delivery_fee ?? 0,
           quantity: d.order?.items?.length,
           meta: `₹${d.order?.total} · ${d.order?.items?.length || 0} ${t('delivery.items', 'items')}`,
           vendorLoc: d.order?.vendor ? { latitude: d.order.vendor.latitude, longitude: d.order.vendor.longitude } : null,
@@ -1030,7 +1023,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
       const targetLoc = displayStep === 0 ? activeOrder?.vendorLoc : activeOrder?.dropLoc;
       if (targetLoc && targetLoc.latitude && targetLoc.longitude) {
         if (!myLocation) {
-          Alert.alert("Location Error", "Unable to determine your current location. Please ensure location services are enabled.");
+          Alert.alert(t('delivery.locationError', 'Location Error'), t('delivery.locationErrorMsg', 'Unable to determine your current location. Please ensure location services are enabled.'));
           return false; // Signal slider to reset
         }
         const distMeters = calculateDistanceMeters(
@@ -1042,11 +1035,11 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
         
         if (distMeters > 200) {
           Alert.alert(
-            "Too Far Away",
-            `You must be within 200 meters of the location to slide. (Current distance: ${Math.round(distMeters)} meters)`,
+            t('delivery.tooFar', 'Too Far Away'),
+            t('delivery.tooFarMsg', { dist: Math.round(distMeters), defaultValue: 'You must be within 200 meters of the location to slide. (Current distance: {{dist}} meters)' }),
             [
-              { text: "OK", style: "cancel" },
-              {
+              { text: t('delivery.ok', 'OK'), style: "cancel" },
+              ...(__DEV__ ? [{
                 text: "Mock Arrival (Test)",
                 onPress: () => {
                   setMyLocation({
@@ -1055,7 +1048,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
                   });
                   proceedStepComplete(displayStep);
                 }
-              }
+              }] : []),
             ]
           );
           return false; // Signal slider to reset
@@ -1083,7 +1076,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
         if (currentStepDef.api === 'delivered') {
           if (activeOrder?.id) await clearStep(activeOrder.id);
           setDeliveryCount(c => c + 1);
-          setEarnings(e => e + (activeOrder?.deliveryFee || 65));
+          setEarnings(e => e + (Number(activeOrder?.deliveryFee) || 0));
           setActiveOrder(null);
           setStep(0);
           fetchOrders();
@@ -1120,7 +1113,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
         scrollEnabled={scrollEnabled}
       >
 
-        {/* â”€â”€ Green hero header â”€â”€ */}
+        {/* Green hero header */}
         <View style={styles.hero}>
           <View style={styles.heroTop}>
             <View style={styles.avatarRow}>
@@ -1221,7 +1214,7 @@ const calculateDistanceMeters = (lat1, lon1, lat2, lon2) => {
   );
 }
 
-// â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Styles
 const styles = StyleSheet.create({
   screen:  { flex: 1, backgroundColor: C.bg },
   content: { paddingBottom: 80 },
@@ -1231,7 +1224,9 @@ const styles = StyleSheet.create({
     backgroundColor: C.heroBg,
     paddingTop: Platform.OS === 'android' ? 32 : 56,
     paddingHorizontal: 20,
-    paddingBottom: 22,
+    paddingBottom: 30,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
   heroTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   avatarRow:       { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -1242,7 +1237,7 @@ const styles = StyleSheet.create({
   toggleRow:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statusPill:      { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   statusPillText:  { fontSize: 11, fontWeight: '700', color: C.white },
-  heroStats:       { flexDirection: 'row', backgroundColor: C.heroStatBg, borderRadius: 14, paddingVertical: 14 },
+  heroStats:       { flexDirection: 'row', backgroundColor: C.heroStatBg, borderRadius: 18, paddingVertical: 14 },
   heroStat:        { flex: 1, alignItems: 'center' },
   heroStatValue:   { fontSize: 20, fontWeight: '800', color: C.white, marginBottom: 2 },
   heroStatLabel:   { fontSize: 10, fontWeight: '500', color: C.heroSubText },
@@ -1251,14 +1246,14 @@ const styles = StyleSheet.create({
   // Stepper card
   stepperWrap: {
     backgroundColor: C.white, marginHorizontal: 16, marginTop: 16,
-    borderRadius: 20, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07, shadowRadius: 10, elevation: 3,
+    borderRadius: 24, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1, shadowRadius: 14, elevation: 5,
   },
   stepperHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border },
   stepperTitle:   { fontSize: 15, fontWeight: '700', color: C.textPrimary },
   stepperSub: { fontSize: 11, fontWeight: '500', color: C.textSecond, marginTop: 2 },
-  stepBadge:      { backgroundColor: C.primaryLight, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  stepBadge:      { backgroundColor: C.primaryLight, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, borderWidth: 1, borderColor: '#BFE5CB' },
   stepBadgeText:  { fontSize: 12, fontWeight: '700', color: C.primaryText },
   stepLabelRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 2 },
   stepLabelText:  { fontSize: 17, fontWeight: '800', color: C.textPrimary },

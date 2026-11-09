@@ -1380,7 +1380,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 year: "numeric",
               })}
             </Text>
-            <MaterialIcons name="keyboard-arrow-down" size={16} color={C.textSub} />
+            
           </TouchableOpacity>
         </Animated.View>
 

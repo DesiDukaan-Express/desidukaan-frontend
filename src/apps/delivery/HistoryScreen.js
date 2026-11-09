@@ -31,7 +31,8 @@ const C = {
   gray200:    '#E5E7EB',
   gray300:    '#D1D5DB',
   gray400:    '#9CA3AF',
-  gray500:    '#6B7280',
+  gray500: '#6B7280',
+  gray600:    '#4B5563',
   gray700:    '#374151',
   gray800:    '#1F2937',
   gray900:    '#111827',
@@ -42,7 +43,7 @@ const C = {
   blue:       '#3B82F6',
 };
 
-const TABS = ['Today', 'This Week', 'This Month'];
+
 
 function HistoryCard({ delivery, onRate, onViewRating }) {
   const { t } = useTranslation();
@@ -99,10 +100,8 @@ function HistoryCard({ delivery, onRate, onViewRating }) {
         <View style={s.cardMeta}>
           <Text style={s.metaTime}>{dateStr}  {timeStr}</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <View style={[s.statusPill, { backgroundColor: isDelivered ? C.greenLight : C.redLight }]}>
-              <Text style={[s.statusPillText, { color: isDelivered ? C.greenText : C.redText }]}>
-                {isDelivered ? t('delivery.delivered', 'Delivered') : t('delivery.failed', 'Failed')}
-              </Text>
+            <View style={[s.statusPill, { backgroundColor: cardColor }]}>
+              <Text style={[s.statusPillText, { color: iconColor }]}>{statusLabel}</Text>
             </View>
 
             {isDelivered && (
@@ -122,11 +121,11 @@ function HistoryCard({ delivery, onRate, onViewRating }) {
                   const starsText = "★".repeat(Math.max(1, Math.min(5, num)));
                   return (
                     <Text style={[s.rateBtnText, { color: C.gray600 }]}>
-                      You rated <Text style={{ color: C.starColor, fontWeight: "900" }}>{starsText}</Text>
+                      {t('delivery.youRated', 'You rated')} <Text style={{ color: C.starColor, fontWeight: "900" }}>{starsText}</Text>
                     </Text>
                   );
                 })() : (
-                  <Text style={s.rateBtnText}>{t('delivery.rateCustomer', 'Rate')}</Text>
+                  <Text style={s.rateBtnText}>{t('delivery.rateBtn', 'Rate')}</Text>
                 )}
               </TouchableOpacity>
             )}
@@ -202,7 +201,7 @@ export default function HistoryScreen() {
 
   const submitPartnerReview = async () => {
     if (partnerReviewRating === 0 && partnerStoreRating === 0) {
-      Alert.alert("Please provide at least one rating");
+      Alert.alert(t('delivery.ratingRequired', 'Please provide at least one rating'));
       return;
     }
     setPartnerReviewLoading(true);
@@ -475,7 +474,7 @@ export default function HistoryScreen() {
                     marginBottom: 4,
                   }}
                 >
-                  Rate Customer
+                  {t('delivery.rateCustomer', 'Rate Customer')}
                 </Text>
                 <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, marginBottom: 16 }}>
                   {partnerReviewOrder?.order?.customer?.name || partnerReviewOrder?.order?.order_number || "Customer"}
@@ -519,7 +518,7 @@ export default function HistoryScreen() {
                     borderWidth: 1,
                     borderColor: C.gray200,
                   }}
-                  placeholder="Tell us about the customer (optional)"
+                  placeholder={t('delivery.customerCommentPh', 'Tell us about the customer (optional)')}
                   placeholderTextColor={C.gray400}
                   multiline
                   value={partnerReviewComment}
@@ -538,7 +537,7 @@ export default function HistoryScreen() {
                     marginBottom: 4,
                   }}
                 >
-                  Rate Store
+                  {t('delivery.rateStore', 'Rate Store')}
                 </Text>
                 <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, marginBottom: 16 }}>
                   {partnerReviewOrder?.order?.vendor?.shop_name || "Store"}
@@ -582,7 +581,7 @@ export default function HistoryScreen() {
                     borderWidth: 1,
                     borderColor: C.gray200,
                   }}
-                  placeholder="Tell us about the pickup experience (optional)"
+                  placeholder={t('delivery.storeCommentPh', 'Tell us about the pickup experience (optional)')}
                   placeholderTextColor={C.gray400}
                   multiline
                   value={partnerStoreComment}
@@ -608,7 +607,7 @@ export default function HistoryScreen() {
                 <Text
                   style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.white }}
                 >
-                  Submit Review
+                  {t('delivery.submitReview', 'Submit Review')}
                 </Text>
               )}
             </TouchableOpacity>
@@ -655,7 +654,7 @@ export default function HistoryScreen() {
 
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <Text style={{ fontSize: 18, fontWeight: "900", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray900 }}>
-                Your Submitted Ratings
+                {t('delivery.yourRatings', 'Your Submitted Ratings')}
               </Text>
               <TouchableOpacity onPress={() => setViewPartnerRatingOrder(null)} style={{ padding: 4 }}>
                 <Feather name="x" size={20} color={C.gray500} />
@@ -665,7 +664,7 @@ export default function HistoryScreen() {
             {viewPartnerRatingLoading ? (
               <View style={{ padding: 30, alignItems: "center", justifyContent: "center" }}>
                 <ActivityIndicator color={C.greenDark} size="small" />
-                <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, marginTop: 10 }}>Fetching your reviews…</Text>
+                <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, marginTop: 10 }}>{t('delivery.fetchingReviews', 'Fetching your reviews…')}</Text>
               </View>
             ) : (
               <>
@@ -733,13 +732,13 @@ export default function HistoryScreen() {
                                 </View>
                               ) : (
                                 <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, fontStyle: "italic", marginTop: 4 }}>
-                                  No written comment provided
+                                  {t('delivery.noComment', 'No written comment provided')}
                                 </Text>
                               )}
                             </>
                           ) : (
                             <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray400 }}>
-                              Not Rated
+                              {t('delivery.notRated', 'Not Rated')}
                             </Text>
                           )}
                         </View>
@@ -796,13 +795,13 @@ export default function HistoryScreen() {
                                 </View>
                               ) : (
                                 <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: C.gray400, fontStyle: "italic", marginTop: 4 }}>
-                                  No written comment provided
+                                  {t('delivery.noComment', 'No written comment provided')}
                                 </Text>
                               )}
                             </>
                           ) : (
                             <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.gray400 }}>
-                              Not Rated
+                              {t('delivery.notRated', 'Not Rated')}
                             </Text>
                           )}
                         </View>
@@ -822,7 +821,7 @@ export default function HistoryScreen() {
                   }}
                 >
                   <Text style={{ fontSize: 15, fontWeight: "800", fontFamily: "PlusJakartaSans_800ExtraBold", color: C.white }}>
-                    Close
+                    {t('delivery.close', 'Close')}
                   </Text>
                 </TouchableOpacity>
               </>
@@ -837,13 +836,15 @@ export default function HistoryScreen() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   scroll: { flex: 1 },
-  content: { paddingHorizontal: 16, paddingTop: 16 },
+  content: { paddingHorizontal: 16, paddingTop: 18 },
 
   hero: {
     backgroundColor: C.heroBg,
     paddingTop: Platform.OS === 'android' ? 36 : 58,
     paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingBottom: 40,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
   heroTop: {
     flexDirection: 'row', justifyContent: 'space-between',
@@ -879,19 +880,21 @@ const s = StyleSheet.create({
   tabsWrap: {
     flexDirection: 'row',
     backgroundColor: C.white,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: C.gray200,
+    marginHorizontal: 16,
+    marginTop: -22,
+    padding: 6,
+    gap: 6,
+    borderRadius: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1, shadowRadius: 12, elevation: 6,
   },
-  tab:          { flex: 1, paddingVertical: 7, borderRadius: 20, alignItems: 'center', backgroundColor: C.gray100 },
+  tab:          { flex: 1, paddingVertical: 9, borderRadius: 14, alignItems: 'center', backgroundColor: 'transparent' },
   tabActive:    { backgroundColor: C.heroBg },
   tabText:      { fontSize: 12, fontFamily: 'PlusJakartaSans_700Bold', color: C.gray500 },
   tabTextActive:{ color: C.white },
 
   earningsCard: {
-    backgroundColor: C.white, borderRadius: 20, padding: 18, marginBottom: 16,
+    backgroundColor: C.white, borderRadius: 20, padding: 18, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: C.green,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },

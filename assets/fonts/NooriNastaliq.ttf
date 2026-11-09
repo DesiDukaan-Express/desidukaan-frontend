@@ -1,0 +1,9 @@
+import { useFonts } from 'expo-font';
+
+const [fontsLoaded] = useFonts({
+  NooriNastaliq: require('./assets/fonts/NooriNastaliq.ttf'),
+});
+
+if (!fontsLoaded) {
+  return null;
+}
