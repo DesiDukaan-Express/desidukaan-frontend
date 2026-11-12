@@ -41,6 +41,12 @@ function to24(h12, min, ampm) {
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 
+function to24Hour(h12, ampm) {
+  let h = h12 % 12;
+  if (ampm === "PM") h += 12;
+  return h;
+}
+
 // ── Scrolling wheel (alarm-clock roller) ──────────────────────
 function Wheel({ items, value, onSelect, getLabel, accent, light = true }) {
   const idx = Math.max(0, items.indexOf(value));
@@ -186,23 +192,32 @@ function ClockFace({ h12, min, size = 120 }) {
 }
 
 // ── Alarm Time Picker modal ───────────────────────────────────
+const pad2 = (n) => String(n).padStart(2, "0");
+
 export default function AlarmTimePicker({ visible, value, title, onClose, onSave }) {
+  // Single source of truth is the 24h hour (0–23); 12h view is derived from it.
   const init = from24(value);
-  const [h12, setH12] = useState(init.h12);
+  const [h24, setH24] = useState(to24Hour(init.h12, init.ampm));
   const [min, setMin] = useState(init.min);
-  const [ampm, setAmpm] = useState(init.ampm);
+  const [is24, setIs24] = useState(false);
 
   useEffect(() => {
     if (visible) {
       const v = from24(value);
-      setH12(v.h12);
+      setH24(to24Hour(v.h12, v.ampm));
       setMin(v.min);
-      setAmpm(v.ampm);
     }
   }, [visible]);
 
-  const hours = Array.from({ length: 12 }, (_, i) => i + 1);
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  const ampm = h24 < 12 ? "AM" : "PM";
+
+  const hours12 = Array.from({ length: 12 }, (_, i) => i + 1);
+  const hours24 = Array.from({ length: 24 }, (_, i) => i); // 0 … 23
   const mins = Array.from({ length: 60 }, (_, i) => i);
+
+  const selectHour12 = (h) => setH24(to24Hour(h, ampm));
+  const selectAmPm = (p) => setH24(to24Hour(h12, p));
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -214,26 +229,47 @@ export default function AlarmTimePicker({ visible, value, title, onClose, onSave
               <MaterialIcons name="alarm" size={20} color={C.primary} />
               <Text style={styles.headerTitle}>{title}</Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <MaterialIcons name="close" size={20} color={C.text} />
-            </TouchableOpacity>
+            <View style={styles.headerRight}>
+              {/* 12h / 24h format switch */}
+              <View style={styles.fmtSwitch}>
+                {[false, true].map((mode) => (
+                  <TouchableOpacity
+                    key={String(mode)}
+                    onPress={() => setIs24(mode)}
+                    style={[styles.fmtBtn, is24 === mode && styles.fmtBtnActive]}
+                    activeOpacity={0.8}
+                    accessibilityLabel={mode ? "Use 24 hour format" : "Use 12 hour format"}
+                  >
+                    <Text style={[styles.fmtText, is24 === mode && styles.fmtTextActive]}>
+                      {mode ? "24h" : "12h"}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                <MaterialIcons name="close" size={20} color={C.text} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Alarm panel — ink clock */}
           <View style={styles.clockPanel}>
             <View style={styles.clockRow}>
-              <ClockFace h12={h12} min={min} />
+              <ClockFace h12={h24 % 12} min={min} />
               <View style={{ flex: 1, alignItems: "center" }}>
                 <Text style={styles.alarmLabel}>SET TIME</Text>
                 <View style={styles.digitalRow}>
                   <Text style={styles.digital}>
-                    {String(h12).padStart(2, "0")}
+                    {is24 ? pad2(h24) : pad2(h12)}
                     <Text style={styles.digitalColon}>:</Text>
-                    {String(min).padStart(2, "0")}
+                    {pad2(min)}
                   </Text>
+                  {!is24 && <Text style={styles.digitalAmPm}> {ampm}</Text>}
                 </View>
                 <Text style={styles.alarmSub}>
-                  {ampm === "AM" ? "Morning" : "Evening"} · {to24(h12, min, ampm)} · 24h
+                  {is24
+                    ? `${pad2(h12)}:${pad2(min)} ${ampm} · 12h`
+                    : `${ampm === "AM" ? "Morning" : "Evening"} · ${pad2(h24)}:${pad2(min)} · 24h`}
                 </Text>
               </View>
             </View>
@@ -243,7 +279,26 @@ export default function AlarmTimePicker({ visible, value, title, onClose, onSave
           <View style={styles.wheelRow}>
             <View style={styles.wheelCol}>
               <Text style={styles.wheelLabel}>Hour</Text>
-              <Wheel items={hours} value={h12} onSelect={setH12} accent={C.primary} light={false} />
+              {is24 ? (
+                <Wheel
+                  key="h24"
+                  items={hours24}
+                  value={h24}
+                  onSelect={setH24}
+                  accent={C.primary}
+                  light={false}
+                  getLabel={pad2}
+                />
+              ) : (
+                <Wheel
+                  key="h12"
+                  items={hours12}
+                  value={h12}
+                  onSelect={selectHour12}
+                  accent={C.primary}
+                  light={false}
+                />
+              )}
             </View>
             <View style={styles.wheelCol}>
               <Text style={styles.wheelLabel}>Minute</Text>
@@ -253,44 +308,46 @@ export default function AlarmTimePicker({ visible, value, title, onClose, onSave
                 onSelect={setMin}
                 accent={C.primary}
                 light={false}
-                getLabel={(v) => String(v).padStart(2, "0")}
+                getLabel={pad2}
               />
             </View>
-            <View style={styles.wheelCol}>
-              <Text style={styles.wheelLabel}>Period</Text>
-              <View style={{ height: ITEM_H * 3, justifyContent: "center" }}>
-                {["AM", "PM"].map((p) => (
-                  <TouchableOpacity
-                    key={p}
-                    onPress={() => setAmpm(p)}
-                    style={{
-                      height: ITEM_H,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text
+            {!is24 && (
+              <View style={styles.wheelCol}>
+                <Text style={styles.wheelLabel}>Period</Text>
+                <View style={{ height: ITEM_H * 3, justifyContent: "center" }}>
+                  {["AM", "PM"].map((p) => (
+                    <TouchableOpacity
+                      key={p}
+                      onPress={() => selectAmPm(p)}
                       style={{
-                        fontSize: 21,
-                        fontWeight: "700",
-                        fontFamily: "PlusJakartaSans_700Bold",
-                        color: ampm === p ? C.primary : C.textLight,
+                        height: ITEM_H,
+                        alignItems: "center",
+                        justifyContent: "center",
                       }}
                     >
-                      {p}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                      <Text
+                        style={{
+                          fontSize: 21,
+                          fontWeight: "700",
+                          fontFamily: "PlusJakartaSans_700Bold",
+                          color: ampm === p ? C.primary : C.textLight,
+                        }}
+                      >
+                        {p}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            </View>
+            )}
           </View>
 
-          {/* Actions */}
+          {/* Actions — always saved as HH:MM (24h) */}
           <View style={styles.actions}>
             <TouchableOpacity onPress={onClose} style={styles.cancelBtn}>
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => onSave(to24(h12, min, ampm))} style={styles.saveBtn}>
+            <TouchableOpacity onPress={() => onSave(`${pad2(h24)}:${pad2(min)}`)} style={styles.saveBtn}>
               <MaterialIcons name="alarm-add" size={16} color="#fff" />
               <Text style={styles.saveText}>{title ? `Set ${title}` : "Set Time"}</Text>
             </TouchableOpacity>
@@ -333,6 +390,28 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontFamily: "PlusJakartaSans_800ExtraBold",
     color: C.text,
+  },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  fmtSwitch: {
+    flexDirection: "row",
+    backgroundColor: "#F4F5F7",
+    borderRadius: 999,
+    padding: 3,
+  },
+  fmtBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  fmtBtnActive: { backgroundColor: C.primary },
+  fmtText: {
+    fontSize: 11,
+    fontWeight: "800",
+    fontFamily: "PlusJakartaSans_800ExtraBold",
+    color: C.textSub,
+  },
+  fmtTextActive: { color: "#fff" },
+  digitalAmPm: {
+    color: C.primary,
+    fontSize: 16,
+    fontWeight: "800",
+    fontFamily: "PlusJakartaSans_800ExtraBold",
   },
   closeBtn: {
     width: 32,

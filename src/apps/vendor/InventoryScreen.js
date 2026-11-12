@@ -14,6 +14,7 @@ import {
   Animated,
 } from "react-native";
 import { useTranslation } from "react-i18next";
+import { useNavigation } from "@react-navigation/native";
 
 import { Feather, MaterialIcons } from "@expo/vector-icons";
 
@@ -160,8 +161,22 @@ function ProductCard({
 // MAIN SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function InventoryScreen() {
+export default function InventoryScreen({ onBack } = {}) {
   const { t } = useTranslation();
+  const navigation = useNavigation();
+  // Back to the dashboard: host handler (modal fallback) → navigator goBack →
+  // jump to a dashboard/home route.
+  const handleBackToDashboard = () => {
+    if (onBack) return onBack();
+    let nav = navigation;
+    while (nav) {
+      const names = nav.getState?.()?.routeNames || [];
+      const dash = names.find((n) => /dashboard|home/i.test(String(n)));
+      if (dash) return nav.navigate(dash);
+      nav = nav.getParent?.();
+    }
+    if (navigation?.canGoBack?.()) navigation.goBack();
+  };
   const inv = useInventory();
   const [selected, setSelected] = useState(new Set());
   const [modal, setModal] = useState(null); // null | 'add' | product object
@@ -401,10 +416,28 @@ export default function InventoryScreen() {
             </View>
           </>
         ) : (
-          <View style={{ flex: 1 }}>
-            <Text style={s.heading}>{t('vendor.inventoryTitle')}</Text>
-            <Text style={s.subheading}>{t('vendor.manageCategoriesProducts')}</Text>
-          </View>
+          <>
+            <TouchableOpacity
+              onPress={handleBackToDashboard}
+              activeOpacity={0.8}
+              accessibilityLabel="Back to dashboard"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 19,
+                backgroundColor: "rgba(255,255,255,0.2)",
+                alignItems: "center",
+                justifyContent: "center",
+                marginRight: 10,
+              }}
+            >
+              <MaterialIcons name="arrow-back" size={21} color="#fff" />
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={s.heading}>{t('vendor.inventoryTitle')}</Text>
+              <Text style={s.subheading}>{t('vendor.manageCategoriesProducts')}</Text>
+            </View>
+          </>
         )}
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
           <TouchableOpacity
@@ -638,6 +671,7 @@ export default function InventoryScreen() {
           onClose={() => setModal(null)}
           onSave={handleSave}
           saving={inv.saving}
+          categories={inv.globalCategories}
         />
       )}
 
@@ -701,10 +735,10 @@ export default function InventoryScreen() {
                   setActionSheetProduct(null);
                   handleDelete(productId);
                 }}
-                style={[ s.sheetCancelBtn, {backgroundColor: RED }]}
+                style={[s.sheetCancelBtn, { backgroundColor: RED }]}
                 activeOpacity={0.8}
               >
-                <Text style={[s.sheetCancelText, {color: "#fff"} ]}>{t('vendor.delete')}</Text>
+                <Text style={[s.sheetCancelText, { color: "#fff" }]}>{t('vendor.delete')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {

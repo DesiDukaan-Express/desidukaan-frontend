@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { View, Text, StyleSheet, Platform, Animated, TouchableOpacity } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { io } from "socket.io-client";
@@ -37,7 +38,7 @@ function VendorTabNavigator() {
   const declineBannerAnim = useRef(new Animated.Value(-120)).current;
   const declineBannerTimer = useRef(null);
   const declineCountdownInterval = useRef(null);
-  const navRef = useRef(null);
+  const stackNav = useNavigation();
 
   // ─── Decline Flash Banner ───────────────────────────────
   const showDeclineBanner = (data, declinedAt) => {
@@ -93,7 +94,8 @@ function VendorTabNavigator() {
 
   const handleBannerPress = () => {
     dismissDeclineBanner();
-    navRef.current?.navigate("Orders");
+    // Tab.Navigator has no ref API; navigate through the parent stack instead.
+    stackNav.navigate("VendorHome", { screen: "Orders" });
   };
 
   const TABS = [
@@ -141,7 +143,6 @@ function VendorTabNavigator() {
 
       <View style={styles.tabContainer}>
         <Tab.Navigator
-          ref={navRef}
           lazy={false}
           screenOptions={({ route }) => {
             const tab = TABS.find((t) => t.name === route.name);

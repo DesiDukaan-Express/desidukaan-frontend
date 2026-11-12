@@ -13,6 +13,7 @@ import {
   Platform,
   useWindowDimensions,
   StatusBar,
+  Alert,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import Svg, { Polyline, Circle, G } from "react-native-svg";
@@ -25,6 +26,10 @@ import { TextInput } from "react-native";
 
 import { io } from "socket.io-client";
 import useOrderSound from "../../hooks/useOrderSound";
+// Fallback: if the navigator doesn't expose these routes, we open the screens
+// inside a full-screen modal so "View all" ALWAYS works.
+import VendorOrdersScreen from "./VendorOrdersScreen";
+import InventoryScreen from "./InventoryScreen";
 
 const SOCKET_URL =
   process.env.EXPO_PUBLIC_SOCKET_URL || "http://localhost:3000";
@@ -230,6 +235,9 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
   const [recentOrders, setRecentOrders] = useState([]);
   const [lowStockItems, setLowStockItems] = useState([]);
   const [categoryBreakdown, setCategoryBreakdown] = useState([]);
+  const [periodMenuOpen, setPeriodMenuOpen] = useState(false);
+  // { name: "Orders" | "Inventory", params } when opened via the modal fallback
+  const [embedded, setEmbedded] = useState(null);
 
   // Animations
   const greetFadeAnim = useRef(new Animated.Value(0)).current;
@@ -746,16 +754,68 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
         )
       : 0;
 
+  // Store Performance donut: prefer the revenue-by-category split; when the stats
+  // API doesn't send categories on top products (the usual reason this card was
+  // empty), fall back to the order-outcome split so the card always has data.
+  const perfBreakdown = (() => {
+    if (categoryBreakdown.length) return categoryBreakdown;
+    const parts = [
+      { label: t("dbCompleted", { defaultValue: "Completed" }), value: Number(stats.completedOrders) || 0 },
+      { label: t("dbPending", { defaultValue: "Pending" }), value: Number(stats.pendingOrders) || 0 },
+      { label: t("dbCancelled", { defaultValue: "Cancelled" }), value: Number(stats.cancelledOrders) || 0 },
+    ].filter((p) => p.value > 0);
+    const total = parts.reduce((sum, p) => sum + p.value, 0);
+    if (!total) return [];
+    return parts.map((p) => ({ label: p.label, pct: Math.round((p.value / total) * 100) }));
+  })();
+
   const STAT_TABS = [t('vendor.tabToday'), t('vendor.tabWeek'), t('vendor.tabMonth')];
 
   // Safe navigation helper — some sidebar destinations may not be
   // registered on every navigator, so this avoids a hard crash.
+  // React Navigation does NOT throw for an unknown route — it silently does
+  // nothing, which is why "View all" looked dead. So we look the route up in
+  // this navigator and every parent navigator (tabs/drawers are usually
+  // parents), try common alias names, and tell the user if nothing matched.
+  const ROUTE_ALIASES = {
+    Orders: ["Orders", "VendorOrders", "OrdersTab", "OrderManagement", "OrdersScreen"],
+    Inventory: ["Inventory", "VendorInventory", "InventoryTab", "Products", "InventoryScreen"],
+  };
+  // Keywords used for a fuzzy match when no exact alias is registered
+  const ROUTE_KEYWORDS = { Orders: "order", Inventory: "inventor" };
   const goTo = (routeName, params) => {
-    try {
-      navigation.navigate(routeName, params);
-    } catch (e) {
-      console.warn(`Route "${routeName}" is not available on this navigator.`);
+    const candidates = ROUTE_ALIASES[routeName] || [routeName];
+    const keyword = ROUTE_KEYWORDS[routeName];
+    let nav = navigation;
+    while (nav) {
+      const names = nav.getState?.()?.routeNames || [];
+      // 1) exact alias  2) case-insensitive fuzzy match (e.g. "VendorOrdersTab")
+      const hit =
+        candidates.find((c) => names.includes(c)) ||
+        (keyword
+          ? names.find((n) => String(n).toLowerCase().includes(keyword))
+          : undefined);
+      if (hit) {
+        nav.navigate(hit, params);
+        return;
+      }
+      nav = nav.getParent?.();
     }
+    // 3) Not registered anywhere → open the screen in a full-screen modal so
+    // the button never feels dead.
+    if (routeName === "Orders" || routeName === "Inventory") {
+      console.warn(
+        `Route "${routeName}" not registered in any navigator — opening embedded. ` +
+          `Visible routes: ${(navigation.getState?.()?.routeNames || []).join(", ")}`,
+      );
+      setEmbedded({ name: routeName, params });
+      return;
+    }
+    console.warn(`Route "${routeName}" not found in any parent navigator.`);
+    Alert.alert(
+      t("dbNotAvailableTitle", { defaultValue: "Not available" }),
+      t("dbNotAvailableMsg", { defaultValue: "This section could not be opened right now." }),
+    );
   };
 
   const handleSearch = async (query) => {
@@ -1618,14 +1678,45 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                   paddingHorizontal: 12,
                   paddingVertical: 7,
                 }}
-                onPress={() => setCurrIndex((currIndex + 1) % STAT_TABS.length)}
+                onPress={() => setPeriodMenuOpen((o) => !o)}
+                accessibilityRole="button"
               >
                 <Text style={{ fontSize: 12, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text }}>
                   {STAT_TABS[currIndex]}
                 </Text>
-                <MaterialIcons name="keyboard-arrow-down" size={16} color={C.textSub} />
+                <MaterialIcons name={periodMenuOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"} size={16} color={C.textSub} />
               </TouchableOpacity>
             </View>
+
+            {periodMenuOpen && (
+              <View
+                style={{
+                  alignSelf: "flex-end",
+                  backgroundColor: C.surface,
+                  borderWidth: 1,
+                  borderColor: C.border,
+                  borderRadius: 12,
+                  marginTop: 4,
+                  overflow: "hidden",
+                }}
+              >
+                {STAT_TABS.map((label, idx) => (
+                  <TouchableOpacity
+                    key={label}
+                    onPress={() => { setCurrIndex(idx); setPeriodMenuOpen(false); }}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      backgroundColor: idx === currIndex ? C.primaryDim : "transparent",
+                    }}
+                  >
+                    <Text style={{ fontSize: 12.5, fontWeight: idx === currIndex ? "800" : "600", color: idx === currIndex ? C.primaryDark : C.text }}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             <Text
               style={{
@@ -1854,8 +1945,10 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 const chipIconColors = ["#EF4444", C.orange, C.primary, C.blue];
                 const sold = p.sold ?? p.units_sold ?? p.quantity_sold ?? 0;
                 return (
-                  <View
+                  <TouchableOpacity
                     key={p.id || p.name || i}
+                    onPress={() => goTo("Inventory")}
+                    activeOpacity={0.7}
                     style={{
                       flexDirection: "row",
                       alignItems: "center",
@@ -1889,7 +1982,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                         {t("dbOrdersCount", { n: sold })}
                       </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               })
             ) : (
@@ -1956,8 +2049,10 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                       ? "#FEF3C7"
                       : C.redSoft;
                   return (
-                    <View
+                    <TouchableOpacity
                       key={o.id || i}
+                      onPress={() => goTo("Orders")}
+                      activeOpacity={0.7}
                       style={{
                         flexDirection: "row",
                         alignItems: "center",
@@ -1986,7 +2081,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                           </Text>
                         </View>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
               </>
@@ -2023,8 +2118,10 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 const chipColors = [C.redSoft, C.orangeSoft, C.greenSoft, C.blueSoft];
                 const chipIconColors = ["#EF4444", C.orange, C.primary, C.blue];
                 return (
-                  <View
+                  <TouchableOpacity
                     key={item.name + i}
+                    onPress={() => goTo("Inventory")}
+                    activeOpacity={0.7}
                     style={{
                       flexDirection: "row",
                       alignItems: "center",
@@ -2052,9 +2149,22 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                     <Text style={{ fontSize: 11.5, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.orange }}>
                       {t("dbLeft", { n: item.stockLeft })}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 );
               })
+            ) : stats.lowStockCount > 0 ? (
+              // The list request failed or returned nothing, but the stats say items
+              // are low — never claim "all stocked" in that case.
+              <TouchableOpacity
+                onPress={() => goTo("Inventory")}
+                activeOpacity={0.7}
+                style={{ paddingVertical: 24, alignItems: "center" }}
+              >
+                <MaterialIcons name="warning-amber" size={26} color={C.orange} />
+                <Text style={{ color: C.text, fontSize: 12.5, fontWeight: "700", marginTop: 8, textAlign: "center" }}>
+                  {t("dbNotifLowMany", { n: stats.lowStockCount })}
+                </Text>
+              </TouchableOpacity>
             ) : (
               <View style={{ paddingVertical: 24, alignItems: "center" }}>
                 <MaterialIcons name="check-circle-outline" size={26} color={C.border} />
@@ -2088,11 +2198,10 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                 <Text style={{ fontSize: 11, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold", color: C.text }}>
                   {t("dbThisMonth")}
                 </Text>
-                <MaterialIcons name="keyboard-arrow-down" size={14} color={C.textSub} />
               </View>
             </View>
 
-            {categoryBreakdown.length ? (
+            {perfBreakdown.length ? (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 16, marginTop: 6 }}>
                 {/* Donut */}
                 <View style={{ width: 96, height: 96, alignItems: "center", justifyContent: "center" }}>
@@ -2102,7 +2211,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                         const r = 38;
                         const circumference = 2 * Math.PI * r;
                         let cumulative = 0;
-                        return categoryBreakdown.map((c, i) => {
+                        return perfBreakdown.map((c, i) => {
                           const dash = (c.pct / 100) * circumference;
                           const seg = (
                             <Circle
@@ -2136,7 +2245,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
 
                 {/* Legend */}
                 <View style={{ flex: 1, gap: 8 }}>
-                  {categoryBreakdown.slice(0, 4).map((c, i) => (
+                  {perfBreakdown.slice(0, 4).map((c, i) => (
                     <View key={c.label} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                       <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: C.donutColors[i % C.donutColors.length] }} />
                       <Text style={{ flex: 1, fontSize: 11.5, color: C.textSub, fontWeight: "500", fontFamily: "PlusJakartaSans_500Medium" }} numberOfLines={1}>
@@ -2234,7 +2343,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
                   item={item}
                   onPress={(action) => {
                     setNotifVisible(false);
-                    navigation.navigate("Orders", { initialTab: action });
+                    goTo("Orders", { initialTab: action });
                   }}
                 />
               )}
@@ -2757,7 +2866,7 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           style={bannerStyles.actionBtn}
           onPress={() => {
             dismissBanner();
-            navigation.navigate("Orders", {
+            goTo("Orders", {
               initialTab:
                 newOrderBanner?._type === "phone" ? "requests" : "orders",
             });
@@ -2769,6 +2878,22 @@ export default function StoreDashboard({ vendorStatus, missingDocs = [] }) {
           <MaterialIcons name="close" size={16} color="#64748B" />
         </TouchableOpacity>
       </Animated.View>
+
+      {/* ── EMBEDDED ORDERS / INVENTORY (fallback when not in navigator) ── */}
+      <Modal
+        visible={!!embedded}
+        animationType="slide"
+        onRequestClose={() => setEmbedded(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: C.bg }}>
+          {embedded?.name === "Orders" && (
+            <VendorOrdersScreen onBack={() => setEmbedded(null)} />
+          )}
+          {embedded?.name === "Inventory" && (
+            <InventoryScreen onBack={() => setEmbedded(null)} />
+          )}
+        </View>
+      </Modal>
 
       </View>
       {/* ── end MAIN COLUMN ─────────────────────────────────── */}

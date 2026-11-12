@@ -10,6 +10,7 @@ import {
   Alert,
   StyleSheet,
   Image,
+  Platform,
 } from "react-native";
 import { Feather, MaterialIcons } from "@expo/vector-icons";
 import useAuthStore from "../../store/authStore";
@@ -139,6 +140,13 @@ export default function CatalogueModal({ visible, onClose, onSuccess }) {
       return;
     }
 
+    const bad = itemsArray.find((it) => !(parseFloat(it.price) > 0));
+    if (bad) {
+      Alert.alert("Invalid Price", `Enter a selling price greater than 0 for "${bad.name}".`);
+      return;
+    }
+    itemsArray.forEach((it) => { it.price = parseFloat(it.price); });
+
     setImporting(true);
     try {
       const res = await fetch(`${API_BASE}/inventory/add-from-catalogue`, {
@@ -172,15 +180,20 @@ export default function CatalogueModal({ visible, onClose, onSuccess }) {
       <View style={s.container}>
         {/* Modal Header */}
         <View style={s.header}>
+          <TouchableOpacity
+            onPress={onClose}
+            style={[s.closeBtn, { marginRight: 12 }]}
+            activeOpacity={0.8}
+            accessibilityLabel="Back to inventory"
+          >
+            <Feather name="arrow-left" size={20} color="#18181B" />
+          </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={s.title}>Add from Catalogue</Text>
             <Text style={s.subtitle}>
               Browse master products arranged by category & subcategory
             </Text>
           </View>
-          <TouchableOpacity onPress={onClose} style={s.closeBtn}>
-            <Feather name="x" size={20} color="#18181B" />
-          </TouchableOpacity>
         </View>
 
         {/* Search bar */}
@@ -332,7 +345,14 @@ export default function CatalogueModal({ visible, onClose, onSuccess }) {
                           style={s.input}
                           keyboardType="numeric"
                           value={String(selectedItem.price)}
-                          onChangeText={(v) => updateItemField(p.id, "price", v)}
+                          onChangeText={(v) => {
+                            const cleaned = v.replace(/[^0-9.]/g, "");
+                            const [i = "", ...r] = cleaned.split(".");
+                            const out = r.length
+                              ? (i.replace(/^0+(?=\d)/, "") || "0").slice(0, 7) + "." + r.join("").slice(0, 2)
+                              : i.replace(/^0+(?=\d)/, "").slice(0, 7);
+                            updateItemField(p.id, "price", out);
+                          }}
                         />
                       </View>
                     </View>
@@ -374,7 +394,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: Platform.OS === "ios" ? 52 : Platform.OS === "android" ? 36 : 16,
     paddingBottom: 12,
     backgroundColor: "#FFF",
     borderBottomWidth: 1,

@@ -24,7 +24,7 @@ import VendorMapView from "../../components/VendorMapView";
 import { MaterialIcons, Feather } from "@expo/vector-icons";
 import { io } from "socket.io-client";
 import useOrderSound from "../../hooks/useOrderSound";
-import { useRoute } from "@react-navigation/native";
+import { useRoute, useNavigation } from "@react-navigation/native";
 import { useTranslation } from "react-i18next";
 
 const { width } = Dimensions.get("window");
@@ -49,8 +49,23 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export default function VendorOrdersScreen() {
+export default function VendorOrdersScreen({ onBack } = {}) {
   const { t } = useTranslation();
+  const navigation = useNavigation();
+  // Back to the dashboard: use the host's handler (modal fallback) if given,
+  // otherwise go back in the navigator, otherwise jump to the dashboard route.
+  const handleBack = () => {
+    if (onBack) return onBack();
+    // Walk up the navigators looking for the dashboard/home route.
+    let nav = navigation;
+    while (nav) {
+      const names = nav.getState?.()?.routeNames || [];
+      const dash = names.find((n) => /dashboard|home/i.test(String(n)));
+      if (dash) return nav.navigate(dash);
+      nav = nav.getParent?.();
+    }
+    if (navigation?.canGoBack?.()) navigation.goBack();
+  };
   const { token } = useAuthStore();
   const { playOrderSound } = useOrderSound();
 
@@ -1229,11 +1244,28 @@ socket.on("delivery:declined", (data) => {
     <View style={styles.container}>
       {/* ── HEADER ── */}
       <View style={styles.screenHeader}>
-        <View>
-          <Text style={styles.screenTitle}>{t('vendor.orders')}</Text>
-          <Text style={styles.screenSubtitle}>
-            Manage incoming & active orders
-          </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
+          <TouchableOpacity
+            onPress={handleBack}
+            activeOpacity={0.8}
+            accessibilityLabel="Back to dashboard"
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: "rgba(255,255,255,0.2)",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <MaterialIcons name="arrow-back" size={21} color="#fff" />
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.screenTitle}>{t('vendor.orders')}</Text>
+            <Text style={styles.screenSubtitle}>
+              Manage incoming & active orders
+            </Text>
+          </View>
         </View>
         <View style={styles.headerBadgeWrap}>
           {orders.filter((o) => o.status === "pending").length > 0 && (
@@ -2903,6 +2935,7 @@ socket.on("delivery:declined", (data) => {
                 style={amStyles.secondaryBtn}
                 onPress={() => {
                   setAcceptedModalVisible(false);
+                  setActiveTab("orders");
                   if (selectedOrder) {
                     const customerName =
                       selectedOrder.customer?.name ||
@@ -2915,7 +2948,18 @@ socket.on("delivery:declined", (data) => {
                 }}
                 activeOpacity={0.85}
               >
-                <Text style={amStyles.secondaryBtnText}>{t('vendor.assignLater', "I'll assign later")}</Text>
+                <Text style={amStyles.secondaryBtnText}>{t('vendor.goToOrders', 'Go to Orders')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={amStyles.secondaryBtn}
+                onPress={() => {
+                  setAcceptedModalVisible(false);
+                  handleBack();
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={amStyles.secondaryBtnText}>{t('vendor.proceedToHome', 'Proceed to Home')}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>

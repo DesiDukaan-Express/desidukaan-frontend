@@ -62,6 +62,25 @@ const getDateLocale = (t) => {
   return /^[a-z]{2,3}-[A-Z]{2}$/.test(v) ? v : "en-IN";
 };
 
+// ── Numeric settings: allowed range + whole-number/decimal rule ──────────────
+const NUMERIC_LIMITS = {
+  min_order_value:     { min: 0, max: 10000, label: "Minimum order value" },
+  quick_delivery_fee:  { min: 0, max: 500,   label: "Flat delivery fee" },
+  weather_surcharge:   { min: 0, max: 200,   label: "Bad weather surcharge" },
+  delivery_fee_base:   { min: 0, max: 500,   label: "Base delivery fee" },
+  delivery_fee_per_km: { min: 0, max: 100,   label: "Extra fee per km" },
+  delivery_base_km:    { min: 1, max: 20,    label: "Base delivery distance" },
+};
+const fmtINR = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
+
+// Keep digits and one dot, max 2 decimals.
+const cleanAmount = (v) => {
+  const cleaned = String(v).replace(/[^0-9.]/g, "");
+  const [int = "", ...rest] = cleaned.split(".");
+  const head = int.replace(/^0+(?=\d)/, "");
+  return rest.length ? (head || "0") + "." + rest.join("").slice(0, 2) : head;
+};
+
 export default function VendorProfileScreen() {
   const { token, logout, setActiveRole } = useAuthStore();
   const navigation = useNavigation();
@@ -100,6 +119,7 @@ export default function VendorProfileScreen() {
   const [activeField, setActiveField] = useState("");
   const [activeLabel, setActiveLabel] = useState("");
   const [editValue, setEditValue] = useState("");
+  const [editError, setEditError] = useState("");
   const [urlInput, setUrlInput] = useState("");
 
   // ── Fetch ──────────────────────────────────────────────────
@@ -231,26 +251,48 @@ export default function VendorProfileScreen() {
     setActiveField(field);
     setActiveLabel(label);
     setEditValue(String(currentValue ?? ""));
+    setEditError("");
     setEditModal(true);
+  };
+
+  const isNumericField = !!NUMERIC_LIMITS[activeField];
+
+  const handleEditChange = (raw) => {
+    if (!isNumericField) { setEditValue(raw); return; }
+    const lim = NUMERIC_LIMITS[activeField];
+    const next = cleanAmount(raw);
+    if (raw !== next && /[^0-9.]/.test(raw)) {
+      setEditError("Only numbers are allowed.");
+    } else if (next !== "" && parseFloat(next) > lim.max) {
+      setEditError(`Maximum allowed is ${fmtINR(lim.max)}.`);
+      return; // reject the keystroke that would exceed the limit
+    } else {
+      setEditError("");
+    }
+    setEditValue(next);
   };
 
   const saveEdit = () => {
     const valTrim = editValue.trim();
     if (!valTrim) {
-      Alert.alert(t("vpRequired"), t("vpCannotBeEmpty", { field: activeLabel }));
+      setEditError(t("vpCannotBeEmpty", { field: activeLabel }));
       return;
     }
     if (activeField === "opening_time" || activeField === "closing_time") {
       if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(valTrim)) {
-        Alert.alert(t("vpInvalidFormat"), t("vpUseHHMM"));
+        setEditError(t("vpUseHHMM"));
         return;
       }
     }
-    if (["min_order_value", "quick_delivery_fee", "weather_surcharge", "delivery_base_km", "delivery_fee_base", "delivery_fee_per_km"].includes(activeField)) {
-      if (isNaN(parseFloat(valTrim))) {
-        Alert.alert(t("vpInvalidInput"), t("vpEnterNumeric"));
-        return;
-      }
+    if (isNumericField) {
+      const lim = NUMERIC_LIMITS[activeField];
+      const num = parseFloat(valTrim);
+      if (isNaN(num)) { setEditError("Enter a valid number."); return; }
+      if (num < lim.min) { setEditError(`Minimum allowed is ${fmtINR(lim.min)}.`); return; }
+      if (num > lim.max) { setEditError(`Maximum allowed is ${fmtINR(lim.max)}.`); return; }
+      handleUpdateField(activeField, String(num));
+      setEditModal(false);
+      return;
     }
     handleUpdateField(activeField, valTrim);
     setEditModal(false);
@@ -539,7 +581,7 @@ export default function VendorProfileScreen() {
                 isWide={isWide}
                 t={t}
               />
-              <AccountSettingsCard rs={rs} isWide={isWide} navigation={navigation} />
+              <AccountSettingsCard vendor={vendor} rs={rs} isWide={isWide} navigation={navigation} />
               <LogoutButton onPress={() => setLogoutModal(true)} rs={rs} isWide={isWide} t={t} />
             </View>
           </View>
@@ -568,7 +610,7 @@ export default function VendorProfileScreen() {
               isWide={isWide}
               t={t}
             />
-            <AccountSettingsCard rs={rs} isWide={isWide} navigation={navigation} />
+            <AccountSettingsCard vendor={vendor} rs={rs} isWide={isWide} navigation={navigation} />
             <SwitchProfileButton onPress={async () => { await setActiveRole(null); }} rs={rs} isWide={isWide} t={t} />
             <LogoutButton onPress={() => setLogoutModal(true)} rs={rs} isWide={isWide} t={t} />
           </View>
@@ -620,13 +662,26 @@ return (
             </View>
             <Text style={styles.modalLabel}>{activeLabel}</Text>
             <TextInput
-              style={styles.modalInput}
+              style={[styles.modalInput, !!editError && { borderColor: C.red }]}
               value={editValue}
-              onChangeText={setEditValue}
+              onChangeText={handleEditChange}
               autoFocus
-              placeholder={`${activeLabel}…`}
+              keyboardType={isNumericField ? "decimal-pad" : "default"}
+              maxLength={isNumericField ? 8 : undefined}
+              placeholder={isNumericField ? "0" : `${activeLabel}…`}
               placeholderTextColor={C.textLight}
             />
+            {isNumericField && !editError && (
+              <Text style={{ fontSize: 11, color: C.textLight, marginTop: 6 }}>
+                Enter a number between {fmtINR(NUMERIC_LIMITS[activeField].min)} and {fmtINR(NUMERIC_LIMITS[activeField].max)}.
+              </Text>
+            )}
+            {!!editError && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
+                <MaterialIcons name="error-outline" size={14} color={C.red} />
+                <Text style={{ fontSize: 12, color: C.red, fontWeight: "600", flex: 1 }}>{editError}</Text>
+              </View>
+            )}
             <View style={styles.modalActions}>
               <TouchableOpacity
                 onPress={() => setEditModal(false)}
@@ -1268,14 +1323,16 @@ function StoreSettingsCard({ vendor, storeOpen, onToggle, badWeather, onToggleBa
   );
 }
 
-function AccountSettingsCard({ rs, isWide, navigation }) {
+function AccountSettingsCard({ vendor, rs, isWide, navigation }) {
   const { t } = useTranslation();
   const [showLanguage, setShowLanguage] = React.useState(false);
+  // Same source of truth as the profile banner (onboarding_status).
+  const kycApproved = vendor?.onboarding_status === "approved";
 
   const items = [
     { icon: "account-balance", label: t('profile.bankAccount'), sub: t('profile.bankAccountSub'), color: C.primaryDark, bg: C.primaryDim },
     { icon: "payments", label: t('profile.payoutSettings'), sub: t('profile.payoutSettingsSub'), color: C.tealIcon, bg: C.tealDim },
-    { icon: "verified-user", label: t('profile.kycVerification'), sub: t('profile.kycVerificationSub'), color: C.tealIcon, bg: C.tealDim, right: t('profile.verified') },
+    { icon: "verified-user", label: t('profile.kycVerification'), sub: t('profile.kycVerificationSub'), color: C.tealIcon, bg: C.tealDim, right: kycApproved ? t('profile.verified') : t('profile.pending'), rightColor: kycApproved ? C.green : "#D97706" },
     { icon: "help-outline", label: t('profile.helpSupport'), sub: t('profile.helpSupportSub'), color: C.primaryDark, bg: C.primaryDim, onPress: () => navigation.getParent()?.getParent()?.navigate("Support") },
     { icon: "privacy-tip", label: t('auth.privacyPolicy'), sub: t('profile.privacySub'), color: C.textSub, bg: C.bg },
     { icon: "description", label: t('profile.termsConditions'), sub: t('profile.termsSub'), color: C.textSub, bg: C.bg },
@@ -1318,7 +1375,7 @@ function AccountSettingsCard({ rs, isWide, navigation }) {
             </View>
           </View>
           {item.right ? (
-            <Text style={{ fontSize: 12, color: C.green, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"}}>{item.right}</Text>
+            <Text style={{ fontSize: 12, color: item.rightColor || C.green, fontWeight: "700", fontFamily: "PlusJakartaSans_700Bold"}}>{item.right}</Text>
           ) : (
             <MaterialIcons name="chevron-right" size={20} color={C.textLight} />
           )}
