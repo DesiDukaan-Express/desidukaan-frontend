@@ -40,6 +40,7 @@ export default function OrderPlaced() {
   const slot        = route.params?.slot        || null;
 
   const [status, setStatus] = useState("accepted"); // Default to accepted after payment flow
+  const [declineReason, setDeclineReason] = useState("");
 
   // ── Animations ─────────────────────────────────────────────────────────────
   const scaleAnim    = useRef(new Animated.Value(0)).current;
@@ -93,15 +94,26 @@ export default function OrderPlaced() {
 
   // Timer removed - order is confirmed after payment in this flow
 
-  const goHome = () => navigation.navigate("CustomerApp", {
-    screen: "CustomerTabNavigator",
-    params: { screen: "Home" },
-  });
+  // Navigate by whichever role-app is actually registered (customer / vendor /
+  // delivery), instead of assuming "CustomerApp" always exists.
+  const goTab = (customerTab, vendorTab) => {
+    const names = navigation.getState?.()?.routeNames || [];
+    if (names.includes("CustomerApp")) {
+      return navigation.navigate("CustomerApp", {
+        screen: "CustomerTabNavigator",
+        params: { screen: customerTab },
+      });
+    }
+    if (names.includes("VendorApp")) {
+      return navigation.navigate("VendorApp", { screen: vendorTab });
+    }
+    if (names.includes("Dashboard")) return navigation.navigate("Dashboard");
+    if (names.includes("DeliveryApp")) return navigation.navigate("DeliveryApp");
+    if (navigation.canGoBack?.()) navigation.goBack();
+  };
 
-  const goOrders = () => navigation.navigate("CustomerApp", {
-    screen: "CustomerTabNavigator",
-    params: { screen: "Orders" },
-  });
+  const goHome = () => goTab("Home", "DashboardTab");
+  const goOrders = () => goTab("Orders", "Orders");
 
   const handlePayment = () => {
     alert("Payment feature coming soon!");

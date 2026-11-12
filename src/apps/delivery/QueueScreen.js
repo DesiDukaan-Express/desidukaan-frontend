@@ -13,6 +13,7 @@ import {
 } from '@expo-google-fonts/plus-jakarta-sans';
 import useAuthStore from '../../store/authStore';
 import { useTranslation } from 'react-i18next';
+import { createAudioPlayer } from 'expo-audio';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3000';
@@ -44,17 +45,27 @@ const C = {
 };
 // ── Sound helper ──────────────────────────────────────────────────────────────
 async function playOrderSound() {
+  let player;
+
   try {
-    const { Audio } = require('expo-av');
-    if (!Audio || !Audio.Sound) return;
-    const { sound } = await Audio.Sound.createAsync(
-      require('../../../assets/sounds/new_order.mp3'),
-      { shouldPlay: true, volume: 1.0 }
+    player = createAudioPlayer(
+      require('../../../assets/sounds/new_order.mp3')
     );
-    sound.setOnPlaybackStatusUpdate((s) => {
-      if (s.didJustFinish) sound.unloadAsync();
+
+    player.addListener('playbackStatusUpdate', (status) => {
+      if (status.didJustFinish) {
+        player.remove();
+      }
     });
-  } catch (_) { }
+
+    player.play();
+  } catch (error) {
+    console.log('Order sound error:', error);
+
+    if (player) {
+      player.remove();
+    }
+  }
 }
 
 // ── Timer bar ─────────────────────────────────────────────────────────────────

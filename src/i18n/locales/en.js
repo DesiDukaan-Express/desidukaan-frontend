@@ -1941,6 +1941,12 @@ dobErrPassYearRange: "Passing year must be between 1950 and {{max}}.",
 
 dobErrTraining: "Please select valid training options.",
 
+
+"dbCompleted": "Completed",
+"dbPending": "Pending",
+"dbCancelled": "Cancelled",
+"dbNotAvailableTitle": "Not available",
+"dbNotAvailableMsg": "This section could not be opened right now."
 };
 
 

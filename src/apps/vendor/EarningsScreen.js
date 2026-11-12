@@ -14,6 +14,7 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import { LineChart } from "react-native-chart-kit";
 import { useTranslation } from "react-i18next";
+import { useNavigation } from "@react-navigation/native";
 import useAuthStore from "../../store/authStore";
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
@@ -45,6 +46,17 @@ bg: "#F4F7F5",
 export default function VendorEarningsScreen() {
   const { t } = useTranslation();
   const { token } = useAuthStore();
+  const navigation = useNavigation();
+  const handleBack = () => {
+    let nav = navigation;
+    while (nav) {
+      const names = nav.getState?.()?.routeNames || [];
+      const dash = names.find((n) => /dashboard|home/i.test(String(n)));
+      if (dash) return nav.navigate(dash);
+      nav = nav.getParent?.();
+    }
+    if (navigation?.canGoBack?.()) navigation.goBack();
+  };
   const { width: SCREEN_W } = useWindowDimensions();
   const [loading, setLoading] = React.useState(true);
   const [stats, setStats] = React.useState(null);
@@ -157,13 +169,30 @@ export default function VendorEarningsScreen() {
           { paddingTop: Platform.OS === "ios" ? 52 : 40 },
         ]}
       >
-        <View>
-          <Text style={[styles.headerOverline, { fontSize: rs(10, 11, 11) }]}>
-            {t('vendor.vendorEarnings')}
-          </Text>
-          <Text style={[styles.headerTitle, { fontSize: rs(20, 22, 24) }]}>
-            {t('vendor.earningsTitle')}
-          </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <TouchableOpacity
+            onPress={handleBack}
+            activeOpacity={0.8}
+            accessibilityLabel="Back to dashboard"
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: C.primaryDim,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <MaterialIcons name="arrow-back" size={21} color={C.primary} />
+          </TouchableOpacity>
+          <View>
+            <Text style={[styles.headerOverline, { fontSize: rs(10, 11, 11) }]}>
+              {t('vendor.vendorEarnings')}
+            </Text>
+            <Text style={[styles.headerTitle, { fontSize: rs(20, 22, 24) }]}>
+              {t('vendor.earningsTitle')}
+            </Text>
+          </View>
         </View>
         <View
           style={[
