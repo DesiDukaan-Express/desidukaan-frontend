@@ -549,7 +549,7 @@ export default {
     chartUnavailable: "Chart unavailable",
     welcomeTitle: "Welcome to KwikPik!",
     welcomeSub: "You haven't completed your shop registration yet. Complete it now to start selling!",
-    completeRegistration: "Complete Registration",
+    completeRegistration: "Registration your shop",
     avgPrep: "Avg. Prep",
     prepAvg: "Prep Avg",
     monthlyOrders: "MONTHLY ORDERS",

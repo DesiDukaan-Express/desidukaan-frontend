@@ -488,7 +488,7 @@ export default {
     "loadingDashboard": "તમારું ડેશબોર્ડ લોડ કરી રહ્યું છે...",
     "welcomeTitle": "KwikPik માં આપનું સ્વાગત છે!",
     "welcomeSub": "તમે હજુ સુધી તમારી દુકાનની નોંધણી પૂર્ણ કરી નથી. વેચાણ શરૂ કરવા માટે હવે તેને પૂર્ણ કરો!",
-    "completeRegistration": "નોંધણી પૂર્ણ કરો",
+    "completeRegistration": "તમારી દુકાનની નોંધણી કરો",
     "avgPrep": "સરેરાશ તૈયારી",
     "prepAvg": "તૈયારી સરેરાશ",
     "monthlyOrders": "માસિક ઓર્ડર",

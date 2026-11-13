@@ -488,7 +488,7 @@ export default {
     "loadingDashboard": "ଆପଣଙ୍କର ଡ୍ୟାସବୋର୍ଡ ଲୋଡ୍ କରୁଛି…",
     "welcomeTitle": "KwikPik କୁ ସ୍ Welcome ାଗତ!",
     "welcomeSub": "ଆପଣ ଏପର୍ଯ୍ୟନ୍ତ ଆପଣଙ୍କର ଦୋକାନ ପଞ୍ଜିକରଣ ସମାପ୍ତ କରିନାହାଁନ୍ତି | ବିକ୍ରୟ ଆରମ୍ଭ କରିବା ପାଇଁ ଏହାକୁ ବର୍ତ୍ତମାନ ସମ୍ପୂର୍ଣ୍ଣ କର!",
-    "completeRegistration": "ସମ୍ପୂର୍ଣ୍ଣ ପଞ୍ଜୀକରଣ |",
+    "completeRegistration": "ଆପଣଙ୍କ ଦୋକାନ ପଞ୍ଜୀକରଣ କରନ୍ତୁ",
     "avgPrep": "ହାରାହାରି ପ୍ରସ୍ତୁତି",
     "prepAvg": "ହାରାହାରି ପ୍ରସ୍ତୁତ କରନ୍ତୁ |",
     "monthlyOrders": "ମାସିକ ଆଦେଶ |",
