@@ -488,7 +488,7 @@ export default {
     "loadingDashboard": "آپ کا ڈیش بورڈ لوڈ ہو رہا ہے…",
     "welcomeTitle": "KwikPik میں خوش آمدید!",
     "welcomeSub": "آپ نے ابھی تک اپنی دکان کی رجسٹریشن مکمل نہیں کی ہے۔ فروخت شروع کرنے کے لیے اسے ابھی مکمل کریں!",
-    "completeRegistration": "مکمل رجسٹریشن",
+    "completeRegistration": "اپنی دکان رجسٹر کریں",
     "avgPrep": "اوسط تیاری",
     "prepAvg": "تیاری اوسط",
     "monthlyOrders": "ماہانہ آرڈرز",
