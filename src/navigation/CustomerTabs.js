@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import useCartStore from '../store/cartStore';
 import useAuthStore from '../store/authStore';
 import useOrderStore from '../store/orderStore';
+import { useTheme } from '../theme/ThemeContext';
 
 import HomeScreen from '../apps/customer/HomeScreen';
 import SearchScreen from '../apps/customer/SearchScreen';
@@ -24,23 +25,6 @@ const Stack = createNativeStackNavigator();
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3000';
 
-// ─── Palette matching the app ──────────────────────────────────────────────────
-const C = {
-  green:       '#16A34A',
-  greenLight:  '#F0FDF4',
-  orange:      '#F97316',
-  orangeDark:  '#EA580C',
-  purple:      '#7C3AED',
-  surface:     '#FFFFFF',
-  surfaceLow:  '#F8FAFC',
-  border:      '#E5E7EB',
-  gray400:     '#9CA3AF',
-  gray600:     '#4B5563',
-  gray900:     '#111827',
-  greenDark:   '#15803D',
-  red:         '#DC2626',
-};
-
 const TAB_ICONS = {
   Home:    'home',
   // Search:  'search',
@@ -50,7 +34,7 @@ const TAB_ICONS = {
 };
 
 // ─── Tab icon component ────────────────────────────────────────────────────────
-const TabIcon = ({ iconName, label, focused, cartCount }) => {
+const TabIcon = ({ iconName, label, focused, cartCount, colors }) => {
   const isCart = label === 'Cart';
   return (
     <View
@@ -61,18 +45,18 @@ const TabIcon = ({ iconName, label, focused, cartCount }) => {
         paddingVertical: 4,
         borderRadius: 20,
         minWidth: 56,
-        backgroundColor: focused ? C.greenLight : 'transparent',
+        backgroundColor: focused ? colors.greenLight : 'transparent',
       }}
     >
       <View style={{ position: 'relative' }}>
-        <MaterialIcons name={iconName} size={24} color={focused ? C.green : C.gray400} />
+        <MaterialIcons name={iconName} size={24} color={focused ? colors.green : colors.gray400} />
         {isCart && cartCount > 0 && (
           <View
             style={{
               position: 'absolute',
               top: -4,
               right: -6,
-              backgroundColor: C.orange,
+              backgroundColor: colors.orange,
               borderRadius: 9,
               minWidth: 16,
               height: 16,
@@ -80,7 +64,7 @@ const TabIcon = ({ iconName, label, focused, cartCount }) => {
               justifyContent: 'center',
               paddingHorizontal: 3,
               borderWidth: 1.5,
-              borderColor: C.surface,
+              borderColor: colors.surface,
             }}
           >
             <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>
@@ -93,7 +77,7 @@ const TabIcon = ({ iconName, label, focused, cartCount }) => {
         style={{
           fontSize: 10,
           fontWeight: focused ? '700' : '500',
-          color: focused ? C.green : C.gray400,
+          color: focused ? colors.green : colors.gray400,
           marginTop: 2,
           letterSpacing: 0.1,
         }}
@@ -105,15 +89,16 @@ const TabIcon = ({ iconName, label, focused, cartCount }) => {
 };
 
 // ─── Cart tab with live badge ──────────────────────────────────────────────────
-function CartTabIcon({ focused, label }) {
+function CartTabIcon({ focused, label, colors }) {
   const cart = useCartStore();
   const cartCount = cart?.items?.reduce((s, i) => s + (i.qty || 1), 0) ?? 0;
-  return <TabIcon iconName={TAB_ICONS['Cart']} label={label} focused={focused} cartCount={cartCount} />;
+  return <TabIcon iconName={TAB_ICONS['Cart']} label={label} focused={focused} cartCount={cartCount} colors={colors} />;
 }
 
 // ─── Bottom tab navigator ──────────────────────────────────────────────────────
 function CustomerTabNavigator() {
   const { t } = useTranslation();
+  const { colors } = useTheme();
 
   const TAB_LABELS = {
     Home:    t('home.tab'),
@@ -130,13 +115,13 @@ function CustomerTabNavigator() {
         tabBarShowLabel: false,
         tabBarIcon: ({ focused }) => {
           const label = TAB_LABELS[route.name] || route.name;
-          if (route.name === 'Cart') return <CartTabIcon focused={focused} label={label} />;
-          return <TabIcon iconName={TAB_ICONS[route.name]} label={label} focused={focused} />;
+          if (route.name === 'Cart') return <CartTabIcon focused={focused} label={label} colors={colors} />;
+          return <TabIcon iconName={TAB_ICONS[route.name]} label={label} focused={focused} colors={colors} />;
         },
         tabBarStyle: {
-          backgroundColor: C.surface,
+          backgroundColor: colors.surface,
           borderTopWidth: 1,
-          borderTopColor: C.border,
+          borderTopColor: colors.gray200,
           height: Platform.OS === 'ios' ? 82 : 64,
           paddingBottom: Platform.OS === 'ios' ? 20 : 4,
           paddingTop: 4,
@@ -151,8 +136,8 @@ function CustomerTabNavigator() {
         },
         tabBarIconStyle: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
         tabBarItemStyle: { justifyContent: 'center', alignItems: 'center', height: '100%' },
-        tabBarActiveTintColor: C.green,
-        tabBarInactiveTintColor: C.gray400,
+        tabBarActiveTintColor: colors.green,
+        tabBarInactiveTintColor: colors.gray400,
       })}
     >
       <Tab.Screen name="Home"    component={HomeScreen}    />
@@ -169,6 +154,7 @@ function CustomerTabNavigator() {
 // Shows a live countdown. Tap → back to Checkout (re-opens modal).
 function PendingOrderMonitor() {
   const { t } = useTranslation();
+  const { colors } = useTheme();
   const navigation = useNavigation();
   const { token } = useAuthStore();
   const pendingOrder  = useOrderStore((s) => s.pendingOrder);
@@ -405,6 +391,7 @@ function PendingOrderMonitor() {
             status === 'accepted'  && ms.bAccepted,
             status === 'countered' && ms.bCountered,
             status === 'expired'   && ms.bExpired,
+            { backgroundColor: status === 'pending' ? colors.orangeDark : status === 'accepted' ? colors.green : status === 'countered' ? colors.purple : colors.gray600 },
           ]}
           onPress={() => openCheckout(status)}
           activeOpacity={0.88}
@@ -463,6 +450,7 @@ function PendingOrderMonitor() {
             toast.type === 'danger'    && ms.tDanger,
             toast.type === 'countered' && ms.tCountered,
             isPersist && { bottom: BOTTOM + 74 }, // stack above banner
+            { backgroundColor: toast.type === 'success' ? colors.green : toast.type === 'danger' ? colors.red : toast.type === 'countered' ? colors.purple : colors.gray900 },
           ]}
           onPress={toast.onPress || (() => setToast(null))}
           activeOpacity={0.9}
@@ -520,12 +508,11 @@ const ms = StyleSheet.create({
     shadowOffset:    { width: 0, height: 6 },
     shadowOpacity:   0.25,
     shadowRadius:    14,
-    backgroundColor: C.orangeDark,
   },
-  bPending:   { backgroundColor: C.orangeDark },
-  bAccepted:  { backgroundColor: C.green },
-  bCountered: { backgroundColor: C.purple },
-  bExpired:   { backgroundColor: C.gray600 },
+  bPending:   {},
+  bAccepted:  {},
+  bCountered: {},
+  bExpired:   {},
 
   bubble: {
     width:            46,
@@ -554,7 +541,6 @@ const ms = StyleSheet.create({
     bottom:          BOTTOM,
     zIndex:          10000,
     elevation:       21,
-    backgroundColor: C.gray900,
     borderRadius:    14,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -566,8 +552,8 @@ const ms = StyleSheet.create({
     shadowOpacity:   0.2,
     shadowRadius:    10,
   },
-  tSuccess:   { backgroundColor: C.green },
-  tDanger:    { backgroundColor: C.red },
-  tCountered: { backgroundColor: C.purple },
+  tSuccess:   {},
+  tDanger:    {},
+  tCountered: {},
   toastText:  { flex: 1, color: '#fff', fontSize: 13, fontWeight: '700', lineHeight: 19 },
 });

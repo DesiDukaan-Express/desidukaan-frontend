@@ -623,6 +623,13 @@ export default function VendorOnboardingScreen({
   const submitLock = useRef(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [autoApproved, setAutoApproved] = useState(false);
+  // ── Admin approval gate (after Step 3) ──────────────────────────────────────
+  const [vendorId, setVendorId] = useState(null);
+  const [approvalStatus, setApprovalStatus] = useState('none'); // none | pending | approved | rejected
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  // Steps 1-3 are locked once the vendor is pending/approved (only a rejection reopens them)
+  const detailsLocked = approvalStatus === 'pending' || approvalStatus === 'approved';
 const { t } = useTranslation();
   const scrollRef = useRef(null);
 
@@ -1011,6 +1018,93 @@ const { t } = useTranslation();
   const [catTopOptions, setCatTopOptions] = useState([]);
   const [catTopLoading, setCatTopLoading] = useState(false);
 
+
+  // ── Poll for admin decision while the approval popup is open ────────────────
+  useEffect(() => {
+    if (!showApprovalModal || approvalStatus !== 'pending') return;
+    let cancelled = false;
+
+    const check = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/vendors/me/profile`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const v = (await res.json()).data?.vendor;
+        if (cancelled || !v) return;
+        if (v.onboarding_status === 'approved') setApprovalStatus('approved');
+        else if (v.onboarding_status === 'rejected') {
+          setRejectionReason(v.onboarding_note || '');
+          setApprovalStatus('rejected');
+        }
+      } catch {
+        // network hiccup — try again on the next tick
+      }
+    };
+
+    check();
+    const id = setInterval(check, 15000); // every 15s
+    return () => { cancelled = true; clearInterval(id); };
+  }, [showApprovalModal, approvalStatus]);
+
+  // ── Resume: if the vendor already submitted earlier, restore their state ───
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/vendors/me/profile`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return; // 404 = nothing submitted yet → start at step 1
+        const v = (await res.json()).data?.vendor;
+        if (cancelled || !v) return;
+
+        setVendorId(v.id);
+        setApprovalStatus(v.onboarding_status);
+
+        if (v.onboarding_status === 'pending') {
+          setCurrentStep(3);
+          setShowApprovalModal(true);
+        } else if (v.onboarding_status === 'approved') {
+          setCurrentStep(4);
+        } else if (v.onboarding_status === 'rejected') {
+          // Pre-fill the form so they only fix what the admin flagged
+          setRejectionReason(v.onboarding_note || '');
+          setShopName(v.shop_name || '');
+          setOwnerName(v.owner_name || '');
+          setEstYear(v.establishment_year ? String(v.establishment_year) : '');
+          setEmail(v.email || '');
+          setPhone(v.phone || '');
+          setAltName(v.alt_contact_name || '');
+          setAltPhone(v.alt_phone || '');
+          setFssai(v.fssai_number || '');
+          setGst(v.gst_number || '');
+          setAadhar(v.aadhar_number || '');
+          setPan(v.pan_number || '');
+          setTradeLicense(v.trade_license_number || '');
+          setLandmark(v.landmark || '');
+          setUpiId(v.upi_id || '');
+          setAccountName(v.bank_account_name || '');
+          setIfsc(v.bank_ifsc || '');
+          setDeliveryType(v.delivery_type || 'self');
+          applyingRef.current = true;
+          updateShopLoc({
+            formattedAddress: v.address_line || '',
+            city: v.city || '',
+            pincode: v.pincode || '',
+            lat: v.latitude ?? null,
+            lng: v.longitude ?? null,
+          });
+          setCurrentStep(3);
+          setShowApprovalModal(true);
+        }
+      } catch {
+        // offline / server error — fall through to a fresh form
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -1329,29 +1423,63 @@ const { t } = useTranslation();
 
   // ── Submit ────────────────────────────────────────────────────────────────────
 
-  const handleNext = async () => {
-    if (!validateStep()) return;
+  // ── Step 3 gate: submit shop + compliance + bank details for admin approval ──
+  // Creates the vendor (status: pending) the first time, or updates the same
+  // record when the admin rejected it and the vendor fixed their details.
+  const buildVendorBody = (latitude, longitude) => {
+    const body = {
+      shop_name: shopName,
+      owner_name: ownerName,
+      establishment_year: estYear || null,
+      email,
+      phone,
+      alt_contact_name: altName || null,
+      alt_phone: altPhone || null,
+      fssai_number: fssai || null,
+      gst_number: gst || null,
+      aadhar_number: aadhar || null,
+      pan_number: pan || null,
+      trade_license_number: tradeLicense || null,
+      fssai_license_url: docUrls.fssai || null,
+      gst_certificate_url: docUrls.gst || null,
+      address_line: shopLoc.formattedAddress,
+      landmark: landmark || null,
+      city: shopLoc.city,
+      pincode: shopLoc.pincode,
+      latitude: latitude || null,
+      longitude: longitude || null,
+      upi_id: upiId || null,
+      bank_account_name: accountName || null,
+      bank_account_number: accountNumber || null,
+      bank_ifsc: ifsc || null,
+      delivery_type: deliveryType,
+    };
+    // Replace empty strings with null for backend patterns
+    Object.keys(body).forEach(key => {
+      if (body[key] === '') body[key] = null;
+    });
+    return body;
+  };
 
-    if (currentStep < STEPS.length) {
-      setCurrentStep(prev => prev + 1);
+  const submitVendorForApproval = async () => {
+    if (submitLock.current) return;
+
+    // Already approved earlier (e.g. resumed session) — nothing to resubmit.
+    if (approvalStatus === 'approved') {
+      setCurrentStep(4);
+      return;
+    }
+    // Already waiting for the admin — just show the waiting popup again.
+    if (approvalStatus === 'pending') {
+      setShowApprovalModal(true);
       return;
     }
 
-// ── Final submit ──────────────────────────────────────────────────────────
-if (submitLock.current) {
-  console.log("Submission already in progress");
-  return;
-}
-
-submitLock.current = true;
-setLoading(true);
-
-console.log("Starting vendor onboarding submission...");
+    submitLock.current = true;
+    setLoading(true);
     try {
-      // 1. Auto-geocode pincode + city → lat/lng
-      //    This runs just before submit so we always have fresh coords
-      // 1. Auto-geocode pincode + city → lat/lng (only if the map pin wasn't set
-      //    already by a suggestion selection or marker drag)
+      // Auto-geocode only if the map pin wasn't already set by a suggestion
+      // selection, "use current location" or a marker drag.
       let latitude = shopLoc.lat;
       let longitude = shopLoc.lng;
       if (!latitude || !longitude) {
@@ -1361,7 +1489,6 @@ console.log("Starting vendor onboarding submission...");
         longitude = coords.longitude;
         setGeocoding(false);
       }
-
       if (!latitude || !longitude) {
         // Non-blocking warning — vendor still registers, just won't appear in nearby search
         Alert.alert(
@@ -1371,160 +1498,148 @@ console.log("Starting vendor onboarding submission...");
         );
       }
 
-      // 2. Create vendor
-      const body = {
-        shop_name: shopName,
-        owner_name: ownerName,
-        establishment_year: estYear || null,
-        email,
-        phone,
-        alt_contact_name: altName || null,
-        alt_phone: altPhone || null,
-        fssai_number: fssai || null,
-        gst_number: gst || null,
-        aadhar_number: aadhar || null,
-        pan_number: pan || null,
-        trade_license_number: tradeLicense || null,
-        fssai_license_url: docUrls.fssai || null,
-        gst_certificate_url: docUrls.gst || null,
-        address_line: shopLoc.formattedAddress,
-        landmark: landmark || null,
-        city: shopLoc.city,
-        pincode: shopLoc.pincode,
-        latitude: latitude || null,
-        longitude: longitude || null,
-        upi_id: upiId || null,
-        bank_account_name: accountName || null,
-        bank_account_number: accountNumber || null,
-        bank_ifsc: ifsc || null,
-        delivery_type: deliveryType,
-      };
+      const body = buildVendorBody(latitude, longitude);
 
-      // Clean body – replace empty strings with null for backend patterns
-      Object.keys(body).forEach(key => {
-        if (body[key] === '') body[key] = null;
-      });
-
-      const vendorRes = await fetch(`${API_BASE}/vendors`, {
+      // POST /vendors upserts by user_id: first time it creates the vendor,
+      // after a rejection it updates it and the backend resets the status to
+      // 'pending' (see createVendor in vendors/service.js).
+      const res = await fetch(`${API_BASE}/vendors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.msg || data.message || t('obErrCreateShop'));
+      }
 
-      const vendorData = await vendorRes.json().catch(() => ({}));
-
-console.log("Vendor creation response:", {
-  status: vendorRes.status,
-  success: vendorRes.ok,
-  data: vendorData,
-});
-
-if (!vendorRes.ok) {
-  throw new Error(
-    vendorData.msg ||
-    vendorData.message ||
-    t('obErrCreateShop')
-  );
-}
-
-      // Capture auto-approve flag from backend (response: { data: { vendor: { auto_approved, ... } } })
-      setAutoApproved(vendorData.data?.vendor?.auto_approved === true);
-
-      // 3. Create products
-      //    Note: we send item_type (DB column name) NOT type, to avoid backend mapping issues
-const allProds = getAllProducts();
-
-for (const product of allProds) {
-  const productRes = await fetch(`${API_BASE}/products`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      name: product.name,
-      description: product.description || null,
-      brand: product.brand || null,
-      mrp: parseFloat(product.mrp || 0),
-      price: parseFloat(
-        product.price || product.base_price || product.sp || 0
-      ),
-      unit: product.unit || 'kg',
-      category:
-        product.category?.name ||
-        product.cat ||
-        currentCategory?.name ||
-        '',
-      category_id:
-        product.subcategory_id ||
-        product.category_id ||
-        currentCategory?.id,
-      stock_qty: parseInt(
-        product.stock || product.stock_qty || 0,
-        10
-      ),
-      type: product.item_type || product.type || 'packed',
-      image_url: product.image_url || product.image || null,
-      weight_options: (() => {
-        const opts = Array.isArray(product.weight_options)
-          ? product.weight_options
-          : [];
-
-        return opts.map(opt => {
-          if (typeof opt === 'string') {
-            const m = opt.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Z]+)$/);
-
-            if (m) {
-              return {
-                weight: parseFloat(m[1]),
-                unit: m[2],
-              };
-            }
-
-            return {
-              weight: parseFloat(opt) || 0,
-              unit: 'g',
-            };
-          }
-
-          return opt;
-        });
-      })(),
-    }),
-  });
-
-  const productData = await productRes.json().catch(() => ({}));
-
-  if (!productRes.ok) {
-    throw new Error(
-      productData.msg ||
-      productData.message ||
-      t('obErrCreateProduct', { name: product.name })
-    );
-  }
-
-  console.log(`Product created successfully: ${product.name}`);
-}
-
-      // Show the success popup FIRST and do NOT call onComplete() yet.
-      // onComplete() triggers checkVendorProfile() in the root navigator,
-      // which updates vendorStatus/vendorOnboarded — the moment that flips,
-      // the root Stack.Navigator swaps this screen out for VendorApp,
-      // unmounting VendorOnboardingScreen (and this success modal) before
-      // the user ever sees it. That's why Submit & Go Live looked like it
-      // did nothing. Instead we show the modal now and only call
-      // onComplete() once the user taps through it (see successBtn below),
-      // so the screen swap happens after they've seen the confirmation.
-      console.log("Vendor onboarding completed successfully. Opening vendor dashboard...");
-onComplete?.();
+      const v = data.data?.vendor;
+      if (v?.id) setVendorId(v.id);
+      setRejectionReason('');
+      setApprovalStatus(v?.onboarding_status === 'approved' ? 'approved' : 'pending');
+      setShowApprovalModal(true);
     } catch (err) {
       Alert.alert(t('obError'), err.message);
     } finally {
-  setLoading(false);
-  setGeocoding(false);
-  submitLock.current = false;
-  console.log("Vendor onboarding submission finished.");
-}
+      setLoading(false);
+      setGeocoding(false);
+      submitLock.current = false;
+    }
+  };
+
+  // ── Next / final submit ─────────────────────────────────────────────────────
+
+  const handleNext = async () => {
+    if (!validateStep()) return;
+
+    // Step 3 → admin approval gate. The vendor cannot reach the catalog
+    // steps until the admin approves; the approval popup advances to step 4.
+    if (currentStep === 3) {
+      await submitVendorForApproval();
+      return;
+    }
+
+    if (currentStep < STEPS.length) {
+      setCurrentStep(prev => prev + 1);
+      return;
+    }
+
+    // ── Final submit (vendor already exists + is approved; create products) ──
+    if (submitLock.current) return;
+    if (approvalStatus !== 'approved') {
+      Alert.alert(t('obError'), 'Your shop details are not approved yet.');
+      return;
+    }
+
+    submitLock.current = true;
+    setLoading(true);
+
+    try {
+      const allProds = getAllProducts();
+
+      for (const product of allProds) {
+        const productRes = await fetch(`${API_BASE}/products`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            name: product.name,
+            description: product.description || null,
+            brand: product.brand || null,
+            mrp: parseFloat(product.mrp || 0),
+            price: parseFloat(
+              product.price || product.base_price || product.sp || 0
+            ),
+            unit: product.unit || 'kg',
+            category:
+              product.category?.name ||
+              product.cat ||
+              currentCategory?.name ||
+              '',
+            category_id:
+              product.subcategory_id ||
+              product.category_id ||
+              currentCategory?.id,
+            stock_qty: parseInt(
+              product.stock || product.stock_qty || 0,
+              10
+            ),
+            type: product.item_type || product.type || 'packed',
+            image_url: product.image_url || product.image || null,
+            weight_options: (() => {
+              const opts = Array.isArray(product.weight_options)
+                ? product.weight_options
+                : [];
+
+              return opts.map(opt => {
+                if (typeof opt === 'string') {
+                  const m = opt.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Z]+)$/);
+
+                  if (m) {
+                    return {
+                      weight: parseFloat(m[1]),
+                      unit: m[2],
+                    };
+                  }
+
+                  return {
+                    weight: parseFloat(opt) || 0,
+                    unit: 'g',
+                  };
+                }
+
+                return opt;
+              });
+            })(),
+          }),
+        });
+
+        const productData = await productRes.json().catch(() => ({}));
+
+        if (!productRes.ok) {
+          throw new Error(
+            productData.msg ||
+            productData.message ||
+            t('obErrCreateProduct', { name: product.name })
+          );
+        }
+      }
+
+      // Show the success popup FIRST. Do NOT call onComplete() here:
+      // it triggers checkVendorProfile() in the root navigator, which swaps
+      // this screen out for VendorApp and would unmount the success modal.
+      // onComplete() is called by the modal's button instead.
+      setAutoApproved(true); // vendor was approved at step 3 → shop is live
+      setShowSuccess(true);
+    } catch (err) {
+      Alert.alert(t('obError'), err.message);
+    } finally {
+      setLoading(false);
+      setGeocoding(false);
+      submitLock.current = false;
+    }
   };
 
   const progressPercent = ((currentStep - 1) / (STEPS.length - 1)) * 100;
@@ -1533,6 +1648,81 @@ onComplete?.();
 
   return (
     <View style={styles.container}>
+
+      {/* ── ADMIN APPROVAL POPUP (shown after bank details, step 3) ── */}
+      <Modal
+        visible={showApprovalModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.successOverlay}>
+          <View style={styles.successCard}>
+            <View style={[
+              styles.successIconWrap,
+              approvalStatus === 'rejected' && { backgroundColor: '#FEE2E2' },
+            ]}>
+              <MaterialIcons
+                name={
+                  approvalStatus === 'approved' ? 'check-circle'
+                  : approvalStatus === 'rejected' ? 'error-outline'
+                  : 'hourglass-empty'
+                }
+                size={48}
+                color={approvalStatus === 'rejected' ? '#DC2626' : '#16A34A'}
+              />
+            </View>
+
+            <Text style={styles.successTitle}>
+              {approvalStatus === 'approved' ? 'Details Approved!'
+                : approvalStatus === 'rejected' ? 'Changes Needed'
+                : 'Waiting for Admin Approval'}
+            </Text>
+
+            <Text style={styles.successDesc}>
+              {approvalStatus === 'approved'
+                ? 'Your shop, compliance and bank details are verified. You can now add your products.'
+                : approvalStatus === 'rejected'
+                ? (rejectionReason || 'Our team found an issue with your details. Please review them and submit again.')
+                : 'Our team is verifying your shop, compliance and bank details. This usually takes 24-48 hours. You can wait here or come back later - your progress is saved.'}
+            </Text>
+
+            {approvalStatus === 'pending' && (
+              <ActivityIndicator color="#16A34A" style={{ marginTop: 4 }} />
+            )}
+
+            {approvalStatus === 'approved' && (
+              <TouchableOpacity
+                style={styles.successBtn}
+                activeOpacity={0.88}
+                onPress={() => { setShowApprovalModal(false); setCurrentStep(4); }}
+              >
+                <Text style={styles.successBtnText}>Continue to Catalog</Text>
+              </TouchableOpacity>
+            )}
+
+            {approvalStatus === 'rejected' && (
+              <TouchableOpacity
+                style={styles.successBtn}
+                activeOpacity={0.88}
+                onPress={() => { setShowApprovalModal(false); setCurrentStep(1); }}
+              >
+                <Text style={styles.successBtnText}>Edit Details</Text>
+              </TouchableOpacity>
+            )}
+
+            {approvalStatus === 'pending' && (
+              <TouchableOpacity
+                style={[styles.successBtn, { backgroundColor: '#E5E7EB', shadowOpacity: 0, elevation: 0 }]}
+                activeOpacity={0.88}
+                onPress={() => { setShowApprovalModal(false); onBackToRolePicker?.(); }}
+              >
+                <Text style={[styles.successBtnText, { color: '#374151' }]}>Close & Check Later</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* ── SUCCESS POPUP ── */}
       <Modal visible={showSuccess} transparent animationType="fade">
@@ -1742,8 +1932,8 @@ onComplete?.();
                 <View key={step.id} style={styles.stepPillWrapper}>
                   <TouchableOpacity
                     activeOpacity={step.id < currentStep ? 0.6 : 1}
-                    disabled={step.id >= currentStep}
-                    onPress={() => step.id < currentStep && setCurrentStep(step.id)}
+                    disabled={step.id >= currentStep || (detailsLocked && step.id <= 3)}
+                    onPress={() => step.id < currentStep && !(detailsLocked && step.id <= 3) && setCurrentStep(step.id)}
                     style={styles.stepPill}
                   >
                     <View style={[
@@ -1909,15 +2099,6 @@ onComplete?.();
                 {fieldErrors.estYear ? <Text style={styles.fieldError}>{fieldErrors.estYear}</Text> : null}
                 <Text style={styles.helperText}>{t('obEstYearHelp')}</Text>
 
-                <View style={styles.whyAskBox}>
-                  <View style={styles.whyIconCircle}>
-                    <MaterialIcons name="shield" size={14} color={PRIMARY} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.whyAskTitle}>{t('obWhyAsk')}</Text>
-                    <Text style={styles.whyAskText}>{t('obWhyAskText')}</Text>
-                  </View>
-                </View>
               </View>
 
               <View style={styles.labelRow}>
@@ -1950,55 +2131,8 @@ onComplete?.();
             </View>
           )}
 
-          {/* ── Advanced (optional) features ── */}
-          {currentStep === 1 && (
-            <View style={styles.advCard}>
-              <View style={styles.advHeaderRow}>
-                <Text style={styles.advTitle}>{t('obAdvTitle')}</Text>
-                <View style={styles.optionalPill}><Text style={styles.optionalPillText}>{t('obOptional')}</Text></View>
-              </View>
-              <Text style={styles.advSub}>{t('obAdvSub')}</Text>
 
-              {[
-                { key: 'notifications', icon: 'shopping-cart', title: t('obAdvNotifTitle'), desc: t('obAdvNotifDesc'), tag: t('obAdvNotifTag'), value: advNotifications, onToggle: setAdvNotifications },
-                { key: 'analytics', icon: 'bar-chart', title: t('obAdvAnalyticsTitle'), desc: t('obAdvAnalyticsDesc'), tag: t('obAdvAnalyticsTag'), value: advAnalytics, onToggle: setAdvAnalytics },
-                { key: 'promotions', icon: 'campaign', title: t('obAdvPromoTitle'), desc: t('obAdvPromoDesc'), tag: t('obAdvPromoTag'), value: advPromotions, onToggle: setAdvPromotions },
-              ].map((f) => (
-                <View key={f.key} style={styles.advItem}>
-                  <View style={styles.advItemTop}>
-                    <View style={styles.advIconCircle}>
-                      <MaterialIcons name={f.icon} size={17} color={PRIMARY} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.advItemTitle}>{f.title}</Text>
-                      <Text style={styles.advItemDesc}>{f.desc}</Text>
-                    </View>
-                    <Switch
-                      value={f.value}
-                      onValueChange={f.onToggle}
-                      trackColor={{ false: '#DADFDC', true: PRIMARY }}
-                      thumbColor="#fff"
-                    />
-                  </View>
-                  <Text style={styles.advItemTag}>{f.tag}</Text>
-                </View>
-              ))}
-            </View>
-          )}
 
-          {/* ── Security reassurance banner ── */}
-          {currentStep === 1 && (
-            <View style={styles.secureBanner}>
-              <View style={styles.secureBannerIcon}>
-                <MaterialIcons name="verified-user" size={18} color={PRIMARY} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.secureBannerTitle}>{t('obSecureTitle')}</Text>
-                <Text style={styles.secureBannerText}>{t('obSecureText')}</Text>
-              </View>
-              <TouchableOpacity><Text style={styles.learnMore}>{t('obLearnMore')}</Text></TouchableOpacity>
-            </View>
-          )}
 
           {currentStep === 1 && (
             <View style={styles.form}>
@@ -2303,15 +2437,7 @@ onComplete?.();
               <Text style={styles.label}>{t('obTradeLicense')}</Text>
               <TextInput style={styles.input} placeholder={t('obTradeLicensePh')} maxLength={50} value={tradeLicense} onChangeText={setTradeLicense} />
 
-              <View style={[styles.infoBox, { marginTop: 16 }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  <MaterialIcons name="hourglass-empty" size={14} color="#047857" />
-                  <Text style={[styles.infoText, { fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", marginBottom: 0 }]}>{t('obAdminApproval')}</Text>
-                </View>
-                <Text style={styles.infoText}>
-                  {t('obApprovalA')} <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>{t('obHours')}</Text>{t('obApprovalB')}
-                </Text>
-              </View>
+
 
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 12 }}>
                 <MaterialIcons name="description" size={18} color={PRIMARY} />
@@ -2459,7 +2585,19 @@ onComplete?.();
                   <Text style={styles.ifscStatusTextMuted}>{t('obIfscError')}</Text>
                 </View>
               ) : null}
+
+                                        <View style={[styles.infoBox, { marginTop: 16 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <MaterialIcons name="hourglass-empty" size={14} color="#047857" />
+                  <Text style={[styles.infoText, { fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold", marginBottom: 0 }]}>{t('obAdminApproval')}</Text>
+                </View>
+                <Text style={styles.infoText}>
+                  {t('obApprovalA')} <Text style={{ fontWeight: '700', fontFamily: "PlusJakartaSans_700Bold" }}>{t('obHours')}</Text>{t('obApprovalB')}
+                </Text>
+              </View>
             </View>
+
+
           )}
 
           {/* ── STEP 4: Product Catalog ── */}
@@ -2993,32 +3131,14 @@ onComplete?.();
             </View>
           )}
 
-          {/* Trust footer */}
-          <View style={styles.trustFooter}>
-            {[
-              { icon: 'groups', title: t('obTrust1T'), sub: t('obTrust1S') },
-              { icon: 'flash-on', title: t('obTrust2T'), sub: t('obTrust2S') },
-              { icon: 'support-agent', title: t('obTrust3T'), sub: t('obTrust3S') },
-              { icon: 'verified-user', title: t('obTrust4T'), sub: t('obTrust4S') },
-            ].map((item) => (
-              <View key={item.title} style={styles.trustItem}>
-                <View style={styles.trustIconCircle}>
-                  <MaterialIcons name={item.icon} size={18} color={PRIMARY} />
-                </View>
-                <Text style={styles.trustTitle}>{item.title}</Text>
-                <Text style={styles.trustSub}>{item.sub}</Text>
-              </View>
-            ))}
-          </View>
 
-          <View style={{ height: 40 }} />
         </Animated.ScrollView>
       </KeyboardAvoidingView>
 
       {/* Bottom bar */}
       <View style={styles.bottomBar}>
         <View style={styles.bottomBarRow}>
-          {currentStep > 1 && (
+          {currentStep > 1 && !(detailsLocked && currentStep <= 4) && (
             <TouchableOpacity style={styles.backBtn} onPress={() => setCurrentStep(prev => prev - 1)}>
               <Text style={styles.backText}>← {t('obBack')}</Text>
             </TouchableOpacity>

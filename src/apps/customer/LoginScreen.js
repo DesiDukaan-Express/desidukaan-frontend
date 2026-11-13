@@ -519,7 +519,8 @@ const handleVerifyEmailOtp = async () => {
                         onPress={handleSendEmailOtp}
                       />
 
-                      <TouchableOpacity
+
+<TouchableOpacity
   style={{ alignItems: "center", marginTop: 4, marginBottom: 12 }}
   onPress={() => {
     setEmailAction(
@@ -533,8 +534,23 @@ const handleVerifyEmailOtp = async () => {
       ? "New to DesiDukaan? Register with Email"
       : "Already registered? Login with Email"}
   </Text>
-                        <Text style={s.resendLink}>Use phone number instead</Text>
-                      </TouchableOpacity>
+</TouchableOpacity>
+
+<TouchableOpacity
+  style={{ alignItems: "center", marginBottom: 8 }}
+  onPress={() => {
+    setLoginMethod("phone");
+    setStep("mobile");
+    setOtp("");
+    setError("");
+    setEmailAction("login");
+  }}
+>
+  <Text style={s.resendLink}>
+    Use phone number instead
+  </Text>
+</TouchableOpacity>
+
                     </>
                   ) : (
                     <>
@@ -643,30 +659,6 @@ const handleVerifyEmailOtp = async () => {
                     </>
                   )}
                 </Animated.View>
-
-                {/* Or divider */}
-                <View style={s.orRow}>
-                  <View style={s.orLine} />
-                  <Text style={s.orText}>{t("common.or")}</Text>
-                  <View style={s.orLine} />
-                </View>
-
-                {/* Create account */}
-                
-<TouchableOpacity
-  onPress={() => {
-    setLoginMethod("email");
-    setEmailAction("register");
-    setStep("email");
-    setError("");
-    setOtp("");
-  }}
->
-  <Text style={s.registerText}>
-    New to DesiDukaan?{" "}
-    <Text style={s.registerLink}>Register with Email</Text>
-  </Text>
-</TouchableOpacity>
 
 
                 {/* Legal + footer */}
