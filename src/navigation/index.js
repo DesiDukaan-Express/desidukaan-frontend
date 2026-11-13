@@ -76,21 +76,26 @@ export default function Navigation() {
         useAuthStore.getState().addEnabledRole("vendor");
       }
 
-      setVendorOnboarded(
-        !!(vendor?.shop_name && vendor?.onboarding_status === "approved"),
-      );
+      // Onboarding is complete only when the admin approved the shop AND the
+      // vendor finished the catalog step (has at least one product).
+      const isApproved = vendor?.onboarding_status === "approved";
+      const hasProducts = (vendor?._count?.products ?? 0) > 0;
+      const onboardingDone = !!(vendor?.shop_name && isApproved && hasProducts);
+      setVendorOnboarded(onboardingDone);
       console.log("Vendor check:", {
         shop_name: vendor?.shop_name,
         onboarding_status: vendor?.onboarding_status,
-        vendorOnboarded: !!(vendor?.shop_name && vendor?.onboarding_status === "approved"),
+        products: vendor?._count?.products ?? 0,
+        vendorOnboarded: onboardingDone,
       });
       setVendorStatus(vendor?.onboarding_status || null);
       setVendorMissingDocs(vendor?.missing_docs || []);
 
       // Suspended vendors get the full-screen block instead of the app.
+      // (a rejected / pending vendor is NOT suspended — they see the onboarding flow)
       if (
-        vendor?.is_active === false ||
-        vendor?.onboarding_status === "suspended"
+        vendor?.onboarding_status === "suspended" ||
+        (vendor?.is_active === false && vendor?.onboarding_status === "approved")
       ) {
         flagVendorSuspended();
       } else {
