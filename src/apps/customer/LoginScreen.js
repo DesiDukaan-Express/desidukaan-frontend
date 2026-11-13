@@ -69,7 +69,6 @@ export default function LoginScreen({ navigation }) {
   const [step, setStep]               = useState("mobile");
   const [email, setEmail] = useState("");
   const [loginMethod, setLoginMethod] = useState("phone");
-  const [emailAction, setEmailAction] = useState("login");
   const [focusedField, setFocusedField] = useState(null);
   const [resendTimer, setResendTimer] = useState(0);
   const [error, setError]             = useState("");
@@ -273,11 +272,18 @@ const handleVerifyEmailOtp = async () => {
       return;
     }
 
-    if (!res.ok) {
-      throw new Error(
-        data.message || data.msg || "Invalid or expired OTP."
-      );
-    }
+if (res.status === 404 && data.needsRegistration) {
+  navigation.navigate("Signup", {
+    email: email.trim().toLowerCase(),
+  });
+  return;
+}
+
+if (!res.ok) {
+  throw new Error(
+    data.message || data.msg || "Invalid or expired OTP."
+  );
+}
 
     if (!data.user || !data.accessToken || !data.refreshToken) {
       throw new Error("Login response is missing authentication details.");
@@ -449,13 +455,16 @@ const handleVerifyEmailOtp = async () => {
                       />
 
                       <TouchableOpacity
-  style={{ alignItems: "center", marginTop: 16 }}
+  style={{ alignItems: "center", marginTop: 4, marginBottom: 12 }}
   onPress={() => {
     setLoginMethod("email");
     setStep("email");
     setError("");
   }}
 >
+   <Text style={s.resendLink}>
+    New to DesiDukaan? Create an Account
+  </Text>
   <Text style={s.resendLink}>Use email instead</Text>
 </TouchableOpacity>
 
@@ -463,15 +472,14 @@ const handleVerifyEmailOtp = async () => {
                                         </>
                   ) : step === "email" ? (
                     <>
-                      <Text style={s.formHeading}>
-  {emailAction === "register"
-    ? "Register with Email"
-    : "Login with Email"}
+<Text style={s.formHeading}>
+  {loginMethod === "email" ? "Verify Email" : "Verify Phone"}
 </Text>
-                      <Text style={s.formSubheading}>
-  {emailAction === "register"
-    ? "Create your DesiDukaan account using your email address."
-    : "Enter your email address to receive a one-time password."}
+
+<Text style={s.formSubheading}>
+  {loginMethod === "email"
+    ? `Enter the OTP sent to ${email}`
+    : `Enter the OTP sent to +91 ${mobile}`}
 </Text>
 
                       <View style={s.fieldGroup}>
@@ -508,31 +516,24 @@ const handleVerifyEmailOtp = async () => {
 
                       {error ? <ErrorBox msg={error} /> : null}
 
-                      <PrimaryCta
-                        label={
-  emailAction === "register"
-    ? "Register with Email"
-    : "Send Email OTP"
-}
-                        loading={loading}
-                        disabled={!isValidEmail(email)}
-                        onPress={handleSendEmailOtp}
-                      />
+<PrimaryCta
+  label="Send Email OTP"
+  loading={loading}
+  disabled={!isValidEmail(email)}
+  onPress={handleSendEmailOtp}
+/>
 
 
 <TouchableOpacity
   style={{ alignItems: "center", marginTop: 4, marginBottom: 12 }}
   onPress={() => {
-    setEmailAction(
-      emailAction === "login" ? "register" : "login"
-    );
-    setError("");
+    navigation.navigate("Signup", {
+      email: email.trim().toLowerCase(),
+    });
   }}
 >
   <Text style={s.resendLink}>
-    {emailAction === "login"
-      ? "New to DesiDukaan? Register with Email"
-      : "Already registered? Login with Email"}
+    New to DesiDukaan? Create an Account
   </Text>
 </TouchableOpacity>
 
@@ -543,7 +544,6 @@ const handleVerifyEmailOtp = async () => {
     setStep("mobile");
     setOtp("");
     setError("");
-    setEmailAction("login");
   }}
 >
   <Text style={s.resendLink}>
@@ -560,12 +560,11 @@ const handleVerifyEmailOtp = async () => {
                           <Feather name="arrow-left" size={16} color={C.gray700} />
                         </TouchableOpacity>
                         <View style={{ flex: 1 }}>
-                          <Text style={[s.formHeading, { textAlign: "left" }]}>{t("auth.enterOtp")}</Text>
-                          <Text style={[s.formSubheading, { textAlign: "left", marginBottom: 0 }]}>
-                            {loginMethod === "email"
-  ? `OTP sent to ${email}`
-  : t("auth.otpSentTo", { mobile })}
-                          </Text>
+<Text style={s.formHeading}>Login with Email</Text>
+
+<Text style={s.formSubheading}>
+  Enter your registered email address to receive a one-time password.
+</Text>
                         </View>
                       </View>
 
@@ -595,21 +594,25 @@ const handleVerifyEmailOtp = async () => {
   }}
   onFocus={() => setFocusedField("otp")}
   onBlur={() => setFocusedField(null)}
-  onSubmitEditing={() => {
-    if (otp.length === 6 && !loading) {
-      handleVerifyOtp();
-    }
-  }}
-  onKeyPress={(e) => {
-    if (
-      Platform.OS === "web" &&
-      e.nativeEvent.key === "Enter" &&
-      otp.length === 6 &&
-      !loading
-    ) {
-      handleVerifyOtp();
-    }
-  }}
+onSubmitEditing={() => {
+  if (otp.length === 6 && !loading) {
+    loginMethod === "email"
+      ? handleVerifyEmailOtp()
+      : handleVerifyOtp();
+  }
+}}
+onKeyPress={(e) => {
+  if (
+    Platform.OS === "web" &&
+    e.nativeEvent.key === "Enter" &&
+    otp.length === 6 &&
+    !loading
+  ) {
+    loginMethod === "email"
+      ? handleVerifyEmailOtp()
+      : handleVerifyOtp();
+  }
+}}
   underlineColorAndroid="transparent"
 />
                           {otp.length === 6 && !error && (

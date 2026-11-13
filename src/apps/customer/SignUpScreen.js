@@ -63,6 +63,8 @@ const C = {
 };
 
 const isValidIndianMobile = (num) => /^[6-9]\d{9}$/.test(num);
+const isValidEmail = (value) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
 const GENDERS = [
   { key: "male",   label: "Male",   icon: "mars" },
@@ -73,9 +75,12 @@ const GENDERS = [
 export default function SignupScreen({ navigation, route }) {
   const { t } = useTranslation();
   const prefillPhone = route?.params?.phone || "";
+const prefillEmail = route?.params?.email || "";
 
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState(prefillPhone);
+  const [email, setEmail] = useState(prefillEmail);
+const [verificationMethod, setVerificationMethod] = useState("phone");
   const [dob, setDob] = useState("");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [gender, setGender] = useState("");
@@ -187,12 +192,13 @@ export default function SignupScreen({ navigation, route }) {
     mobile.length > 0 && !["6", "7", "8", "9"].includes(mobile[0])
       ? "Must start with 6, 7, 8, or 9" : "";
 
-  const isFormValid =
-    name.trim().length >= 2 &&
-    isMobileReady &&
-    isDobValid &&
-    gender !== "" &&
-    agreed;
+const isFormValid =
+  name.trim().length >= 2 &&
+  isMobileReady &&
+  isValidEmail(email) &&
+  isDobValid &&
+  gender !== "" &&
+  agreed;
 
   // Step 1: register → account saved to DB
   const handleSignup = async () => {
@@ -202,12 +208,15 @@ export default function SignupScreen({ navigation, route }) {
       const res = await fetch(`${BASE_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(), phone: mobile,
-          age: calculatedAge,
-          dob,
-          gender,
-        }),
+body: JSON.stringify({
+  name: name.trim(),
+  phone: mobile,
+  email: email.trim().toLowerCase(),
+  verificationMethod,
+  age: calculatedAge,
+  dob,
+  gender,
+}),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.msg || "Registration failed");
@@ -222,7 +231,7 @@ export default function SignupScreen({ navigation, route }) {
       animateStep(() => {
         setStep("otp");
         setOtp("");
-        setResendTimer(30);
+        setResendTimer(verificationMethod === "email" ? 60 : 30);
       });
     } catch (e) { setError(e.message); shakeError(); }
     finally { setLoading(false); }
@@ -233,34 +242,78 @@ export default function SignupScreen({ navigation, route }) {
     if (otp.length !== 6 || loading) return;
     setLoading(true); setError("");
     try {
-      const res = await fetch(`${BASE_URL}/auth/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: mobile, code: otp }),
-      });
-      const data = await res.json();
-      if (data.error === "ACCOUNT_DEACTIVATED") {
-        useAuthStore.getState().flagDeactivated();
-        return;
-      }
-      if (!res.ok) throw new Error(data.msg || "Invalid OTP");
-      await login(data.user, data.accessToken, data.refreshToken);
+const endpoint =
+  verificationMethod === "email"
+    ? "/auth/email/verify"
+    : "/auth/verify";
+
+const requestBody =
+  verificationMethod === "email"
+    ? { email: email.trim().toLowerCase(), otp }
+    : { phone: mobile, code: otp };
+
+const res = await fetch(`${BASE_URL}${endpoint}`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(requestBody),
+});
+
+const data = await res.json();
+
+if (data.error === "ACCOUNT_DEACTIVATED") {
+  useAuthStore.getState().flagDeactivated();
+  return;
+}
+
+if (!res.ok) {
+  throw new Error(data.msg || data.message || "Invalid OTP");
+}
+
+await login(data.user, data.accessToken, data.refreshToken);
       // Navigation auto-updates — RolePickerScreen shows (activeRole is null)
     } catch (e) { setError(e.message); shakeError(); }
     finally { setLoading(false); }
   };
 
-  const handleResend = async () => {
-    if (resendTimer > 0) return;
-    setOtp(""); setResendTimer(30); setError("");
-    try {
-      await fetch(`${BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: mobile }),
-      });
-    } catch (_) { }
-  };
+const handleResend = async () => {
+  if (resendTimer > 0 || loading) return;
+
+  setOtp("");
+  setError("");
+  setLoading(true);
+
+  try {
+    const endpoint =
+      verificationMethod === "email"
+        ? "/auth/email/send-otp"
+        : "/auth/login";
+
+    const requestBody =
+      verificationMethod === "email"
+        ? { email: email.trim().toLowerCase() }
+        : { phone: mobile };
+
+    const res = await fetch(`${BASE_URL}${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(
+        data.msg || data.message || "Unable to resend OTP."
+      );
+    }
+
+    setResendTimer(verificationMethod === "email" ? 60 : 30);
+  } catch (e) {
+    setError(e.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <LinearGradient
@@ -392,6 +445,39 @@ placeholder={t("auth.fullNamePlaceholder", {
                       </Field>
 
 
+{/* Email */}
+<Field label={t("auth.email", { defaultValue: "Email Address" })}>
+  <View style={[
+    s.inputBox,
+    focusedField === "email" && s.inputBoxFocused,
+    email.length > 0 && !isValidEmail(email) && s.inputBoxError,
+  ]}>
+    <IIcon name="mail" focused={focusedField === "email"} />
+    <TextInput
+      placeholder="Enter your email address"
+      placeholderTextColor={C.gray400}
+      keyboardType="email-address"
+      autoCapitalize="none"
+      autoCorrect={false}
+      value={email}
+      onChangeText={(value) => {
+        setEmail(value);
+        setError("");
+      }}
+      onFocus={() => setFocusedField("email")}
+      onBlur={() => setFocusedField(null)}
+      style={s.fieldInput}
+      underlineColorAndroid="transparent"
+    />
+    {isValidEmail(email) && <Check />}
+  </View>
+  {email.length > 0 && !isValidEmail(email) && (
+    <Text style={s.fieldError}>Enter a valid email address.</Text>
+  )}
+</Field>
+
+
+
 
                       {/* DOB + Gender */}
                       <View style={tablet ? s.rowFields : s.colFields}>
@@ -478,6 +564,56 @@ placeholder={t("auth.fullNamePlaceholder", {
                         </View>
                       </View>
 
+{/* OTP Verification Method */}
+<View style={s.fieldGroup}>
+  <Text style={s.fieldLabel}>
+    Choose OTP Verification Method
+  </Text>
+
+  <View style={s.roleContainer}>
+    <TouchableOpacity
+      style={[
+        s.roleTab,
+        verificationMethod === "phone" && s.roleTabActive,
+      ]}
+      onPress={() => setVerificationMethod("phone")}
+    >
+      <Feather
+        name="smartphone"
+        size={15}
+        color={verificationMethod === "phone" ? C.white : C.gray500}
+      />
+      <Text style={[
+        s.roleTabText,
+        verificationMethod === "phone" && s.roleTabTextActive,
+      ]}>
+        Phone OTP
+      </Text>
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      style={[
+        s.roleTab,
+        verificationMethod === "email" && s.roleTabActive,
+      ]}
+      onPress={() => setVerificationMethod("email")}
+    >
+      <Feather
+        name="mail"
+        size={15}
+        color={verificationMethod === "email" ? C.white : C.gray500}
+      />
+      <Text style={[
+        s.roleTabText,
+        verificationMethod === "email" && s.roleTabTextActive,
+      ]}>
+        Email OTP
+      </Text>
+    </TouchableOpacity>
+  </View>
+</View>
+
+
                       {/* Terms */}
                       <View style={s.checkboxRow}>
                         <TouchableOpacity
@@ -548,12 +684,19 @@ placeholder={t("auth.fullNamePlaceholder", {
                       <View style={s.successBanner}>
                         <Feather name="check-circle" size={16} color={C.greenBright} />
                         <Text style={s.successText}>
-                          Account created! Verify your number to continue.
+                         Account created! Verify your selected contact method to continue.
                         </Text>
                       </View>
 
-                      <Text style={[s.formHeading, { fontSize: headingSize }]}>Verify number</Text>
-                      <Text style={s.formSubheading}>OTP sent to +91 {mobile}</Text>
+<Text style={[s.formHeading, { fontSize: headingSize }]}>
+  {verificationMethod === "email" ? "Verify Email" : "Verify Phone"}
+</Text>
+
+<Text style={s.formSubheading}>
+  {verificationMethod === "email"
+    ? `OTP sent to ${email}`
+    : `OTP sent to +91 ${mobile}`}
+</Text>
 
                       <Field label="One-Time Password">
                         <View style={[
